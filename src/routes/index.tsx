@@ -28,8 +28,9 @@ function Landing() {
       setBusy(false)
       return
     }
-    await router.invalidate()
+    // Navigate before invalidating: re-running this route's beforeLoad would redirect to /start and drop the topic.
     await router.navigate({ to: '/start', search })
+    await router.invalidate()
   }
 
   async function facebook() {
