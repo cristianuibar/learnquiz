@@ -48,8 +48,8 @@ export const ItemPayload = ItemShape.refine(
   (i) =>
     i.format === 'mcq'
       ? i.options.length >= 3 && i.options.length <= 4 && i.options.filter((o) => o.is_correct).length === 1
-      : i.options.length === 0 && (i.format !== 'cloze' || i.accepted_answers.length > 0),
-  { message: 'mcq needs 3-4 options with exactly one correct; cloze and short need no options; cloze needs accepted_answers' },
+      : i.options.length === 0 && (i.format !== 'cloze' || (i.accepted_answers.length > 0 && i.stem.split('____').length === 2)),
+  { message: 'mcq needs 3-4 options with exactly one correct; cloze and short need no options; cloze needs accepted_answers and exactly one ____ in the stem' },
 )
 export type ItemPayload = z.infer<typeof ItemPayload>
 

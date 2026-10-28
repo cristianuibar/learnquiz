@@ -97,11 +97,11 @@ export async function ensureConceptItems(
           })
         ).results
       } catch (e) {
-        if (!(e instanceof LlmError)) throw e // check unusable: keep the Zod-valid items
+        if (!(e instanceof LlmError)) throw e
       }
       drafted.forEach((payload, index) => {
         const verdict = verdicts?.find((v) => v.index === index)
-        if (!verdicts || verdict?.keep) kept.push({ payload, check: verdict ?? null })
+        if (verdict?.keep) kept.push({ payload, check: verdict ?? null })
       })
     } catch (e) {
       if (!(e instanceof LlmError)) throw e

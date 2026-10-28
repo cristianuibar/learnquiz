@@ -64,7 +64,7 @@ function Path() {
                 unit.unlocked ? 'bg-learning text-white' : 'bg-muted text-muted-foreground',
               )}
             >
-              {unit.order}
+              {unit.order + 1}
             </span>
             <div className="min-w-0 flex-1">
               <h2 className={cn('text-xl font-semibold', !unit.unlocked && 'text-muted-foreground')}>{unit.name}</h2>
