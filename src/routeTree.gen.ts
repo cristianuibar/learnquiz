@@ -10,43 +10,63 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AboutRouteImport } from './routes/about'
+import { Route as StartRouteImport } from './routes/start'
+import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as TTopicIdPathRouteImport } from './routes/t.$topicId.path'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AboutRoute = AboutRouteImport.update({
-  id: '/about',
-  path: '/about',
+const StartRoute = StartRouteImport.update({
+  id: '/start',
+  path: '/start',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
+  id: '/api/auth/$',
+  path: '/api/auth/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TTopicIdPathRoute = TTopicIdPathRouteImport.update({
+  id: '/t/$topicId/path',
+  path: '/t/$topicId/path',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/about': typeof AboutRoute
+  '/start': typeof StartRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/t/$topicId/path': typeof TTopicIdPathRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/about': typeof AboutRoute
+  '/start': typeof StartRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/t/$topicId/path': typeof TTopicIdPathRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/about': typeof AboutRoute
+  '/start': typeof StartRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/t/$topicId/path': typeof TTopicIdPathRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/about'
+  fullPaths: '/' | '/start' | '/api/auth/$' | '/t/$topicId/path'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/about'
-  id: '__root__' | '/' | '/about'
+  to: '/' | '/start' | '/api/auth/$' | '/t/$topicId/path'
+  id: '__root__' | '/' | '/start' | '/api/auth/$' | '/t/$topicId/path'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AboutRoute: typeof AboutRoute
+  StartRoute: typeof StartRoute
+  ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  TTopicIdPathRoute: typeof TTopicIdPathRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -58,11 +78,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/about': {
-      id: '/about'
-      path: '/about'
-      fullPath: '/about'
-      preLoaderRoute: typeof AboutRouteImport
+    '/start': {
+      id: '/start'
+      path: '/start'
+      fullPath: '/start'
+      preLoaderRoute: typeof StartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/$': {
+      id: '/api/auth/$'
+      path: '/api/auth/$'
+      fullPath: '/api/auth/$'
+      preLoaderRoute: typeof ApiAuthSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/t/$topicId/path': {
+      id: '/t/$topicId/path'
+      path: '/t/$topicId/path'
+      fullPath: '/t/$topicId/path'
+      preLoaderRoute: typeof TTopicIdPathRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -70,7 +104,9 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AboutRoute: AboutRoute,
+  StartRoute: StartRoute,
+  ApiAuthSplatRoute: ApiAuthSplatRoute,
+  TTopicIdPathRoute: TTopicIdPathRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

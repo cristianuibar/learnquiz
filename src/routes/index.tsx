@@ -1,87 +1,87 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { useState } from 'react'
+import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { authClient } from '@/lib/auth-client'
 
-export const Route = createFileRoute('/')({ component: App })
+export const Route = createFileRoute('/')({
+  beforeLoad: ({ context }) => {
+    if (context.user) throw redirect({ to: '/start' })
+  },
+  component: Landing,
+})
 
-function App() {
+function Landing() {
+  const { facebookEnabled } = Route.useRouteContext()
+  const router = useRouter()
+  const [topic, setTopic] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const search = topic.trim() ? { topic: topic.trim() } : {}
+
+  async function guest() {
+    setBusy(true)
+    setError('')
+    const { error } = await authClient.signIn.anonymous()
+    if (error) {
+      setError(error.message ?? 'Could not sign in')
+      setBusy(false)
+      return
+    }
+    await router.invalidate()
+    await router.navigate({ to: '/start', search })
+  }
+
+  async function facebook() {
+    setBusy(true)
+    setError('')
+    const { error } = await authClient.signIn.social({
+      provider: 'facebook',
+      callbackURL: `/start${topic.trim() ? `?topic=${encodeURIComponent(topic.trim())}` : ''}`,
+    })
+    if (error) {
+      setError(error.message ?? 'Could not sign in')
+      setBusy(false)
+    }
+  }
+
   return (
-    <main className="page-wrap px-4 pb-8 pt-14">
-      <section className="island-shell rise-in relative overflow-hidden rounded-[2rem] px-6 py-10 sm:px-10 sm:py-14">
-        <div className="pointer-events-none absolute -left-20 -top-24 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(79,184,178,0.32),transparent_66%)]" />
-        <div className="pointer-events-none absolute -bottom-20 -right-20 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(47,106,74,0.18),transparent_66%)]" />
-        <p className="island-kicker mb-3">TanStack Start Base Template</p>
-        <h1 className="display-title mb-5 max-w-3xl text-4xl leading-[1.02] font-bold tracking-tight text-[var(--sea-ink)] sm:text-6xl">
-          Start simple, ship quickly.
-        </h1>
-        <p className="mb-8 max-w-2xl text-base text-[var(--sea-ink-soft)] sm:text-lg">
-          This base starter intentionally keeps things light: two routes, clean
-          structure, and the essentials you need to build from scratch.
+    <main className="mx-auto flex w-full max-w-xl flex-col gap-8 px-4 pt-16 pb-16">
+      <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Quiz it, until you learn it</h1>
+      <form
+        className="flex flex-col gap-3 sm:flex-row"
+        onSubmit={(e) => {
+          e.preventDefault()
+          router.navigate({ to: '/start', search })
+        }}
+      >
+        <Input
+          aria-label="What do you want to learn?"
+          placeholder="What do you want to learn?"
+          className="h-11"
+          value={topic}
+          onChange={(e) => setTopic(e.target.value)}
+          maxLength={200}
+        />
+        <Button type="submit" className="h-11 px-6" disabled={busy}>
+          Start
+        </Button>
+      </form>
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <Button variant="outline" className="h-11 px-6" onClick={guest} disabled={busy}>
+          Continue as guest
+        </Button>
+        {facebookEnabled && (
+          <Button variant="outline" className="h-11 px-6" onClick={facebook} disabled={busy}>
+            Continue with Facebook
+          </Button>
+        )}
+      </div>
+      {error && (
+        <p role="alert" className="text-sm font-medium text-wrong">
+          {error}
         </p>
-        <div className="flex flex-wrap gap-3">
-          <a
-            href="/about"
-            className="rounded-full border border-[rgba(50,143,151,0.3)] bg-[rgba(79,184,178,0.14)] px-5 py-2.5 text-sm font-semibold text-[var(--lagoon-deep)] no-underline transition hover:-translate-y-0.5 hover:bg-[rgba(79,184,178,0.24)]"
-          >
-            About This Starter
-          </a>
-          <a
-            href="https://tanstack.com/router"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-full border border-[rgba(23,58,64,0.2)] bg-white/50 px-5 py-2.5 text-sm font-semibold text-[var(--sea-ink)] no-underline transition hover:-translate-y-0.5 hover:border-[rgba(23,58,64,0.35)]"
-          >
-            Router Guide
-          </a>
-        </div>
-      </section>
-
-      <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          [
-            'Type-Safe Routing',
-            'Routes and links stay in sync across every page.',
-          ],
-          [
-            'Server Functions',
-            'Call server code from your UI without creating API boilerplate.',
-          ],
-          [
-            'Streaming by Default',
-            'Ship progressively rendered responses for faster experiences.',
-          ],
-          [
-            'Tailwind Native',
-            'Design quickly with utility-first styling and reusable tokens.',
-          ],
-        ].map(([title, desc], index) => (
-          <article
-            key={title}
-            className="island-shell feature-card rise-in rounded-2xl p-5"
-            style={{ animationDelay: `${index * 90 + 80}ms` }}
-          >
-            <h2 className="mb-2 text-base font-semibold text-[var(--sea-ink)]">
-              {title}
-            </h2>
-            <p className="m-0 text-sm text-[var(--sea-ink-soft)]">{desc}</p>
-          </article>
-        ))}
-      </section>
-
-      <section className="island-shell mt-8 rounded-2xl p-6">
-        <p className="island-kicker mb-2">Quick Start</p>
-        <ul className="m-0 list-disc space-y-2 pl-5 text-sm text-[var(--sea-ink-soft)]">
-          <li>
-            Edit <code>src/routes/index.tsx</code> to customize the home page.
-          </li>
-          <li>
-            Update <code>src/components/Header.tsx</code> and{' '}
-            <code>src/components/Footer.tsx</code> for brand links.
-          </li>
-          <li>
-            Add routes in <code>src/routes</code> and tweak visual tokens in{' '}
-            <code>src/styles.css</code>.
-          </li>
-        </ul>
-      </section>
+      )}
     </main>
   )
 }
