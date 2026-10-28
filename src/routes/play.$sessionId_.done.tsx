@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { endSession } from '@/server/play'
 
-export const Route = createFileRoute('/play/$sessionId/done')({
+export const Route = createFileRoute('/play/$sessionId_/done')({
   beforeLoad: ({ context }) => {
     if (!context.user) throw redirect({ to: '/' })
   },

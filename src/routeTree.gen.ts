@@ -13,7 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as StartRouteImport } from './routes/start'
 import { Route as PlaySessionIdRouteImport } from './routes/play.$sessionId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
-import { Route as PlaySessionIdDoneRouteImport } from './routes/play.$sessionId.done'
+import { Route as PlaySessionIdDoneRouteImport } from './routes/play.$sessionId_.done'
 import { Route as TTopicIdPathRouteImport } from './routes/t.$topicId.path'
 
 const IndexRoute = IndexRouteImport.update({
@@ -37,9 +37,9 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const PlaySessionIdDoneRoute = PlaySessionIdDoneRouteImport.update({
-  id: '/done',
-  path: '/done',
-  getParentRoute: () => PlaySessionIdRoute,
+  id: '/play/$sessionId_/done',
+  path: '/play/$sessionId/done',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const TTopicIdPathRoute = TTopicIdPathRouteImport.update({
   id: '/t/$topicId/path',
@@ -50,7 +50,7 @@ const TTopicIdPathRoute = TTopicIdPathRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/start': typeof StartRoute
-  '/play/$sessionId': typeof PlaySessionIdRouteWithChildren
+  '/play/$sessionId': typeof PlaySessionIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/play/$sessionId/done': typeof PlaySessionIdDoneRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
@@ -58,7 +58,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/start': typeof StartRoute
-  '/play/$sessionId': typeof PlaySessionIdRouteWithChildren
+  '/play/$sessionId': typeof PlaySessionIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/play/$sessionId/done': typeof PlaySessionIdDoneRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
@@ -67,9 +67,9 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/start': typeof StartRoute
-  '/play/$sessionId': typeof PlaySessionIdRouteWithChildren
+  '/play/$sessionId': typeof PlaySessionIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
-  '/play/$sessionId/done': typeof PlaySessionIdDoneRoute
+  '/play/$sessionId_/done': typeof PlaySessionIdDoneRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
 }
 export interface FileRouteTypes {
@@ -95,15 +95,16 @@ export interface FileRouteTypes {
     | '/start'
     | '/play/$sessionId'
     | '/api/auth/$'
-    | '/play/$sessionId/done'
+    | '/play/$sessionId_/done'
     | '/t/$topicId/path'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   StartRoute: typeof StartRoute
-  PlaySessionIdRoute: typeof PlaySessionIdRouteWithChildren
+  PlaySessionIdRoute: typeof PlaySessionIdRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  PlaySessionIdDoneRoute: typeof PlaySessionIdDoneRoute
   TTopicIdPathRoute: typeof TTopicIdPathRoute
 }
 
@@ -137,12 +138,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/play/$sessionId/done': {
-      id: '/play/$sessionId/done'
-      path: '/done'
+    '/play/$sessionId_/done': {
+      id: '/play/$sessionId_/done'
+      path: '/play/$sessionId/done'
       fullPath: '/play/$sessionId/done'
       preLoaderRoute: typeof PlaySessionIdDoneRouteImport
-      parentRoute: typeof PlaySessionIdRoute
+      parentRoute: typeof rootRouteImport
     }
     '/t/$topicId/path': {
       id: '/t/$topicId/path'
@@ -154,23 +155,12 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface PlaySessionIdRouteChildren {
-  PlaySessionIdDoneRoute: typeof PlaySessionIdDoneRoute
-}
-
-const PlaySessionIdRouteChildren: PlaySessionIdRouteChildren = {
-  PlaySessionIdDoneRoute: PlaySessionIdDoneRoute,
-}
-
-const PlaySessionIdRouteWithChildren = PlaySessionIdRoute._addFileChildren(
-  PlaySessionIdRouteChildren,
-)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   StartRoute: StartRoute,
-  PlaySessionIdRoute: PlaySessionIdRouteWithChildren,
+  PlaySessionIdRoute: PlaySessionIdRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  PlaySessionIdDoneRoute: PlaySessionIdDoneRoute,
   TTopicIdPathRoute: TTopicIdPathRoute,
 }
 export const routeTree = rootRouteImport

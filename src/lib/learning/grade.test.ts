@@ -28,3 +28,10 @@ describe('grade', () => {
     expect(JSON.stringify(view)).not.toContain('is_correct')
   })
 })
+
+it('cloze accepts a partial phrase that covers most of the key', () => {
+  const payload: ItemPayload = { ...base, format: 'cloze', accepted_answers: ['within adult reach', 'out of reach of children'], model_answer: 'within adult reach' }
+  expect(gradeAnswer(payload, { text: 'within reach' }).correct).toBe(true)
+  expect(gradeAnswer(payload, { text: 'reach' }).correct).toBe(false)
+  expect(gradeAnswer(payload, { text: 'within reach' }).correctAnswer).toBe('within adult reach')
+})
