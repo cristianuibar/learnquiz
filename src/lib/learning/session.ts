@@ -68,7 +68,7 @@ export function streakAfter(
   now: Date,
   itemsAnswered: number,
 ): { streakCount: number; lastSessionAt: number | null } {
-  if (itemsAnswered < 10) return prev
+  if (itemsAnswered < 10) return { streakCount: prev.streakCount, lastSessionAt: prev.lastSessionAt }
   const gap = prev.lastSessionAt === null ? Infinity : Math.floor(now.getTime() / DAY) - Math.floor(prev.lastSessionAt / DAY)
   const streakCount = gap === 0 ? Math.max(1, prev.streakCount) : gap === 1 ? prev.streakCount + 1 : 1
   return { streakCount, lastSessionAt: now.getTime() }

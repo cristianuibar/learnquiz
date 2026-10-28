@@ -546,10 +546,11 @@ async function finalise(db: Db, learnerId: string, session: SessionRow, topic: T
     const ids = JSON.parse(session.itemIdsJson) as string[]
     // The bonus is for finishing the queue, not for leaving early.
     bonus = plan.answered && plan.position >= ids.length - 1 ? SESSION_BONUS : 0
+    const { streakCount, lastSessionAt } = streakAfter(lt, new Date(now), answered)
     stmts.push(
       db
         .update(learnerTopic)
-        .set({ xp: sql`${learnerTopic.xp} + ${bonus}`, ...streakAfter(lt, new Date(now), answered) })
+        .set({ xp: sql`${learnerTopic.xp} + ${bonus}`, streakCount, lastSessionAt })
         .where(and(eq(learnerTopic.learnerId, learnerId), eq(learnerTopic.topicId, topic.id))),
     )
   }

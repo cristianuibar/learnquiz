@@ -32,20 +32,12 @@ export function gradeAnswer(payload: ItemPayload, answer: Answer) {
     const given = normalize(answer.text ?? '')
     const correct = payload.accepted_answers.some((a) => {
       const want = normalize(a)
-      return given === want || (want.length >= 6 && withinOneEdit(given, want)) || coversMost(given, want)
+      return given === want || (want.length >= 6 && withinOneEdit(given, want))
     })
     return { correct, correctAnswer: payload.accepted_answers[0] ?? payload.model_answer, chosenFeedback: null }
   }
   // shortcut: short answers are never graded here, the server routes them to the model; wire that in before shipping short items.
   return { correct: false, correctAnswer: payload.model_answer, chosenFeedback: null }
-}
-
-// "within reach" for "within adult reach": every given word is in the key and covers at least half of it.
-function coversMost(given: string, want: string): boolean {
-  const g = given.split(' ').filter(Boolean)
-  const w = want.split(' ').filter(Boolean)
-  if (g.length < 1 || w.length < 2 || !g.some((t) => t.length >= 4)) return false
-  return g.every((t) => w.includes(t)) && g.length * 2 >= w.length
 }
 
 export function revealState(correct: boolean, confidence: Confidence): RevealState {

@@ -30,8 +30,8 @@ it('reinserts a missed item 5 slots later', () => {
 
 it('counts a day only at 10 items and resets after a gap', () => {
   const day = (n: number) => new Date(Date.UTC(2026, 9, n, 12))
-  const prev = { streakCount: 3, lastSessionAt: day(27).getTime() }
-  expect(streakAfter(prev, day(28), 9)).toBe(prev)
+  const prev = { streakCount: 3, lastSessionAt: day(27).getTime(), xp: 100, level: 3, rating: 1500 }
+  expect(streakAfter(prev, day(28), 9)).toEqual({ streakCount: 3, lastSessionAt: day(27).getTime() })
   expect(streakAfter(prev, day(28), 10).streakCount).toBe(4)
   expect(streakAfter(prev, day(27), 10).streakCount).toBe(3)
   expect(streakAfter(prev, day(30), 10).streakCount).toBe(1)

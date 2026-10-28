@@ -29,9 +29,19 @@ describe('grade', () => {
   })
 })
 
-it('cloze accepts a partial phrase that covers most of the key', () => {
+it('cloze rejects a partial phrase that covers most of the key', () => {
   const payload: ItemPayload = { ...base, format: 'cloze', accepted_answers: ['within adult reach', 'out of reach of children'], model_answer: 'within adult reach' }
-  expect(gradeAnswer(payload, { text: 'within reach' }).correct).toBe(true)
+  expect(gradeAnswer(payload, { text: 'within reach' }).correct).toBe(false)
   expect(gradeAnswer(payload, { text: 'reach' }).correct).toBe(false)
   expect(gradeAnswer(payload, { text: 'within reach' }).correctAnswer).toBe('within adult reach')
+})
+
+it('cloze rejects duplicated tokens in place of the accepted phrase', () => {
+  const payload: ItemPayload = { ...base, format: 'cloze', accepted_answers: ['within adult reach'] }
+  expect(gradeAnswer(payload, { text: 'reach reach' }).correct).toBe(false)
+})
+
+it('cloze rejects an answer that drops negation', () => {
+  const payload: ItemPayload = { ...base, format: 'cloze', accepted_answers: ['does not dissolve'] }
+  expect(gradeAnswer(payload, { text: 'does dissolve' }).correct).toBe(false)
 })
