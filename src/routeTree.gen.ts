@@ -11,7 +11,9 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as StartRouteImport } from './routes/start'
+import { Route as PlaySessionIdRouteImport } from './routes/play.$sessionId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as PlaySessionIdDoneRouteImport } from './routes/play.$sessionId.done'
 import { Route as TTopicIdPathRouteImport } from './routes/t.$topicId.path'
 
 const IndexRoute = IndexRouteImport.update({
@@ -24,10 +26,20 @@ const StartRoute = StartRouteImport.update({
   path: '/start',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlaySessionIdRoute = PlaySessionIdRouteImport.update({
+  id: '/play/$sessionId',
+  path: '/play/$sessionId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
+} as any)
+const PlaySessionIdDoneRoute = PlaySessionIdDoneRouteImport.update({
+  id: '/done',
+  path: '/done',
+  getParentRoute: () => PlaySessionIdRoute,
 } as any)
 const TTopicIdPathRoute = TTopicIdPathRouteImport.update({
   id: '/t/$topicId/path',
@@ -38,33 +50,59 @@ const TTopicIdPathRoute = TTopicIdPathRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/start': typeof StartRoute
+  '/play/$sessionId': typeof PlaySessionIdRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/play/$sessionId/done': typeof PlaySessionIdDoneRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/start': typeof StartRoute
+  '/play/$sessionId': typeof PlaySessionIdRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/play/$sessionId/done': typeof PlaySessionIdDoneRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/start': typeof StartRoute
+  '/play/$sessionId': typeof PlaySessionIdRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/play/$sessionId/done': typeof PlaySessionIdDoneRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/start' | '/api/auth/$' | '/t/$topicId/path'
+  fullPaths:
+    | '/'
+    | '/start'
+    | '/play/$sessionId'
+    | '/api/auth/$'
+    | '/play/$sessionId/done'
+    | '/t/$topicId/path'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/start' | '/api/auth/$' | '/t/$topicId/path'
-  id: '__root__' | '/' | '/start' | '/api/auth/$' | '/t/$topicId/path'
+  to:
+    | '/'
+    | '/start'
+    | '/play/$sessionId'
+    | '/api/auth/$'
+    | '/play/$sessionId/done'
+    | '/t/$topicId/path'
+  id:
+    | '__root__'
+    | '/'
+    | '/start'
+    | '/play/$sessionId'
+    | '/api/auth/$'
+    | '/play/$sessionId/done'
+    | '/t/$topicId/path'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   StartRoute: typeof StartRoute
+  PlaySessionIdRoute: typeof PlaySessionIdRouteWithChildren
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   TTopicIdPathRoute: typeof TTopicIdPathRoute
 }
@@ -85,12 +123,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StartRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/play/$sessionId': {
+      id: '/play/$sessionId'
+      path: '/play/$sessionId'
+      fullPath: '/play/$sessionId'
+      preLoaderRoute: typeof PlaySessionIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
       fullPath: '/api/auth/$'
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/play/$sessionId/done': {
+      id: '/play/$sessionId/done'
+      path: '/done'
+      fullPath: '/play/$sessionId/done'
+      preLoaderRoute: typeof PlaySessionIdDoneRouteImport
+      parentRoute: typeof PlaySessionIdRoute
     }
     '/t/$topicId/path': {
       id: '/t/$topicId/path'
@@ -102,9 +154,22 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface PlaySessionIdRouteChildren {
+  PlaySessionIdDoneRoute: typeof PlaySessionIdDoneRoute
+}
+
+const PlaySessionIdRouteChildren: PlaySessionIdRouteChildren = {
+  PlaySessionIdDoneRoute: PlaySessionIdDoneRoute,
+}
+
+const PlaySessionIdRouteWithChildren = PlaySessionIdRoute._addFileChildren(
+  PlaySessionIdRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   StartRoute: StartRoute,
+  PlaySessionIdRoute: PlaySessionIdRouteWithChildren,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   TTopicIdPathRoute: TTopicIdPathRoute,
 }
