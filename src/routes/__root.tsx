@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { HeadContent, Outlet, Scripts, createRootRoute, useLocation } from '@tanstack/react-router'
+import { HeadContent, Outlet, Scripts, createRootRoute, redirect, useLocation } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 import { BottomNav } from '@/components/bottom-nav'
@@ -10,7 +10,12 @@ import { getSessionFn } from '@/server/session-fn'
 import appCss from '../styles.css?url'
 
 export const Route = createRootRoute({
-  beforeLoad: () => getSessionFn(),
+  beforeLoad: async ({ location }) => {
+    const session = await getSessionFn()
+    // A company member must see the disclosure before any other screen.
+    if (session.needsDisclosure && location.pathname !== '/welcome') throw redirect({ to: '/welcome', search: { redirect: location.href } })
+    return session
+  },
   loader: ({ context }) => (context.user ? getLatestTopicIdFn() : null),
   notFoundComponent: () => (
     <main className="mx-auto w-full max-w-xl px-4 pt-8">
@@ -54,7 +59,7 @@ function Root() {
   const latestTopicId = Route.useLoaderData()
   const { pathname } = useLocation()
   const focus = /^\/play\/[^/]+\/?$/.test(pathname) // an active session has no chrome
-  const nav = user && !focus && !/^\/(org|admin)(\/|$)/.test(pathname)
+  const nav = user && !focus && !/^\/(org|admin|welcome|join|sign-in)(\/|$)/.test(pathname)
 
   useEffect(() => {
     void navigator.serviceWorker?.register('/sw.js')
