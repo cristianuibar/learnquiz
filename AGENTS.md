@@ -11,3 +11,8 @@ the project root (`../IDEA.md`, `../AGENTS.md`, `../context/spec/SPEC.md`, `../c
 - Every model call goes through `src/lib/llm/client.ts` and is logged to `model_calls`.
 - Commit explicit paths only. Work on branches; keep `main` clean.
 - Never commit secrets, `.env` or `.dev.vars` files.
+- PRs, issues, commit messages, release notes, the README and GitHub comments describe the
+  change only: never mention review process or agent tooling ("cross-review",
+  "cross-family" gates, reviewer or implementer lanes, lines like
+  `Implementer: codex (openai): gpt-6.1-sol xhigh`). The README's hackathon disclosure
+  that coding agents were used is the one exception.
