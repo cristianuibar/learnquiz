@@ -50,6 +50,7 @@ export async function chatJson<T>(opts: {
     const started = Date.now()
     let usage: Usage | undefined
     let content = ''
+    let cutOff = false
     try {
       let res: Response
       try {
@@ -74,7 +75,9 @@ export async function chatJson<T>(opts: {
       const body = (await res.json()) as { choices?: { message?: { content?: string | null }; finish_reason?: string }[]; usage?: Usage }
       usage = body.usage
       content = body.choices?.[0]?.message?.content ?? ''
+      cutOff = body.choices?.[0]?.finish_reason === 'length'
       if (!content) throw new Error(`empty reply (finish_reason ${body.choices?.[0]?.finish_reason ?? 'unknown'})`)
+      if (cutOff) throw new Error('reply cut off by max_tokens')
       let json: unknown
       try {
         json = JSON.parse(content)
@@ -90,8 +93,14 @@ export async function chatJson<T>(opts: {
       await logCall(opts, started, usage, failure)
       // Only bad output is worth a second try; transport and HTTP errors fail fast.
       if (e instanceof LlmError) throw new LlmError(`LLM request failed (${e.status})`, e.status)
-      if (content) messages.push({ role: 'assistant', content })
-      messages.push({ role: 'user', content: `Your reply was rejected: ${failure}\nReply again with only the corrected JSON.` })
+      // A cut-off reply is never echoed back: it is huge and the model only needs to be told to be brief.
+      if (content && !cutOff) messages.push({ role: 'assistant', content })
+      messages.push({
+        role: 'user',
+        content: cutOff
+          ? 'Your reply was far too long and got cut off. Reply again with the same JSON shape, short texts, no repetition.'
+          : `Your reply was rejected: ${failure}\nReply again with only the corrected JSON.`,
+      })
     }
   }
   throw new LlmError(`LLM output invalid after retry: ${failure}`, 422)

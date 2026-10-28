@@ -18,7 +18,7 @@ const chunks = <T>(rows: T[], size: number) =>
 export const createTopic = createServerFn({ method: 'POST' })
   .validator(
     z.object({
-      topic: z.string().trim().min(1).max(200),
+      topic: z.string().trim().min(2).max(200),
       goal: z.string().max(300).optional(),
       sourceText: z.string().max(400000).optional(),
     }),
@@ -41,7 +41,7 @@ export const createTopic = createServerFn({ method: 'POST' })
           schema: CurriculumSkeleton,
           schemaName: 'curriculum_skeleton',
           ...curriculumPrompt({ topic: data.topic, goal: data.goal, levelHint: 3, sourceText: data.sourceText }),
-          maxTokens: 24000, // measured: reasoning alone took 5.3k of the 8k default on a 30-concept topic
+          maxTokens: 16000, // measured: 8.6k tokens on a 30-concept topic, reasoning included
           learnerId,
         })
       } catch (e) {

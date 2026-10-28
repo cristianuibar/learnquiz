@@ -7,16 +7,16 @@ export const CurriculumSkeleton = z.object({
   units: z
     .array(
       z.object({
-        name: z.string(),
-        summary: z.string(),
+        name: z.string().max(80),
+        summary: z.string().max(300),
         concepts: z
           .array(
             z.object({
-              name: z.string(),
-              summary: z.string(),
-              prerequisites: z.array(z.string()),
-              source_quote: z.string().nullable(),
-              misconceptions: z.array(z.string()),
+              name: z.string().max(80),
+              summary: z.string().max(400),
+              prerequisites: z.array(z.string().max(80)).max(4),
+              source_quote: z.string().max(300).nullable(),
+              misconceptions: z.array(z.string().max(200)).max(3),
             }),
           )
           .min(4)
@@ -31,13 +31,15 @@ export type CurriculumSkeleton = z.infer<typeof CurriculumSkeleton>
 // Job 7.2: one item. The shape alone goes to the model; ItemPayload adds the cross-field rules.
 const ItemShape = z.object({
   format: z.enum(['mcq', 'cloze', 'short']),
-  stem: z.string().min(1),
-  options: z.array(z.object({ id: z.string(), text: z.string(), is_correct: z.boolean(), feedback: z.string() })),
-  accepted_answers: z.array(z.string()),
-  model_answer: z.string(),
+  stem: z.string().min(1).max(600),
+  options: z
+    .array(z.object({ id: z.string().max(4), text: z.string().max(300), is_correct: z.boolean(), feedback: z.string().max(300) }))
+    .max(4),
+  accepted_answers: z.array(z.string().max(120)).max(6),
+  model_answer: z.string().max(600),
   explanation: z.string().max(400),
   difficulty: z.number().int().min(1).max(5),
-  source_quote: z.string().nullable(),
+  source_quote: z.string().max(300).nullable(),
   grounded: z.boolean(),
   bloom: z.enum(['remember', 'understand', 'apply']),
 })
@@ -57,6 +59,6 @@ export type ItemBatch = z.infer<typeof ItemBatch>
 
 // Job 7.3: self-check verdicts, index = position in the drafted batch (0-based).
 export const SelfCheck = z.object({
-  results: z.array(z.object({ index: z.number().int().min(0).max(99), keep: z.boolean(), reasons: z.array(z.string()) })),
+  results: z.array(z.object({ index: z.number().int().min(0).max(99), keep: z.boolean(), reasons: z.array(z.string().max(200)).max(4) })),
 })
 export type SelfCheck = z.infer<typeof SelfCheck>

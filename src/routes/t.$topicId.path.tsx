@@ -96,13 +96,15 @@ function Concept({
         <div className="mt-4">
           <Working label="Writing questions" />
         </div>
-      ) : count > 0 && items.length === 0 ? (
-        <Button variant="outline" className="mt-4 h-11 px-6" onClick={() => run(load)}>
-          Show questions
-        </Button>
+      ) : count > 0 ? (
+        items.length === 0 && (
+          <Button variant="outline" className="mt-4 h-11 px-6" onClick={() => run(load)}>
+            Show questions
+          </Button>
+        )
       ) : (
         <Button variant="outline" className="mt-4 h-11 px-6" onClick={() => run(generate)}>
-          {count > 0 ? 'Generate more' : 'Generate questions'}
+          Generate questions
         </Button>
       )}
       {error && (

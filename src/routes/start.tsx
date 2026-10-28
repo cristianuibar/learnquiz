@@ -65,6 +65,7 @@ function Start() {
               className="h-11"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
+              minLength={2}
               maxLength={200}
               required
               autoFocus

@@ -21,7 +21,7 @@ export function curriculumPrompt(a: {
 Rules:
 - 4 to 10 units, ordered from foundations to advanced. 4 to 8 concepts per unit.
 - A concept is the smallest teachable idea, testable with 1 to 3 questions. Names are short and unique across the whole curriculum.
-- summary: one or two sentences. misconceptions: 1 or 2 common mistakes learners make on that concept.
+- summary: one or two sentences, at most 300 characters. misconceptions: 1 or 2 common mistakes learners make on that concept, each under 200 characters.
 - prerequisites: exact names of other concepts in this curriculum that must be learned first. Direct prerequisites only, no transitive ones, no cycles. Use [] for foundations.
 - source_quote: when source text is given, a short verbatim passage (at most 200 characters) from it that supports the concept, copied exactly; null when none fits. Always null when no source text is given.
 - Ground every claim in the source text when it is given. Do not invent facts.`,
