@@ -43,14 +43,16 @@ export async function ensureConceptItems(
   learnerId: string,
   concept: typeof concepts.$inferSelect,
   topic: typeof topics.$inferSelect,
-  opts: { targetDifficulty: number; spread?: boolean },
+  opts: { targetDifficulty: number; spread?: boolean; unseen?: Set<string> },
 ): Promise<StoredItem[]> {
   const existing = await db
     .select()
     .from(items)
     .where(and(eq(items.conceptId, concept.id), eq(items.status, 'active')))
     .orderBy(desc(items.createdAt))
-  if (existing.length >= 6) return existing.map(asItem)
+  // Six stored items are enough unless the learner has already seen them all.
+  const fresh = opts.unseen ? existing.filter((r) => !opts.unseen!.has(r.id)).length : existing.length
+  if (existing.length >= 6 && fresh > 0) return existing.map(asItem)
   // shortcut: no lock, two concurrent calls for one concept may both generate; add a claim row if the UI double-fires.
 
   const avoidStems = existing.slice(0, 3).map((r) => (JSON.parse(r.payloadJson) as ItemPayload).stem)

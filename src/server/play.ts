@@ -201,7 +201,7 @@ export const startSession = createServerFn({ method: 'POST' })
 
     // Seen items come back through the due list, not as fresh frontier questions.
     const top = frontier.slice(0, 4)
-    const generated = await Promise.all(top.map((f) => ensureConceptItems(db, learnerId, f.concept, topic, { targetDifficulty })))
+    const generated = await Promise.all(top.map((f) => ensureConceptItems(db, learnerId, f.concept, topic, { targetDifficulty, unseen: seen })))
     const frontierInput = top.map((f, i) => ({
       conceptId: f.concept.id,
       unitOrder: f.unitOrder,
@@ -257,7 +257,10 @@ export const getSession = createServerFn({ method: 'GET' })
     const learnerId = await requireLearnerId()
     const db = getDb()
     const { session, topic } = await loadSession(db, learnerId, data.sessionId)
-    return viewOf(db, session, topic, readPlan(session))
+    const plan = readPlan(session)
+    // A reload during the reveal moves on: the answer is already recorded.
+    if (session.endedAt === null && plan.answered) return advance(db, learnerId, session, topic, plan)
+    return viewOf(db, session, topic, plan)
   })
 
 export const answerItem = createServerFn({ method: 'POST' })
@@ -386,6 +389,32 @@ export const answerItem = createServerFn({ method: 'POST' })
     }
   })
 
+async function advance(db: Db, learnerId: string, session: SessionRow, topic: TopicRow, plan: PlacementPlan | QueuePlan): Promise<SessionView> {
+  const ids = JSON.parse(session.itemIdsJson) as string[]
+  let nextId: string | null
+  if ('log' in plan) {
+    const conceptOf = new Map(plan.pool.map((p) => [p.id, p.conceptId]))
+    nextId = shouldStop(plan.log)
+      ? null
+      : pickNext(plan.workingLevel, plan.pool, plan.log.map((l) => ({ id: l.itemId, conceptId: conceptOf.get(l.itemId) ?? '' })))
+    if (nextId) ids.push(nextId)
+  } else {
+    nextId = ids[plan.position + 1] ?? null
+  }
+
+  if (!nextId) {
+    await finalise(db, learnerId, session, topic)
+    const done = await loadSession(db, learnerId, session.id)
+    return viewOf(db, done.session, done.topic, plan)
+  }
+  const advanced = { ...plan, position: plan.position + 1, answered: false }
+  await db
+    .update(sessions)
+    .set({ itemIdsJson: JSON.stringify(ids), planJson: JSON.stringify(advanced) })
+    .where(eq(sessions.id, session.id))
+  return viewOf(db, { ...session, itemIdsJson: JSON.stringify(ids) }, topic, advanced)
+}
+
 export const nextItem = createServerFn({ method: 'POST' })
   .validator(z.object({ sessionId: z.string().min(1), why: z.string().trim().max(300).optional() }))
   .handler(async ({ data }): Promise<SessionView> => {
@@ -403,29 +432,7 @@ export const nextItem = createServerFn({ method: 'POST' })
         .where(and(eq(attempts.id, plan.lastAttemptId), eq(attempts.learnerId, learnerId)))
     }
 
-    const ids = JSON.parse(session.itemIdsJson) as string[]
-    let nextId: string | null
-    if ('log' in plan) {
-      const conceptOf = new Map(plan.pool.map((p) => [p.id, p.conceptId]))
-      nextId = shouldStop(plan.log)
-        ? null
-        : pickNext(plan.workingLevel, plan.pool, plan.log.map((l) => ({ id: l.itemId, conceptId: conceptOf.get(l.itemId) ?? '' })))
-      if (nextId) ids.push(nextId)
-    } else {
-      nextId = ids[plan.position + 1] ?? null
-    }
-
-    if (!nextId) {
-      await finalise(db, learnerId, session, topic)
-      const done = await loadSession(db, learnerId, session.id)
-      return viewOf(db, done.session, done.topic, plan)
-    }
-    const advanced = { ...plan, position: plan.position + 1, answered: false }
-    await db
-      .update(sessions)
-      .set({ itemIdsJson: JSON.stringify(ids), planJson: JSON.stringify(advanced) })
-      .where(eq(sessions.id, session.id))
-    return viewOf(db, { ...session, itemIdsJson: JSON.stringify(ids) }, topic, advanced)
+    return advance(db, learnerId, session, topic, plan)
   })
 
 export const endSession = createServerFn({ method: 'POST' })
