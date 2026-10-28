@@ -51,7 +51,7 @@ export function RevealCard({
         <>
           <p className="mt-2 text-lg font-medium">{reveal.correctAnswer}</p>
           <details className="mt-1">
-            <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium">Why</summary>
+            <summary className="flex min-h-12 cursor-pointer items-center text-sm font-medium">Why</summary>
             <p>{reveal.explanation}</p>
             {quote}
           </details>
@@ -65,11 +65,20 @@ export function RevealCard({
           )}
           <p className="mt-2">{reveal.explanation}</p>
           {quote}
-          {state === 'D' && reveal.misconception && <p className="mt-3">{reveal.misconception}</p>}
+          {reveal.mixUps.length > 0 && (
+            <div className="mt-3">
+              <p className="font-medium">Common mix-up</p>
+              <ul className="mt-1 list-disc pl-5">
+                {reveal.mixUps.map((m) => (
+                  <li key={m}>{m}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           {wrong && (
             <div className="mt-4 flex flex-col gap-2">
               <Label htmlFor="why">In one line, why?</Label>
-              <Input id="why" className="h-11 bg-background" value={why} maxLength={300} onChange={(e) => onWhy(e.target.value)} />
+              <Input id="why" className="h-12 bg-background" value={why} maxLength={300} onChange={(e) => onWhy(e.target.value)} />
             </div>
           )}
           {reveal.returnsThisSession && <p className="mt-3 text-sm font-medium">This comes back later this session.</p>}

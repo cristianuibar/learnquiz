@@ -26,7 +26,7 @@ export type Reveal = {
   chosenFeedback: string | null // why the chosen option is wrong (mcq, states C and D)
   explanation: string
   sourceQuote: string | null
-  misconception: string | null // state D only: one paragraph on the likely misconception
+  mixUps: string[] // state D only: the concept's common mistakes
   returnsThisSession: boolean // states C and D: the item re-enters later
   pKnownBefore: number
   pKnownAfter: number

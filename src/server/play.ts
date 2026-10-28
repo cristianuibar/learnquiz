@@ -370,10 +370,8 @@ export const answerItem = createServerFn({ method: 'POST' })
     }
     await batch(db, stmts)
 
-    // State D only, built in code from the chosen option's feedback and the concept's known mix-ups; no model call.
+    // State D only, read from the concept; no model call. chosenFeedback is shown on its own, so it is not repeated here.
     const mixUps = state === 'D' ? (JSON.parse(concept.misconceptionsJson) as string[]) : []
-    const misconception =
-      state === 'D' ? [grade.chosenFeedback, mixUps.length ? `Common mix-up: ${mixUps.join('; ')}` : null].filter(Boolean).join(' ') || null : null
     return {
       attemptId,
       state,
@@ -382,7 +380,7 @@ export const answerItem = createServerFn({ method: 'POST' })
       chosenFeedback: grade.chosenFeedback,
       explanation: payload.explanation,
       sourceQuote: payload.source_quote,
-      misconception,
+      mixUps,
       returnsThisSession,
       pKnownBefore,
       pKnownAfter,
