@@ -2,18 +2,13 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, asc, count, desc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '@/db'
-import { conceptEdges, concepts, items, learnerTopic, sources, topics, units } from '@/db/schema'
+import { conceptEdges, concepts, items, learnerTopic, placements, sources, topics, units } from '@/db/schema'
 import { validateSkeleton, fallbackSkeleton } from '@/lib/curriculum/validate'
 import { chatJson, LlmError } from '@/lib/llm/client'
-import { curriculumPrompt, itemsPrompt, selfCheckPrompt } from '@/lib/llm/prompts'
-import { CurriculumSkeleton, ItemBatch, ItemPayload, SelfCheck } from '@/lib/llm/schemas'
+import { curriculumPrompt } from '@/lib/llm/prompts'
+import { CurriculumSkeleton } from '@/lib/llm/schemas'
+import { asItem, chunks, ensureConceptItems, httpError, loadPKnown, mean, targetFor, type StoredItem } from '@/server/helpers'
 import { requireLearnerId } from '@/server/session'
-
-const httpError = (message: string, status: number) => Object.assign(new Error(message), { status })
-
-// D1 allows 100 bound parameters per statement, so multi-row inserts go in small chunks.
-const chunks = <T>(rows: T[], size: number) =>
-  Array.from({ length: Math.ceil(rows.length / size) }, (_, i) => rows.slice(i * size, (i + 1) * size))
 
 export const createTopic = createServerFn({ method: 'POST' })
   .validator(
@@ -102,7 +97,7 @@ export const getTopicPath = createServerFn({ method: 'GET' })
       .where(and(eq(topics.id, data.topicId), eq(topics.learnerId, learnerId)))
     if (!topic) throw httpError('Topic not found', 404)
 
-    const [unitRows, conceptRows, edges, counts] = await Promise.all([
+    const [unitRows, conceptRows, edges, counts, known, [lt], [placement]] = await Promise.all([
       db.select().from(units).where(eq(units.topicId, topic.id)).orderBy(asc(units.order)),
       db.select().from(concepts).where(eq(concepts.topicId, topic.id)).orderBy(asc(concepts.order)),
       db.select({ fromId: conceptEdges.fromId, toId: conceptEdges.toId }).from(conceptEdges).where(eq(conceptEdges.topicId, topic.id)),
@@ -111,35 +106,58 @@ export const getTopicPath = createServerFn({ method: 'GET' })
         .from(items)
         .where(and(eq(items.topicId, topic.id), eq(items.status, 'active')))
         .groupBy(items.conceptId),
+      loadPKnown(db, learnerId, topic.id),
+      db
+        .select({ level: learnerTopic.level, xp: learnerTopic.xp, streak: learnerTopic.streakCount })
+        .from(learnerTopic)
+        .where(and(eq(learnerTopic.learnerId, learnerId), eq(learnerTopic.topicId, topic.id))),
+      db
+        .select({ logJson: placements.logJson })
+        .from(placements)
+        .where(and(eq(placements.learnerId, learnerId), eq(placements.topicId, topic.id)))
+        .orderBy(desc(placements.createdAt))
+        .limit(1),
     ])
     const itemCount = new Map(counts.map((c) => [c.conceptId, c.n]))
     return {
       topic,
-      units: unitRows.map((u) => ({
-        id: u.id,
-        order: u.order,
-        name: u.name,
-        summary: u.summary,
-        concepts: conceptRows
+      // The reveal line lives in placements.log_json as { log, levelLine }.
+      learner: {
+        level: lt?.level ?? 3,
+        levelLine: placement ? ((JSON.parse(placement.logJson) as { levelLine?: string }).levelLine ?? null) : null,
+        placed: Boolean(placement),
+        xp: lt?.xp ?? 0,
+        streak: lt?.streak ?? 0,
+      },
+      units: unitRows.map((u) => {
+        const unitConcepts = conceptRows
           .filter((c) => c.unitId === u.id)
-          .map((c) => ({ id: c.id, order: c.order, name: c.name, summary: c.summary, grounded: c.grounded, itemCount: itemCount.get(c.id) ?? 0 })),
-      })),
+          .map((c) => ({
+            id: c.id,
+            order: c.order,
+            name: c.name,
+            summary: c.summary,
+            grounded: c.grounded,
+            itemCount: itemCount.get(c.id) ?? 0,
+            pKnown: known.get(c.id) ?? 0,
+          }))
+        return {
+          id: u.id,
+          order: u.order,
+          name: u.name,
+          summary: u.summary,
+          mastery: mean(unitConcepts.map((c) => c.pKnown)),
+          unlocked: u.unlockedAt !== null,
+          concepts: unitConcepts,
+        }
+      }),
       edges,
     }
   })
 
-type GeneratedItem = { id: string; format: ItemPayload['format']; difficultyPrior: number; payload: ItemPayload }
-
-const asItem = (r: typeof items.$inferSelect): GeneratedItem => ({
-  id: r.id,
-  format: r.format as ItemPayload['format'],
-  difficultyPrior: r.difficultyPrior,
-  payload: JSON.parse(r.payloadJson) as ItemPayload,
-})
-
 export const getConceptItems = createServerFn({ method: 'GET' })
   .validator(z.object({ conceptId: z.string().min(1) }))
-  .handler(async ({ data }): Promise<{ items: GeneratedItem[] }> => {
+  .handler(async ({ data }): Promise<{ items: StoredItem[] }> => {
     const learnerId = await requireLearnerId()
     const rows = await getDb()
       .select({ item: items })
@@ -152,7 +170,7 @@ export const getConceptItems = createServerFn({ method: 'GET' })
 
 export const generateConceptItems = createServerFn({ method: 'POST' })
   .validator(z.object({ conceptId: z.string().min(1) }))
-  .handler(async ({ data }): Promise<{ items: GeneratedItem[] }> => {
+  .handler(async ({ data }): Promise<{ items: StoredItem[] }> => {
     const learnerId = await requireLearnerId()
     const db = getDb()
     const [row] = await db
@@ -161,88 +179,9 @@ export const generateConceptItems = createServerFn({ method: 'POST' })
       .innerJoin(topics, eq(topics.id, concepts.topicId))
       .where(and(eq(concepts.id, data.conceptId), eq(topics.learnerId, learnerId)))
     if (!row) throw httpError('Concept not found', 404)
-    const { concept, topic } = row
-
-    const existing = await db
-      .select()
-      .from(items)
-      .where(and(eq(items.conceptId, concept.id), eq(items.status, 'active')))
-      .orderBy(desc(items.createdAt))
-    if (existing.length >= 6) return { items: existing.map(asItem) }
-    // shortcut: no lock, two concurrent calls for one concept may both generate; add a claim row if the UI double-fires.
-
     const [lt] = await db
       .select({ level: learnerTopic.level })
       .from(learnerTopic)
-      .where(and(eq(learnerTopic.learnerId, learnerId), eq(learnerTopic.topicId, topic.id)))
-    const targetDifficulty = Math.min(5, Math.max(1, Math.round((lt?.level ?? 3) + 0.5)))
-    const avoidStems = existing.slice(0, 3).map((r) => (JSON.parse(r.payloadJson) as ItemPayload).stem)
-    const misconceptions = JSON.parse(concept.misconceptionsJson) as string[]
-
-    const kept: { payload: ItemPayload; check: unknown }[] = []
-    for (let round = 0; round < 2 && kept.length < 3; round++) {
-      try {
-        const batch = await chatJson({
-          purpose: 'items',
-          schema: ItemBatch,
-          schemaName: 'item_batch',
-          ...itemsPrompt({
-            topic: topic.title,
-            goal: topic.goal,
-            concept,
-            misconceptions,
-            targetDifficulty,
-            formats: ['mcq', 'cloze'],
-            sourceQuote: concept.sourceQuote,
-            avoidStems,
-          }),
-          maxTokens: 16000,
-          learnerId,
-        })
-        const drafted = batch.items.flatMap((i) => {
-          const ok = ItemPayload.safeParse(i)
-          return ok.success ? [ok.data] : []
-        })
-        if (!drafted.length) continue
-        let verdicts: SelfCheck['results'] | null = null
-        try {
-          verdicts = (
-            await chatJson({
-              purpose: 'self_check',
-              schema: SelfCheck,
-              schemaName: 'self_check',
-              ...selfCheckPrompt({ items: drafted }),
-              reasoningEffort: 'minimal',
-              learnerId,
-            })
-          ).results
-        } catch (e) {
-          if (!(e instanceof LlmError)) throw e // check unusable: keep the Zod-valid items
-        }
-        drafted.forEach((payload, index) => {
-          const verdict = verdicts?.find((v) => v.index === index)
-          if (!verdicts || verdict?.keep) kept.push({ payload, check: verdict ?? null })
-        })
-      } catch (e) {
-        if (!(e instanceof LlmError)) throw e
-        console.error('item generation failed', e.message)
-        break
-      }
-    }
-    if (!kept.length) throw httpError('Could not generate items for this concept', 502)
-
-    const now = Date.now()
-    const rows = kept.map(({ payload, check }) => ({
-      id: crypto.randomUUID(),
-      conceptId: concept.id,
-      topicId: topic.id,
-      format: payload.format,
-      payloadJson: JSON.stringify(payload),
-      difficultyPrior: payload.difficulty,
-      checkJson: check === null ? null : JSON.stringify(check),
-      createdAt: now,
-    }))
-    const [first, ...rest] = chunks(rows, 10).map((r) => db.insert(items).values(r))
-    await db.batch([first, ...rest])
-    return { items: [...existing.map(asItem), ...rows.map((r, i) => ({ id: r.id, format: r.format, difficultyPrior: r.difficultyPrior, payload: kept[i].payload }))] }
+      .where(and(eq(learnerTopic.learnerId, learnerId), eq(learnerTopic.topicId, row.topic.id)))
+    return { items: await ensureConceptItems(db, learnerId, row.concept, row.topic, { targetDifficulty: targetFor(lt?.level ?? 3) }) }
   })

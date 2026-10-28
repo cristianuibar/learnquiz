@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Working } from '@/components/working'
 import { authClient } from '@/lib/auth-client'
 import { createTopic } from '@/server/curriculum'
+import { startPlacement } from '@/server/play'
 
 export const Route = createFileRoute('/start')({
   validateSearch: (search: Record<string, unknown>): { topic?: string } => ({
@@ -21,15 +22,17 @@ function Start() {
   const search = Route.useSearch()
   const router = useRouter()
   const create = useServerFn(createTopic)
+  const place = useServerFn(startPlacement)
+  const created = useRef<{ key: string; topicId: string }>(undefined) // a retry after a failed placement reuses the topic
   const [topic, setTopic] = useState(search.topic ?? '')
   const [goal, setGoal] = useState('')
   const [sourceText, setSourceText] = useState('')
-  const [status, setStatus] = useState<'idle' | 'working' | 'done'>('idle')
+  const [status, setStatus] = useState<'idle' | 'curriculum' | 'questions'>('idle')
   const [error, setError] = useState('')
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    setStatus('working')
+    setStatus('curriculum')
     setError('')
     try {
       if (!user) {
@@ -37,16 +40,20 @@ function Start() {
         if (error) throw new Error(error.message ?? 'Could not sign in')
         await router.invalidate()
       }
-      const { topicId } = await create({
-        data: {
-          topic: topic.trim(),
-          goal: goal.trim() || undefined,
-          sourceText: sourceText.trim() || undefined,
-        },
-      })
-      setStatus('done')
-      await new Promise((r) => setTimeout(r, 400)) // let "Ready" register
-      await router.navigate({ to: '/t/$topicId/path', params: { topicId } })
+      const key = JSON.stringify([topic.trim(), goal.trim(), sourceText.trim()])
+      if (created.current?.key !== key) {
+        const { topicId } = await create({
+          data: {
+            topic: topic.trim(),
+            goal: goal.trim() || undefined,
+            sourceText: sourceText.trim() || undefined,
+          },
+        })
+        created.current = { key, topicId }
+      }
+      setStatus('questions')
+      const { sessionId } = await place({ data: { topicId: created.current.topicId } })
+      await router.navigate({ to: '/play/$sessionId', params: { sessionId } })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
       setStatus('idle')
@@ -55,7 +62,10 @@ function Start() {
 
   return (
     <main className="mx-auto w-full max-w-xl px-4 pt-8 pb-16">
-      <h1 className="mb-8 text-3xl font-bold tracking-tight">What do you want to learn?</h1>
+      <div className="mb-8 flex items-baseline justify-between gap-4">
+        <h1 className="text-3xl font-bold tracking-tight">What do you want to learn?</h1>
+        <span className="shrink-0 text-sm font-medium text-muted-foreground">1 of 2</span>
+      </div>
       {status === 'idle' ? (
         <form className="flex flex-col gap-6" onSubmit={submit}>
           <div className="flex flex-col gap-2">
@@ -97,11 +107,14 @@ function Start() {
             </p>
           )}
           <Button type="submit" className="h-11 self-end px-6">
-            Build my path
+            Find my level
           </Button>
         </form>
       ) : (
-        <Working label="Building your curriculum" done={status === 'done'} />
+        <div className="flex flex-col gap-3">
+          <Working label="Building your curriculum" done={status === 'questions'} />
+          {status === 'questions' && <Working label="Writing your first questions" />}
+        </div>
       )}
     </main>
   )

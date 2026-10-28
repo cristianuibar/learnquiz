@@ -40,6 +40,7 @@ export function itemsPrompt(a: {
   concept: { name: string; summary: string }
   misconceptions: string[]
   targetDifficulty: number
+  spread?: boolean // placement: difficulties across 1 to 5 instead of around the target
   formats: ('mcq' | 'cloze' | 'short')[]
   sourceQuote?: string | null
   avoidStems: string[]
@@ -51,7 +52,11 @@ Write exactly 6 items for the given concept.
 - Allowed formats: ${formats}. ${
       a.formats.includes('short') ? 'Mix them.' : 'Never use any other format.'
     } When mcq and cloze are both allowed, write at least 2 of each.
-- difficulty is an integer 1 to 5. Stay within 1 of the target difficulty, and hit the target itself at least 3 times.
+- difficulty is an integer 1 to 5. ${
+      a.spread
+        ? 'Spread the six items across the whole range: use every difficulty from 1 to 5 at least once.'
+        : 'Stay within 1 of the target difficulty, and hit the target itself at least 3 times.'
+    }
 - mcq: 3 or 4 options with ids "a", "b", "c", "d"; exactly one has is_correct true. Every option has feedback: why it is right, or why it is wrong. Wrong options come from the listed misconceptions or other common errors. accepted_answers is [].
 - cloze: the stem contains ____ exactly once. options is []. accepted_answers lists every acceptable spelling of the blank (1 to 4 entries).
 - short: options is [] and accepted_answers is []. model_answer is a one or two sentence answer.
@@ -63,7 +68,7 @@ Write exactly 6 items for the given concept.
 - Every stem must differ from the stems to avoid.`,
     user: `Topic: ${a.topic}
 Learner goal: ${a.goal?.trim() || 'not stated'}
-Target difficulty: ${a.targetDifficulty} of 5 (learner level ${levelLabel(a.targetDifficulty)})
+Target difficulty: ${a.spread ? 'spread across 1 to 5' : `${a.targetDifficulty} of 5 (learner level ${levelLabel(a.targetDifficulty)})`}
 Formats: ${formats}
 Concept: ${a.concept.name}
 Summary: ${a.concept.summary}

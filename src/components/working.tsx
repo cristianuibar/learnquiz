@@ -8,7 +8,7 @@ export function Working({ label, done }: { label: string; done?: boolean }) {
       ) : (
         <Loader2 className="size-5 animate-spin text-learning motion-reduce:animate-none" aria-hidden />
       )}
-      {done ? 'Ready' : label}
+      {label}
     </p>
   )
 }

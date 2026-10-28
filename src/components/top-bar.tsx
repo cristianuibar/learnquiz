@@ -26,9 +26,11 @@ export function TopBar({
       {user && (
         <div className="flex items-center gap-1 text-sm">
           <span className="font-medium">{user.isAnonymous ? 'Guest' : user.name}</span>
-          <Button variant="ghost" className="h-11" onClick={signOut}>
-            Sign out
-          </Button>
+          {!user.isAnonymous && (
+            <Button variant="ghost" className="h-11" onClick={signOut}>
+              Sign out
+            </Button>
+          )}
         </div>
       )}
     </header>
