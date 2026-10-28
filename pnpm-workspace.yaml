@@ -1,0 +1,11 @@
+allowBuilds:
+  esbuild: true
+  lightningcss: true
+  sharp: true
+  workerd: true
+minimumReleaseAgeExclude:
+  - framer-motion@14.7.1
+  - motion-dom@14.7.1
+  - motion-utils@14.7.0
+  - motion@14.7.1
+  - lucide-react@1.63.0
