@@ -1,8 +1,13 @@
 # AGENTS.md - learnquiz
 
-Codebase for Learn Quiz. Product context, open decisions and the brand draft live one
-level up in the project root (`../IDEA.md`, `../AGENTS.md`, `../context/`).
+Codebase for Learn Quiz. Product context, the spec and research live one level up in
+the project root (`../IDEA.md`, `../AGENTS.md`, `../context/spec/SPEC.md`, `../context/`).
 
-- No stack is chosen yet. Do not scaffold a framework until it is decided.
+- Stack: TanStack Start (React) on one Cloudflare Worker, D1 + Drizzle, R2, Better Auth.
+  Read `README.md` for how to run it and `../context/spec/SPEC.md` for what to build.
+- Only `src/server/env.ts` imports `cloudflare:workers`. Build db and auth per request.
+- D1 has no transactions: use `db.batch()`. Migrations: `drizzle-kit generate`, then
+  `wrangler d1 migrations apply learnquiz --local|--remote`.
+- Every model call goes through `src/lib/llm/client.ts` and is logged to `model_calls`.
 - Commit explicit paths only. Work on branches; keep `main` clean.
-- Never commit secrets or `.env` files.
+- Never commit secrets, `.env` or `.dev.vars` files.
