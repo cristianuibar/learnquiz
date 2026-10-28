@@ -22,7 +22,7 @@ function Done() {
   const s = Route.useLoaderData()
   const placed = s.kind === 'placement' && s.level !== null
   return (
-    <main className="mx-auto w-full max-w-xl px-4 pt-8 pb-16">
+    <main className="mx-auto w-full max-w-xl px-4 pt-8 pb-8">
       <h1 className="text-3xl font-bold tracking-tight">
         {placed ? `You're at level ${s.level} of 5` : `Session done, ${clock(s.durationMs)}`}
       </h1>
@@ -75,9 +75,9 @@ function Done() {
       <p className="mt-10 rounded-lg bg-learning-soft p-4">
         <span className="font-semibold">Coach:</span> {s.nextLine}
       </p>
-      <div className="mt-10 flex flex-wrap items-center gap-3">
+      <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center">
         {placed ? (
-          <Button asChild className="h-11 px-6">
+          <Button asChild className="h-12 w-full px-6 sm:w-auto">
             <Link to="/t/$topicId/path" params={{ topicId: s.topicId }}>
               See your path
             </Link>
@@ -85,7 +85,7 @@ function Done() {
         ) : (
           <>
             <StartButton topicId={s.topicId}>Another session</StartButton>
-            <Button asChild variant="outline" className="h-11 px-6">
+            <Button asChild variant="outline" className="h-12 w-full px-6 sm:w-auto">
               <Link to="/t/$topicId/path" params={{ topicId: s.topicId }}>
                 Your path
               </Link>

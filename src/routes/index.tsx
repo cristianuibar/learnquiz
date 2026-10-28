@@ -58,21 +58,21 @@ function Landing() {
         <Input
           aria-label="What do you want to learn?"
           placeholder="What do you want to learn?"
-          className="h-11"
+          className="h-12"
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
           maxLength={200}
         />
-        <Button type="submit" className="h-11 px-6" disabled={busy}>
+        <Button type="submit" className="h-12 px-6" disabled={busy}>
           Start
         </Button>
       </form>
       <div className="flex flex-col gap-3 sm:flex-row">
-        <Button variant="outline" className="h-11 px-6" onClick={guest} disabled={busy}>
+        <Button variant="outline" className="h-12 px-6" onClick={guest} disabled={busy}>
           Continue as guest
         </Button>
         {facebookEnabled && (
-          <Button variant="outline" className="h-11 px-6" onClick={facebook} disabled={busy}>
+          <Button variant="outline" className="h-12 px-6" onClick={facebook} disabled={busy}>
             Continue with Facebook
           </Button>
         )}

@@ -67,7 +67,12 @@
   * {
     @apply border-border outline-ring/50;
   }
+  input,
+  textarea {
+    scroll-margin-bottom: 7rem; /* a focused field scrolls clear of the sticky action bar */
+  }
   body {
     @apply bg-background text-foreground;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
   }
 }

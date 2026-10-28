@@ -38,7 +38,7 @@ export function StartButton({
   if (working) return <Working label={placement ? 'Writing your first questions' : 'Picking your questions'} />
   if (error) return <InlineError message={error} onRetry={go} />
   return (
-    <Button variant={variant} className="h-11 px-6" onClick={go}>
+    <Button variant={variant} className="h-12 w-full px-6 sm:w-auto" onClick={go}>
       {children}
     </Button>
   )
