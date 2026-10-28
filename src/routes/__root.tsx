@@ -62,7 +62,7 @@ function Root() {
 
   return (
     <>
-      {!focus && <TopBar />}
+      {!focus && <TopBar signIn={(!user || user.isAnonymous) && pathname !== '/sign-in'} />}
       <Outlet />
       {nav && <BottomNav topicId={latestTopicId} />}
     </>
