@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "learnquiz",
+  "compatibility_date": "2025-09-02",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "@tanstack/react-start/server-entry",
+  "observability": { "enabled": true },
+  "upload_source_maps": true,
+  "routes": [{ "pattern": "learnquiz.com", "custom_domain": true }],
+  "vars": {
+    "LLM_PROFILE": "meta",
+    "LLM_BASE_URL": "https://api.meta.ai/v1",
+    "LLM_MODEL": "muse-spark-1.3",
+    "IMAGE_MODEL": "muse-image-1.0",
+    "VOICE_ENABLED": "false",
+    "BETTER_AUTH_URL": "https://learnquiz.com"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "learnquiz",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "drizzle"
+    }
+  ],
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "learnquiz-media" }]
+}

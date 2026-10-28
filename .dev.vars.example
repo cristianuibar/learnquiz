@@ -1,0 +1,6 @@
+# Copy to .dev.vars for local development. Never commit .dev.vars.
+LLM_API_KEY=
+BETTER_AUTH_SECRET=change-me-to-32-random-bytes
+BETTER_AUTH_URL=http://localhost:3000
+FACEBOOK_APP_ID=
+FACEBOOK_APP_SECRET=
