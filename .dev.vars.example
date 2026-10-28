@@ -1,5 +1,5 @@
 # Copy to .dev.vars for local development. Never commit .dev.vars.
-LLM_API_KEY=
+# LLM_API_KEY is injected at run time (see README); leave it out of this file.
 BETTER_AUTH_SECRET=change-me-to-32-random-bytes
 BETTER_AUTH_URL=http://localhost:3000
 FACEBOOK_APP_ID=

@@ -45,8 +45,11 @@ export const createTopic = createServerFn({ method: 'POST' })
           learnerId,
         })
       } catch (e) {
-        if (!(e instanceof LlmError)) throw e
-        console.error('curriculum model failed, using fallback', e.message)
+        // Only invalid output falls back to the generic skeleton; a dead or unauthorised model must not look like success.
+        if (!(e instanceof LlmError) || e.status !== 422) {
+          throw httpError(`The model did not answer (${e instanceof LlmError ? e.status : 'error'}). Try again.`, 503)
+        }
+        console.error('curriculum output invalid, using fallback', e.message)
         skeleton = fallbackSkeleton(data.topic)
       }
       const valid = validateSkeleton(skeleton, data.sourceText)
@@ -127,6 +130,26 @@ export const getTopicPath = createServerFn({ method: 'GET' })
 
 type GeneratedItem = { id: string; format: ItemPayload['format']; difficultyPrior: number; payload: ItemPayload }
 
+const asItem = (r: typeof items.$inferSelect): GeneratedItem => ({
+  id: r.id,
+  format: r.format as ItemPayload['format'],
+  difficultyPrior: r.difficultyPrior,
+  payload: JSON.parse(r.payloadJson) as ItemPayload,
+})
+
+export const getConceptItems = createServerFn({ method: 'GET' })
+  .validator(z.object({ conceptId: z.string().min(1) }))
+  .handler(async ({ data }): Promise<{ items: GeneratedItem[] }> => {
+    const learnerId = await requireLearnerId()
+    const rows = await getDb()
+      .select({ item: items })
+      .from(items)
+      .innerJoin(topics, eq(topics.id, items.topicId))
+      .where(and(eq(items.conceptId, data.conceptId), eq(items.status, 'active'), eq(topics.learnerId, learnerId)))
+      .orderBy(desc(items.createdAt))
+    return { items: rows.map((r) => asItem(r.item)) }
+  })
+
 export const generateConceptItems = createServerFn({ method: 'POST' })
   .validator(z.object({ conceptId: z.string().min(1) }))
   .handler(async ({ data }): Promise<{ items: GeneratedItem[] }> => {
@@ -145,12 +168,6 @@ export const generateConceptItems = createServerFn({ method: 'POST' })
       .from(items)
       .where(and(eq(items.conceptId, concept.id), eq(items.status, 'active')))
       .orderBy(desc(items.createdAt))
-    const asItem = (r: (typeof existing)[number]): GeneratedItem => ({
-      id: r.id,
-      format: r.format as ItemPayload['format'],
-      difficultyPrior: r.difficultyPrior,
-      payload: JSON.parse(r.payloadJson) as ItemPayload,
-    })
     if (existing.length >= 6) return { items: existing.map(asItem) }
     // shortcut: no lock, two concurrent calls for one concept may both generate; add a claim row if the UI double-fires.
 

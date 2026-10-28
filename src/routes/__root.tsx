@@ -8,6 +8,11 @@ import appCss from '../styles.css?url'
 
 export const Route = createRootRoute({
   beforeLoad: () => getSessionFn(),
+  notFoundComponent: () => (
+    <main className="mx-auto w-full max-w-xl px-4 pt-8">
+      <p className="text-lg font-medium">Page not found.</p>
+    </main>
+  ),
   head: () => ({
     meta: [
       {

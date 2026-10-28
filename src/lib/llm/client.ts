@@ -94,7 +94,7 @@ export async function chatJson<T>(opts: {
       messages.push({ role: 'user', content: `Your reply was rejected: ${failure}\nReply again with only the corrected JSON.` })
     }
   }
-  throw new LlmError(`LLM output invalid after retry: ${failure}`, 502)
+  throw new LlmError(`LLM output invalid after retry: ${failure}`, 422)
 }
 
 async function logCall(

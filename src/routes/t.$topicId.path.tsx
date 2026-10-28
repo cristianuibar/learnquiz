@@ -5,7 +5,7 @@ import { Check, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Working } from '@/components/working'
-import { generateConceptItems, getTopicPath } from '@/server/curriculum'
+import { generateConceptItems, getConceptItems, getTopicPath } from '@/server/curriculum'
 
 type Item = Awaited<ReturnType<typeof generateConceptItems>>['items'][number]
 
@@ -65,15 +65,19 @@ function Concept({
   concept: ReturnType<typeof Route.useLoaderData>['units'][number]['concepts'][number]
 }) {
   const generate = useServerFn(generateConceptItems)
+  const load = useServerFn(getConceptItems)
   const [items, setItems] = useState<Item[]>([])
+  const [count, setCount] = useState(concept.itemCount)
   const [working, setWorking] = useState(false)
   const [error, setError] = useState('')
 
-  async function run() {
+  async function run(fn: typeof generate) {
     setWorking(true)
     setError('')
     try {
-      setItems((await generate({ data: { conceptId: concept.id } })).items)
+      const result = (await fn({ data: { conceptId: concept.id } })).items
+      setItems(result)
+      setCount(result.length)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
     }
@@ -85,16 +89,20 @@ function Concept({
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="font-medium">{concept.name}</h3>
         {concept.grounded && <Badge variant="outline">From your material</Badge>}
-        <span className="text-sm text-muted-foreground">{concept.itemCount} questions</span>
+        <span className="text-sm text-muted-foreground">{count} questions</span>
       </div>
       <p className="mt-1 text-sm text-muted-foreground">{concept.summary}</p>
       {working ? (
         <div className="mt-4">
           <Working label="Writing questions" />
         </div>
+      ) : count > 0 && items.length === 0 ? (
+        <Button variant="outline" className="mt-4 h-11 px-6" onClick={() => run(load)}>
+          Show questions
+        </Button>
       ) : (
-        <Button variant="outline" className="mt-4 h-11 px-6" onClick={run}>
-          Generate questions
+        <Button variant="outline" className="mt-4 h-11 px-6" onClick={() => run(generate)}>
+          {count > 0 ? 'Generate more' : 'Generate questions'}
         </Button>
       )}
       {error && (
