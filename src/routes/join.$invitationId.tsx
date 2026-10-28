@@ -30,8 +30,8 @@ function Join() {
   async function accept() {
     const { error } = await authClient.organization.acceptInvitation({ invitationId })
     if (error) throw new Error(error.message ?? 'Could not join')
-    await router.invalidate()
     await router.navigate({ to: '/welcome' })
+    await router.invalidate()
   }
 
   const message = !invite ? 'This invite link is not valid.' : invite.status !== 'pending' ? closed[invite.status] : ''

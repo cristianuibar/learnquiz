@@ -23,8 +23,8 @@ function SignIn() {
       <CredentialsForm
         initial="in"
         onDone={async () => {
+          await router.navigate({ href: next })
           await router.invalidate()
-          router.history.push(next)
         }}
       />
       {facebookEnabled && (

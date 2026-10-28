@@ -27,8 +27,8 @@ function NewCompany() {
     setError('')
     try {
       const { slug } = await create({ data: { name: String(f.get('name')), roleName: String(f.get('role')) } })
-      await router.invalidate()
       await router.navigate({ to: '/org/$slug', params: { slug } })
+      await router.invalidate()
     } catch (err) {
       setError(errorMessage(err))
       setBusy(false)

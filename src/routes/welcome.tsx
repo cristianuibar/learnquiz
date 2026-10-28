@@ -33,8 +33,8 @@ function Welcome() {
     setError('')
     try {
       await accept()
+      await router.navigate({ href: next })
       await router.invalidate()
-      router.history.push(next)
     } catch (err) {
       setError(errorMessage(err))
       setBusy(false)
