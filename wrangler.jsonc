@@ -19,7 +19,7 @@
     {
       "binding": "DB",
       "database_name": "learnquiz",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "0aee5b26-bd1b-4a9f-ad44-8d95454d8ebf",
       "migrations_dir": "drizzle"
     }
   ],
