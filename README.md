@@ -31,14 +31,14 @@ images, Better Auth (guest login, Facebook login when configured), shadcn/ui, Ta
 
 ```sh
 pnpm install
-cp .dev.vars.example .dev.vars        # set BETTER_AUTH_SECRET
+cp .dev.vars.example .dev.vars        # set LLM_API_KEY and BETTER_AUTH_SECRET
 pnpm exec wrangler d1 migrations apply learnquiz --local
-LLM_API_KEY=... CLOUDFLARE_INCLUDE_PROCESS_ENV=true pnpm dev   # http://localhost:3000
+pnpm dev                              # http://localhost:3000
 ```
 
-The API key is read from the process environment so it never sits in a file. With
-Proton Pass: `CLOUDFLARE_INCLUDE_PROCESS_ENV=true pass-cli run --env-file lq.env -- pnpm dev` where `lq.env` holds only the
-`pass://` reference.
+`.dev.vars` is git-ignored. To fill the key from Proton Pass without showing it:
+`pass-cli run --env-file lq.env -- sh -c 'printf "LLM_API_KEY=%s\n" "$LLM_API_KEY" >> .dev.vars'`
+where `lq.env` holds only the `pass://` reference.
 
 Deploy: create the D1 database and R2 bucket named in `wrangler.jsonc`, put the
 `database_id` there, set the secrets with `wrangler secret put`, then `pnpm deploy`.
