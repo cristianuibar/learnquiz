@@ -47,24 +47,24 @@ export async function chatJson<T>(opts: {
   ]
   const clean = (s: string) => (env.LLM_API_KEY ? s.replaceAll(env.LLM_API_KEY, '[redacted]') : s).slice(0, 300)
 
-  // Daily cap backstop for every caller: reject before fetch and before logCall,
-  // so a capped learner gets a 429 and no new model_calls row.
-  // shortcut: count-then-call is not atomic, so concurrent calls can overshoot by a few; the per-handler check keeps the common path exact.
-  if (opts.learnerId) {
-    try {
-      const [row] = await getDb()
-        .select({ n: count() })
-        .from(modelCalls)
-        .where(and(eq(modelCalls.learnerId, opts.learnerId), gte(modelCalls.createdAt, utcDayStart(Date.now()))))
-      if (isOverDailyCap(row?.n ?? 0)) throw new LlmError('You have reached the daily limit for generating new content. Try again tomorrow.', 429)
-    } catch (e) {
-      if (e instanceof LlmError) throw e
-      console.error('daily cap check failed, allowing call', e instanceof Error ? e.message : e)
-    }
-  }
-
   let failure = ''
   for (let attempt = 0; attempt < 2; attempt++) {
+    // Daily cap backstop for every attempt: reject before fetch and before logCall,
+    // so a capped learner gets a 429 and no new model_calls row.
+    // shortcut: count-then-call is not atomic, so concurrent calls can overshoot by a few; the per-handler check keeps the common path exact.
+    if (opts.learnerId) {
+      try {
+        const [row] = await getDb()
+          .select({ n: count() })
+          .from(modelCalls)
+          .where(and(eq(modelCalls.learnerId, opts.learnerId), gte(modelCalls.createdAt, utcDayStart(Date.now()))))
+        if (isOverDailyCap(row?.n ?? 0)) throw new LlmError('You have reached the daily limit for generating new content. Try again tomorrow.', 429)
+      } catch (e) {
+        if (e instanceof LlmError) throw e
+        console.error('daily cap check failed, allowing call', e instanceof Error ? e.message : e)
+      }
+    }
+
     const started = Date.now()
     let usage: Usage | undefined
     let content = ''
