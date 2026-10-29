@@ -14,5 +14,6 @@ the project root (`../IDEA.md`, `../AGENTS.md`, `../context/spec/SPEC.md`, `../c
 - PRs, issues, commit messages, release notes, the README and GitHub comments describe the
   change only: never mention review process or agent tooling ("cross-review",
   "cross-family" gates, reviewer or implementer lanes, lines like
-  `Implementer: codex (openai): gpt-6.1-sol xhigh`). The README's hackathon disclosure
-  that coding agents were used is the one exception.
+  `Implementer: codex (openai): gpt-6.1-sol xhigh`). Two exceptions: the README's
+  hackathon disclosure that coding agents were used, and the one `Implementer:` line in
+  commit bodies and PR descriptions, which the merge gate reads.
