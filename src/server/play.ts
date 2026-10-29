@@ -201,7 +201,18 @@ export const startSession = createServerFn({ method: 'POST' })
 
     // Seen items come back through the due list, not as fresh frontier questions.
     const top = frontier.slice(0, 4)
-    const generated = await Promise.all(top.map((f) => ensureConceptItems(db, learnerId, f.concept, topic, { targetDifficulty, unseen: seen })))
+    const generated = await Promise.all(top.map(async (f) => {
+      try {
+        return await ensureConceptItems(db, learnerId, f.concept, topic, { targetDifficulty, unseen: seen })
+      } catch (error) {
+        // Defer capped generation when stored reviews are due; other failures still surface.
+        if (
+          due.length > 0 && error instanceof Error && 'status' in error && error.status === 429 &&
+          error.message === 'You have reached the daily limit for generating new content. Try again tomorrow.'
+        ) return []
+        throw error
+      }
+    }))
     const frontierInput = top.map((f, i) => ({
       conceptId: f.concept.id,
       unitOrder: f.unitOrder,
