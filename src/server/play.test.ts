@@ -1,7 +1,8 @@
 import { DatabaseSync } from 'node:sqlite'
 import { readFileSync } from 'node:fs'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
-import { expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { chatJson, LlmError } from '@/lib/llm/client'
 
 // Only external boundaries are faked: the server-fn transport, auth, the model
 // client and the Cloudflare bindings. The handlers under test run for real
@@ -21,15 +22,17 @@ vi.mock('@/db', () => ({ getDb: () => holder.db }))
 vi.mock('@/server/session', () => ({ requireLearnerId: async () => 'u1' }))
 
 vi.mock('@/lib/llm/client', () => ({
-  chatJson: async () => ({ line: 'You know the basics and will grow from here.' }),
+  chatJson: vi.fn(async () => ({ line: 'You know the basics and will grow from here.' })),
   LlmError: class LlmError extends Error {
-    status = 500
+    constructor(message: string, public status: number) {
+      super(message)
+    }
   },
 }))
 
 vi.mock('cloudflare:workers', () => ({ env: {} }))
 
-import { endSession, nextItem } from './play'
+import { endSession, nextItem, startSession } from './play'
 
 type Method = 'run' | 'all' | 'values' | 'get'
 
@@ -85,6 +88,71 @@ function seedTopicAndLearner(raw: DatabaseSync, xp: number) {
 
 const scalar = (raw: DatabaseSync, sqlText: string, ...params: (string | number)[]) =>
   (raw.prepare(sqlText).get(...params) as unknown as Record<string, unknown> | undefined) ?? {}
+
+function seedFrontier(raw: DatabaseSync, itemCount: number, hasDue: boolean) {
+  raw.prepare('INSERT INTO units (id, topic_id, "order", name, unlocked_at) VALUES (?, ?, ?, ?, ?)').run('un1', 't1', 0, 'Basics', 1)
+  raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)').run('c1', 't1', 'un1', 0, 'Variables', '')
+  const payload = JSON.stringify({
+    format: 'cloze', stem: 'Solve x + 1 = 2: x = ____.', options: [], accepted_answers: ['1'], model_answer: '1',
+    explanation: 'Subtract 1 from both sides.', difficulty: 1, source_quote: null, grounded: false, bloom: 'apply',
+  })
+  const item = raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+  const schedule = raw.prepare('INSERT INTO learner_item (learner_id, item_id, due, stability, difficulty, state) VALUES (?, ?, ?, ?, ?, ?)')
+  for (let i = 1; i <= itemCount; i++) {
+    item.run(`i${i}`, 'c1', 't1', 'cloze', payload, 1, Date.now())
+    schedule.run('u1', `i${i}`, Date.now() + (hasDue && i === 1 ? -1 : 86_400_000), 1, 5, 2)
+  }
+}
+
+describe('startSession frontier replenishment', () => {
+  let raw: DatabaseSync
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-29T12:00:00Z'))
+    vi.mocked(chatJson).mockClear()
+    raw = makeDb()
+    seedTopicAndLearner(raw, 0)
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    raw.close()
+  })
+
+  it.each([
+    { frontier: 'underfilled', itemCount: 1, hasDue: true },
+    { frontier: 'seen-out', itemCount: 6, hasDue: true },
+    { frontier: 'underfilled', itemCount: 1, hasDue: false },
+  ])('handles the daily cap with a $frontier frontier and hasDue=$hasDue', async ({ itemCount, hasDue }) => {
+    seedFrontier(raw, itemCount, hasDue)
+    const log = raw.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    for (let i = 0; i < 20; i++) log.run(`call-${i}`, 'u1', 'items', 'muse-spark-1.3', 0, 1, Date.now())
+
+    const result = startSession({ data: { topicId: 't1' } })
+    if (hasDue) {
+      await expect(result).resolves.toEqual({ sessionId: expect.any(String) })
+      const { sessionId } = await result
+      const stored = scalar(raw, 'SELECT learner_id, topic_id, kind, item_ids_json, plan_json FROM sessions WHERE id = ?', sessionId)
+      expect(stored).toMatchObject({ learner_id: 'u1', topic_id: 't1', kind: 'session', item_ids_json: JSON.stringify(['i1']) })
+      expect(JSON.parse(stored.plan_json as string)).toMatchObject({ queue: ['i1'], reasons: { due: 1, frontier: 0, closers: 0 } })
+    } else {
+      await expect(result).rejects.toMatchObject({ status: 429 })
+      expect(scalar(raw, 'SELECT COUNT(*) AS n FROM sessions').n).toBe(0)
+    }
+    expect(chatJson).not.toHaveBeenCalled()
+    expect(scalar(raw, 'SELECT COUNT(*) AS n FROM model_calls').n).toBe(20)
+  })
+
+  it.each([new LlmError('Provider rate limit', 429), new Error('Unexpected generation failure')])(
+    'propagates other frontier errors even with a due question: $message',
+    async (error) => {
+      seedFrontier(raw, 1, true)
+      vi.mocked(chatJson).mockRejectedValueOnce(error)
+
+      await expect(startSession({ data: { topicId: 't1' } })).rejects.toThrow(error.message)
+      expect(scalar(raw, 'SELECT COUNT(*) AS n FROM sessions').n).toBe(0)
+    },
+  )
+})
 
 it('credits the session bonus once when two finishing nextItem calls race (practice)', async () => {
   const raw = makeDb()
