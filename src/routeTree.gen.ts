@@ -10,10 +10,16 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as StartRouteImport } from './routes/start'
+import { Route as WelcomeRouteImport } from './routes/welcome'
+import { Route as JoinInvitationIdRouteImport } from './routes/join.$invitationId'
 import { Route as MeIndexRouteImport } from './routes/me.index'
+import { Route as OrgNewRouteImport } from './routes/org.new'
 import { Route as PlaySessionIdRouteImport } from './routes/play.$sessionId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as OrgSlugIndexRouteImport } from './routes/org.$slug.index'
+import { Route as OrgSlugPeopleRouteImport } from './routes/org.$slug.people'
 import { Route as PlaySessionIdDoneRouteImport } from './routes/play.$sessionId_.done'
 import { Route as TTopicIdPathRouteImport } from './routes/t.$topicId.path'
 
@@ -22,14 +28,34 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SignInRoute = SignInRouteImport.update({
+  id: '/sign-in',
+  path: '/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StartRoute = StartRouteImport.update({
   id: '/start',
   path: '/start',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WelcomeRoute = WelcomeRouteImport.update({
+  id: '/welcome',
+  path: '/welcome',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JoinInvitationIdRoute = JoinInvitationIdRouteImport.update({
+  id: '/join/$invitationId',
+  path: '/join/$invitationId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MeIndexRoute = MeIndexRouteImport.update({
   id: '/me/',
   path: '/me/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrgNewRoute = OrgNewRouteImport.update({
+  id: '/org/new',
+  path: '/org/new',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PlaySessionIdRoute = PlaySessionIdRouteImport.update({
@@ -40,6 +66,16 @@ const PlaySessionIdRoute = PlaySessionIdRouteImport.update({
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrgSlugIndexRoute = OrgSlugIndexRouteImport.update({
+  id: '/org/$slug/',
+  path: '/org/$slug/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrgSlugPeopleRoute = OrgSlugPeopleRouteImport.update({
+  id: '/org/$slug/people',
+  path: '/org/$slug/people',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PlaySessionIdDoneRoute = PlaySessionIdDoneRouteImport.update({
@@ -55,70 +91,112 @@ const TTopicIdPathRoute = TTopicIdPathRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/sign-in': typeof SignInRoute
   '/start': typeof StartRoute
+  '/welcome': typeof WelcomeRoute
+  '/join/$invitationId': typeof JoinInvitationIdRoute
+  '/org/new': typeof OrgNewRoute
   '/play/$sessionId': typeof PlaySessionIdRoute
   '/me/': typeof MeIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/org/$slug/people': typeof OrgSlugPeopleRoute
   '/play/$sessionId/done': typeof PlaySessionIdDoneRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
+  '/org/$slug/': typeof OrgSlugIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/sign-in': typeof SignInRoute
   '/start': typeof StartRoute
+  '/welcome': typeof WelcomeRoute
+  '/join/$invitationId': typeof JoinInvitationIdRoute
+  '/org/new': typeof OrgNewRoute
   '/play/$sessionId': typeof PlaySessionIdRoute
   '/me': typeof MeIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/org/$slug/people': typeof OrgSlugPeopleRoute
   '/play/$sessionId/done': typeof PlaySessionIdDoneRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
+  '/org/$slug': typeof OrgSlugIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/sign-in': typeof SignInRoute
   '/start': typeof StartRoute
+  '/welcome': typeof WelcomeRoute
+  '/join/$invitationId': typeof JoinInvitationIdRoute
+  '/org/new': typeof OrgNewRoute
   '/play/$sessionId': typeof PlaySessionIdRoute
   '/me/': typeof MeIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/org/$slug/people': typeof OrgSlugPeopleRoute
   '/play/$sessionId_/done': typeof PlaySessionIdDoneRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
+  '/org/$slug/': typeof OrgSlugIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/sign-in'
     | '/start'
+    | '/welcome'
+    | '/join/$invitationId'
+    | '/org/new'
     | '/play/$sessionId'
     | '/me/'
     | '/api/auth/$'
+    | '/org/$slug/people'
     | '/play/$sessionId/done'
     | '/t/$topicId/path'
+    | '/org/$slug/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/sign-in'
     | '/start'
+    | '/welcome'
+    | '/join/$invitationId'
+    | '/org/new'
     | '/play/$sessionId'
     | '/me'
     | '/api/auth/$'
+    | '/org/$slug/people'
     | '/play/$sessionId/done'
     | '/t/$topicId/path'
+    | '/org/$slug'
   id:
     | '__root__'
     | '/'
+    | '/sign-in'
     | '/start'
+    | '/welcome'
+    | '/join/$invitationId'
+    | '/org/new'
     | '/play/$sessionId'
     | '/me/'
     | '/api/auth/$'
+    | '/org/$slug/people'
     | '/play/$sessionId_/done'
     | '/t/$topicId/path'
+    | '/org/$slug/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SignInRoute: typeof SignInRoute
   StartRoute: typeof StartRoute
+  WelcomeRoute: typeof WelcomeRoute
+  JoinInvitationIdRoute: typeof JoinInvitationIdRoute
+  OrgNewRoute: typeof OrgNewRoute
   PlaySessionIdRoute: typeof PlaySessionIdRoute
   MeIndexRoute: typeof MeIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  OrgSlugPeopleRoute: typeof OrgSlugPeopleRoute
   PlaySessionIdDoneRoute: typeof PlaySessionIdDoneRoute
   TTopicIdPathRoute: typeof TTopicIdPathRoute
+  OrgSlugIndexRoute: typeof OrgSlugIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -130,6 +208,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sign-in': {
+      id: '/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof SignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/start': {
       id: '/start'
       path: '/start'
@@ -137,11 +222,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StartRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/welcome': {
+      id: '/welcome'
+      path: '/welcome'
+      fullPath: '/welcome'
+      preLoaderRoute: typeof WelcomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/join/$invitationId': {
+      id: '/join/$invitationId'
+      path: '/join/$invitationId'
+      fullPath: '/join/$invitationId'
+      preLoaderRoute: typeof JoinInvitationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/me/': {
       id: '/me/'
       path: '/me'
       fullPath: '/me/'
       preLoaderRoute: typeof MeIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/org/new': {
+      id: '/org/new'
+      path: '/org/new'
+      fullPath: '/org/new'
+      preLoaderRoute: typeof OrgNewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/play/$sessionId': {
@@ -156,6 +262,20 @@ declare module '@tanstack/react-router' {
       path: '/api/auth/$'
       fullPath: '/api/auth/$'
       preLoaderRoute: typeof ApiAuthSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/org/$slug/': {
+      id: '/org/$slug/'
+      path: '/org/$slug'
+      fullPath: '/org/$slug/'
+      preLoaderRoute: typeof OrgSlugIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/org/$slug/people': {
+      id: '/org/$slug/people'
+      path: '/org/$slug/people'
+      fullPath: '/org/$slug/people'
+      preLoaderRoute: typeof OrgSlugPeopleRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/play/$sessionId_/done': {
@@ -177,12 +297,18 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  SignInRoute: SignInRoute,
   StartRoute: StartRoute,
+  WelcomeRoute: WelcomeRoute,
+  JoinInvitationIdRoute: JoinInvitationIdRoute,
+  OrgNewRoute: OrgNewRoute,
   PlaySessionIdRoute: PlaySessionIdRoute,
   MeIndexRoute: MeIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  OrgSlugPeopleRoute: OrgSlugPeopleRoute,
   PlaySessionIdDoneRoute: PlaySessionIdDoneRoute,
   TTopicIdPathRoute: TTopicIdPathRoute,
+  OrgSlugIndexRoute: OrgSlugIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

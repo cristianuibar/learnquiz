@@ -25,7 +25,7 @@ Every model call is logged to the `model_calls` table. The in-app trace is plann
 ## Stack
 
 TanStack Start (React 19) on one Cloudflare Worker, D1 (SQLite) through Drizzle, R2 for
-images, Better Auth (guest login, Facebook login when configured), shadcn/ui, Tailwind 4.
+images, Better Auth (guest login, email and password, organizations and invites, Facebook login when configured), shadcn/ui, Tailwind 4.
 
 ## Run it
 
@@ -49,6 +49,10 @@ learner at 20 model calls per day and pasted sources at 20,000 characters.
 Config (`wrangler.jsonc` vars and secrets): `LLM_PROFILE` (`meta`, `baseten`, `ollama`),
 `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, `IMAGE_MODEL`, `VOICE_ENABLED`,
 `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET`.
+
+Staff (the `/admin` area, `requireStaff()`): make a user staff once they have signed up:
+`pnpm exec wrangler d1 execute learnquiz --remote --command "UPDATE user SET role='admin' WHERE email='you@example.com'"`
+(drop `--remote` for the local database).
 
 Local edition: point `LLM_PROFILE=ollama` and `LLM_BASE_URL` at an Ollama or llama.cpp
 server running Muse Glimmer; images and voice switch off.

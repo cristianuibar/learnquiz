@@ -185,3 +185,36 @@ export const modelCalls = sqliteTable('model_calls', {
   error: text('error'),
   createdAt: integer('created_at').notNull(),
 })
+
+// Company training roles: the benchmark is the mastery threshold, onboarding_days the period it should be met in.
+export const jobRoles = sqliteTable('job_roles', {
+  id: text('id').primaryKey(),
+  orgId: text('org_id').notNull(),
+  name: text('name').notNull(),
+  benchmark: real('benchmark').notNull().default(0.85),
+  onboardingDays: integer('onboarding_days').notNull().default(30),
+  status: text('status', { enum: ['active', 'archived'] }).notNull().default('active'),
+  createdAt: integer('created_at').notNull(),
+})
+
+export const memberRoleAssignments = sqliteTable(
+  'member_role_assignments',
+  {
+    userId: text('user_id').notNull(),
+    orgId: text('org_id').notNull(),
+    jobRoleId: text('job_role_id').notNull(),
+    assignedAt: integer('assigned_at').notNull(),
+    proficientAt: integer('proficient_at'),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.orgId] })],
+)
+
+export const consents = sqliteTable(
+  'consents',
+  {
+    userId: text('user_id').notNull(),
+    kind: text('kind').notNull(), // e.g. 'disclosure-v1'
+    acceptedAt: integer('accepted_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.kind] })],
+)

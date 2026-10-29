@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm'
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
-// Better Auth core tables plus the anonymous plugin's user.isAnonymous. Same shape as `auth generate` for sqlite.
+// Better Auth core tables plus the anonymous, admin and organization plugins' fields. Same shape as `auth generate` for sqlite.
 const timestamp = (name: string) => integer(name, { mode: 'timestamp_ms' })
 const createdAt = () => timestamp('created_at').default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`).notNull()
 const updatedAt = () =>
@@ -19,6 +19,10 @@ export const user = sqliteTable('user', {
   createdAt: createdAt(),
   updatedAt: updatedAt(),
   isAnonymous: integer('is_anonymous', { mode: 'boolean' }).default(false),
+  role: text('role'),
+  banned: integer('banned', { mode: 'boolean' }).default(false),
+  banReason: text('ban_reason'),
+  banExpires: timestamp('ban_expires'),
 })
 
 export const session = sqliteTable(
@@ -34,6 +38,8 @@ export const session = sqliteTable(
     userId: text('user_id')
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
+    impersonatedBy: text('impersonated_by'),
+    activeOrganizationId: text('active_organization_id'),
   },
   (t) => [index('session_user_id_idx').on(t.userId)],
 )
@@ -71,4 +77,50 @@ export const verification = sqliteTable(
     updatedAt: updatedAt(),
   },
   (t) => [index('verification_identifier_idx').on(t.identifier)],
+)
+
+export const organization = sqliteTable('organization', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  slug: text('slug').notNull().unique(),
+  logo: text('logo'),
+  createdAt: timestamp('created_at').notNull(),
+  metadata: text('metadata'),
+})
+
+export const member = sqliteTable(
+  'member',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    role: text('role').default('member').notNull(),
+    createdAt: timestamp('created_at').notNull(),
+  },
+  (t) => [index('member_organization_id_idx').on(t.organizationId), index('member_user_id_idx').on(t.userId)],
+)
+
+export const invitation = sqliteTable(
+  'invitation',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    email: text('email').notNull(),
+    role: text('role'),
+    status: text('status').default('pending').notNull(),
+    expiresAt: timestamp('expires_at').notNull(),
+    createdAt: createdAt(),
+    inviterId: text('inviter_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    jobRoleId: text('job_role_id').notNull(), // additional field: the job role the invitee is assigned on accepting
+    inviteeName: text('invitee_name').notNull(), // additional field: prefills the sign-up name
+  },
+  (t) => [index('invitation_organization_id_idx').on(t.organizationId), index('invitation_email_idx').on(t.email)],
 )
