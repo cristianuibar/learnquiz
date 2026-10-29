@@ -4,6 +4,7 @@ import { concepts, items, learnerConcept, topics } from '@/db/schema'
 import { chatJson, LlmError } from '@/lib/llm/client'
 import { itemsPrompt, selfCheckPrompt } from '@/lib/llm/prompts'
 import { ItemBatch, ItemPayload, SelfCheck } from '@/lib/llm/schemas'
+import { assertWithinDailyCap } from '@/server/model-cap'
 
 // Server-only helpers shared by the server-function files. They live apart from them so no server-only import reaches the client bundle.
 
@@ -53,6 +54,8 @@ export async function ensureConceptItems(
   // Six stored items are enough unless the learner has already seen them all.
   const fresh = opts.unseen ? existing.filter((r) => !opts.unseen!.has(r.id)).length : existing.length
   if (existing.length >= 6 && fresh > 0) return existing.map(asItem)
+  // Only a real generation spends the cap; stored items stay readable at the cap.
+  await assertWithinDailyCap(db, learnerId)
   // shortcut: no lock, two concurrent calls for one concept may both generate; add a claim row if the UI double-fires.
 
   const avoidStems = existing.slice(0, 3).map((r) => (JSON.parse(r.payloadJson) as ItemPayload).stem)
@@ -97,6 +100,7 @@ export async function ensureConceptItems(
           })
         ).results
       } catch (e) {
+        if (e instanceof LlmError && e.status === 429) throw httpError(e.message, 429)
         if (!(e instanceof LlmError)) throw e
       }
       drafted.forEach((payload, index) => {
@@ -104,6 +108,7 @@ export async function ensureConceptItems(
         if (verdict?.keep) kept.push({ payload, check: verdict ?? null })
       })
     } catch (e) {
+      if (e instanceof LlmError && e.status === 429) throw httpError(e.message, 429)
       if (!(e instanceof LlmError)) throw e
       console.error('item generation failed', e.message)
       break

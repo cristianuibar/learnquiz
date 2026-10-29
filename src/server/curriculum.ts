@@ -7,7 +7,9 @@ import { validateSkeleton, fallbackSkeleton } from '@/lib/curriculum/validate'
 import { chatJson, LlmError } from '@/lib/llm/client'
 import { curriculumPrompt } from '@/lib/llm/prompts'
 import { CurriculumSkeleton } from '@/lib/llm/schemas'
+import { MAX_SOURCE_TEXT_CHARS } from '@/lib/limits'
 import { asItem, chunks, ensureConceptItems, httpError, loadPKnown, mean, targetFor, type StoredItem } from '@/server/helpers'
+import { assertWithinDailyCap } from '@/server/model-cap'
 import { requireLearnerId } from '@/server/session'
 
 export const createTopic = createServerFn({ method: 'POST' })
@@ -15,12 +17,14 @@ export const createTopic = createServerFn({ method: 'POST' })
     z.object({
       topic: z.string().trim().min(2).max(200),
       goal: z.string().max(300).optional(),
-      sourceText: z.string().max(400000).optional(),
+      sourceText: z.string().max(MAX_SOURCE_TEXT_CHARS).optional(),
     }),
   )
   .handler(async ({ data }): Promise<{ topicId: string }> => {
     const learnerId = await requireLearnerId()
     const db = getDb()
+    // Before any stored write: a capped learner stores no topic or source row.
+    await assertWithinDailyCap(db, learnerId)
     const topicId = crypto.randomUUID()
     await db.insert(topics).values({ id: topicId, learnerId, title: data.topic, goal: data.goal ?? null, status: 'generating', createdAt: Date.now() })
     try {
@@ -40,6 +44,13 @@ export const createTopic = createServerFn({ method: 'POST' })
           learnerId,
         })
       } catch (e) {
+        if (e instanceof LlmError && e.status === 429) {
+          // A request that raced the cap check stored its rows before the backstop
+          // fired; remove them so a capped request leaves nothing behind.
+          await db.delete(sources).where(eq(sources.topicId, topicId)).catch(() => {})
+          await db.delete(topics).where(eq(topics.id, topicId)).catch(() => {})
+          throw httpError(e.message, 429)
+        }
         // Only invalid output falls back to the generic skeleton; a dead or unauthorised model must not look like success.
         if (!(e instanceof LlmError) || e.status !== 422) {
           throw httpError(`The model did not answer (${e instanceof LlmError ? e.status : 'error'}). Try again.`, 503)
