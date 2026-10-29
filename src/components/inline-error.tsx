@@ -7,7 +7,7 @@ export function InlineError({ message, onRetry }: { message: string; onRetry: ()
   return (
     <div role="alert" className="flex flex-wrap items-center gap-3">
       <p className="text-sm font-medium text-wrong">{message}</p>
-      <Button variant="outline" className="h-11 px-6" onClick={onRetry}>
+      <Button variant="outline" className="h-12 px-6" onClick={onRetry}>
         Try again
       </Button>
     </div>

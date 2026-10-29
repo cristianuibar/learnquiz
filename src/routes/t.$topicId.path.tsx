@@ -24,7 +24,7 @@ export const Route = createFileRoute('/t/$topicId/path')({
       <p role="alert" className="font-medium text-wrong">
         {error instanceof Error ? error.message : 'Something went wrong'}
       </p>
-      <Button asChild variant="outline" className="mt-6 h-11 px-6">
+      <Button asChild variant="outline" className="mt-6 h-12 px-6">
         <Link to="/start">Start over</Link>
       </Button>
     </main>
@@ -76,7 +76,7 @@ function Path() {
                 </span>
               </div>
               <details className="mt-2">
-                <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium">
+                <summary className="flex min-h-12 cursor-pointer items-center text-sm font-medium">
                   {unit.concepts.length} concepts
                 </summary>
                 <ul className="mt-2 flex flex-col gap-3">
@@ -89,7 +89,7 @@ function Path() {
           </li>
         ))}
       </ol>
-      <div className="sticky bottom-0 -mx-4 mt-8 border-t bg-background px-4 py-4">
+      <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] -mx-4 mt-8 border-t bg-background px-4 py-4">
         <StartButton topicId={topic.id} placement={!learner.placed}>
           {learner.placed ? 'Start session' : 'Find my level'}
         </StartButton>
@@ -134,7 +134,7 @@ function Concept({
       ) : (
         concept.itemCount > 0 &&
         items.length === 0 && (
-          <Button variant="outline" className="mt-4 h-11 px-6" onClick={show}>
+          <Button variant="outline" className="mt-4 h-12 px-6" onClick={show}>
             Show questions
           </Button>
         )

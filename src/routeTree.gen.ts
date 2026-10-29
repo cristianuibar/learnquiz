@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as StartRouteImport } from './routes/start'
+import { Route as MeIndexRouteImport } from './routes/me.index'
 import { Route as PlaySessionIdRouteImport } from './routes/play.$sessionId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as PlaySessionIdDoneRouteImport } from './routes/play.$sessionId_.done'
@@ -24,6 +25,11 @@ const IndexRoute = IndexRouteImport.update({
 const StartRoute = StartRouteImport.update({
   id: '/start',
   path: '/start',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MeIndexRoute = MeIndexRouteImport.update({
+  id: '/me/',
+  path: '/me/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PlaySessionIdRoute = PlaySessionIdRouteImport.update({
@@ -51,6 +57,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/start': typeof StartRoute
   '/play/$sessionId': typeof PlaySessionIdRoute
+  '/me/': typeof MeIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/play/$sessionId/done': typeof PlaySessionIdDoneRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/start': typeof StartRoute
   '/play/$sessionId': typeof PlaySessionIdRoute
+  '/me': typeof MeIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/play/$sessionId/done': typeof PlaySessionIdDoneRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
@@ -68,6 +76,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/start': typeof StartRoute
   '/play/$sessionId': typeof PlaySessionIdRoute
+  '/me/': typeof MeIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/play/$sessionId_/done': typeof PlaySessionIdDoneRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
@@ -78,6 +87,7 @@ export interface FileRouteTypes {
     | '/'
     | '/start'
     | '/play/$sessionId'
+    | '/me/'
     | '/api/auth/$'
     | '/play/$sessionId/done'
     | '/t/$topicId/path'
@@ -86,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/start'
     | '/play/$sessionId'
+    | '/me'
     | '/api/auth/$'
     | '/play/$sessionId/done'
     | '/t/$topicId/path'
@@ -94,6 +105,7 @@ export interface FileRouteTypes {
     | '/'
     | '/start'
     | '/play/$sessionId'
+    | '/me/'
     | '/api/auth/$'
     | '/play/$sessionId_/done'
     | '/t/$topicId/path'
@@ -103,6 +115,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   StartRoute: typeof StartRoute
   PlaySessionIdRoute: typeof PlaySessionIdRoute
+  MeIndexRoute: typeof MeIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   PlaySessionIdDoneRoute: typeof PlaySessionIdDoneRoute
   TTopicIdPathRoute: typeof TTopicIdPathRoute
@@ -122,6 +135,13 @@ declare module '@tanstack/react-router' {
       path: '/start'
       fullPath: '/start'
       preLoaderRoute: typeof StartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/me/': {
+      id: '/me/'
+      path: '/me'
+      fullPath: '/me/'
+      preLoaderRoute: typeof MeIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/play/$sessionId': {
@@ -159,6 +179,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   StartRoute: StartRoute,
   PlaySessionIdRoute: PlaySessionIdRoute,
+  MeIndexRoute: MeIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   PlaySessionIdDoneRoute: PlaySessionIdDoneRoute,
   TTopicIdPathRoute: TTopicIdPathRoute,

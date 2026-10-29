@@ -124,32 +124,29 @@ function Play({ initial }: { initial: SessionView }) {
   const chosen = item?.options.find((o) => o.id === choice)?.text ?? (item?.format === 'mcq' ? null : choice.trim())
 
   return (
-    <main className="mx-auto w-full max-w-xl px-4 pt-4 pb-16">
+    <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col px-4 pt-4">
       <ProgressHeader topicId={view.topicId} position={progress.position} total={progress.total} placement={placement} />
-      <div className="mt-8 flex flex-col gap-6">
+      <div className="mt-6 flex flex-1 flex-col gap-6 pb-6">
         {view.ended || !item ? (
           !error && <Working label={placement ? 'Working out your level' : 'Wrapping up'} />
         ) : reveal ? (
           <>
             <p className="text-xl font-semibold">{item.stem}</p>
             <form
-              className="flex flex-col gap-4"
+              id="play"
               onSubmit={(e) => {
                 e.preventDefault()
                 submitNext()
               }}
             >
               <RevealCard reveal={reveal} chosen={chosen} why={why} onWhy={setWhy} />
-              <Button type="submit" autoFocus disabled={busy} className="h-11 self-end px-6">
-                {reveal.state === 'D' ? 'Got it' : 'Continue'}
-              </Button>
             </form>
             {reported ? (
               <p className="text-sm text-muted-foreground">Reported</p>
             ) : (
               <Button
                 variant="link"
-                className="h-11 self-start px-0 text-muted-foreground"
+                className="h-12 self-start px-0 text-muted-foreground"
                 disabled={busy}
                 onClick={() =>
                   void run(async () => {
@@ -164,6 +161,7 @@ function Play({ initial }: { initial: SessionView }) {
           </>
         ) : (
           <form
+            id="play"
             className="flex flex-col gap-6"
             onSubmit={(e) => {
               e.preventDefault()
@@ -187,7 +185,7 @@ function Play({ initial }: { initial: SessionView }) {
                 </Label>
                 <Input
                   id="answer"
-                  className="h-11"
+                  className="h-12"
                   value={choice}
                   onChange={(e) => setChoice(e.target.value)}
                   maxLength={500}
@@ -197,13 +195,25 @@ function Play({ initial }: { initial: SessionView }) {
               </div>
             )}
             <ConfidencePicker value={confidence} onChange={setConfidence} />
-            <Button type="submit" disabled={!ready || busy} className="h-11 self-end px-6">
-              Check
-            </Button>
           </form>
         )}
         {error && <InlineError message={error.message} onRetry={error.retry} />}
       </div>
+      {!view.ended && item && (
+        // Pinned to the bottom edge so the thumb reaches it; the key remounts it so autoFocus lands on Continue after a check.
+        <div className="sticky bottom-0 -mx-4 border-t bg-background px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <Button
+            key={reveal ? 'next' : 'check'}
+            type="submit"
+            form="play"
+            autoFocus={Boolean(reveal)}
+            disabled={busy || (!reveal && !ready)}
+            className="h-12 w-full px-6"
+          >
+            {reveal ? (reveal.state === 'D' ? 'Got it' : 'Continue') : 'Check'}
+          </Button>
+        </div>
+      )}
     </main>
   )
 }

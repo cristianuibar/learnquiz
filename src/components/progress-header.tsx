@@ -19,7 +19,7 @@ export function ProgressHeader({
         to="/t/$topicId/path"
         params={{ topicId }}
         aria-label="Close"
-        className="-ml-3 flex size-11 shrink-0 items-center justify-center rounded-md outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        className="-ml-3 flex size-12 shrink-0 items-center justify-center rounded-md outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50"
       >
         <X className="size-5" aria-hidden />
       </Link>

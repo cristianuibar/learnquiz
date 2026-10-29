@@ -22,7 +22,7 @@ export function ConfidencePicker({
       value={value}
       onChange={(id) => onChange(id as Confidence)}
       className="grid grid-cols-3 gap-2"
-      itemClassName="justify-center"
+      itemClassName="justify-center px-2"
     />
   )
 }

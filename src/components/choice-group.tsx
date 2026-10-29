@@ -28,7 +28,7 @@ export function ChoiceGroup({
           <label
             key={o.id}
             className={cn(
-              'flex min-h-11 cursor-pointer items-center rounded-lg border bg-background px-4 py-2 hover:bg-accent has-checked:border-primary has-checked:bg-accent has-checked:font-medium has-focus-visible:ring-[3px] has-focus-visible:ring-ring/50',
+              'flex min-h-12 cursor-pointer items-center rounded-lg border bg-background px-4 py-2 hover:bg-accent has-checked:border-primary has-checked:bg-accent has-checked:font-medium has-focus-visible:ring-[3px] has-focus-visible:ring-ring/50',
               itemClassName,
             )}
           >
