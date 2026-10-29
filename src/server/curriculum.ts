@@ -44,7 +44,13 @@ export const createTopic = createServerFn({ method: 'POST' })
           learnerId,
         })
       } catch (e) {
-        if (e instanceof LlmError && e.status === 429) throw httpError(e.message, 429)
+        if (e instanceof LlmError && e.status === 429) {
+          // A request that raced the cap check stored its rows before the backstop
+          // fired; remove them so a capped request leaves nothing behind.
+          await db.delete(sources).where(eq(sources.topicId, topicId)).catch(() => {})
+          await db.delete(topics).where(eq(topics.id, topicId)).catch(() => {})
+          throw httpError(e.message, 429)
+        }
         // Only invalid output falls back to the generic skeleton; a dead or unauthorised model must not look like success.
         if (!(e instanceof LlmError) || e.status !== 422) {
           throw httpError(`The model did not answer (${e instanceof LlmError ? e.status : 'error'}). Try again.`, 503)
