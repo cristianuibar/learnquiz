@@ -1,3 +1,4 @@
+import { MAX_SOURCE_TEXT_CHARS } from '@/lib/limits'
 import type { ItemPayload } from '@/lib/llm/schemas'
 
 type Prompt = { system: string; user: string }
@@ -5,8 +6,8 @@ type Prompt = { system: string; user: string }
 const LEVELS = ['novice', 'beginner', 'intermediate', 'advanced', 'fluent']
 const levelLabel = (level: number) => `${level} of 5 (${LEVELS[Math.min(5, Math.max(1, Math.round(level))) - 1]})`
 
-// shortcut: the prompt carries only the first 200k characters of a source, split by section when sources outgrow that.
-const SOURCE_CAP = 200_000
+// The stored source is already capped at the trust boundary; this slice only guards direct callers.
+const SOURCE_CAP = MAX_SOURCE_TEXT_CHARS
 
 // Job 7.1: curriculum skeleton.
 export function curriculumPrompt(a: {

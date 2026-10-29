@@ -1,4 +1,7 @@
 {
+  // Deploy-time edge limit (set in the Cloudflare dashboard, WAF > Rate limiting rules):
+  // POST requests to learnquiz.com, 10 per minute per IP, block. The per-learner daily
+  // model cap in the worker is the second layer; this rule stops one IP minting guests.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "learnquiz",
   "compatibility_date": "2025-09-02",

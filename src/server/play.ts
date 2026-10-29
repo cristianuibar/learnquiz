@@ -498,9 +498,11 @@ ${log.map((l) => `- ${concept.get(l.itemId) ?? 'unknown'}: ${l.correct ? 'right'
   }
 }
 
-// Closes the session in one batch, so it is either fully ended or untouched. Callers check endedAt first.
+// The claim update leads the batch and every side effect is gated on its token, so a concurrent close is a no-op and the batch stays all-or-nothing.
 async function finalise(db: Db, learnerId: string, session: SessionRow, topic: TopicRow) {
   const now = Date.now()
+  const claimToken = crypto.randomUUID()
+  const claimed = sql`exists (select 1 from sessions where id = ${session.id} and json_extract(plan_json, '$.finaliseClaim') = ${claimToken})`
   const plan = readPlan(session)
   const stmts: Stmt[] = []
   let bonus = 0
@@ -527,14 +529,17 @@ async function finalise(db: Db, learnerId: string, session: SessionRow, topic: T
       db
         .update(learnerTopic)
         .set({ level })
-        .where(and(eq(learnerTopic.learnerId, learnerId), eq(learnerTopic.topicId, topic.id))),
+        .where(and(eq(learnerTopic.learnerId, learnerId), eq(learnerTopic.topicId, topic.id), claimed)),
       ...chunks(seeds, 10).map((rows) => db.insert(learnerConcept).values(rows).onConflictDoNothing()),
       db
         .update(units)
         .set({ unlockedAt: now })
-        .where(and(inArray(units.id, unlock), isNull(units.unlockedAt))),
+        .where(and(inArray(units.id, unlock), isNull(units.unlockedAt), claimed)),
       // The placement id is the session id, and the reveal line rides along in log_json.
-      db.insert(placements).values({ id: session.id, learnerId, topicId: topic.id, logJson: JSON.stringify({ log: plan.log, levelLine }), levelResult: level, createdAt: now }),
+      db
+        .insert(placements)
+        .values({ id: session.id, learnerId, topicId: topic.id, logJson: JSON.stringify({ log: plan.log, levelLine }), levelResult: level, createdAt: now })
+        .onConflictDoNothing(),
     )
   } else if (!('log' in plan)) {
     const [lt, [{ answered }]] = await Promise.all([
@@ -549,14 +554,18 @@ async function finalise(db: Db, learnerId: string, session: SessionRow, topic: T
       db
         .update(learnerTopic)
         .set({ xp: sql`${learnerTopic.xp} + ${bonus}`, streakCount, lastSessionAt })
-        .where(and(eq(learnerTopic.learnerId, learnerId), eq(learnerTopic.topicId, topic.id))),
+        .where(and(eq(learnerTopic.learnerId, learnerId), eq(learnerTopic.topicId, topic.id), claimed)),
     )
   }
 
-  stmts.push(
+  stmts.unshift(
     db
       .update(sessions)
-      .set({ endedAt: now, xp: session.xp + bonus })
+      .set({
+        endedAt: now,
+        xp: session.xp + bonus,
+        planJson: sql`json_set(coalesce(plan_json, '{}'), '$.finaliseClaim', ${claimToken})`,
+      })
       .where(and(eq(sessions.id, session.id), isNull(sessions.endedAt))),
   )
   await batch(db, stmts)
