@@ -58,8 +58,8 @@ server running Muse Glimmer; images and voice switch off.
 All code in this repository was written during the hackathon window, starting
 Oct 27, 2026. Before the kickoff only the name, the domain and an unused visual mood
 board existed; that mood board was derived from a third-party site and none of its
-assets, colours or copy ship here. Coding agents (Claude Code and Muse Code) were used
-to write code under the author's direction.
+assets, colours or copy ship here. Coding agents (Claude Code and Codex) were used
+to write code under the author's direction, and Gemini and Grok agents reviewed it.
 
 ## Licence
 
