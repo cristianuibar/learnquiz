@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Working } from '@/components/working'
 import { authClient } from '@/lib/auth-client'
+import { MAX_SOURCE_TEXT_CHARS } from '@/lib/limits'
 import { createTopic } from '@/server/curriculum'
 import { startPlacement } from '@/server/play'
 
@@ -98,7 +99,7 @@ function Start() {
               className="min-h-32"
               value={sourceText}
               onChange={(e) => setSourceText(e.target.value)}
-              maxLength={400000}
+              maxLength={MAX_SOURCE_TEXT_CHARS}
             />
           </div>
           {error && (
