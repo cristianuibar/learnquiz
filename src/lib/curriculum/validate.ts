@@ -20,7 +20,7 @@ const key = (s: string) => norm(s).toLowerCase()
 
 export function validateSkeleton(skeleton: CurriculumSkeleton, sourceText?: string | null): ValidatedSkeleton {
   const notes: string[] = []
-  const source = sourceText ? norm(sourceText) : null
+  const source = sourceText?.trim() ? sourceText : null
   const byName = new Map<string, string>()
   const units: ValidatedUnit[] = skeleton.units.map((u) => ({
     id: crypto.randomUUID(),
@@ -29,9 +29,13 @@ export function validateSkeleton(skeleton: CurriculumSkeleton, sourceText?: stri
     concepts: u.concepts.map((c) => {
       const id = crypto.randomUUID()
       if (!byName.has(key(c.name))) byName.set(key(c.name), id)
-      // shortcut: exact whitespace-normalised match only, so a quote with changed quotes or case is dropped; loosen if too many are lost.
+      // Match whitespace, case and quote-style variants, retaining the exact source substring.
       const quote = c.source_quote && norm(c.source_quote)
-      const kept = source && quote && source.includes(quote) ? quote : null
+      const pattern = quote?.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        .replace(/ /g, '\\s+')
+        .replace(/["“”]/g, '["“”]')
+        .replace(/['‘’]/g, "['‘’]")
+      const kept = source && pattern ? source.match(new RegExp(pattern, 'iu'))?.[0] ?? null : null
       if (quote && source && !kept) notes.push(`dropped quote not found in source: ${c.name}`)
       return { id, name: c.name, summary: c.summary, sourceQuote: kept, grounded: kept !== null, misconceptions: c.misconceptions }
     }),

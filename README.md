@@ -42,6 +42,9 @@ where `lq.env` holds only the `pass://` reference.
 
 Deploy: create the D1 database and R2 bucket named in `wrangler.jsonc`, put the
 `database_id` there, set the secrets with `wrangler secret put`, then `pnpm deploy`.
+In the Cloudflare dashboard, add a WAF rate limiting rule for the same zone: POST
+requests to learnquiz.com, 10 per minute per IP, block. The worker also caps each
+learner at 20 model calls per day and pasted sources at 20,000 characters.
 
 Config (`wrangler.jsonc` vars and secrets): `LLM_PROFILE` (`meta`, `baseten`, `ollama`),
 `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, `IMAGE_MODEL`, `VOICE_ENABLED`,
@@ -55,8 +58,8 @@ server running Muse Glimmer; images and voice switch off.
 All code in this repository was written during the hackathon window, starting
 Oct 27, 2026. Before the kickoff only the name, the domain and an unused visual mood
 board existed; that mood board was derived from a third-party site and none of its
-assets, colours or copy ship here. Coding agents (Claude Code and Muse Code) were used
-to write code under the author's direction.
+assets, colours or copy ship here. Coding agents (Claude Code and Codex) were used
+to write code under the author's direction, and Gemini and Grok agents reviewed it.
 
 ## Licence
 

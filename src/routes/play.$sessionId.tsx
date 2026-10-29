@@ -29,12 +29,21 @@ export const Route = createFileRoute('/play/$sessionId')({
   },
 })
 
+function isAnswerConflict(err: unknown): boolean {
+  const e = err as { status?: number; message?: string }
+  return (
+    e?.status === 409 ||
+    ['Already answered', 'This session has ended', 'That is not the current question'].some((m) => e?.message?.includes(m))
+  )
+}
+
 function Play({ initial }: { initial: SessionView }) {
   const router = useRouter()
   const check = useServerFn(answerItem)
   const next = useServerFn(nextItem)
   const end = useServerFn(endSession)
   const report = useServerFn(reportItem)
+  const sync = useServerFn(getSession)
   const [view, setView] = useState(initial)
   const [choice, setChoice] = useState('') // option id (mcq) or typed text
   const [confidence, setConfidence] = useState<Confidence | null>(null)
@@ -66,12 +75,34 @@ function Play({ initial }: { initial: SessionView }) {
       await router.navigate({ to: '/play/$sessionId/done', params: { sessionId: view.id } })
     })
 
+  async function resync() {
+    const v = await sync({ data: { sessionId: view.id } })
+    setView(v)
+    if (v.ended) return finish()
+    setChoice('')
+    setConfidence(null)
+    setReveal(null)
+    setWhy('')
+    setReported(false)
+    shownAt.current = Date.now()
+  }
+
   function submitCheck() {
     if (!item || !ready || busy) return
     const responseMs = Date.now() - shownAt.current
     void run(async () => {
       const answer = item.format === 'mcq' ? { optionId: choice } : { text: choice.trim() }
-      setReveal(await check({ data: { sessionId: view.id, itemId: item.id, answer, confidence, responseMs } }))
+      try {
+        setReveal(await check({ data: { sessionId: view.id, itemId: item.id, answer, confidence, responseMs } }))
+      } catch (err) {
+        if (!isAnswerConflict(err)) throw err
+        // The answer already landed (its response was lost): resync instead of replaying it.
+        try {
+          await resync()
+        } catch (syncErr) {
+          setError({ message: errorMessage(syncErr), retry: () => void run(resync) })
+        }
+      }
     })
   }
 
