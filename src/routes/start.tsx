@@ -52,6 +52,7 @@ function Start() {
         })
         created.current = { key, topicId }
       }
+      await router.invalidate()
       setStatus('questions')
       const { sessionId } = await place({ data: { topicId: created.current.topicId } })
       await router.navigate({ to: '/play/$sessionId', params: { sessionId } })
