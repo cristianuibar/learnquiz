@@ -24,6 +24,13 @@ function Overview() {
         </ul>
       </section>
       <Link
+        to="/org/$slug/roles"
+        params={{ slug: org.slug }}
+        className="mt-6 inline-flex h-11 items-center rounded-md font-medium underline outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      >
+        Manage job roles
+      </Link>
+      <Link
         to="/org/$slug/people"
         params={{ slug: org.slug }}
         className="mt-10 inline-flex h-11 items-center rounded-md font-medium underline outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"

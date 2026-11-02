@@ -4,7 +4,7 @@ import { and, asc, desc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '@/db'
 import { invitation, member, organization, user } from '@/db/auth-schema'
-import { jobRoles, memberRoleAssignments } from '@/db/schema'
+import { jobRoles, memberRoleAssignments, topics } from '@/db/schema'
 import { getAuth } from '@/server/auth'
 import { requireOrgAdmin } from '@/server/authz'
 import { getEnv } from '@/server/env'
@@ -12,6 +12,11 @@ import { httpError } from '@/server/helpers'
 import { getSessionUser } from '@/server/session'
 
 const Slug = z.object({ slug: z.string().min(1).max(100) })
+const Role = z.object({
+  name: z.string().trim().min(2).max(80),
+  benchmark: z.number().min(0).max(1).default(0.85),
+  onboardingDays: z.number().int().positive().default(30),
+})
 
 const slugify = (name: string) =>
   name
@@ -23,13 +28,26 @@ const slugify = (name: string) =>
 
 const rolesOf = (orgId: string) =>
   getDb()
-    .select({ id: jobRoles.id, name: jobRoles.name })
+    .select({ id: jobRoles.id, name: jobRoles.name, benchmark: jobRoles.benchmark, onboardingDays: jobRoles.onboardingDays, topicId: topics.id, topicStatus: topics.status })
     .from(jobRoles)
+    .innerJoin(topics, eq(topics.jobRoleId, jobRoles.id))
     .where(and(eq(jobRoles.orgId, orgId), eq(jobRoles.status, 'active')))
     .orderBy(asc(jobRoles.createdAt))
 
+async function insertRole(orgId: string, data: z.input<typeof Role>) {
+  const db = getDb()
+  const id = crypto.randomUUID()
+  const createdAt = Date.now()
+  // A role and its single draft topic must be stored together.
+  await db.batch([
+    db.insert(jobRoles).values({ id, orgId, ...data, createdAt }),
+    db.insert(topics).values({ id: crypto.randomUUID(), jobRoleId: id, title: data.name, status: 'draft', createdAt }),
+  ])
+  return { id }
+}
+
 export const createCompany = createServerFn({ method: 'POST' })
-  .validator(z.object({ name: z.string().trim().min(2).max(80), roleName: z.string().trim().min(2).max(80) }))
+  .validator(z.object({ name: z.string().trim().min(2).max(80), roleName: Role.shape.name }))
   .handler(async ({ data }): Promise<{ slug: string }> => {
     const me = await getSessionUser()
     if (!me) throw httpError('Sign in first', 401)
@@ -40,8 +58,22 @@ export const createCompany = createServerFn({ method: 'POST' })
     const slug = taken || base === 'new' ? `${base}-${crypto.randomUUID().slice(0, 4)}` : base
     // The creator becomes owner and the company becomes their active organization.
     const org = await getAuth().api.createOrganization({ headers: getRequestHeaders(), body: { name: data.name, slug } })
-    await db.insert(jobRoles).values({ id: crypto.randomUUID(), orgId: org.id, name: data.roleName, createdAt: Date.now() })
+    await insertRole(org.id, { name: data.roleName })
     return { slug: org.slug }
+  })
+
+export const listRoles = createServerFn({ method: 'GET' })
+  .validator(Slug)
+  .handler(async ({ data }) => {
+    const { org } = await requireOrgAdmin(data.slug)
+    return { name: org.name, slug: org.slug, roles: await rolesOf(org.id) }
+  })
+
+export const createRole = createServerFn({ method: 'POST' })
+  .validator(Slug.extend(Role.shape))
+  .handler(async ({ data: { slug, ...role } }) => {
+    const { org } = await requireOrgAdmin(slug)
+    return insertRole(org.id, role)
   })
 
 export const getOrgOverview = createServerFn({ method: 'GET' })
