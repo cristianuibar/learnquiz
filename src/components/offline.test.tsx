@@ -53,7 +53,8 @@ async function renderApp(initialEntry = '/start') {
   const start = createRoute({ getParentRoute: () => rootRoute, path: '/start', component: () => <h1>Today</h1> })
   const path = createRoute({ getParentRoute: () => rootRoute, path: '/t/$topicId/path', loader: pathRoute.options.loader, component: pathRoute.options.component, errorComponent: pathRoute.options.errorComponent })
   const play = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId', loader: playRoute.options.loader, component: playRoute.options.component, errorComponent: playRoute.options.errorComponent })
-  const router = createRouter({ routeTree: rootRoute.addChildren([start, path, play]), history: createMemoryHistory({ initialEntries: [initialEntry] }), defaultPendingMinMs: 0 })
+  const done = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId/done', component: () => <h1>Session complete</h1> })
+  const router = createRouter({ routeTree: rootRoute.addChildren([start, path, play, done]), history: createMemoryHistory({ initialEntries: [initialEntry] }), defaultPendingMinMs: 0 })
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -107,6 +108,31 @@ it('keeps the answer after an offline Check and submits it with Try again online
     expect(answerItem).toHaveBeenLastCalledWith({ data: expect.objectContaining({ itemId: 'item', answer: { optionId: 'four' }, confidence: 'sure' }) })
     expect(container.querySelector('[role="status"] h2')?.textContent).toBe('Correct, you were sure')
     expect(container.querySelector('[role="alert"]')).toBeNull()
+  } finally {
+    await cleanup()
+  }
+})
+
+it.each([false, true])('resyncs after a question is retired during an answer (session ended: %s)', async (ended) => {
+  const { container, cleanup } = await renderApp('/play/session')
+  try {
+    await act(async () => {
+      container.querySelector<HTMLInputElement>('input[name="answer"]')!.click()
+      container.querySelector<HTMLInputElement>('input[value="sure"]')!.click()
+    })
+    // Server errors can arrive without custom status properties after serialization.
+    vi.mocked(answerItem).mockRejectedValueOnce(new Error('This question has been retired'))
+    vi.mocked(getSession).mockResolvedValue({
+      id: 'session', kind: 'session', topicId: 'topic', topicTitle: 'Arithmetic', ended,
+      progress: { position: 2, total: 2 },
+      item: ended ? null : { id: 'next', conceptId: 'concept', conceptName: 'Addition', format: 'mcq', stem: '3 + 3?', options: [{ id: 'six', text: '6' }], difficulty: 1 },
+    })
+    await act(async () => { container.querySelector<HTMLButtonElement>('button[form="play"]')!.click() })
+    expect(container.textContent).toContain(ended ? 'Session complete' : '3 + 3?')
+    expect(container.textContent).not.toContain('2 + 2?')
+    expect(container.querySelector('[role="alert"]')).toBeNull()
+    expect(answerItem).toHaveBeenCalledTimes(1)
+    if (!ended) expect(container.querySelector<HTMLButtonElement>('button[form="play"]')?.disabled).toBe(true)
   } finally {
     await cleanup()
   }

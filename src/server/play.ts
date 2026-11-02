@@ -296,7 +296,8 @@ export const answerItem = createServerFn({ method: 'POST' })
     if (plan.answered) throw httpError('Already answered. Continue to the next question.', 409)
     // shortcut: no row lock, two concurrent answers to one slot would both count; add a version check if the UI double-fires.
 
-    const { item, concept, payload } = await loadItem(db, session.topicId, data.itemId)
+    const { item, concept, payload } = await loadItem(db, session.topicId, data.itemId, true)
+    if (item.status === 'retired') throw httpError('This question has been retired', 409)
     const [[lc], [li]] = await Promise.all([
       db.select().from(learnerConcept).where(and(eq(learnerConcept.learnerId, learnerId), eq(learnerConcept.conceptId, concept.id))),
       db.select().from(learnerItem).where(and(eq(learnerItem.learnerId, learnerId), eq(learnerItem.itemId, item.id))),
