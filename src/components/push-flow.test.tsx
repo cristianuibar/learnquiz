@@ -7,8 +7,9 @@ import { Route as appRoot } from '@/routes/__root'
 import { Route as doneRoute } from '@/routes/play.$sessionId_.done'
 import { Route as quickRoute } from '@/routes/play.quick.$itemId'
 import { Route as signInRoute } from '@/routes/sign-in'
+import { Route as meRoute } from '@/routes/me.index'
 import { endSession, startMiniSession } from '@/server/play'
-import { getPushSettings } from '@/server/push'
+import { getPushSettings, savePushPreferences } from '@/server/push'
 import { getSessionFn } from '@/server/session-fn'
 import type { SummaryView } from '@/lib/learning/types'
 
@@ -17,6 +18,7 @@ vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn(async () => ({ user:
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => 't1' }))
 vi.mock('@/server/play', () => ({ endSession: vi.fn(), startMiniSession: vi.fn(), startSession: vi.fn() }))
 vi.mock('@/server/push', () => ({ getPushSettings: vi.fn(), subscribe: vi.fn(), unsubscribe: vi.fn(), sendTestPush: vi.fn(), savePushPreferences: vi.fn() }))
+vi.mock('@/server/model-trace', () => ({ getModelTrace: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
 
 afterEach(() => {
@@ -32,7 +34,8 @@ async function renderApp(entry: string) {
     beforeLoad: quickRoute.options.beforeLoad, loaderDeps: quickRoute.options.loaderDeps, loader: quickRoute.options.loader })
   const play = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId', component: () => <main>One question</main> })
   const signIn = createRoute({ getParentRoute: () => rootRoute, path: '/sign-in', validateSearch: signInRoute.options.validateSearch, component: () => <main>Sign in</main> })
-  const router = createRouter({ routeTree: rootRoute.addChildren([done, quick, play, signIn]), history: createMemoryHistory({ initialEntries: [entry] }) })
+  const me = createRoute({ getParentRoute: () => rootRoute, path: '/me', beforeLoad: meRoute.options.beforeLoad, loader: meRoute.options.loader, component: meRoute.options.component })
+  const router = createRouter({ routeTree: rootRoute.addChildren([done, quick, play, signIn, me]), history: createMemoryHistory({ initialEntries: [entry] }) })
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -47,7 +50,7 @@ it.each([
   { total: 1, canPrompt: false, standalone: false, expected: false },
 ])('offers opt-in after the first completed summary (total=$total, first=$canPrompt, standalone=$standalone)', async ({ total, canPrompt, standalone, expected }) => {
   vi.mocked(endSession).mockResolvedValue({ sessionId: 's1', kind: 'session', topicId: 't1', durationMs: 1000, correct: total, total, xp: 0,
-    streak: 0, level: 1, levelLine: null, masteryMoved: [], mistakes: [], nextLine: 'Come back soon.' } satisfies SummaryView)
+    streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], nextLine: 'Come back soon.' } satisfies SummaryView)
   vi.mocked(getPushSettings).mockResolvedValue({ publicKey: 'public-key', isStaff: false, endpoints: [], canPrompt,
     prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' } })
   vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('iPhone')
@@ -89,5 +92,20 @@ it('preserves the notification link through sign-in without opening a session wh
     expect(router.state.location.search).toEqual({ redirect: link })
     expect(container.textContent).toContain('Sign in')
     expect(startMiniSession).not.toHaveBeenCalled()
+  } finally { await cleanup() }
+})
+
+it('keeps staff navigation and working push controls together on Profile', async () => {
+  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'u1', name: 'Learner', isAnonymous: false, role: 'admin' }, facebookEnabled: false, needsDisclosure: false })
+  const prefs = { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' }
+  vi.mocked(getPushSettings).mockResolvedValue({ publicKey: null, isStaff: true, endpoints: [], canPrompt: false, prefs })
+  const { container, cleanup } = await renderApp('/me')
+  try {
+    expect(container.querySelector('h1')?.textContent).toBe('Learner')
+    expect(container.querySelector('a[href="/admin"]')?.textContent).toBe('Staff area')
+    const pause = [...container.querySelectorAll('button')].find((button) => button.textContent === 'Pause pushes')!
+    await act(async () => pause.click())
+    expect(savePushPreferences).toHaveBeenCalledExactlyOnceWith({ data: { ...prefs, paused: true } })
+    expect(container.querySelector('[role="status"]')?.textContent).toBe('Pushes paused on all your devices.')
   } finally { await cleanup() }
 })

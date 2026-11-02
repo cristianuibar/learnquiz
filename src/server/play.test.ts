@@ -35,8 +35,8 @@ vi.mock('@/lib/llm/client', () => ({
 
 vi.mock('cloudflare:workers', () => ({ env: {} }))
 
-import { answerItem, endSession, getSession, nextItem, startMiniSession, startSession } from './play'
-import { getTopicPath } from './curriculum'
+import { answerItem, endSession, getSession, nextItem, startMiniSession, startPlacement, startSession } from './play'
+import { getConceptItems, getTopicPath } from './curriculum'
 import { getPushSettings } from './push'
 
 type Method = 'run' | 'all' | 'values' | 'get'
@@ -175,6 +175,35 @@ describe('learner practice and unit unlocks', () => {
   })
   afterEach(() => {
     vi.useRealTimers()
+  })
+
+  it('only exposes the learner\'s answered active questions in Path after placement', async () => {
+    seedFrontier(raw, 8, false)
+    raw.prepare('UPDATE items SET status = ? WHERE id = ?').run('reported', 'i7')
+    raw.prepare('UPDATE items SET status = ? WHERE id = ?').run('rejected', 'i8')
+    raw.prepare('DELETE FROM learner_item WHERE item_id NOT IN (?, ?)').run('i7', 'i8')
+    raw.prepare('INSERT INTO learner_item (learner_id, item_id, due, stability, difficulty, state) VALUES (?, ?, ?, ?, ?, ?)')
+      .run('u2', 'i6', Date.now(), 1, 5, 2)
+
+    const { sessionId } = await startPlacement({ data: { topicId: 't1' } })
+    const { item } = await getSession({ data: { sessionId } })
+    // Being served a question must not reveal its answers before submission.
+    expect(await getConceptItems({ data: { conceptId: 'c1' } })).toEqual({ items: [] })
+    await answerItem({ data: { sessionId, itemId: item!.id, answer: { text: '1' }, confidence: 'sure', responseMs: 1000 } })
+    await endSession({ data: { sessionId } })
+
+    expect((await getTopicPath({ data: { topicId: 't1' } })).learner.placed).toBe(true)
+    expect(await getConceptItems({ data: { conceptId: 'c1' } })).toEqual({
+      items: [{
+        id: item!.id, format: 'cloze', difficultyPrior: 1, generatedBy: null,
+        payload: {
+          format: 'cloze', stem: 'Solve x + 1 = 2: x = ____.', options: [], accepted_answers: ['1'], model_answer: '1',
+          explanation: 'Subtract 1 from both sides.', difficulty: 1, source_quote: null, grounded: false, bloom: 'apply',
+        },
+      }],
+    })
+    vi.mocked(requireLearnerId).mockResolvedValueOnce('u2')
+    expect(await getConceptItems({ data: { conceptId: 'c1' } })).toEqual({ items: [] })
   })
 
   it('keeps unit 2 locked in another learner\'s Path and practice after placement', async () => {

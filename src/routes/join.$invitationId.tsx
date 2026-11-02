@@ -60,7 +60,7 @@ function Join() {
               </p>
             )}
             <Button
-              className="h-11 self-end px-6"
+              className="h-12 self-end px-6"
               disabled={busy}
               onClick={async () => {
                 setBusy(true)

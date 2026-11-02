@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "2b323266-ef51-4cbb-bcd4-bb11cfcbdbc9",
-  "prevId": "338c6053-8870-43ce-98c5-13f9d92c4889",
+  "id": "894f62f3-779d-4005-95eb-83b69f81a3e0",
+  "prevId": "0596bced-7d46-4fa9-beb9-38b652f0d286",
   "tables": {
     "attempts": {
       "name": "attempts",
@@ -406,6 +406,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "generated_by": {
+          "name": "generated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "difficulty_prior": {
@@ -868,6 +875,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "topic_id": {
+          "name": "topic_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "purpose": {
           "name": "purpose",
           "type": "text",
@@ -1039,27 +1053,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "item_id": {
-          "name": "item_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "session_id": {
-          "name": "session_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "opened_at": {
-          "name": "opened_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -1113,38 +1106,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": false
-        },
-        "paused": {
-          "name": "paused",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "start_minute": {
-          "name": "start_minute",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 540
-        },
-        "end_minute": {
-          "name": "end_minute",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 1020
-        },
-        "timezone": {
-          "name": "timezone",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'UTC'"
         },
         "updated_at": {
           "name": "updated_at",
@@ -1416,6 +1377,13 @@
         },
         "goal": {
           "name": "goal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "generated_by": {
+          "name": "generated_by",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

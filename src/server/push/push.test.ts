@@ -18,6 +18,7 @@ vi.mock('@tanstack/react-start', () => ({
 vi.mock('@/db', () => ({ getDb: () => holder.db }))
 vi.mock('@/server/env', () => ({ getEnv: () => holder.env }))
 vi.mock('@/server/session', () => ({ getSessionUser: vi.fn() }))
+vi.mock('@tanstack/react-start/server', () => ({ setResponseStatus: vi.fn() }))
 
 import { getPushSettings, savePushPreferences, sendTestPush, subscribe, unsubscribe } from './index'
 import { sendPush } from './sender'

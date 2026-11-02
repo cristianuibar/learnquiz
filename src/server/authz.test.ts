@@ -9,6 +9,7 @@ import { checkMembership, requireStaff } from './authz'
 
 vi.mock('@/server/env', () => ({})) // cloudflare:workers does not exist under vitest
 vi.mock('@/server/session', () => ({ getSessionUser: vi.fn() }))
+vi.mock('@tanstack/react-start/server', () => ({ setResponseStatus: vi.fn() }))
 
 let db: Db
 beforeAll(() => {
