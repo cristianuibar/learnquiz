@@ -81,6 +81,47 @@ async function key(container: HTMLElement, type: 'keydown' | 'keyup') {
     .dispatchEvent(new KeyboardEvent(type, { key: ' ', bubbles: true, cancelable: true })))
 }
 
+it.each([
+  { format: 'mcq', repeats: false },
+  { format: 'cloze', repeats: false },
+  { format: 'short', repeats: false },
+  { format: 'cloze', repeats: true },
+] as const)('focuses the next $format question after Continue (repeats: $repeats)', async ({ format, repeats }) => {
+  const { container, initial, cleanup } = await renderPlay(false)
+  const nextView: SessionView = {
+    ...initial,
+    progress: { position: 2, total: 2 },
+    item: repeats ? initial.item : { ...initial.item!, id: 'i2', format, stem: 'What is 2 + 2?', options: format === 'mcq' ? [{ id: 'four', text: '4' }, { id: 'five', text: '5' }] : [] },
+  }
+  if (repeats) {
+    const reveal = {
+      attemptId: 'a1', correct: false, correctAnswer: '1', state: 'C' as const, mixUps: [], explanation: 'Subtract one.',
+      score: 0, feedback: null, missingPoints: [],
+      chosenFeedback: null, sourceQuote: null, returnsThisSession: true, pKnownBefore: 0.1, pKnownAfter: 0.05,
+    }
+    vi.mocked(answerItem).mockResolvedValueOnce(reveal)
+  }
+  vi.mocked(nextItem).mockReset().mockResolvedValue(nextView)
+  try {
+    await act(async () => {
+      const input = container.querySelector<HTMLInputElement>('#answer')!
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, repeats ? '0' : '1')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      container.querySelector<HTMLInputElement>(`input[value="${repeats ? 'unsure' : 'sure'}"]`)!.click()
+    })
+    await act(async () => { button(container, 'Check').click() })
+    await act(async () => {
+      const next = button(container, 'Continue')
+      next.focus()
+      next.click()
+    })
+    expect(nextItem).toHaveBeenCalledWith({ data: { sessionId: 's1', why: undefined } })
+    expect(document.activeElement?.textContent).toBe(nextView.item!.stem)
+    expect(document.activeElement?.tagName).toBe('H1')
+    expect(button(container, 'Check').disabled).toBe(true)
+  } finally { await cleanup() }
+})
+
 it('records, uploads WAV, lets the learner edit the transcript, and checks the edited answer', async () => {
   const { container, cleanup } = await renderPlay()
   try {

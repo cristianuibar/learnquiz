@@ -20,7 +20,7 @@ vi.mock('@tanstack/react-start', () => ({ createServerFn: () => ({
   }),
 }) }))
 
-import { createTopic, getConceptItems, getTopicPath } from './curriculum'
+import { createTopic, getTopicPath } from './curriculum'
 import { endSession, getSession, startPlacement, startSession } from './play'
 import { getModelTrace } from './model-trace'
 import { getEnv } from './env'
@@ -132,8 +132,8 @@ it.each(['placement', 'session'] as const)('traces real %s startup generation, r
   expect(path.topic.generatedBy).toBe('muse-spark-1.3')
   expect((await getSession({ data: { sessionId } })).ended).toBe(true)
   expect(view.item?.generatedBy).toBe('muse-spark-1.3')
-  const stored = await getConceptItems({ data: { conceptId: view.item!.conceptId } })
-  expect(stored.items.map((i) => i.generatedBy)).toEqual(Array(6).fill('muse-spark-1.3'))
+  const stored = raw.prepare('SELECT generated_by FROM items WHERE concept_id = ?').all(view.item!.conceptId) as { generated_by: string }[]
+  expect(stored.map((i) => i.generated_by)).toEqual(Array(6).fill('muse-spark-1.3'))
   if (kind === 'placement') {
     expect(summary.levelLineModel).toBe('muse-spark-1.3')
     expect((await getTopicPath({ data: { topicId } })).learner.levelLineModel).toBe('muse-spark-1.3')
