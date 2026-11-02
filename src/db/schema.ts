@@ -6,11 +6,12 @@ import { user } from './auth-schema'
 
 export const topics = sqliteTable('topics', {
   id: text('id').primaryKey(),
-  learnerId: text('learner_id').notNull(),
+  learnerId: text('learner_id'), // Personal topics belong to a learner; company topics belong to a job role.
+  jobRoleId: text('job_role_id').unique().references(() => jobRoles.id),
   title: text('title').notNull(),
   goal: text('goal'),
   generatedBy: text('generated_by'),
-  status: text('status', { enum: ['generating', 'ready', 'failed'] }).notNull().default('generating'),
+  status: text('status', { enum: ['draft', 'generating', 'ready', 'failed'] }).notNull().default('generating'),
   createdAt: integer('created_at').notNull(),
 })
 

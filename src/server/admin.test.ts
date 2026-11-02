@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { dbSchema } from '@/db'
 import { getAuth } from '@/server/auth'
 import { getSessionUser } from '@/server/session'
-import { getPeople, getOrgOverview } from '@/server/org'
+import { createRole, getPeople, getOrgOverview, listRoles } from '@/server/org'
 import { getCompanies, getCompany, getStaffSession, listUsers, setUserBan } from './admin'
 
 const boundary = vi.hoisted(() => ({ db: null as unknown, headers: new Headers(), status: 200 }))
@@ -66,6 +66,7 @@ beforeAll(async () => {
     const id = accounts.get(name)!.id
     sqlite.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, ?)').run(name, org, id, role, NOW)
     sqlite.prepare('INSERT INTO job_roles (id, org_id, name, created_at) VALUES (?, ?, ?, ?)').run(org, org, `${org} role`, NOW)
+    sqlite.prepare('INSERT INTO topics (id, job_role_id, title, status, created_at) VALUES (?, ?, ?, ?, ?)').run(`role-${org}`, org, `${org} role`, 'draft', NOW)
     sqlite.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES (?, ?, ?, ?)').run(id, org, org, NOW)
     sqlite.prepare('INSERT INTO topics (id, learner_id, title, created_at) VALUES (?, ?, ?, ?)').run(org, id, `${org} topic`, NOW)
     sqlite.prepare('INSERT INTO sources (id, topic_id, kind, title, body_text, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(org, org, 'text', `${org} document`, 'Private source text', NOW)
@@ -124,8 +125,10 @@ it('returns company members, roles, documents, distinct active learners and scop
 })
 
 it('allows staff to read the company portal without invite secrets or company write access', async () => {
-  await expect(getOrgOverview({ data: { slug: 'alpha' } })).resolves.toMatchObject({ name: 'alpha', readOnly: true })
+  await expect(getOrgOverview({ data: { slug: 'alpha' } })).resolves.toMatchObject({ name: 'alpha', roles: [{ id: 'alpha', name: 'alpha role' }], readOnly: true })
   await expect(getPeople({ data: { slug: 'alpha' } })).resolves.toMatchObject({ readOnly: true, members: [{ email: 'learner@staff.test' }], invites: [] })
+  await expect(listRoles({ data: { slug: 'alpha' } })).rejects.toMatchObject({ status: 403 })
+  await expect(createRole({ data: { slug: 'alpha', name: 'Staff-created role' } })).rejects.toMatchObject({ status: 403 })
   const response = await authRequest('organization/invite-member', {
     organizationId: 'alpha', email: 'another@staff.test', role: 'member', jobRoleId: 'alpha', inviteeName: 'Another',
   }, accounts.get('staff')!.cookie)

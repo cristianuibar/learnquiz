@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "4e2d5a20-29f3-4afd-9331-3e3a099abd56",
-  "prevId": "894f62f3-779d-4005-95eb-83b69f81a3e0",
+  "id": "0de07e00-dd68-42ae-a446-8d72e6fc30b2",
+  "prevId": "7cb4a71c-d9b1-4eec-935a-66a8bc690432",
   "tables": {
     "attempts": {
       "name": "attempts",
@@ -1053,27 +1053,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "item_id": {
-          "name": "item_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "session_id": {
-          "name": "session_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "opened_at": {
-          "name": "opened_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -1127,38 +1106,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": false
-        },
-        "paused": {
-          "name": "paused",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "start_minute": {
-          "name": "start_minute",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 540
-        },
-        "end_minute": {
-          "name": "end_minute",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 1020
-        },
-        "timezone": {
-          "name": "timezone",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'UTC'"
         },
         "updated_at": {
           "name": "updated_at",
@@ -1418,7 +1365,14 @@
           "name": "learner_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "job_role_id": {
+          "name": "job_role_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "title": {
@@ -1458,8 +1412,30 @@
           "autoincrement": false
         }
       },
-      "indexes": {},
-      "foreignKeys": {},
+      "indexes": {
+        "topics_job_role_id_unique": {
+          "name": "topics_job_role_id_unique",
+          "columns": [
+            "job_role_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "topics_job_role_id_job_roles_id_fk": {
+          "name": "topics_job_role_id_job_roles_id_fk",
+          "tableFrom": "topics",
+          "tableTo": "job_roles",
+          "columnsFrom": [
+            "job_role_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
