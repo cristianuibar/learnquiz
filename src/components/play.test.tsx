@@ -5,7 +5,7 @@ import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { Route as playRoute } from '@/routes/play.$sessionId'
 import { Route as appRootRoute } from '@/routes/__root'
-import { answerItem, getSession, transcribeAnswer } from '@/server/play'
+import { answerItem, getSession, nextItem, transcribeAnswer } from '@/server/play'
 import type { Reveal, SessionView } from '@/lib/learning/types'
 
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
@@ -68,7 +68,7 @@ async function renderPlay(voiceEnabled: boolean | null = true, permissionPending
   document.body.appendChild(container)
   const root = createRoot(container)
   await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
-  return { container, mic, async cleanup() {
+  return { container, mic, initial, async cleanup() {
     await act(async () => root.unmount())
     container.remove()
     delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT
@@ -79,6 +79,34 @@ async function key(container: HTMLElement, type: 'keydown' | 'keyup') {
   await act(async () => button(container, type === 'keydown' ? 'Hold to answer by voice' : 'Release to transcribe')
     .dispatchEvent(new KeyboardEvent(type, { key: ' ', bubbles: true, cancelable: true })))
 }
+
+it.each(['mcq', 'cloze', 'short'] as const)('focuses the next %s question after Continue', async (format) => {
+  const { container, initial, cleanup } = await renderPlay(false)
+  const nextView: SessionView = {
+    ...initial,
+    progress: { position: 2, total: 2 },
+    item: { ...initial.item!, id: 'i2', format, stem: 'What is 2 + 2?', options: format === 'mcq' ? [{ id: 'four', text: '4' }, { id: 'five', text: '5' }] : [] },
+  }
+  vi.mocked(nextItem).mockReset().mockResolvedValue(nextView)
+  try {
+    await act(async () => {
+      const input = container.querySelector<HTMLInputElement>('#answer')!
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '1')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      container.querySelector<HTMLInputElement>('input[value="sure"]')!.click()
+    })
+    await act(async () => { button(container, 'Check').click() })
+    await act(async () => {
+      const next = button(container, 'Continue')
+      next.focus()
+      next.click()
+    })
+    expect(nextItem).toHaveBeenCalledWith({ data: { sessionId: 's1', why: undefined } })
+    expect(document.activeElement?.textContent).toBe('What is 2 + 2?')
+    expect(document.activeElement?.tagName).toBe('H1')
+    expect(button(container, 'Check').disabled).toBe(true)
+  } finally { await cleanup() }
+})
 
 it('records, uploads WAV, lets the learner edit the transcript, and checks the edited answer', async () => {
   const { container, cleanup } = await renderPlay()
