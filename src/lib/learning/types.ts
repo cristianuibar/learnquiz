@@ -16,12 +16,15 @@ export type ItemView = {
 export type Answer = { optionId?: string; text?: string }
 
 // (correct, confidence) decides the reveal state: A correct+sure, B correct+unsure/guess, C wrong+unsure/guess, D wrong+sure.
-export type RevealState = 'A' | 'B' | 'C' | 'D'
+export type RevealState = 'A' | 'B' | 'C' | 'D' | 'ungraded'
 
 export type Reveal = {
-  attemptId: string
+  attemptId: string | null // no scored attempt when grading is unavailable
   state: RevealState
   correct: boolean
+  score: number | null // 0..1; null when grading is unavailable
+  feedback: string | null
+  missingPoints: string[]
   correctAnswer: string // option text, or accepted answers joined with " / "
   chosenFeedback: string | null // why the chosen option is wrong (mcq, states C and D)
   explanation: string

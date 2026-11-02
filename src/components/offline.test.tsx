@@ -101,7 +101,7 @@ it('keeps the answer after an offline Check and submits it with Try again online
     expect(container.querySelector('[role="alert"]')?.textContent).toContain("You're offline")
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
     vi.mocked(answerItem).mockResolvedValueOnce({
-      attemptId: 'attempt', state: 'A', correct: true, correctAnswer: '4', chosenFeedback: null, explanation: 'Two plus two is four.', sourceQuote: null, mixUps: [], returnsThisSession: false, pKnownBefore: 0.1, pKnownAfter: 0.5,
+      attemptId: 'attempt', state: 'A', correct: true, score: 1, feedback: null, missingPoints: [], correctAnswer: '4', chosenFeedback: null, explanation: 'Two plus two is four.', sourceQuote: null, mixUps: [], returnsThisSession: false, pKnownBefore: 0.1, pKnownAfter: 0.5,
     })
     await act(async () => { container.querySelector<HTMLButtonElement>('[role="alert"] button')!.click() })
     expect(answerItem).toHaveBeenLastCalledWith({ data: expect.objectContaining({ itemId: 'item', answer: { optionId: 'four' }, confidence: 'sure' }) })

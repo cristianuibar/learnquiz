@@ -10,7 +10,8 @@ import { levelResult, nextLevel, pickNext, PLACEMENT, shouldStop } from '@/lib/l
 import { composeSession, reinsert, SESSION_BONUS, streakAfter, xpFor } from '@/lib/learning/session'
 import type { Confidence, ItemView, Reveal, SessionView, SummaryView } from '@/lib/learning/types'
 import { chatJson, transcribeAudio } from '@/lib/llm/client'
-import type { ItemPayload } from '@/lib/llm/schemas'
+import { gradePrompt } from '@/lib/llm/prompts'
+import { Grade, type ItemPayload } from '@/lib/llm/schemas'
 import { validateVoiceWav } from '@/lib/voice'
 import { getEnv } from '@/server/env'
 import { chunks, ensureConceptItems, httpError, loadPKnown, mean, targetFor } from '@/server/helpers'
@@ -333,9 +334,36 @@ export const answerItem = createServerFn({ method: 'POST' })
 
     const now = Date.now()
     const grade = gradeAnswer(payload, data.answer)
+    const pKnownBefore = lc?.pKnown ?? BKT.L0
+    let shortGrade: Grade | undefined
+    if (payload.format === 'short') {
+      try {
+        shortGrade = await chatJson({
+          purpose: 'grade',
+          schema: Grade,
+          schemaName: 'grade',
+          ...gradePrompt({ item: payload, answer: data.answer.text ?? '' }),
+          reasoningEffort: 'minimal',
+          maxTokens: 2000,
+          learnerId,
+          sessionId: session.id,
+        })
+        grade.correct = shortGrade.score >= 0.8
+      } catch (e) {
+        console.error('short answer grading failed, revealing model answer', e instanceof Error ? e.message : e)
+        // Advance without recording a wrong answer or changing mastery, scheduling or XP.
+        await db.update(sessions).set({ planJson: JSON.stringify({ ...plan, answered: true, lastAttemptId: undefined }) }).where(eq(sessions.id, session.id))
+        return {
+          attemptId: null, state: 'ungraded', correct: false, score: null,
+          feedback: 'Compare your answer with the model answer. Your learning progress has not changed.',
+          missingPoints: [], correctAnswer: payload.model_answer, chosenFeedback: null,
+          explanation: payload.explanation, sourceQuote: payload.source_quote, mixUps: [], returnsThisSession: false,
+          pKnownBefore, pKnownAfter: pKnownBefore,
+        }
+      }
+    }
     const { correct } = grade
     const state = revealState(correct, data.confidence)
-    const pKnownBefore = lc?.pKnown ?? BKT.L0
     const pKnownAfter = update(pKnownBefore, correct, guessFor(payload.format, payload.options.length, data.confidence))
     const { next, retrievabilityBefore } = review(li ?? null, correct, data.confidence, new Date(now))
     // A wrong-and-sure miss is flagged until the item is answered right again.
@@ -370,10 +398,10 @@ export const answerItem = createServerFn({ method: 'POST' })
         at: now,
         answerJson: JSON.stringify(data.answer),
         correct,
-        score: correct ? 1 : 0,
+        score: shortGrade?.score ?? (correct ? 1 : 0),
         confidence: data.confidence,
         responseMs: Math.min(data.responseMs, 600_000),
-        gradeJson: JSON.stringify({ correctAnswer: grade.correctAnswer }),
+        gradeJson: JSON.stringify({ correctAnswer: grade.correctAnswer, ...shortGrade }),
         rating: ratingFor(correct, data.confidence),
         pKnownBefore,
         pKnownAfter,
@@ -417,6 +445,9 @@ export const answerItem = createServerFn({ method: 'POST' })
       attemptId,
       state,
       correct,
+      score: shortGrade?.score ?? (correct ? 1 : 0),
+      feedback: shortGrade?.feedback ?? null,
+      missingPoints: shortGrade?.missing_points ?? [],
       correctAnswer: grade.correctAnswer,
       chosenFeedback: grade.chosenFeedback,
       explanation: payload.explanation,
@@ -433,9 +464,9 @@ async function advance(db: Db, learnerId: string, session: SessionRow, topic: To
   let nextId: string | null
   if ('log' in plan) {
     const conceptOf = new Map(plan.pool.map((p) => [p.id, p.conceptId]))
-    nextId = shouldStop(plan.log)
+    nextId = ids.length >= PLACEMENT.max || shouldStop(plan.log)
       ? null
-      : pickNext(plan.workingLevel, plan.pool, plan.log.map((l) => ({ id: l.itemId, conceptId: conceptOf.get(l.itemId) ?? '' })))
+      : pickNext(plan.workingLevel, plan.pool, ids.map((id) => ({ id, conceptId: conceptOf.get(id) ?? '' })))
     if (nextId) ids.push(nextId)
   } else {
     nextId = ids[plan.position + 1] ?? null
