@@ -36,7 +36,7 @@ export function gradeAnswer(payload: ItemPayload, answer: Answer) {
     })
     return { correct, correctAnswer: payload.accepted_answers[0] ?? payload.model_answer, chosenFeedback: null }
   }
-  // shortcut: short answers are never graded here, the server routes them to the model; wire that in before shipping short items.
+  // The server supplies the model's verdict for short answers; this helper only supplies their model answer.
   return { correct: false, correctAnswer: payload.model_answer, chosenFeedback: null }
 }
 

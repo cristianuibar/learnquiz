@@ -2,6 +2,7 @@ import { createDecipheriv, createECDH, generateKeyPairSync, hkdfSync, randomByte
 import { readFileSync, readdirSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
+import { setResponseStatus } from '@tanstack/react-start/server'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import type { z } from 'zod'
 import { getSessionUser } from '@/server/session'
@@ -15,6 +16,7 @@ vi.mock('@tanstack/react-start', () => ({
     validator: (schema: z.ZodType) => ({ handler: (fn: (input: { data: unknown }) => unknown) => async (input: { data: unknown }) => fn({ data: schema.parse(input.data) }) }),
   }),
 }))
+vi.mock('@tanstack/react-start/server', () => ({ setResponseStatus: vi.fn() }))
 vi.mock('@/db', () => ({ getDb: () => holder.db }))
 vi.mock('@/server/env', () => ({ getEnv: () => holder.env }))
 vi.mock('@/server/session', () => ({ getSessionUser: vi.fn() }))
@@ -69,6 +71,7 @@ beforeEach(() => {
   raw.exec('BEGIN')
   holder.env = { ...vapidEnv }
   vi.mocked(getSessionUser).mockResolvedValue(staff as never)
+  vi.mocked(setResponseStatus).mockClear()
   vi.stubGlobal('fetch', http)
   http.mockReset().mockResolvedValue(new Response(null, { status: 201 }))
   vi.useFakeTimers({ toFake: ['Date'] })
@@ -112,6 +115,7 @@ it('refuses unauthenticated, guest and banned accounts and restricts test delive
   vi.mocked(getSessionUser).mockResolvedValue(learner as never)
   await subscribe({ data: { endpoint, keys } })
   await expect(sendTestPush({ data: { endpoint } })).rejects.toMatchObject({ status: 403 })
+  expect(setResponseStatus).toHaveBeenLastCalledWith(403)
   vi.mocked(getSessionUser).mockResolvedValue(staff as never)
   await expect(sendTestPush({ data: { endpoint } })).rejects.toMatchObject({ status: 404 })
   expect(http).not.toHaveBeenCalled()

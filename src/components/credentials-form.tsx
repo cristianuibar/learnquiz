@@ -41,12 +41,12 @@ export function CredentialsForm({ email, name, initial = 'up', onDone }: { email
       {up && (
         <div className="flex flex-col gap-2">
           <Label htmlFor="name">Name</Label>
-          <Input id="name" name="name" className="h-11" defaultValue={name} autoComplete="name" maxLength={80} required />
+          <Input id="name" name="name" className="h-12" defaultValue={name} autoComplete="name" maxLength={80} required />
         </div>
       )}
       <div className="flex flex-col gap-2">
         <Label htmlFor="email">Email</Label>
-        <Input id="email" name="email" type="email" className="h-11" defaultValue={email} readOnly={Boolean(email)} autoComplete="email" required />
+        <Input id="email" name="email" type="email" className="h-12" defaultValue={email} readOnly={Boolean(email)} autoComplete="email" required />
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor="password">Password</Label>
@@ -54,7 +54,7 @@ export function CredentialsForm({ email, name, initial = 'up', onDone }: { email
           id="password"
           name="password"
           type="password"
-          className="h-11"
+          className="h-12"
           autoComplete={up ? 'new-password' : 'current-password'}
           minLength={8}
           maxLength={128}
@@ -67,10 +67,10 @@ export function CredentialsForm({ email, name, initial = 'up', onDone }: { email
         </p>
       )}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Button type="button" variant="ghost" className="h-11" onClick={() => setMode(up ? 'in' : 'up')}>
+        <Button type="button" variant="ghost" className="h-12" onClick={() => setMode(up ? 'in' : 'up')}>
           {up ? 'I have an account' : 'Create an account'}
         </Button>
-        <Button type="submit" className="h-11 px-6" disabled={busy}>
+        <Button type="submit" className="h-12 px-6" disabled={busy}>
           {up ? 'Sign up' : 'Sign in'}
         </Button>
       </div>

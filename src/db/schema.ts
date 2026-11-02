@@ -9,6 +9,7 @@ export const topics = sqliteTable('topics', {
   learnerId: text('learner_id').notNull(),
   title: text('title').notNull(),
   goal: text('goal'),
+  generatedBy: text('generated_by'),
   status: text('status', { enum: ['generating', 'ready', 'failed'] }).notNull().default('generating'),
   createdAt: integer('created_at').notNull(),
 })
@@ -66,6 +67,7 @@ export const items = sqliteTable('items', {
   topicId: text('topic_id').notNull(),
   format: text('format', { enum: ['mcq', 'cloze', 'short', 'image', 'order'] }).notNull(),
   payloadJson: text('payload_json').notNull(), // ItemPayload from src/lib/llm/schemas.ts
+  generatedBy: text('generated_by'),
   difficultyPrior: integer('difficulty_prior').notNull().default(3),
   eloDifficulty: real('elo_difficulty'),
   checkJson: text('check_json'),
@@ -185,6 +187,7 @@ export const modelCalls = sqliteTable('model_calls', {
   id: text('id').primaryKey(),
   learnerId: text('learner_id'),
   sessionId: text('session_id'),
+  topicId: text('topic_id'),
   purpose: text('purpose').notNull(),
   model: text('model').notNull(),
   latencyMs: integer('latency_ms').notNull(),
