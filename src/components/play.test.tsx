@@ -24,7 +24,7 @@ beforeEach(() => {
 })
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); finishPermission = undefined })
 
-async function renderPlay(voiceEnabled = true, permissionPending = false) {
+async function renderPlay(voiceEnabled: boolean | null = true, permissionPending = false) {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   stopTrack = vi.fn()
   const mic = { getTracks: () => [{ stop: stopTrack }] } as unknown as MediaStream
@@ -54,7 +54,8 @@ async function renderPlay(voiceEnabled = true, permissionPending = false) {
     startRendering() { return Promise.resolve({ getChannelData: () => new Float32Array(24_000).fill(0.25) }) }
   })
   const initial: SessionView = {
-    id: 's1', kind: 'session', topicId: 't1', topicTitle: 'Algebra', progress: { position: 1, total: 1 }, ended: false, voiceEnabled,
+    id: 's1', kind: 'session', topicId: 't1', topicTitle: 'Algebra', progress: { position: 1, total: 1 }, ended: false,
+    ...(voiceEnabled === null ? {} : { voiceEnabled }),
     item: { id: 'i1', conceptId: 'c1', conceptName: 'Variables', format: 'cloze', stem: 'x + 1 = 2; x = ____', options: [], difficulty: 1 },
   }
   vi.mocked(getSession).mockResolvedValue(initial)
@@ -154,10 +155,19 @@ it('discards a canceled permission request while a new recording is pending', as
   } finally { await cleanup() }
 })
 
-it('offers typing when voice is disabled', async () => {
-  const { container, cleanup } = await renderPlay(false)
+it.each([false, null])('offers typing when voice availability is %s', async (voiceEnabled) => {
+  const { container, cleanup } = await renderPlay(voiceEnabled)
   try {
-    expect(container.querySelector<HTMLInputElement>('#answer')!.disabled).toBe(false)
+    const input = container.querySelector<HTMLInputElement>('#answer')!
+    expect(input.disabled).toBe(false)
     expect(button(container, 'Hold to answer by voice')).toBeUndefined()
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '1')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      container.querySelector<HTMLInputElement>('input[value="sure"]')!.click()
+    })
+    await act(async () => { button(container, 'Check').click() })
+    expect(answerItem).toHaveBeenCalledWith({ data: expect.objectContaining({ answer: { text: '1' }, confidence: 'sure' }) })
+    expect(container.textContent).toContain('Correct, you were sure')
   } finally { await cleanup() }
 })
