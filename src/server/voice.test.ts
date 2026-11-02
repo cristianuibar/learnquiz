@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
@@ -32,7 +32,9 @@ const row = (sql: string) => raw.prepare(sql).get() as Record<string, unknown>
 
 beforeAll(() => {
   raw = new DatabaseSync(':memory:')
-  raw.exec(readFileSync(new URL('../../drizzle/0000_scaffold.sql', import.meta.url), 'utf8').replaceAll('--> statement-breakpoint', ''))
+  for (const file of readdirSync('drizzle').filter((f) => f.endsWith('.sql')).sort()) {
+    raw.exec(readFileSync(`drizzle/${file}`, 'utf8').replaceAll('--> statement-breakpoint', ''))
+  }
   const run = (sql: string, params: unknown[], method: string) => {
     const stmt = raw.prepare(sql)
     ;(stmt as unknown as { setReturnArrays: (value: boolean) => void }).setReturnArrays(true)
@@ -95,8 +97,8 @@ it('transcribes an owned current answer, logs voice, and grades the learner’s 
   const body = request.body as FormData
   expect(JSON.parse(await (body.get('request') as Blob).text())).toEqual({ model: 'muse-voice-transcribe-1.0', mode: 'PUSH_TO_TALK', audioEncoding: 'WAV' })
   expect(new Uint8Array(await (body.get('audio') as File).arrayBuffer())).toEqual(new Uint8Array(await recording().arrayBuffer()))
-  expect(row('SELECT learner_id, session_id, purpose, model, ok, error FROM model_calls')).toEqual({
-    learner_id: 'u1', session_id: 's1', purpose: 'voice', model: 'muse-voice-transcribe-1.0', ok: 1, error: null,
+  expect(row('SELECT learner_id, session_id, topic_id, purpose, model, ok, error FROM model_calls')).toEqual({
+    learner_id: 'u1', session_id: 's1', topic_id: 't1', purpose: 'voice', model: 'muse-voice-transcribe-1.0', ok: 1, error: null,
   })
   expect(row('SELECT COUNT(*) AS n FROM attempts').n).toBe(0)
   const reveal = await answerItem({ data: { sessionId: 's1', itemId: 'i1', answer: { text: '1' }, confidence: 'sure', responseMs: 1500 } })

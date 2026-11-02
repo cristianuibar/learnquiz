@@ -90,7 +90,8 @@ function People() {
   return (
     <main className="mx-auto w-full max-w-3xl px-4 pt-8 pb-16">
       <h1 className="text-3xl font-bold tracking-tight">People at {org.name}</h1>
-      <form className="mt-8 flex flex-col gap-6" onSubmit={invite}>
+      {org.readOnly && <p className="mt-4 text-muted-foreground">Staff view · Read only</p>}
+      {!org.readOnly && <form className="mt-8 flex flex-col gap-6" onSubmit={invite}>
         <div className="flex flex-col gap-2">
           <Label htmlFor="name">Name</Label>
           <Input id="name" name="name" className="h-11" maxLength={80} required />
@@ -122,7 +123,7 @@ function People() {
         <Button type="submit" className="h-11 self-end px-6" disabled={busy}>
           Create invite link
         </Button>
-      </form>
+      </form>}
       {org.invites.length > 0 && (
         <section className="mt-10">
           <h2 className="text-xl font-semibold">Invited</h2>

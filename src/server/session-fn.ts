@@ -10,7 +10,7 @@ import { getSessionUser } from '@/server/session'
 // Lives apart from the request helpers so no server-only import reaches the client bundle.
 export const getSessionFn = createServerFn({ method: 'GET' }).handler(
   async (): Promise<{
-    user: { id: string; name: string; isAnonymous: boolean } | null
+    user: { id: string; name: string; isAnonymous: boolean; role?: string | null } | null
     facebookEnabled: boolean
     needsDisclosure: boolean
     adminCompanies: { name: string; slug: string }[]
@@ -39,7 +39,7 @@ export const getSessionFn = createServerFn({ method: 'GET' }).handler(
             .map(({ name, slug }) => ({ name, slug }))
         : []
     return {
-      user: user && { id: user.id, name: user.name, isAnonymous: Boolean(user.isAnonymous) },
+      user: user && { id: user.id, name: user.name, isAnonymous: Boolean(user.isAnonymous), role: user.role },
       facebookEnabled: facebookEnabled(),
       needsDisclosure: Boolean(unconsented),
       adminCompanies,

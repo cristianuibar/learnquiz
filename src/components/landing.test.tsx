@@ -125,7 +125,7 @@ it.each([
 })
 
 it('lets an owner leave the portal to train, return through Profile and sign out', async () => {
-  vi.mocked(getSessionUser).mockResolvedValue({ id: 'owner', name: 'Owner', isAnonymous: false } as never)
+  vi.mocked(getSessionUser).mockResolvedValue({ id: 'owner', name: 'Owner', isAnonymous: false, role: 'admin' } as never)
   const { container, router, cleanup } = await renderApp('/')
   try {
     expect(router.state.location.pathname).toBe('/org/northwind')
@@ -135,6 +135,7 @@ it('lets an owner leave the portal to train, return through Profile and sign out
     expect(container.querySelector('h1')?.textContent).toBe('What do you want to learn?')
     await act(async () => { container.querySelector<HTMLAnchorElement>('a[href="/me"]')!.click(); await router.load() })
     expect([...container.querySelectorAll('a[href^="/org/"]')].map((a) => a.textContent)).toEqual(['Northwind portal', 'Contoso portal'])
+    expect(container.querySelector('a[href="/admin"]')?.textContent).toBe('Staff area')
     await act(async () => { container.querySelector<HTMLAnchorElement>('a[href="/org/contoso"]')!.click(); await router.load() })
     expect(router.state.location.pathname).toBe('/org/contoso')
     expect(container.querySelector('h1')?.textContent).toBe('Contoso')

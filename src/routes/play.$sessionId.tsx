@@ -1,10 +1,11 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { ChoiceGroup } from '@/components/choice-group'
 import { ConfidencePicker } from '@/components/confidence-picker'
 import { InlineError, RouteError, errorMessage } from '@/components/inline-error'
 import { ProgressHeader } from '@/components/progress-header'
+import { ModelLabel } from '@/components/model-label'
 import { RevealCard } from '@/components/reveal-card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -55,10 +56,15 @@ function Play({ initial }: { initial: SessionView }) {
   const [voiceBusy, setVoiceBusy] = useState(false)
   const [error, setError] = useState<{ message: string; retry: () => void } | null>(null)
   const shownAt = useRef(Date.now())
+  const questionHeading = useRef<HTMLHeadingElement>(null)
 
   const { item, progress } = view
   const placement = view.kind === 'placement'
   const ready = choice.trim() !== '' && confidence !== null
+
+  useEffect(() => {
+    questionHeading.current?.focus()
+  }, [item?.id, progress.position])
 
   async function run(fn: () => Promise<void>) {
     setBusy(true)
@@ -170,11 +176,14 @@ function Play({ initial }: { initial: SessionView }) {
               submitCheck()
             }}
           >
+            <h1 ref={questionHeading} tabIndex={-1} className="text-xl leading-snug font-semibold">
+              {item.stem}
+            </h1>
             {item.format === 'mcq' ? (
               <ChoiceGroup
                 name="answer"
                 legend={item.stem}
-                legendClassName="mb-4 text-xl font-semibold"
+                legendClassName="sr-only"
                 options={item.options}
                 value={choice}
                 onChange={setChoice}
@@ -182,7 +191,7 @@ function Play({ initial }: { initial: SessionView }) {
               />
             ) : (
               <div className="flex flex-col gap-4">
-                <Label htmlFor="answer" className="text-xl leading-snug font-semibold">
+                <Label htmlFor="answer" className="sr-only">
                   {item.stem}
                 </Label>
                 <Input
@@ -193,7 +202,6 @@ function Play({ initial }: { initial: SessionView }) {
                   maxLength={1000}
                   disabled={voiceBusy}
                   autoComplete="off"
-                  autoFocus
                 />
                 {view.voiceEnabled && (
                   <VoiceAnswer key={item.id} sessionId={view.id} itemId={item.id} disabled={busy} onTranscript={setChoice} onBusyChange={setVoiceBusy} />
@@ -203,6 +211,7 @@ function Play({ initial }: { initial: SessionView }) {
             <ConfidencePicker value={confidence} onChange={setConfidence} />
           </form>
         )}
+        {item && <ModelLabel model={item.generatedBy} />}
         {error && <InlineError message={error.message} onRetry={error.retry} />}
       </div>
       {!view.ended && item && (
