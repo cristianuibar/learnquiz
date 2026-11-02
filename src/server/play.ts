@@ -1,16 +1,19 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, count, eq, gte, inArray, isNotNull, isNull, lte, ne, sql } from 'drizzle-orm'
+import { and, asc, count, eq, gte, inArray, isNull, lte, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb, type Db } from '@/db'
-import { attempts, concepts, items, learnerConcept, learnerItem, learnerTopic, placements, sessions, topics, units } from '@/db/schema'
+import { attempts, concepts, items, learnerConcept, learnerItem, learnerTopic, learnerUnit, placements, sessions, topics, units } from '@/db/schema'
 import { BKT, guessFor, MASTERY, placementPrior, update } from '@/lib/learning/bkt'
 import { ratingFor, retrievability, review } from '@/lib/learning/fsrs'
 import { gradeAnswer, revealState, toItemView } from '@/lib/learning/grade'
 import { levelResult, nextLevel, pickNext, PLACEMENT, shouldStop } from '@/lib/learning/placement'
 import { composeSession, reinsert, SESSION_BONUS, streakAfter, xpFor } from '@/lib/learning/session'
 import type { Confidence, ItemView, Reveal, SessionView, SummaryView } from '@/lib/learning/types'
-import { chatJson } from '@/lib/llm/client'
-import type { ItemPayload } from '@/lib/llm/schemas'
+import { chatJson, transcribeAudio } from '@/lib/llm/client'
+import { gradePrompt } from '@/lib/llm/prompts'
+import { Grade, type ItemPayload } from '@/lib/llm/schemas'
+import { validateVoiceWav } from '@/lib/voice'
+import { getEnv } from '@/server/env'
 import { chunks, ensureConceptItems, httpError, loadPKnown, mean, targetFor } from '@/server/helpers'
 import { requireLearnerId } from '@/server/session'
 
@@ -89,8 +92,9 @@ async function loadFrontier(db: Db, learnerId: string, topicId: string) {
     .select({ concept: concepts, unitOrder: units.order, pKnown: learnerConcept.pKnown })
     .from(concepts)
     .innerJoin(units, eq(units.id, concepts.unitId))
+    .innerJoin(learnerUnit, and(eq(learnerUnit.unitId, units.id), eq(learnerUnit.learnerId, learnerId)))
     .leftJoin(learnerConcept, and(eq(learnerConcept.conceptId, concepts.id), eq(learnerConcept.learnerId, learnerId)))
-    .where(and(eq(concepts.topicId, topicId), isNotNull(units.unlockedAt)))
+    .where(eq(concepts.topicId, topicId))
   return rows
     .map((r) => ({ concept: r.concept, unitOrder: r.unitOrder, pKnown: r.pKnown ?? BKT.L0 }))
     .filter((r) => r.pKnown < MASTERY)
@@ -121,6 +125,7 @@ async function viewOf(db: Db, session: SessionRow, topic: TopicRow, plan: Placem
       { id: row.id, conceptId: concept.id, conceptName: concept.name, format: payload.format, difficultyPrior: row.difficultyPrior, payload },
       session.id + row.id,
     )
+    item.generatedBy = row.generatedBy
   }
   const placement = session.kind === 'placement'
   return {
@@ -131,6 +136,7 @@ async function viewOf(db: Db, session: SessionRow, topic: TopicRow, plan: Placem
     progress: { position: plan.position + 1, total: placement ? Math.max(PLACEMENT_TOTAL, plan.position + 1) : ids.length },
     item,
     ended,
+    voiceEnabled: getEnv().VOICE_ENABLED === 'true' && getEnv().LLM_PROFILE === 'meta',
   }
 }
 
@@ -140,6 +146,7 @@ export const startPlacement = createServerFn({ method: 'POST' })
     const learnerId = await requireLearnerId()
     const db = getDb()
     const topic = await ownedTopic(db, learnerId, data.topicId)
+    const sessionId = crypto.randomUUID()
     const [unitRows, conceptRows] = await Promise.all([
       db.select({ id: units.id }).from(units).where(eq(units.topicId, topic.id)).orderBy(asc(units.order)),
       db.select().from(concepts).where(eq(concepts.topicId, topic.id)).orderBy(asc(concepts.order)),
@@ -152,13 +159,12 @@ export const startPlacement = createServerFn({ method: 'POST' })
 
     // A failed concept keeps the others' stored items, so a retry only regenerates what is missing.
     const generated = await Promise.all(
-      picks.map((c) => ensureConceptItems(db, learnerId, c, topic, { targetDifficulty: PLACEMENT.start, spread: true })),
+      picks.map((c) => ensureConceptItems(db, learnerId, c, topic, { targetDifficulty: PLACEMENT.start, spread: true, sessionId })),
     )
     const pool = generated.flatMap((list, i) => list.map((it) => ({ id: it.id, conceptId: picks[i].id, difficulty: it.difficultyPrior })))
     const first = pickNext(PLACEMENT.start, pool, [])
     if (!first) throw httpError('Could not generate placement questions', 502)
 
-    const sessionId = crypto.randomUUID()
     const plan: PlacementPlan = { position: 0, answered: false, workingLevel: PLACEMENT.start, log: [], pool }
     // itemIdsJson holds the items served so far (the first is picked here); nextItem appends the rest.
     await db.insert(sessions).values({
@@ -179,6 +185,7 @@ export const startSession = createServerFn({ method: 'POST' })
     const learnerId = await requireLearnerId()
     const db = getDb()
     const topic = await ownedTopic(db, learnerId, data.topicId)
+    const sessionId = crypto.randomUUID()
     const now = new Date()
     const [lt, scheduled, frontier] = await Promise.all([
       loadLearnerTopic(db, learnerId, topic.id),
@@ -204,7 +211,7 @@ export const startSession = createServerFn({ method: 'POST' })
     const top = frontier.slice(0, 4)
     const generated = await Promise.all(top.map(async (f) => {
       try {
-        return await ensureConceptItems(db, learnerId, f.concept, topic, { targetDifficulty, unseen: seen })
+        return await ensureConceptItems(db, learnerId, f.concept, topic, { targetDifficulty, unseen: seen, sessionId })
       } catch (error) {
         // Defer capped generation when stored reviews are due; other failures still surface.
         if (
@@ -250,7 +257,6 @@ export const startSession = createServerFn({ method: 'POST' })
       },
       unitStart: Object.fromEntries((await unitMastery(db, learnerId, topic.id)).map((u) => [u.unitId, u.mastery])),
     }
-    const sessionId = crypto.randomUUID()
     await db.insert(sessions).values({
       id: sessionId,
       learnerId,
@@ -273,6 +279,32 @@ export const getSession = createServerFn({ method: 'GET' })
     // A reload during the reveal moves on: the answer is already recorded.
     if (session.endedAt === null && plan.answered) return advance(db, learnerId, session, topic, plan)
     return viewOf(db, session, topic, plan)
+  })
+
+export const transcribeAnswer = createServerFn({ method: 'POST' })
+  .validator((data: unknown) => {
+    if (!(data instanceof FormData)) throw httpError('A recording is required.', 400)
+    return z.object({ sessionId: z.string().min(1), itemId: z.string().min(1), audio: z.instanceof(File) }).parse({
+      sessionId: data.get('sessionId'), itemId: data.get('itemId'), audio: data.get('audio'),
+    })
+  })
+  .handler(async ({ data }): Promise<string> => {
+    const learnerId = await requireLearnerId()
+    if (getEnv().VOICE_ENABLED !== 'true' || getEnv().LLM_PROFILE !== 'meta') throw httpError('Voice answers are unavailable.', 404)
+    const db = getDb()
+    const { session } = await loadSession(db, learnerId, data.sessionId)
+    const plan = readPlan(session)
+    if (session.endedAt !== null || plan.answered || (JSON.parse(session.itemIdsJson) as string[])[plan.position] !== data.itemId) {
+      throw httpError('That is not the current question', 409)
+    }
+    const { payload } = await loadItem(db, session.topicId, data.itemId)
+    if (payload.format === 'mcq') throw httpError('Choose an answer for this question.', 400)
+    try {
+      await validateVoiceWav(data.audio)
+    } catch (e) {
+      throw httpError(e instanceof Error ? e.message : 'Invalid recording.', 400)
+    }
+    return transcribeAudio({ audio: data.audio, learnerId, sessionId: session.id, topicId: session.topicId })
   })
 
 export const answerItem = createServerFn({ method: 'POST' })
@@ -305,9 +337,36 @@ export const answerItem = createServerFn({ method: 'POST' })
 
     const now = Date.now()
     const grade = gradeAnswer(payload, data.answer)
+    const pKnownBefore = lc?.pKnown ?? BKT.L0
+    let shortGrade: Grade | undefined
+    if (payload.format === 'short') {
+      try {
+        shortGrade = await chatJson({
+          purpose: 'grade',
+          schema: Grade,
+          schemaName: 'grade',
+          ...gradePrompt({ item: payload, answer: data.answer.text ?? '' }),
+          reasoningEffort: 'minimal',
+          maxTokens: 2000,
+          learnerId,
+          sessionId: session.id,
+        })
+        grade.correct = shortGrade.score >= 0.8
+      } catch (e) {
+        console.error('short answer grading failed, revealing model answer', e instanceof Error ? e.message : e)
+        // Advance without recording a wrong answer or changing mastery, scheduling or XP.
+        await db.update(sessions).set({ planJson: JSON.stringify({ ...plan, answered: true, lastAttemptId: undefined }) }).where(eq(sessions.id, session.id))
+        return {
+          attemptId: null, state: 'ungraded', correct: false, score: null,
+          feedback: 'Compare your answer with the model answer. Your learning progress has not changed.',
+          missingPoints: [], correctAnswer: payload.model_answer, chosenFeedback: null,
+          explanation: payload.explanation, sourceQuote: payload.source_quote, mixUps: [], returnsThisSession: false,
+          pKnownBefore, pKnownAfter: pKnownBefore,
+        }
+      }
+    }
     const { correct } = grade
     const state = revealState(correct, data.confidence)
-    const pKnownBefore = lc?.pKnown ?? BKT.L0
     const pKnownAfter = update(pKnownBefore, correct, guessFor(payload.format, payload.options.length, data.confidence))
     const { next, retrievabilityBefore } = review(li ?? null, correct, data.confidence, new Date(now))
     // A wrong-and-sure miss is flagged until the item is answered right again.
@@ -342,10 +401,10 @@ export const answerItem = createServerFn({ method: 'POST' })
         at: now,
         answerJson: JSON.stringify(data.answer),
         correct,
-        score: correct ? 1 : 0,
+        score: shortGrade?.score ?? (correct ? 1 : 0),
         confidence: data.confidence,
         responseMs: Math.min(data.responseMs, 600_000),
-        gradeJson: JSON.stringify({ correctAnswer: grade.correctAnswer }),
+        gradeJson: JSON.stringify({ correctAnswer: grade.correctAnswer, ...shortGrade }),
         rating: ratingFor(correct, data.confidence),
         pKnownBefore,
         pKnownAfter,
@@ -389,6 +448,9 @@ export const answerItem = createServerFn({ method: 'POST' })
       attemptId,
       state,
       correct,
+      score: shortGrade?.score ?? (correct ? 1 : 0),
+      feedback: shortGrade?.feedback ?? null,
+      missingPoints: shortGrade?.missing_points ?? [],
       correctAnswer: grade.correctAnswer,
       chosenFeedback: grade.chosenFeedback,
       explanation: payload.explanation,
@@ -410,9 +472,9 @@ async function advance(db: Db, learnerId: string, session: SessionRow, topic: To
   let nextId: string | null
   if ('log' in plan) {
     const conceptOf = new Map(plan.pool.map((p) => [p.id, p.conceptId]))
-    nextId = shouldStop(plan.log)
+    nextId = ids.length >= PLACEMENT.max || shouldStop(plan.log)
       ? null
-      : pickNext(plan.workingLevel, plan.pool.filter((p) => available.has(p.id)), plan.log.map((l) => ({ id: l.itemId, conceptId: conceptOf.get(l.itemId) ?? '' })))
+      : pickNext(plan.workingLevel, plan.pool.filter((p) => available.has(p.id)), ids.map((id) => ({ id, conceptId: conceptOf.get(id) ?? '' })))
     if (nextId) ids.push(nextId)
   } else {
     while (position < ids.length && !available.has(ids[position])) position++
@@ -509,11 +571,12 @@ ${log.map((l) => `- ${concept.get(l.itemId) ?? 'unknown'}: ${l.correct ? 'right'
       maxTokens: 2000,
       learnerId,
       sessionId: session.id,
+      topicId: topic.id,
     })
-    return line
+    return { levelLine: line, levelLineModel: getEnv().LLM_MODEL }
   } catch (e) {
     console.error('placement line failed, using template', e instanceof Error ? e.message : e)
-    return fallback
+    return { levelLine: fallback, levelLineModel: null }
   }
 }
 
@@ -529,7 +592,7 @@ async function finalise(db: Db, learnerId: string, session: SessionRow, topic: T
   // A placement abandoned before its first answer changes nothing but its end time.
   if ('log' in plan && plan.log.length) {
     const level = levelResult(plan.log)
-    const [unitRows, conceptRows, levelLine] = await Promise.all([
+    const [unitRows, conceptRows, line] = await Promise.all([
       db.select({ id: units.id, order: units.order }).from(units).where(eq(units.topicId, topic.id)),
       db.select({ id: concepts.id, unitId: concepts.unitId }).from(concepts).where(eq(concepts.topicId, topic.id)),
       placementLine(db, learnerId, session, topic, plan.log, level),
@@ -551,13 +614,16 @@ async function finalise(db: Db, learnerId: string, session: SessionRow, topic: T
         .where(and(eq(learnerTopic.learnerId, learnerId), eq(learnerTopic.topicId, topic.id), claimed)),
       ...chunks(seeds, 10).map((rows) => db.insert(learnerConcept).values(rows).onConflictDoNothing()),
       db
-        .update(units)
-        .set({ unlockedAt: now })
-        .where(and(inArray(units.id, unlock), isNull(units.unlockedAt), claimed)),
+        .insert(learnerUnit)
+        .select(db
+          .select({ learnerId: sql<string>`${learnerId}`.as('learner_id'), unitId: units.id, unlockedAt: sql<number>`${now}`.as('unlocked_at') })
+          .from(units)
+          .where(and(inArray(units.id, unlock), claimed)))
+        .onConflictDoNothing(),
       // The placement id is the session id, and the reveal line rides along in log_json.
       db
         .insert(placements)
-        .values({ id: session.id, learnerId, topicId: topic.id, logJson: JSON.stringify({ log: plan.log, levelLine }), levelResult: level, createdAt: now })
+        .values({ id: session.id, learnerId, topicId: topic.id, logJson: JSON.stringify({ log: plan.log, ...line }), levelResult: level, createdAt: now })
         .onConflictDoNothing(),
     )
   } else if (!('log' in plan)) {
@@ -596,7 +662,7 @@ async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: 
     loadLearnerTopic(db, learnerId, topic.id),
     db.select({ total: count() }).from(attempts).where(eq(attempts.sessionId, session.id)),
     db
-      .select({ itemId: attempts.itemId, confidence: attempts.confidence, gradeJson: attempts.gradeJson, payloadJson: items.payloadJson })
+      .select({ itemId: attempts.itemId, confidence: attempts.confidence, gradeJson: attempts.gradeJson, payloadJson: items.payloadJson, generatedBy: items.generatedBy })
       .from(attempts)
       .innerJoin(items, eq(items.id, attempts.itemId))
       .where(and(eq(attempts.sessionId, session.id), eq(attempts.learnerId, learnerId), eq(attempts.correct, false)))
@@ -624,6 +690,7 @@ async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: 
         stem: (JSON.parse(w.payloadJson) as ItemPayload).stem,
         correctAnswer: (JSON.parse(w.gradeJson ?? '{}') as { correctAnswer?: string }).correctAnswer ?? '',
         wasSure: w.confidence === 'sure',
+        generatedBy: w.generatedBy,
       },
     ]),
   )
@@ -639,6 +706,7 @@ async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: 
     streak: lt.streakCount,
     level: lt.level,
     levelLine: placement ? ((JSON.parse(placement.logJson) as { levelLine?: string }).levelLine ?? null) : null,
+    levelLineModel: placement ? ((JSON.parse(placement.logJson) as { levelLineModel?: string }).levelLineModel ?? null) : null,
     masteryMoved: mastery
       .filter((u) => u.unitId in before && Math.abs(u.mastery - before[u.unitId]) > 0.001)
       .map((u) => ({ unitId: u.unitId, unitName: u.unitName, before: before[u.unitId], after: u.mastery })),

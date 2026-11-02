@@ -13,6 +13,7 @@ function Overview() {
   return (
     <main className="mx-auto w-full max-w-3xl px-4 pt-8 pb-16">
       <h1 className="text-3xl font-bold tracking-tight">{org.name}</h1>
+      {org.readOnly && <p className="mt-4 text-muted-foreground">Staff view · Read only</p>}
       <section className="mt-10">
         <h2 className="text-xl font-semibold">Job roles</h2>
         <ul className="mt-4 flex flex-col gap-2">
