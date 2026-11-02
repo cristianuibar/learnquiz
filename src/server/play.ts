@@ -1,8 +1,8 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, count, eq, gte, inArray, isNotNull, isNull, lte, sql } from 'drizzle-orm'
+import { and, asc, count, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb, type Db } from '@/db'
-import { attempts, concepts, items, learnerConcept, learnerItem, learnerTopic, placements, sessions, topics, units } from '@/db/schema'
+import { attempts, concepts, items, learnerConcept, learnerItem, learnerTopic, learnerUnit, placements, sessions, topics, units } from '@/db/schema'
 import { BKT, guessFor, MASTERY, placementPrior, update } from '@/lib/learning/bkt'
 import { ratingFor, retrievability, review } from '@/lib/learning/fsrs'
 import { gradeAnswer, revealState, toItemView } from '@/lib/learning/grade'
@@ -89,8 +89,9 @@ async function loadFrontier(db: Db, learnerId: string, topicId: string) {
     .select({ concept: concepts, unitOrder: units.order, pKnown: learnerConcept.pKnown })
     .from(concepts)
     .innerJoin(units, eq(units.id, concepts.unitId))
+    .innerJoin(learnerUnit, and(eq(learnerUnit.unitId, units.id), eq(learnerUnit.learnerId, learnerId)))
     .leftJoin(learnerConcept, and(eq(learnerConcept.conceptId, concepts.id), eq(learnerConcept.learnerId, learnerId)))
-    .where(and(eq(concepts.topicId, topicId), isNotNull(units.unlockedAt)))
+    .where(eq(concepts.topicId, topicId))
   return rows
     .map((r) => ({ concept: r.concept, unitOrder: r.unitOrder, pKnown: r.pKnown ?? BKT.L0 }))
     .filter((r) => r.pKnown < MASTERY)
@@ -543,9 +544,12 @@ async function finalise(db: Db, learnerId: string, session: SessionRow, topic: T
         .where(and(eq(learnerTopic.learnerId, learnerId), eq(learnerTopic.topicId, topic.id), claimed)),
       ...chunks(seeds, 10).map((rows) => db.insert(learnerConcept).values(rows).onConflictDoNothing()),
       db
-        .update(units)
-        .set({ unlockedAt: now })
-        .where(and(inArray(units.id, unlock), isNull(units.unlockedAt), claimed)),
+        .insert(learnerUnit)
+        .select(db
+          .select({ learnerId: sql<string>`${learnerId}`.as('learner_id'), unitId: units.id, unlockedAt: sql<number>`${now}`.as('unlocked_at') })
+          .from(units)
+          .where(and(inArray(units.id, unlock), claimed)))
+        .onConflictDoNothing(),
       // The placement id is the session id, and the reveal line rides along in log_json.
       db
         .insert(placements)

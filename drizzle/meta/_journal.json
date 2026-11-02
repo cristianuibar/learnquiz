@@ -22,6 +22,13 @@
       "when": 1793230811689,
       "tag": "0002_orgs_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1793641177180,
+      "tag": "0003_learner_unit_unlocks",
+      "breakpoints": true
     }
   ]
 }
