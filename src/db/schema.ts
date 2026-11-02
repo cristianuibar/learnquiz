@@ -1,4 +1,5 @@
-import { integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { user } from './auth-schema'
 
 // learner_id everywhere is the Better Auth user id (guest or Facebook). ids are crypto.randomUUID().
 // Times are epoch milliseconds. JSON lives in *_json text columns.
@@ -228,3 +229,34 @@ export const consents = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.userId, t.kind] })],
 )
+
+export const pushSubscriptions = sqliteTable('push_subscriptions', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  endpoint: text('endpoint').notNull().unique(),
+  p256dh: text('p256dh').notNull(),
+  auth: text('auth').notNull(),
+  createdAt: integer('created_at').notNull(),
+}, (t) => [index('push_subscriptions_user_idx').on(t.userId)])
+
+export const pushPrefs = sqliteTable('push_prefs', {
+  userId: text('user_id').primaryKey().references(() => user.id, { onDelete: 'cascade' }),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(false),
+  paused: integer('paused', { mode: 'boolean' }).notNull().default(false),
+  startMinute: integer('start_minute').notNull().default(540),
+  endMinute: integer('end_minute').notNull().default(1020),
+  timezone: text('timezone').notNull().default('UTC'),
+  updatedAt: integer('updated_at').notNull(),
+})
+
+export const pushLog = sqliteTable('push_log', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  subscriptionId: text('subscription_id').notNull(), // Retained when a subscription expires.
+  outcome: text('outcome', { enum: ['accepted', 'gone', 'failed'] }).notNull(),
+  httpStatus: integer('http_status'),
+  itemId: text('item_id'),
+  sessionId: text('session_id'),
+  openedAt: integer('opened_at'),
+  createdAt: integer('created_at').notNull(),
+}, (t) => [index('push_log_user_idx').on(t.userId)])

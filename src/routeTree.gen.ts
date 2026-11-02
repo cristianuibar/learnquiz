@@ -21,6 +21,7 @@ import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as OrgSlugIndexRouteImport } from './routes/org.$slug.index'
 import { Route as OrgSlugPeopleRouteImport } from './routes/org.$slug.people'
 import { Route as PlaySessionIdDoneRouteImport } from './routes/play.$sessionId_.done'
+import { Route as PlayQuickItemIdRouteImport } from './routes/play.quick.$itemId'
 import { Route as TTopicIdPathRouteImport } from './routes/t.$topicId.path'
 
 const IndexRoute = IndexRouteImport.update({
@@ -83,6 +84,11 @@ const PlaySessionIdDoneRoute = PlaySessionIdDoneRouteImport.update({
   path: '/play/$sessionId/done',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlayQuickItemIdRoute = PlayQuickItemIdRouteImport.update({
+  id: '/play/quick/$itemId',
+  path: '/play/quick/$itemId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TTopicIdPathRoute = TTopicIdPathRouteImport.update({
   id: '/t/$topicId/path',
   path: '/t/$topicId/path',
@@ -101,6 +107,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/org/$slug/people': typeof OrgSlugPeopleRoute
   '/play/$sessionId/done': typeof PlaySessionIdDoneRoute
+  '/play/quick/$itemId': typeof PlayQuickItemIdRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
   '/org/$slug/': typeof OrgSlugIndexRoute
 }
@@ -116,6 +123,7 @@ export interface FileRoutesByTo {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/org/$slug/people': typeof OrgSlugPeopleRoute
   '/play/$sessionId/done': typeof PlaySessionIdDoneRoute
+  '/play/quick/$itemId': typeof PlayQuickItemIdRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
   '/org/$slug': typeof OrgSlugIndexRoute
 }
@@ -132,6 +140,7 @@ export interface FileRoutesById {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/org/$slug/people': typeof OrgSlugPeopleRoute
   '/play/$sessionId_/done': typeof PlaySessionIdDoneRoute
+  '/play/quick/$itemId': typeof PlayQuickItemIdRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
   '/org/$slug/': typeof OrgSlugIndexRoute
 }
@@ -149,6 +158,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/org/$slug/people'
     | '/play/$sessionId/done'
+    | '/play/quick/$itemId'
     | '/t/$topicId/path'
     | '/org/$slug/'
   fileRoutesByTo: FileRoutesByTo
@@ -164,6 +174,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/org/$slug/people'
     | '/play/$sessionId/done'
+    | '/play/quick/$itemId'
     | '/t/$topicId/path'
     | '/org/$slug'
   id:
@@ -179,6 +190,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/org/$slug/people'
     | '/play/$sessionId_/done'
+    | '/play/quick/$itemId'
     | '/t/$topicId/path'
     | '/org/$slug/'
   fileRoutesById: FileRoutesById
@@ -195,6 +207,7 @@ export interface RootRouteChildren {
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   OrgSlugPeopleRoute: typeof OrgSlugPeopleRoute
   PlaySessionIdDoneRoute: typeof PlaySessionIdDoneRoute
+  PlayQuickItemIdRoute: typeof PlayQuickItemIdRoute
   TTopicIdPathRoute: typeof TTopicIdPathRoute
   OrgSlugIndexRoute: typeof OrgSlugIndexRoute
 }
@@ -285,6 +298,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlaySessionIdDoneRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/play/quick/$itemId': {
+      id: '/play/quick/$itemId'
+      path: '/play/quick/$itemId'
+      fullPath: '/play/quick/$itemId'
+      preLoaderRoute: typeof PlayQuickItemIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/t/$topicId/path': {
       id: '/t/$topicId/path'
       path: '/t/$topicId/path'
@@ -307,6 +327,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   OrgSlugPeopleRoute: OrgSlugPeopleRoute,
   PlaySessionIdDoneRoute: PlaySessionIdDoneRoute,
+  PlayQuickItemIdRoute: PlayQuickItemIdRoute,
   TTopicIdPathRoute: TTopicIdPathRoute,
   OrgSlugIndexRoute: OrgSlugIndexRoute,
 }

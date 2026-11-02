@@ -71,6 +71,35 @@ and sent to `/v1/asr/transcribe`; recordings are not stored. Each transcription
 counts toward the daily model-call cap and logs a `voice` call. Voice is disabled
 by default; typing remains available when recording or transcription fails.
 
+Web Push uses `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (base64url P-256 keys) and
+`VAPID_SUBJECT` (a contact `mailto:` or HTTPS URL). The owner generates the key pair,
+stores it in Proton Pass, and sets these Worker secrets. Keep the same pair: browser
+subscriptions are bound to its public key. No Node `web-push` runtime is needed.
+To generate a pair in a private owner terminal with Node WebCrypto:
+
+```js
+const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify'])
+const publicKey = Buffer.from(await crypto.subtle.exportKey('raw', pair.publicKey)).toString('base64url')
+const { d: privateKey } = await crypto.subtle.exportKey('jwk', pair.privateKey)
+console.log({ publicKey, privateKey })
+```
+
+After the first finished session, account users can opt into notifications from
+the summary. On iOS, add Learn Quiz to the home screen first. **Profile** also
+offers browser subscription controls, an account-wide pause, and working hours
+with a timezone. The sender checks these preferences before delivery.
+Staff (`role=admin`) also see **Send test push**, which
+sends only to their current browser. On Android Chrome, allow notifications, send
+a test, then check the device notification and tap it to return to the profile.
+A successful send means the push service accepted it; device delivery still depends on browser
+and OS notification settings. Delivery attempts are recorded in `push_log`; HTTP
+404/410 removes the expired subscription, while transient failures leave it intact.
+Supported services are Chrome/FCM, Mozilla Push, and Apple Web Push.
+
+Question reminders link to `/play/quick/$itemId`. The sender adds a `pushId` to
+the link; opening it records `push_log.opened_at` and resumes a single-question
+`mini` session. A missed answer gets feedback and finishes without a re-ask.
+
 Staff (the `/admin` area, `requireStaff()`): make a user staff once they have signed up:
 `pnpm exec wrangler d1 execute learnquiz --remote --command "UPDATE user SET role='admin' WHERE email='you@example.com'"`
 (drop `--remote` for the local database).

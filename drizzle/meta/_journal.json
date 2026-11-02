@@ -29,6 +29,20 @@
       "when": 1793641177180,
       "tag": "0003_learner_unit_unlocks",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1793644166771,
+      "tag": "0004_push",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1793644614667,
+      "tag": "0005_push_sessions",
+      "breakpoints": true
     }
   ]
 }
