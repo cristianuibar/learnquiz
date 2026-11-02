@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, asc, eq, isNull } from 'drizzle-orm'
 import { getDb } from '@/db'
-import { member } from '@/db/auth-schema'
+import { member, organization } from '@/db/auth-schema'
 import { consents } from '@/db/schema'
 import { facebookEnabled } from '@/server/auth'
 import { httpError } from '@/server/helpers'
@@ -13,6 +13,7 @@ export const getSessionFn = createServerFn({ method: 'GET' }).handler(
     user: { id: string; name: string; isAnonymous: boolean } | null
     facebookEnabled: boolean
     needsDisclosure: boolean
+    adminCompanies: { name: string; slug: string }[]
   }> => {
     const user = await getSessionUser()
     // A signed-in member of any company who has not accepted the disclosure yet.
@@ -26,10 +27,22 @@ export const getSessionFn = createServerFn({ method: 'GET' }).handler(
         .where(and(eq(member.userId, user.id), isNull(consents.userId)))
         .limit(1)
         .get())
+    const adminCompanies =
+      user && !user.isAnonymous
+        ? (await getDb()
+            .select({ name: organization.name, slug: organization.slug, role: member.role })
+            .from(member)
+            .innerJoin(organization, eq(organization.id, member.organizationId))
+            .where(eq(member.userId, user.id))
+            .orderBy(asc(member.createdAt), asc(organization.id)))
+            .filter(({ role }) => role.split(',').some((r) => r === 'owner' || r === 'admin'))
+            .map(({ name, slug }) => ({ name, slug }))
+        : []
     return {
       user: user && { id: user.id, name: user.name, isAnonymous: Boolean(user.isAnonymous) },
       facebookEnabled: facebookEnabled(),
       needsDisclosure: Boolean(unconsented),
+      adminCompanies,
     }
   },
 )
