@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, createFileRoute, redirect } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { Check, X } from 'lucide-react'
+import { ConceptDiagram } from '@/components/concept-diagram'
 import { MasteryBar } from '@/components/mastery-bar'
 import { StartButton } from '@/components/start-button'
 import { Badge } from '@/components/ui/badge'
@@ -34,6 +35,7 @@ export const Route = createFileRoute('/t/$topicId/path')({
 
 function Path() {
   const { topic, units, learner } = Route.useLoaderData()
+  const [expandedUnits, setExpandedUnits] = useState<Set<string>>(() => new Set())
   return (
     <main className="mx-auto w-full max-w-2xl px-4 pt-8 pb-4">
       <h1 className="text-3xl font-bold tracking-tight">{topic.title}</h1>
@@ -75,13 +77,21 @@ function Path() {
                   {unit.unlocked ? `${Math.round(unit.mastery * 100)}%` : 'locked'}
                 </span>
               </div>
-              <details className="mt-2">
+              <details className="mt-2" onToggle={(event) => {
+                const open = event.currentTarget.open
+                setExpandedUnits((current) => {
+                  const next = new Set(current)
+                  if (open) next.add(unit.id)
+                  else next.delete(unit.id)
+                  return next
+                })
+              }}>
                 <summary className="flex min-h-12 cursor-pointer items-center text-sm font-medium">
                   {unit.concepts.length} concepts
                 </summary>
                 <ul className="mt-2 flex flex-col gap-3">
                   {unit.concepts.map((concept) => (
-                    <Concept key={concept.id} concept={concept} />
+                    <Concept key={concept.id} concept={concept} showDiagram={expandedUnits.has(unit.id)} />
                   ))}
                 </ul>
               </details>
@@ -100,8 +110,10 @@ function Path() {
 
 function Concept({
   concept,
+  showDiagram,
 }: {
   concept: ReturnType<typeof Route.useLoaderData>['units'][number]['concepts'][number]
+  showDiagram: boolean
 }) {
   const load = useServerFn(getConceptItems)
   const [items, setItems] = useState<Item[]>([])
@@ -127,6 +139,7 @@ function Concept({
         {concept.itemCount > 0 && <span className="text-sm text-muted-foreground">{concept.itemCount} questions</span>}
       </div>
       <p className="mt-1 text-sm text-muted-foreground">{concept.summary}</p>
+      {showDiagram && concept.visual && <ConceptDiagram conceptId={concept.id} />}
       {working ? (
         <div className="mt-4">
           <Working label="Loading questions" />

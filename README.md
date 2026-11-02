@@ -16,7 +16,7 @@ Built solo by Cristian Uibar for the Meta Global AI Developer Hackathon
 | --- | --- |
 | Curriculum skeleton, question generation, self-check | Muse Spark 1.3 (Meta Model API, JSON-schema output) |
 | Session planning with tools (coach), planned | Muse Wonder 1.0 |
-| Diagrams and visual questions, planned | Muse Image 1.0 |
+| Procedure diagrams, generated once per visual concept | Muse Image 1.0 |
 | Spoken answers, planned | Muse Voice Transcribe 1.0 |
 | Open-weights path | Muse Spark Open via Baseten, Muse Glimmer via Ollama for the local edition |
 

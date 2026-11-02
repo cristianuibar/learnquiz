@@ -4,6 +4,7 @@ import { getDb } from '@/db'
 import { modelCalls } from '@/db/schema'
 import { isOverDailyCap, utcDayStart } from '@/lib/limits'
 import { getEnv } from '@/server/env'
+import { assertWithinDailyCap } from '@/server/model-cap'
 
 // USD per million tokens; reasoning tokens bill as output. Unlisted models cost 0.
 export const PRICES: Record<string, { in: number; out: number }> = {
@@ -125,7 +126,7 @@ export async function chatJson<T>(opts: {
 }
 
 async function logCall(
-  opts: { purpose: string; learnerId?: string | null; sessionId?: string | null },
+  opts: { purpose: string; learnerId?: string | null; sessionId?: string | null; model?: string; costUsd?: number },
   started: number,
   usage: Usage | undefined,
   error: string | null,
@@ -134,7 +135,8 @@ async function logCall(
     const env = getEnv()
     const promptTokens = usage?.prompt_tokens ?? 0
     const completionTokens = usage?.completion_tokens ?? 0
-    const price = PRICES[env.LLM_MODEL] ?? { in: 0, out: 0 }
+    const model = opts.model ?? env.LLM_MODEL
+    const price = PRICES[model] ?? { in: 0, out: 0 }
     await getDb()
       .insert(modelCalls)
       .values({
@@ -142,17 +144,49 @@ async function logCall(
         learnerId: opts.learnerId ?? null,
         sessionId: opts.sessionId ?? null,
         purpose: opts.purpose,
-        model: env.LLM_MODEL,
+        model,
         latencyMs: Date.now() - started,
         promptTokens,
         completionTokens,
         reasoningTokens: usage?.completion_tokens_details?.reasoning_tokens ?? 0,
-        costUsd: (promptTokens * price.in + completionTokens * price.out) / 1_000_000,
+        costUsd: opts.costUsd ?? (promptTokens * price.in + completionTokens * price.out) / 1_000_000,
         ok: error === null,
         error,
         createdAt: Date.now(),
       })
   } catch (e) {
     console.error('model_calls log failed', e instanceof Error ? e.message : e)
+  }
+}
+
+// Images use the same endpoint credentials, daily budget and call ledger as text.
+// No automatic retry: a second paid generation needs an explicit retry by the learner.
+export async function generateImage(opts: { prompt: string; learnerId: string }): Promise<Uint8Array> {
+  const env = getEnv()
+  await assertWithinDailyCap(getDb(), opts.learnerId)
+  const started = Date.now()
+  let costUsd = 0
+  let error: string | null = null
+  try {
+    const res = await fetch(`${env.LLM_BASE_URL}/images/generations`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...(env.LLM_API_KEY && { authorization: `Bearer ${env.LLM_API_KEY}` }) },
+      body: JSON.stringify({ model: env.IMAGE_MODEL, prompt: opts.prompt, n: 1, size: '1024x1024', response_format: 'b64_json' }),
+      signal: AbortSignal.timeout(120_000),
+    })
+    if (!res.ok) throw new LlmError(`Image HTTP ${res.status}`, res.status)
+    costUsd = 0.01
+    const body = z.object({ data: z.array(z.object({ b64_json: z.string().min(1).max(14_000_000) })).length(1) }).parse(await res.json())
+    const bytes = Uint8Array.from(atob(body.data[0].b64_json), (c) => c.charCodeAt(0))
+    if (bytes.length > 10_000_000 || ![137, 80, 78, 71, 13, 10, 26, 10].every((b, i) => bytes[i] === b)) {
+      throw new Error('Image response is not a PNG under 10 MB')
+    }
+    return bytes
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    error = (env.LLM_API_KEY ? message.replaceAll(env.LLM_API_KEY, '[redacted]') : message).slice(0, 300)
+    throw new LlmError('The diagram could not be generated. Try again.', e instanceof LlmError ? e.status : 502)
+  } finally {
+    await logCall({ purpose: 'diagram', learnerId: opts.learnerId, model: env.IMAGE_MODEL, costUsd }, started, undefined, error)
   }
 }

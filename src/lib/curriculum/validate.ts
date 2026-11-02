@@ -4,6 +4,7 @@ export type ValidatedConcept = {
   id: string
   name: string
   summary: string
+  visual: boolean
   sourceQuote: string | null
   grounded: boolean
   misconceptions: string[]
@@ -37,7 +38,7 @@ export function validateSkeleton(skeleton: CurriculumSkeleton, sourceText?: stri
         .replace(/['‘’]/g, "['‘’]")
       const kept = source && pattern ? source.match(new RegExp(pattern, 'iu'))?.[0] ?? null : null
       if (quote && source && !kept) notes.push(`dropped quote not found in source: ${c.name}`)
-      return { id, name: c.name, summary: c.summary, sourceQuote: kept, grounded: kept !== null, misconceptions: c.misconceptions }
+      return { id, name: c.name, summary: c.summary, visual: c.visual, sourceQuote: kept, grounded: kept !== null, misconceptions: c.misconceptions }
     }),
   }))
 
@@ -90,6 +91,7 @@ export function fallbackSkeleton(topic: string): CurriculumSkeleton {
         const concept = {
           name: `${n}: ${topic}`,
           summary: `${n} for ${topic}.`,
+          visual: false,
           prerequisites: previous ? [previous] : [],
           source_quote: null,
           misconceptions: [],

@@ -385,6 +385,7 @@ export const answerItem = createServerFn({ method: 'POST' })
     const mixUps = state === 'D' ? (JSON.parse(concept.misconceptionsJson) as string[]) : []
     return {
       attemptId,
+      diagramConceptId: concept.visual ? concept.id : null,
       state,
       correct,
       correctAnswer: grade.correctAnswer,

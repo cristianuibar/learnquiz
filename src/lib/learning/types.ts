@@ -19,6 +19,7 @@ export type Answer = { optionId?: string; text?: string }
 export type RevealState = 'A' | 'B' | 'C' | 'D'
 
 export type Reveal = {
+  diagramConceptId: string | null
   attemptId: string
   state: RevealState
   correct: boolean
