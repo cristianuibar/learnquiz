@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, asc, count, desc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '@/db'
-import { conceptEdges, concepts, items, learnerTopic, learnerUnit, placements, sources, topics, units } from '@/db/schema'
+import { conceptEdges, concepts, items, learnerItem, learnerTopic, learnerUnit, placements, sources, topics, units } from '@/db/schema'
 import { validateSkeleton, fallbackSkeleton } from '@/lib/curriculum/validate'
 import { chatJson, LlmError } from '@/lib/llm/client'
 import { curriculumPrompt } from '@/lib/llm/prompts'
@@ -179,6 +179,7 @@ export const getConceptItems = createServerFn({ method: 'GET' })
       .select({ item: items })
       .from(items)
       .innerJoin(topics, eq(topics.id, items.topicId))
+      .innerJoin(learnerItem, and(eq(learnerItem.itemId, items.id), eq(learnerItem.learnerId, learnerId)))
       .where(and(eq(items.conceptId, data.conceptId), eq(items.status, 'active'), eq(topics.learnerId, learnerId)))
       .orderBy(desc(items.createdAt))
     return { items: rows.map((r) => asItem(r.item)) }
