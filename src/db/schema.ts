@@ -37,6 +37,7 @@ export const concepts = sqliteTable('concepts', {
   order: integer('order').notNull(),
   name: text('name').notNull(),
   summary: text('summary').notNull(),
+  critical: integer('critical', { mode: 'boolean' }).notNull().default(false),
   level: integer('level').notNull().default(3),
   sourceId: text('source_id'),
   sourceQuote: text('source_quote'),
