@@ -4,3 +4,7 @@ BETTER_AUTH_SECRET=change-me-to-32-random-bytes
 BETTER_AUTH_URL=http://localhost:3000
 FACEBOOK_APP_ID=
 FACEBOOK_APP_SECRET=
+# Web Push: uncompressed P-256 public key and 32-byte private key, base64url.
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=mailto:you@example.com

@@ -62,6 +62,28 @@ Config (`wrangler.jsonc` vars and secrets): `LLM_PROFILE` (`meta`, `baseten`, `o
 `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, `IMAGE_MODEL`, `VOICE_ENABLED`,
 `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET`.
 
+Web Push uses `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (base64url P-256 keys) and
+`VAPID_SUBJECT` (a contact `mailto:` or HTTPS URL). The owner generates the key pair,
+stores it in Proton Pass, and sets these Worker secrets. Keep the same pair: browser
+subscriptions are bound to its public key. No Node `web-push` runtime is needed.
+To generate a pair in a private owner terminal with Node WebCrypto:
+
+```js
+const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify'])
+const publicKey = Buffer.from(await crypto.subtle.exportKey('raw', pair.publicKey)).toString('base64url')
+const { d: privateKey } = await crypto.subtle.exportKey('jwk', pair.privateKey)
+console.log({ publicKey, privateKey })
+```
+
+After applying local migrations, signed-in account users can enable or disable
+notifications in **Profile**. Staff (`role=admin`) also see **Send test push**, which
+sends only to their current browser. On Android Chrome, allow notifications, send
+a test, then check the device notification and tap it to return to the profile.
+A successful send means the push service accepted it; device delivery still depends on browser
+and OS notification settings. Delivery attempts are recorded in `push_log`; HTTP
+404/410 removes the expired subscription, while transient failures leave it intact.
+Supported services are Chrome/FCM, Mozilla Push, and Apple Web Push.
+
 Staff (the `/admin` area, `requireStaff()`): make a user staff once they have signed up:
 `pnpm exec wrangler d1 execute learnquiz --remote --command "UPDATE user SET role='admin' WHERE email='you@example.com'"`
 (drop `--remote` for the local database).
