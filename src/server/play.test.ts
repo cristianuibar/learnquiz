@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { chatJson, LlmError } from '@/lib/llm/client'
+import { requireLearnerId } from '@/server/session'
 
 // Only external boundaries are faked: the server-fn transport, auth, the model
 // client and the Cloudflare bindings. The handlers under test run for real
@@ -19,7 +20,7 @@ vi.mock('@tanstack/react-start', () => ({
 
 vi.mock('@/db', () => ({ getDb: () => holder.db }))
 
-vi.mock('@/server/session', () => ({ requireLearnerId: async () => 'u1' }))
+vi.mock('@/server/session', () => ({ requireLearnerId: vi.fn(async () => 'u1') }))
 
 vi.mock('@/lib/llm/client', () => ({
   chatJson: vi.fn(async () => ({ line: 'You know the basics and will grow from here.' })),
@@ -32,7 +33,8 @@ vi.mock('@/lib/llm/client', () => ({
 
 vi.mock('cloudflare:workers', () => ({ env: {} }))
 
-import { endSession, nextItem, startSession } from './play'
+import { answerItem, endSession, getSession, nextItem, startPlacement, startSession } from './play'
+import { getConceptItems, getTopicPath } from './curriculum'
 
 type Method = 'run' | 'all' | 'values' | 'get'
 
@@ -61,13 +63,14 @@ function makeDb() {
   const db = drizzle(
     async (sqlText, params, method) => runOne(sqlText, params, method),
     async (batch) => {
-      raw.exec('SAVEPOINT batch')
+      raw.exec('SAVEPOINT d1_batch')
       try {
         const out = batch.map((q) => runOne(q.sql, q.params, q.method))
-        raw.exec('RELEASE batch')
+        raw.exec('RELEASE d1_batch')
         return out
       } catch (e) {
-        raw.exec('ROLLBACK TO batch; RELEASE batch')
+        raw.exec('ROLLBACK TO d1_batch')
+        raw.exec('RELEASE d1_batch')
         throw e
       }
     },
@@ -80,7 +83,7 @@ let raw: DatabaseSync
 beforeAll(() => { raw = makeDb() })
 beforeEach(() => { raw.exec('BEGIN') })
 afterEach(() => { raw.exec('ROLLBACK') })
-afterAll(() => raw.close())
+afterAll(() => { raw.close() })
 
 function seedTopicAndLearner(raw: DatabaseSync, xp: number) {
   raw
@@ -97,7 +100,8 @@ const scalar = (raw: DatabaseSync, sqlText: string, ...params: (string | number)
   (raw.prepare(sqlText).get(...params) as unknown as Record<string, unknown> | undefined) ?? {}
 
 function seedFrontier(raw: DatabaseSync, itemCount: number, hasDue: boolean) {
-  raw.prepare('INSERT INTO units (id, topic_id, "order", name, unlocked_at) VALUES (?, ?, ?, ?, ?)').run('un1', 't1', 0, 'Basics', 1)
+  raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un1', 't1', 0, 'Basics')
+  raw.prepare('INSERT INTO learner_unit (learner_id, unit_id, unlocked_at) VALUES (?, ?, ?)').run('u1', 'un1', 1)
   raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)').run('c1', 't1', 'un1', 0, 'Variables', '')
   const payload = JSON.stringify({
     format: 'cloze', stem: 'Solve x + 1 = 2: x = ____.', options: [], accepted_answers: ['1'], model_answer: '1',
@@ -111,7 +115,7 @@ function seedFrontier(raw: DatabaseSync, itemCount: number, hasDue: boolean) {
   }
 }
 
-describe('startSession frontier replenishment', () => {
+describe('learner practice and unit unlocks', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-10-29T12:00:00Z'))
@@ -120,6 +124,77 @@ describe('startSession frontier replenishment', () => {
   })
   afterEach(() => {
     vi.useRealTimers()
+  })
+
+  it('only exposes the learner\'s answered active questions in Path after placement', async () => {
+    seedFrontier(raw, 8, false)
+    raw.prepare('UPDATE items SET status = ? WHERE id = ?').run('reported', 'i7')
+    raw.prepare('UPDATE items SET status = ? WHERE id = ?').run('rejected', 'i8')
+    raw.prepare('DELETE FROM learner_item WHERE item_id NOT IN (?, ?)').run('i7', 'i8')
+    raw.prepare('INSERT INTO learner_item (learner_id, item_id, due, stability, difficulty, state) VALUES (?, ?, ?, ?, ?, ?)')
+      .run('u2', 'i6', Date.now(), 1, 5, 2)
+
+    const { sessionId } = await startPlacement({ data: { topicId: 't1' } })
+    const { item } = await getSession({ data: { sessionId } })
+    // Being served a question must not reveal its answers before submission.
+    expect(await getConceptItems({ data: { conceptId: 'c1' } })).toEqual({ items: [] })
+    await answerItem({ data: { sessionId, itemId: item!.id, answer: { text: '1' }, confidence: 'sure', responseMs: 1000 } })
+    await endSession({ data: { sessionId } })
+
+    expect((await getTopicPath({ data: { topicId: 't1' } })).learner.placed).toBe(true)
+    expect(await getConceptItems({ data: { conceptId: 'c1' } })).toEqual({
+      items: [{
+        id: item!.id, format: 'cloze', difficultyPrior: 1, generatedBy: null,
+        payload: {
+          format: 'cloze', stem: 'Solve x + 1 = 2: x = ____.', options: [], accepted_answers: ['1'], model_answer: '1',
+          explanation: 'Subtract 1 from both sides.', difficulty: 1, source_quote: null, grounded: false, bloom: 'apply',
+        },
+      }],
+    })
+    vi.mocked(requireLearnerId).mockResolvedValueOnce('u2')
+    expect(await getConceptItems({ data: { conceptId: 'c1' } })).toEqual({ items: [] })
+  })
+
+  it('keeps unit 2 locked in another learner\'s Path and practice after placement', async () => {
+    const payload = JSON.stringify({
+      format: 'cloze', stem: 'Solve x + 1 = 2: x = ____.', options: [], accepted_answers: ['1'], model_answer: '1',
+      explanation: 'Subtract 1 from both sides.', difficulty: 1, source_quote: null, grounded: false, bloom: 'apply',
+    })
+    for (const order of [0, 1]) {
+      const unitId = `un${order + 1}`
+      const conceptId = `c${order + 1}`
+      raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run(unitId, 't1', order, `Unit ${order + 1}`)
+      raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(conceptId, 't1', unitId, 0, `Concept ${order + 1}`, '')
+      for (let i = 0; i < 6; i++) {
+        raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+          .run(`${conceptId}-i${i}`, conceptId, 't1', 'cloze', payload, 1, Date.now())
+      }
+    }
+    const plan = JSON.stringify({
+      position: 7, answered: true, workingLevel: 1,
+      log: Array.from({ length: 8 }, () => ({ itemId: 'c1-i0', correct: false, confidence: 'sure', level: 1 })),
+      pool: [],
+    })
+    raw.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, plan_json, started_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .run('s1', 'u1', 't1', 'placement', plan, Date.now())
+
+    await endSession({ data: { sessionId: 's1' } })
+    expect((await getTopicPath({ data: { topicId: 't1' } })).units.map((u) => u.unlocked)).toEqual([true, true])
+    expect(scalar(raw, 'SELECT COUNT(*) AS n FROM units WHERE unlocked_at IS NOT NULL').n).toBe(0)
+    await expect(startSession({ data: { topicId: 't1' } })).resolves.toEqual({ sessionId: expect.any(String) })
+
+    // Retained legacy timestamps must not grant the next learner access.
+    raw.prepare('UPDATE units SET unlocked_at = ? WHERE topic_id = ?').run(1, 't1')
+    // Shared-role access is not available yet. Transfer ownership so both learners
+    // exercise the same stored units through the existing authorization checks.
+    raw.prepare('UPDATE topics SET learner_id = ? WHERE id = ?').run('u2', 't1')
+    raw.prepare('INSERT INTO learner_topic (learner_id, topic_id) VALUES (?, ?)').run('u2', 't1')
+    vi.mocked(requireLearnerId).mockResolvedValueOnce('u2')
+    expect((await getTopicPath({ data: { topicId: 't1' } })).units.map((u) => u.unlocked)).toEqual([false, false])
+    vi.mocked(requireLearnerId).mockResolvedValueOnce('u2')
+    await expect(startSession({ data: { topicId: 't1' } })).rejects.toMatchObject({ status: 409, message: 'Nothing to practise yet' })
+    expect(scalar(raw, 'SELECT COUNT(*) AS n FROM sessions WHERE learner_id = ?', 'u2').n).toBe(0)
   })
 
   it.each([

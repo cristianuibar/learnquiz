@@ -1,7 +1,10 @@
 import { useRouter } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 
-export const errorMessage = (err: unknown) => (err instanceof Error && err.message) || 'Something went wrong'
+export const errorMessage = (err: unknown) =>
+  typeof navigator !== 'undefined' && navigator.onLine === false
+    ? "You're offline"
+    : (err instanceof Error && err.message) || 'Something went wrong'
 
 export function InlineError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (

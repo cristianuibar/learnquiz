@@ -5,12 +5,13 @@ CREATE TABLE `__new_topics` (
 	`job_role_id` text,
 	`title` text NOT NULL,
 	`goal` text,
+	`generated_by` text,
 	`status` text DEFAULT 'generating' NOT NULL,
 	`created_at` integer NOT NULL,
 	FOREIGN KEY (`job_role_id`) REFERENCES `job_roles`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-INSERT INTO `__new_topics`("id", "learner_id", "title", "goal", "status", "created_at") SELECT "id", "learner_id", "title", "goal", "status", "created_at" FROM `topics`;--> statement-breakpoint
+INSERT INTO `__new_topics`("id", "learner_id", "title", "goal", "generated_by", "status", "created_at") SELECT "id", "learner_id", "title", "goal", "generated_by", "status", "created_at" FROM `topics`;--> statement-breakpoint
 DROP TABLE `topics`;--> statement-breakpoint
 ALTER TABLE `__new_topics` RENAME TO `topics`;--> statement-breakpoint
 PRAGMA defer_foreign_keys=OFF;--> statement-breakpoint

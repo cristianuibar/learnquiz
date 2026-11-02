@@ -13,6 +13,7 @@ function Overview() {
   return (
     <main className="mx-auto w-full max-w-3xl px-4 pt-8 pb-16">
       <h1 className="text-3xl font-bold tracking-tight">{org.name}</h1>
+      {org.readOnly && <p className="mt-4 text-muted-foreground">Staff view · Read only</p>}
       <section className="mt-10">
         <h2 className="text-xl font-semibold">Job roles</h2>
         <ul className="mt-4 flex flex-col gap-2">
@@ -23,13 +24,15 @@ function Overview() {
           ))}
         </ul>
       </section>
-      <Link
-        to="/org/$slug/roles"
-        params={{ slug: org.slug }}
-        className="mt-6 inline-flex h-11 items-center rounded-md font-medium underline outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-      >
-        Manage job roles
-      </Link>
+      {!org.readOnly && (
+        <Link
+          to="/org/$slug/roles"
+          params={{ slug: org.slug }}
+          className="mt-6 inline-flex h-11 items-center rounded-md font-medium underline outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        >
+          Manage job roles
+        </Link>
+      )}
       <Link
         to="/org/$slug/people"
         params={{ slug: org.slug }}

@@ -27,7 +27,7 @@ beforeAll(() => {
   sqlite = new DatabaseSync(':memory:')
   sqlite.exec('PRAGMA foreign_keys = ON')
   for (const file of readdirSync('drizzle').filter((f) => f.endsWith('.sql')).sort()) {
-    if (file === '0003_job_role_topics.sql') {
+    if (file === '0005_job_role_topics.sql') {
       for (const id of ['owner', 'admin', 'member', 'other-owner']) {
         sqlite.prepare('INSERT INTO user (id, name, email) VALUES (?, ?, ?)').run(id, id, `${id}@x.test`)
       }
@@ -40,7 +40,7 @@ beforeAll(() => {
       for (const [id, org, name] of [['legacy-role', 'org-a', 'Original role'], ['other-role', 'org-b', 'Private role']]) {
         sqlite.prepare('INSERT INTO job_roles (id, org_id, name, created_at) VALUES (?, ?, ?, ?)').run(id, org, name, 1)
       }
-      sqlite.prepare('INSERT INTO topics (id, learner_id, title, status, created_at) VALUES (?, ?, ?, ?, ?)').run('personal', 'owner', 'Algebra', 'ready', 1)
+      sqlite.prepare('INSERT INTO topics (id, learner_id, title, status, generated_by, created_at) VALUES (?, ?, ?, ?, ?, ?)').run('personal', 'owner', 'Algebra', 'ready', 'muse-spark-1.3', 1)
     }
     sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8').replaceAll('--> statement-breakpoint', ''))
   }
@@ -101,7 +101,7 @@ it('backfills one draft topic per existing role and preserves personal topics', 
     { job_role_id: 'legacy-role', learner_id: null, title: 'Original role', status: 'draft' },
     { job_role_id: 'other-role', learner_id: null, title: 'Private role', status: 'draft' },
   ])
-  expect(sqlite.prepare('SELECT * FROM topics WHERE id = ?').get('personal')).toMatchObject({ learner_id: 'owner', job_role_id: null, title: 'Algebra', status: 'ready', created_at: 1 })
+  expect(sqlite.prepare('SELECT * FROM topics WHERE id = ?').get('personal')).toMatchObject({ learner_id: 'owner', job_role_id: null, title: 'Algebra', status: 'ready', generated_by: 'muse-spark-1.3', created_at: 1 })
 })
 
 it.each(['owner', 'admin'])('%s creates and lists roles with defaults or custom targets in their own company', async (id) => {
