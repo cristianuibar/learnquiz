@@ -64,7 +64,7 @@ function Play({ initial }: { initial: SessionView }) {
 
   useEffect(() => {
     questionHeading.current?.focus()
-  }, [item?.id])
+  }, [item?.id, progress.position])
 
   async function run(fn: () => Promise<void>) {
     setBusy(true)
