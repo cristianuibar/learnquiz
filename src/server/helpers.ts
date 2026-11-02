@@ -77,7 +77,7 @@ export async function ensureConceptItems(
           misconceptions,
           targetDifficulty: opts.targetDifficulty,
           spread: opts.spread,
-          formats: ['mcq', 'cloze'],
+          formats: ['mcq', 'cloze', 'short'],
           sourceQuote: concept.sourceQuote,
           avoidStems,
         }),
