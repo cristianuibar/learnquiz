@@ -7,19 +7,24 @@ import { Route as appRootRoute } from '@/routes/__root'
 import { Route as startRoute } from '@/routes/start'
 import { createTopic } from '@/server/curriculum'
 import { getLatestTopicIdFn } from '@/server/latest-topic'
+import { getCompanyBranding } from '@/server/org-settings'
+import { getSessionFn } from '@/server/session-fn'
 import { startPlacement } from '@/server/play'
 
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
 vi.mock('@/server/curriculum', () => ({ createTopic: vi.fn() }))
 vi.mock('@/server/play', () => ({ startPlacement: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
+vi.mock('@/server/org-settings', () => ({ getCompanyBranding: vi.fn() }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: vi.fn() }))
 vi.mock('@/server/session-fn', () => ({
-  getSessionFn: async () => ({ user: { id: 'learner', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false }),
+  getSessionFn: vi.fn(),
 }))
 
 beforeEach(() => {
   vi.mocked(getLatestTopicIdFn).mockResolvedValue(null)
+  vi.mocked(getCompanyBranding).mockResolvedValue(null)
+  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'learner', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false })
 })
 
 async function renderStart(initialEntry = '/start') {
@@ -114,6 +119,24 @@ it.each([
     expect(pathHref()).toBe('/t/new-topic/path')
   } finally {
     finishPlacement({ sessionId: 'placement' })
+    await cleanup()
+  }
+})
+
+
+it('shows the employee company logo and returns to the default brand after sign-out', async () => {
+  vi.mocked(getCompanyBranding).mockResolvedValue({ name: 'Alpha Training', logoUrl: '/api/org/org-a/logo?v=logo', accent: '#543189' })
+  const { container, router, cleanup } = await renderStart()
+  try {
+    expect(container.querySelector('header img')?.getAttribute('alt')).toBe('Alpha Training')
+    expect(container.querySelector('header img')?.getAttribute('src')).toBe('/api/org/org-a/logo?v=logo')
+    await act(async () => {
+      vi.mocked(getSessionFn).mockResolvedValue({ user: null, facebookEnabled: false, needsDisclosure: false })
+      await router.invalidate()
+    })
+    expect(container.querySelector('header img')).toBeNull()
+    expect(container.querySelector('header a')?.textContent).toBe('Learn Quiz')
+  } finally {
     await cleanup()
   }
 })

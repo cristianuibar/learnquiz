@@ -1,4 +1,6 @@
 import { integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { organization } from './auth-schema'
+import type { WorkingHours } from '@/lib/company-settings'
 
 // learner_id everywhere is the Better Auth user id (guest or Facebook). ids are crypto.randomUUID().
 // Times are epoch milliseconds. JSON lives in *_json text columns.
@@ -218,3 +220,12 @@ export const consents = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.userId, t.kind] })],
 )
+
+export const orgSettings = sqliteTable('org_settings', {
+  orgId: text('org_id').primaryKey().references(() => organization.id, { onDelete: 'cascade' }),
+  companyName: text('company_name').notNull(),
+  timezone: text('timezone').notNull().default('UTC'),
+  workingHours: text('working_hours_json', { mode: 'json' }).$type<WorkingHours>().notNull(),
+  logoKey: text('logo_key'),
+  accent: text('accent'),
+})
