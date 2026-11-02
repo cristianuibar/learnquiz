@@ -29,7 +29,12 @@ function Join() {
 
   async function accept() {
     const { error } = await authClient.organization.acceptInvitation({ invitationId })
-    if (error) throw new Error(error.message ?? 'Could not join')
+    if (error) {
+      const failure = new Error(error.message ?? 'Could not join')
+      setError(failure.message)
+      await router.invalidate()
+      throw failure
+    }
     await router.navigate({ to: '/welcome' })
     await router.invalidate()
   }
