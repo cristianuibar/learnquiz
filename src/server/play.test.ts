@@ -144,7 +144,7 @@ describe('learner practice and unit unlocks', () => {
     expect((await getTopicPath({ data: { topicId: 't1' } })).learner.placed).toBe(true)
     expect(await getConceptItems({ data: { conceptId: 'c1' } })).toEqual({
       items: [{
-        id: item!.id, format: 'cloze', difficultyPrior: 1,
+        id: item!.id, format: 'cloze', difficultyPrior: 1, generatedBy: null,
         payload: {
           format: 'cloze', stem: 'Solve x + 1 = 2: x = ____.', options: [], accepted_answers: ['1'], model_answer: '1',
           explanation: 'Subtract 1 from both sides.', difficulty: 1, source_quote: null, grounded: false, bloom: 'apply',
