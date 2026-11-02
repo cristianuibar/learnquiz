@@ -75,6 +75,8 @@ beforeAll(() => {
     raw.exec(readFileSync(`drizzle/${file}`, 'utf8').replaceAll('--> statement-breakpoint', ''))
   }
   const run = (sql: string, params: unknown[], method: string) => {
+    // Match D1's prepared-statement limit, which node:sqlite does not enforce.
+    if (params.length > 100) throw new Error(`D1_ERROR: too many SQL variables (${params.length} > 100)`)
     const stmt = raw.prepare(sql)
     stmt.setReturnArrays(true)
     const args = params as (string | number | null)[]

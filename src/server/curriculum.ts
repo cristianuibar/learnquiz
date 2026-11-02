@@ -25,7 +25,8 @@ function curriculumWrites(db: Db, topicId: string, valid: ValidatedSkeleton, gen
   )
   return [
     ...chunks(unitRows, 10).map((rows) => db.insert(units).values(rows)),
-    ...chunks(conceptRows, 8).map((rows) => db.insert(concepts).values(rows)),
+    // Each concept binds 13 parameters including defaults; seven rows stay below D1's 100-parameter limit.
+    ...chunks(conceptRows, 7).map((rows) => db.insert(concepts).values(rows)),
     ...chunks(valid.edges.map((e) => ({ topicId, ...e })), 20).map((rows) => db.insert(conceptEdges).values(rows)),
     db.update(topics).set({ status: 'ready', generatedBy }).where(eq(topics.id, topicId)),
   ] as const
