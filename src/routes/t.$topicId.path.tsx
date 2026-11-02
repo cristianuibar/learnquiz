@@ -1,8 +1,11 @@
 import { useState } from 'react'
-import { Link, createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { Check, X } from 'lucide-react'
+import { RouteError } from '@/components/inline-error'
 import { MasteryBar } from '@/components/mastery-bar'
+import { ModelLabel } from '@/components/model-label'
+import { ModelTrace } from '@/components/model-trace'
 import { StartButton } from '@/components/start-button'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -19,16 +22,7 @@ export const Route = createFileRoute('/t/$topicId/path')({
     if (!context.user) throw redirect({ to: '/' })
   },
   loader: ({ params }) => getTopicPath({ data: { topicId: params.topicId } }),
-  errorComponent: ({ error }) => (
-    <main className="mx-auto w-full max-w-xl px-4 pt-8">
-      <p role="alert" className="font-medium text-wrong">
-        {error instanceof Error ? error.message : 'Something went wrong'}
-      </p>
-      <Button asChild variant="outline" className="mt-6 h-12 px-6">
-        <Link to="/start">Start over</Link>
-      </Button>
-    </main>
-  ),
+  errorComponent: RouteError,
   component: Path,
 })
 
@@ -37,15 +31,18 @@ function Path() {
   return (
     <main className="mx-auto w-full max-w-2xl px-4 pt-8 pb-4">
       <h1 className="text-3xl font-bold tracking-tight">{topic.title}</h1>
+      <ModelLabel model={topic.generatedBy} />
+      <ModelTrace key={topic.id} scope={{ scope: 'topic', topicId: topic.id }} />
       {learner.placed ? (
         <>
           <p className="mt-2 text-lg font-medium">
             Level {learner.level} of 5 · {LEVELS[learner.level - 1]}
           </p>
           {learner.levelLine && (
-            <blockquote className="mt-2 border-l-2 border-learning pl-3 text-muted-foreground">
-              {learner.levelLine}
-            </blockquote>
+            <div>
+              <blockquote className="mt-2 border-l-2 border-learning pl-3 text-muted-foreground">{learner.levelLine}</blockquote>
+              <ModelLabel model={learner.levelLineModel} />
+            </div>
           )}
         </>
       ) : (
@@ -104,7 +101,7 @@ function Concept({
   concept: ReturnType<typeof Route.useLoaderData>['units'][number]['concepts'][number]
 }) {
   const load = useServerFn(getConceptItems)
-  const [items, setItems] = useState<Item[]>([])
+  const [items, setItems] = useState<Item[] | null>(null)
   const [working, setWorking] = useState(false)
   const [error, setError] = useState('')
 
@@ -129,13 +126,13 @@ function Concept({
       <p className="mt-1 text-sm text-muted-foreground">{concept.summary}</p>
       {working ? (
         <div className="mt-4">
-          <Working label="Loading questions" />
+          <Working label="Loading answered questions" />
         </div>
       ) : (
         concept.itemCount > 0 &&
-        items.length === 0 && (
+        items === null && (
           <Button variant="outline" className="mt-4 h-12 px-6" onClick={show}>
-            Show questions
+            Show answered questions
           </Button>
         )
       )}
@@ -144,7 +141,12 @@ function Concept({
           {error}
         </p>
       )}
-      {items.length > 0 && (
+      {items?.length === 0 && (
+        <p role="status" className="mt-3 text-sm text-muted-foreground">
+          No answered questions to review yet.
+        </p>
+      )}
+      {items && items.length > 0 && (
         <ol className="mt-4 flex flex-col gap-4 border-t pt-4">
           {items.map((item) => (
             <ItemView key={item.id} item={item} />
@@ -160,6 +162,7 @@ function ItemView({ item }: { item: Item }) {
   return (
     <li className="flex flex-col gap-3">
       <p className="font-medium">{payload.stem}</p>
+      <ModelLabel model={item.generatedBy} />
       {item.format === 'mcq' ? (
         <ul className="flex flex-col gap-2">
           {payload.options.map((option) => (

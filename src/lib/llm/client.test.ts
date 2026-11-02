@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { expect, it, vi } from 'vitest'
@@ -18,8 +18,9 @@ it('refuses a malformed-output retry after the twentieth daily model call', asyn
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-10-29T12:00:00Z'))
   try {
-    const ddl = readFileSync(new URL('../../../drizzle/0000_scaffold.sql', import.meta.url), 'utf8')
-    raw.exec(ddl.replaceAll('--> statement-breakpoint', ''))
+    for (const file of readdirSync('drizzle').filter((f) => f.endsWith('.sql')).sort()) {
+      raw.exec(readFileSync(`drizzle/${file}`, 'utf8').replaceAll('--> statement-breakpoint', ''))
+    }
     // Reuse the SQLite proxy convention from play.test.ts; queries and logs run for real.
     const db = drizzle(async (sql, params, method) => {
       const stmt = raw.prepare(sql)

@@ -10,13 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as StartRouteImport } from './routes/start'
 import { Route as WelcomeRouteImport } from './routes/welcome'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminCompaniesRouteImport } from './routes/admin.companies'
+import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as JoinInvitationIdRouteImport } from './routes/join.$invitationId'
 import { Route as MeIndexRouteImport } from './routes/me.index'
 import { Route as OrgNewRouteImport } from './routes/org.new'
 import { Route as PlaySessionIdRouteImport } from './routes/play.$sessionId'
+import { Route as AdminCompaniesSlugRouteImport } from './routes/admin.companies_.$slug'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as OrgSlugIndexRouteImport } from './routes/org.$slug.index'
 import { Route as OrgSlugPeopleRouteImport } from './routes/org.$slug.people'
@@ -28,6 +33,11 @@ import { Route as ApiOrgOrgIdLogoRouteImport } from './routes/api/org.$orgId.log
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignInRoute = SignInRouteImport.update({
@@ -44,6 +54,21 @@ const WelcomeRoute = WelcomeRouteImport.update({
   id: '/welcome',
   path: '/welcome',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCompaniesRoute = AdminCompaniesRouteImport.update({
+  id: '/companies',
+  path: '/companies',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AdminRoute,
 } as any)
 const JoinInvitationIdRoute = JoinInvitationIdRouteImport.update({
   id: '/join/$invitationId',
@@ -64,6 +89,11 @@ const PlaySessionIdRoute = PlaySessionIdRouteImport.update({
   id: '/play/$sessionId',
   path: '/play/$sessionId',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AdminCompaniesSlugRoute = AdminCompaniesSlugRouteImport.update({
+  id: '/companies_/$slug',
+  path: '/companies/$slug',
+  getParentRoute: () => AdminRoute,
 } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
@@ -103,13 +133,18 @@ const ApiOrgOrgIdLogoRoute = ApiOrgOrgIdLogoRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/sign-in': typeof SignInRoute
   '/start': typeof StartRoute
   '/welcome': typeof WelcomeRoute
+  '/admin/companies': typeof AdminCompaniesRoute
+  '/admin/users': typeof AdminUsersRoute
   '/join/$invitationId': typeof JoinInvitationIdRoute
   '/org/new': typeof OrgNewRoute
   '/play/$sessionId': typeof PlaySessionIdRoute
+  '/admin/': typeof AdminIndexRoute
   '/me/': typeof MeIndexRoute
+  '/admin/companies/$slug': typeof AdminCompaniesSlugRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/org/$slug/people': typeof OrgSlugPeopleRoute
   '/org/$slug/settings': typeof OrgSlugSettingsRoute
@@ -123,10 +158,14 @@ export interface FileRoutesByTo {
   '/sign-in': typeof SignInRoute
   '/start': typeof StartRoute
   '/welcome': typeof WelcomeRoute
+  '/admin/companies': typeof AdminCompaniesRoute
+  '/admin/users': typeof AdminUsersRoute
   '/join/$invitationId': typeof JoinInvitationIdRoute
   '/org/new': typeof OrgNewRoute
   '/play/$sessionId': typeof PlaySessionIdRoute
+  '/admin': typeof AdminIndexRoute
   '/me': typeof MeIndexRoute
+  '/admin/companies/$slug': typeof AdminCompaniesSlugRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/org/$slug/people': typeof OrgSlugPeopleRoute
   '/org/$slug/settings': typeof OrgSlugSettingsRoute
@@ -138,13 +177,18 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/sign-in': typeof SignInRoute
   '/start': typeof StartRoute
   '/welcome': typeof WelcomeRoute
+  '/admin/companies': typeof AdminCompaniesRoute
+  '/admin/users': typeof AdminUsersRoute
   '/join/$invitationId': typeof JoinInvitationIdRoute
   '/org/new': typeof OrgNewRoute
   '/play/$sessionId': typeof PlaySessionIdRoute
+  '/admin/': typeof AdminIndexRoute
   '/me/': typeof MeIndexRoute
+  '/admin/companies_/$slug': typeof AdminCompaniesSlugRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/org/$slug/people': typeof OrgSlugPeopleRoute
   '/org/$slug/settings': typeof OrgSlugSettingsRoute
@@ -157,13 +201,18 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/sign-in'
     | '/start'
     | '/welcome'
+    | '/admin/companies'
+    | '/admin/users'
     | '/join/$invitationId'
     | '/org/new'
     | '/play/$sessionId'
+    | '/admin/'
     | '/me/'
+    | '/admin/companies/$slug'
     | '/api/auth/$'
     | '/org/$slug/people'
     | '/org/$slug/settings'
@@ -177,10 +226,14 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/start'
     | '/welcome'
+    | '/admin/companies'
+    | '/admin/users'
     | '/join/$invitationId'
     | '/org/new'
     | '/play/$sessionId'
+    | '/admin'
     | '/me'
+    | '/admin/companies/$slug'
     | '/api/auth/$'
     | '/org/$slug/people'
     | '/org/$slug/settings'
@@ -191,13 +244,18 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/sign-in'
     | '/start'
     | '/welcome'
+    | '/admin/companies'
+    | '/admin/users'
     | '/join/$invitationId'
     | '/org/new'
     | '/play/$sessionId'
+    | '/admin/'
     | '/me/'
+    | '/admin/companies_/$slug'
     | '/api/auth/$'
     | '/org/$slug/people'
     | '/org/$slug/settings'
@@ -209,6 +267,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
   SignInRoute: typeof SignInRoute
   StartRoute: typeof StartRoute
   WelcomeRoute: typeof WelcomeRoute
@@ -234,6 +293,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sign-in': {
       id: '/sign-in'
       path: '/sign-in'
@@ -254,6 +320,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/welcome'
       preLoaderRoute: typeof WelcomeRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/companies': {
+      id: '/admin/companies'
+      path: '/companies'
+      fullPath: '/admin/companies'
+      preLoaderRoute: typeof AdminCompaniesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/join/$invitationId': {
       id: '/join/$invitationId'
@@ -282,6 +369,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/play/$sessionId'
       preLoaderRoute: typeof PlaySessionIdRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/admin/companies_/$slug': {
+      id: '/admin/companies_/$slug'
+      path: '/companies/$slug'
+      fullPath: '/admin/companies/$slug'
+      preLoaderRoute: typeof AdminCompaniesSlugRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/api/auth/$': {
       id: '/api/auth/$'
@@ -335,8 +429,25 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminRouteChildren {
+  AdminCompaniesRoute: typeof AdminCompaniesRoute
+  AdminUsersRoute: typeof AdminUsersRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+  AdminCompaniesSlugRoute: typeof AdminCompaniesSlugRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminCompaniesRoute: AdminCompaniesRoute,
+  AdminUsersRoute: AdminUsersRoute,
+  AdminIndexRoute: AdminIndexRoute,
+  AdminCompaniesSlugRoute: AdminCompaniesSlugRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
   SignInRoute: SignInRoute,
   StartRoute: StartRoute,
   WelcomeRoute: WelcomeRoute,
