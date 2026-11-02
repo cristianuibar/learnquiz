@@ -66,6 +66,12 @@ Staff (the `/admin` area, `requireStaff()`): make a user staff once they have si
 `pnpm exec wrangler d1 execute learnquiz --remote --command "UPDATE user SET role='admin' WHERE email='you@example.com'"`
 (drop `--remote` for the local database).
 
+The staff area lists companies, their members and training roles, member learning
+documents, active learners over the last 30 days, and lifetime model spend. Documents
+and activity are attributed to current company members. Company portals open read-only
+for staff. The Users page searches by email or name and supports banning and unbanning;
+banning revokes existing sessions and prevents sign-in.
+
 Local edition: point `LLM_PROFILE=ollama` and `LLM_BASE_URL` at an Ollama or llama.cpp
 server running Muse Glimmer; images and voice switch off.
 
