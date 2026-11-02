@@ -4,6 +4,7 @@ import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { createTopic, getTopicPath } from '@/server/curriculum'
 import { answerItem } from '@/server/play'
+import { getModelTrace } from '@/server/model-trace'
 import { generateConceptDiagram, serveConceptDiagram } from './diagrams'
 
 const boundary = vi.hoisted(() => ({
@@ -91,6 +92,9 @@ it('generates one diagram across overlapping views, serves its bytes, and reuses
   expect(boundary.env.MEDIA.put).toHaveBeenCalledTimes(1)
   expect(row('SELECT model, purpose, cost_usd, ok FROM model_calls')).toEqual({ model: 'muse-image-1.0', purpose: 'diagram', cost_usd: 0.01, ok: 1 })
   expect(row('SELECT COUNT(*) AS n FROM model_calls').n).toBe(1)
+  expect(await getModelTrace({ data: { scope: 'topic', topicId: 'topic' } })).toMatchObject({
+    calls: [{ purpose: 'diagram', model: 'muse-image-1.0', costUsd: 0.01 }], totalCostUsd: 0.01,
+  })
   const response = await serveConceptDiagram('procedure')
   expect(response.status).toBe(200)
   expect(response.headers.get('content-type')).toBe('image/png')

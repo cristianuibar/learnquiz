@@ -48,6 +48,7 @@ export const generateConceptDiagram = createServerFn({ method: 'POST' })
       if (!(await env.MEDIA.head(key))) {
         const bytes = await generateImage({
           learnerId,
+          topicId: concept.topicId,
           prompt: `Draw a clear educational procedure diagram for ${concept.name} in ${row.topic}.\n${concept.summary}\n${concept.sourceQuote ? `Source material: ${concept.sourceQuote}\n` : ''}Use numbered steps, arrows and short readable labels on a plain background. Follow the supplied procedure accurately; do not invent steps or company policy.`,
         })
         await env.MEDIA.put(key, bytes, { httpMetadata: { contentType: 'image/png' }, onlyIf: { etagDoesNotMatch: '*' } })

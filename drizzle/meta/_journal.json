@@ -26,8 +26,22 @@
     {
       "idx": 3,
       "version": "6",
-      "when": 1793641128653,
-      "tag": "0003_concept_diagram_claim",
+      "when": 1793641177180,
+      "tag": "0003_learner_unit_unlocks",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1793644840158,
+      "tag": "0004_model_trace",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1793657197144,
+      "tag": "0005_concept_diagram_claim",
       "breakpoints": true
     }
   ]

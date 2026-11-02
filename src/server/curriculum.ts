@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, asc, count, desc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '@/db'
-import { conceptEdges, concepts, items, learnerTopic, placements, sources, topics, units } from '@/db/schema'
+import { conceptEdges, concepts, items, learnerItem, learnerTopic, learnerUnit, placements, sources, topics, units } from '@/db/schema'
 import { validateSkeleton, fallbackSkeleton } from '@/lib/curriculum/validate'
 import { chatJson, LlmError } from '@/lib/llm/client'
 import { curriculumPrompt } from '@/lib/llm/prompts'
@@ -11,6 +11,7 @@ import { MAX_SOURCE_TEXT_CHARS } from '@/lib/limits'
 import { asItem, chunks, ensureConceptItems, httpError, loadPKnown, mean, targetFor, type StoredItem } from '@/server/helpers'
 import { assertWithinDailyCap } from '@/server/model-cap'
 import { requireLearnerId } from '@/server/session'
+import { getEnv } from '@/server/env'
 
 export const createTopic = createServerFn({ method: 'POST' })
   .validator(
@@ -34,6 +35,7 @@ export const createTopic = createServerFn({ method: 'POST' })
         await db.insert(sources).values({ id: sourceId, topicId, kind: 'text', title: 'Pasted text', bodyText: data.sourceText, createdAt: Date.now() })
       }
       let skeleton: CurriculumSkeleton
+      let generatedBy: string | null = null
       try {
         skeleton = await chatJson({
           purpose: 'curriculum',
@@ -42,7 +44,9 @@ export const createTopic = createServerFn({ method: 'POST' })
           ...curriculumPrompt({ topic: data.topic, goal: data.goal, levelHint: 3, sourceText: data.sourceText }),
           maxTokens: 16000, // measured: 8.6k tokens on a 30-concept topic, reasoning included
           learnerId,
+          topicId,
         })
+        generatedBy = getEnv().LLM_MODEL
       } catch (e) {
         if (e instanceof LlmError && e.status === 429) {
           // A request that raced the cap check stored its rows before the backstop
@@ -88,7 +92,7 @@ export const createTopic = createServerFn({ method: 'POST' })
         ...chunks(unitRows, 10).map((rows) => db.insert(units).values(rows)),
         ...chunks(conceptRows, 8).map((rows) => db.insert(concepts).values(rows)),
         ...chunks(edgeRows, 20).map((rows) => db.insert(conceptEdges).values(rows)),
-        db.update(topics).set({ status: 'ready' }).where(eq(topics.id, topicId)),
+        db.update(topics).set({ status: 'ready', generatedBy }).where(eq(topics.id, topicId)),
       ])
       return { topicId }
     } catch (e) {
@@ -104,13 +108,18 @@ export const getTopicPath = createServerFn({ method: 'GET' })
     const learnerId = await requireLearnerId()
     const db = getDb()
     const [topic] = await db
-      .select({ id: topics.id, title: topics.title, goal: topics.goal, status: topics.status })
+      .select({ id: topics.id, title: topics.title, goal: topics.goal, status: topics.status, generatedBy: topics.generatedBy })
       .from(topics)
       .where(and(eq(topics.id, data.topicId), eq(topics.learnerId, learnerId)))
     if (!topic) throw httpError('Topic not found', 404)
 
     const [unitRows, conceptRows, edges, counts, known, [lt], [placement]] = await Promise.all([
-      db.select().from(units).where(eq(units.topicId, topic.id)).orderBy(asc(units.order)),
+      db
+        .select({ id: units.id, order: units.order, name: units.name, summary: units.summary, unlockedAt: learnerUnit.unlockedAt })
+        .from(units)
+        .leftJoin(learnerUnit, and(eq(learnerUnit.unitId, units.id), eq(learnerUnit.learnerId, learnerId)))
+        .where(eq(units.topicId, topic.id))
+        .orderBy(asc(units.order)),
       db.select().from(concepts).where(eq(concepts.topicId, topic.id)).orderBy(asc(concepts.order)),
       db.select({ fromId: conceptEdges.fromId, toId: conceptEdges.toId }).from(conceptEdges).where(eq(conceptEdges.topicId, topic.id)),
       db
@@ -137,6 +146,7 @@ export const getTopicPath = createServerFn({ method: 'GET' })
       learner: {
         level: lt?.level ?? 3,
         levelLine: placement ? ((JSON.parse(placement.logJson) as { levelLine?: string }).levelLine ?? null) : null,
+        levelLineModel: placement ? ((JSON.parse(placement.logJson) as { levelLineModel?: string }).levelLineModel ?? null) : null,
         placed: Boolean(placement),
         xp: lt?.xp ?? 0,
         streak: lt?.streak ?? 0,
@@ -176,6 +186,7 @@ export const getConceptItems = createServerFn({ method: 'GET' })
       .select({ item: items })
       .from(items)
       .innerJoin(topics, eq(topics.id, items.topicId))
+      .innerJoin(learnerItem, and(eq(learnerItem.itemId, items.id), eq(learnerItem.learnerId, learnerId)))
       .where(and(eq(items.conceptId, data.conceptId), eq(items.status, 'active'), eq(topics.learnerId, learnerId)))
       .orderBy(desc(items.createdAt))
     return { items: rows.map((r) => asItem(r.item)) }
