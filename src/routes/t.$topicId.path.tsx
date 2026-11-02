@@ -96,7 +96,7 @@ function Concept({
   concept: ReturnType<typeof Route.useLoaderData>['units'][number]['concepts'][number]
 }) {
   const load = useServerFn(getConceptItems)
-  const [items, setItems] = useState<Item[]>([])
+  const [items, setItems] = useState<Item[] | null>(null)
   const [working, setWorking] = useState(false)
   const [error, setError] = useState('')
 
@@ -121,13 +121,13 @@ function Concept({
       <p className="mt-1 text-sm text-muted-foreground">{concept.summary}</p>
       {working ? (
         <div className="mt-4">
-          <Working label="Loading questions" />
+          <Working label="Loading answered questions" />
         </div>
       ) : (
         concept.itemCount > 0 &&
-        items.length === 0 && (
+        items === null && (
           <Button variant="outline" className="mt-4 h-12 px-6" onClick={show}>
-            Show questions
+            Show answered questions
           </Button>
         )
       )}
@@ -136,7 +136,12 @@ function Concept({
           {error}
         </p>
       )}
-      {items.length > 0 && (
+      {items?.length === 0 && (
+        <p role="status" className="mt-3 text-sm text-muted-foreground">
+          No answered questions to review yet.
+        </p>
+      )}
+      {items && items.length > 0 && (
         <ol className="mt-4 flex flex-col gap-4 border-t pt-4">
           {items.map((item) => (
             <ItemView key={item.id} item={item} />
