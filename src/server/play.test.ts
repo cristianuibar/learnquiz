@@ -45,6 +45,7 @@ function makeDb() {
   }
 
   const runOne = (sqlText: string, params: unknown[], method: Method): { rows: unknown[] } => {
+    if (params.length > 100) throw new Error('D1 supports at most 100 bound parameters per statement')
     const stmt = raw.prepare(sqlText)
     ;(stmt as unknown as { setReturnArrays: (v: boolean) => void }).setReturnArrays(true)
     const args = params as (string | number | bigint | null)[]
@@ -159,6 +160,20 @@ describe('learner practice and unit unlocks', () => {
   })
   afterEach(() => {
     vi.useRealTimers()
+  })
+
+  it('continues a large placement pool within the D1 parameter limit and skips retired questions', async () => {
+    seedFrontier(raw, 205, false)
+    const { sessionId } = await startPlacement({ data: { topicId: 't1' } })
+    expect((await getSession({ data: { sessionId } })).item?.id).toBe('i1')
+    await answerItem({ data: { sessionId, itemId: 'i1', answer: { text: '1' }, confidence: 'sure', responseMs: 1000 } })
+    // The original pool spans several statements; only its last question remains available.
+    raw.prepare("UPDATE items SET status = 'retired' WHERE id NOT IN ('i1', 'i205')").run()
+
+    await expect(nextItem({ data: { sessionId } })).resolves.toMatchObject({ ended: false, item: { id: 'i205' } })
+    expect(scalar(raw, 'SELECT item_ids_json, correct_count FROM sessions WHERE id = ?', sessionId))
+      .toEqual({ item_ids_json: JSON.stringify(['i1', 'i205']), correct_count: 1 })
+    expect(scalar(raw, 'SELECT COUNT(*) AS n FROM attempts').n).toBe(1)
   })
 
   it('only exposes the learner\'s answered active questions in Path after placement', async () => {

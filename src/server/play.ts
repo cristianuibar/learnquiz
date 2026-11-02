@@ -466,8 +466,10 @@ async function advance(db: Db, learnerId: string, session: SessionRow, topic: To
   const ids = JSON.parse(session.itemIdsJson) as string[]
   // Recheck persisted queues and placement pools: an admin can retire an item after the session starts.
   const candidates = 'pool' in plan ? plan.pool.map((p) => p.id) : ids.slice(plan.position + 1)
-  const available = new Set(candidates.length ? (await db.select({ id: items.id }).from(items)
-    .where(and(eq(items.topicId, session.topicId), ne(items.status, 'retired'), inArray(items.id, candidates)))).map((i) => i.id) : [])
+  // Leave two of D1's 100 bindings for the topic and retired status.
+  const rows = await Promise.all(chunks(candidates, 98).map((ids) => db.select({ id: items.id }).from(items)
+    .where(and(eq(items.topicId, session.topicId), ne(items.status, 'retired'), inArray(items.id, ids)))))
+  const available = new Set(rows.flat().map((i) => i.id))
   let position = plan.position + 1
   let nextId: string | null
   if ('log' in plan) {
