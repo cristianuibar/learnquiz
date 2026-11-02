@@ -36,6 +36,18 @@ pnpm exec wrangler d1 migrations apply learnquiz --local
 pnpm dev                              # http://localhost:3000
 ```
 
+The Worker entry in `src/worker.ts` delegates HTTP requests to TanStack Start and
+provides empty queue and scheduled handlers. To test a scheduled event locally:
+
+```sh
+pnpm build
+pnpm exec wrangler dev --local --test-scheduled --bundle
+# In another terminal:
+curl http://localhost:8787/__scheduled
+```
+
+`--bundle` enables Wrangler's `/__scheduled` middleware for Vite's prebuilt output.
+
 `.dev.vars` is git-ignored. To fill the key from Proton Pass without showing it:
 `pass-cli run --env-file lq.env -- sh -c 'printf "LLM_API_KEY=%s\n" "$LLM_API_KEY" >> .dev.vars'`
 where `lq.env` holds only the `pass://` reference.
