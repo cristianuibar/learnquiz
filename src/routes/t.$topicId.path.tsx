@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Link, createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { Check, X } from 'lucide-react'
+import { RouteError } from '@/components/inline-error'
 import { MasteryBar } from '@/components/mastery-bar'
 import { StartButton } from '@/components/start-button'
 import { Badge } from '@/components/ui/badge'
@@ -19,16 +20,7 @@ export const Route = createFileRoute('/t/$topicId/path')({
     if (!context.user) throw redirect({ to: '/' })
   },
   loader: ({ params }) => getTopicPath({ data: { topicId: params.topicId } }),
-  errorComponent: ({ error }) => (
-    <main className="mx-auto w-full max-w-xl px-4 pt-8">
-      <p role="alert" className="font-medium text-wrong">
-        {error instanceof Error ? error.message : 'Something went wrong'}
-      </p>
-      <Button asChild variant="outline" className="mt-6 h-12 px-6">
-        <Link to="/start">Start over</Link>
-      </Button>
-    </main>
-  ),
+  errorComponent: RouteError,
   component: Path,
 })
 
