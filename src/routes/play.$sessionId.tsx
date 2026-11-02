@@ -6,6 +6,7 @@ import { ConfidencePicker } from '@/components/confidence-picker'
 import { InlineError, RouteError, errorMessage } from '@/components/inline-error'
 import { ProgressHeader } from '@/components/progress-header'
 import { RevealCard } from '@/components/reveal-card'
+import { SessionTrace } from '@/components/session-trace'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -204,6 +205,7 @@ function Play({ initial }: { initial: SessionView }) {
           </form>
         )}
         {error && <InlineError message={error.message} onRetry={error.retry} />}
+        {!placement && <SessionTrace sessionId={view.id} />}
       </div>
       {!view.ended && item && (
         // Pinned to the bottom edge so the thumb reaches it; the key remounts it so autoFocus lands on Continue after a check.

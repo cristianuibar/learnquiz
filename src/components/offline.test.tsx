@@ -16,7 +16,7 @@ vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => 'topic
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/curriculum', () => ({ getTopicPath: vi.fn(), getConceptItems: vi.fn() }))
 vi.mock('@/server/play', () => ({
-  answerItem: vi.fn(), getSession: vi.fn(), nextItem: vi.fn(), endSession: vi.fn(), reportItem: vi.fn(), startPlacement: vi.fn(), startSession: vi.fn(),
+  answerItem: vi.fn(), getSession: vi.fn(), getSessionTrace: vi.fn(), nextItem: vi.fn(), endSession: vi.fn(), reportItem: vi.fn(), startPlacement: vi.fn(), startSession: vi.fn(),
 }))
 
 beforeEach(() => {

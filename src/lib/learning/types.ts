@@ -34,6 +34,12 @@ export type Reveal = {
 
 export type Progress = { position: number; total: number } // 1-based position of the current item
 
+export type SessionTrace = {
+  planner: string
+  steps: { reason: string }[]
+  calls: { id: string; purpose: string; model: string; latencyMs: number; ok: boolean }[]
+}
+
 export type SessionView = {
   id: string
   kind: 'session' | 'placement' | 'mock' | 'mini'

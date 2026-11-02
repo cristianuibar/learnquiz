@@ -5,11 +5,11 @@ import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { Route as playRoute } from '@/routes/play.$sessionId'
 import { Route as appRootRoute } from '@/routes/__root'
-import { answerItem, getSession, transcribeAnswer } from '@/server/play'
+import { answerItem, getSession, getSessionTrace, transcribeAnswer } from '@/server/play'
 import type { Reveal, SessionView } from '@/lib/learning/types'
 
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
-vi.mock('@/server/play', () => ({ answerItem: vi.fn(), getSession: vi.fn(), transcribeAnswer: vi.fn(), nextItem: vi.fn(), endSession: vi.fn(), reportItem: vi.fn() }))
+vi.mock('@/server/play', () => ({ answerItem: vi.fn(), getSession: vi.fn(), getSessionTrace: vi.fn(), transcribeAnswer: vi.fn(), nextItem: vi.fn(), endSession: vi.fn(), reportItem: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => 't1' }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: async () => ({ user: { id: 'u1', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false }) }))
@@ -107,6 +107,27 @@ it('records, uploads WAV, lets the learner edit the transcript, and checks the e
     await act(async () => { button(container, 'Check').click() })
     expect(answerItem).toHaveBeenCalledWith({ data: expect.objectContaining({ answer: { text: '1' }, confidence: 'sure' }) })
     expect(container.textContent).toContain('Correct, you were sure')
+  } finally { await cleanup() }
+})
+
+it.each([
+  { planner: 'muse-wonder-1.0', ok: true },
+  { planner: 'planned by rules', ok: false },
+])('opens the session trace with $planner and its per-step reasons', async ({ planner, ok }) => {
+  vi.mocked(getSessionTrace).mockReset().mockResolvedValue({
+    planner,
+    steps: [{ reason: 'Review variables before they fade.' }],
+    calls: [{ id: 'plan1', purpose: 'plan', model: 'muse-wonder-1.0', latencyMs: 120, ok }],
+  })
+  const { container, cleanup } = await renderPlay(false)
+  try {
+    expect(container.textContent).toContain('x + 1 = 2')
+    await act(async () => button(container, 'Session trace').click())
+    expect(getSessionTrace).toHaveBeenCalledWith({ data: { sessionId: 's1' } })
+    expect(container.textContent).toContain(planner)
+    expect(container.textContent).toContain('plan · muse-wonder-1.0')
+    expect(container.textContent).toContain('Review variables before they fade.')
+    expect(container.textContent).toContain(ok ? 'succeeded' : 'failed')
   } finally { await cleanup() }
 })
 

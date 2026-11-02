@@ -2,6 +2,7 @@ import { Link, createFileRoute, redirect } from '@tanstack/react-router'
 import { RouteError } from '@/components/inline-error'
 import { MasteryBar } from '@/components/mastery-bar'
 import { StartButton } from '@/components/start-button'
+import { SessionTrace } from '@/components/session-trace'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { endSession } from '@/server/play'
@@ -75,6 +76,7 @@ function Done() {
       <p className="mt-10 rounded-lg bg-learning-soft p-4">
         <span className="font-semibold">Coach:</span> {s.nextLine}
       </p>
+      {s.kind === 'session' && <SessionTrace sessionId={s.sessionId} />}
       <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center">
         {placed ? (
           <Button asChild className="h-12 w-full px-6 sm:w-auto">
