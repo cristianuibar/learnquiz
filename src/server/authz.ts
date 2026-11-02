@@ -1,4 +1,5 @@
 import { and, eq, or } from 'drizzle-orm'
+import { setResponseStatus } from '@tanstack/react-start/server'
 import { getDb, type Db } from '@/db'
 import { member, organization } from '@/db/auth-schema'
 import { httpError } from '@/server/helpers'
@@ -36,9 +37,23 @@ export async function requireOrgAdmin(org: string) {
   return { user, ...(await checkMembership(getDb(), user.id, org, true)) }
 }
 
+// Staff can inspect the existing portal without acquiring company membership or write permissions.
+export async function requireOrgReader(org: string) {
+  const user = await requireUser()
+  if (user.role !== 'admin') return { user, ...(await checkMembership(getDb(), user.id, org, true)), readOnly: false }
+  await requireStaff()
+  const company = await getDb().select().from(organization).where(eq(organization.slug, org)).get()
+  if (!company) throw httpError('Company not found', 404)
+  return { user, org: company, readOnly: true }
+}
+
 // Learn Quiz team: Better Auth admin plugin role.
 export async function requireStaff() {
-  const user = await requireUser()
-  if (user.role !== 'admin') throw httpError('Staff only', 403)
+  const user = await getSessionUser()
+  if (!user || user.role !== 'admin') {
+    const status = user ? 403 : 401
+    setResponseStatus(status)
+    throw httpError(user ? 'Staff only' : 'Sign in first', status)
+  }
   return user
 }
