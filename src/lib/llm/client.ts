@@ -37,6 +37,7 @@ export async function chatJson<T>(opts: {
   retry?: boolean
   learnerId?: string | null
   sessionId?: string | null
+  topicId?: string | null
 }): Promise<T> {
   const env = getEnv()
   const meta = env.LLM_PROFILE === 'meta'
@@ -130,12 +131,12 @@ export async function chatJson<T>(opts: {
 }
 
 // The one-shot voice contract uses a JSON request part and a WAV audio part.
-export async function transcribeAudio(opts: { audio: File; learnerId: string; sessionId: string }): Promise<string> {
+export async function transcribeAudio(opts: { audio: File; learnerId: string; sessionId: string; topicId: string }): Promise<string> {
   const env = getEnv()
   if (env.VOICE_ENABLED !== 'true' || env.LLM_PROFILE !== 'meta') throw new LlmError('Voice answers are unavailable.', 404)
   await assertWithinDailyCap(getDb(), opts.learnerId)
   const model = 'muse-voice-transcribe-1.0'
-  const log = { learnerId: opts.learnerId, sessionId: opts.sessionId, purpose: 'voice', model }
+  const log = { learnerId: opts.learnerId, sessionId: opts.sessionId, topicId: opts.topicId, purpose: 'voice', model }
   const started = Date.now()
   try {
     const body = new FormData()
@@ -162,7 +163,7 @@ export async function transcribeAudio(opts: { audio: File; learnerId: string; se
 }
 
 async function logCall(
-  opts: { purpose: string; model?: string; learnerId?: string | null; sessionId?: string | null },
+  opts: { purpose: string; model?: string; learnerId?: string | null; sessionId?: string | null; topicId?: string | null },
   started: number,
   usage: Usage | undefined,
   error: string | null,
@@ -179,6 +180,7 @@ async function logCall(
         id: crypto.randomUUID(),
         learnerId: opts.learnerId ?? null,
         sessionId: opts.sessionId ?? null,
+        topicId: opts.topicId ?? null,
         purpose: opts.purpose,
         model,
         latencyMs: Date.now() - started,

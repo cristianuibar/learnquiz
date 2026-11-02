@@ -1,8 +1,9 @@
 import { Link, createFileRoute, redirect } from '@tanstack/react-router'
 import { RouteError } from '@/components/inline-error'
 import { MasteryBar } from '@/components/mastery-bar'
+import { ModelLabel } from '@/components/model-label'
+import { ModelTrace } from '@/components/model-trace'
 import { StartButton } from '@/components/start-button'
-import { SessionTrace } from '@/components/session-trace'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { endSession } from '@/server/play'
@@ -28,6 +29,7 @@ function Done() {
         {placed ? `You're at level ${s.level} of 5` : `Session done, ${clock(s.durationMs)}`}
       </h1>
       {placed && s.levelLine && <p className="mt-3 text-lg text-muted-foreground">{s.levelLine}</p>}
+      {placed && s.levelLine && <ModelLabel model={s.levelLineModel} />}
       <p className="mt-4 flex flex-wrap gap-x-6 text-lg font-medium">
         <span>
           {s.correct} / {s.total} correct
@@ -39,6 +41,7 @@ function Done() {
           </>
         )}
       </p>
+      <ModelTrace key={s.sessionId} scope={{ scope: 'session', sessionId: s.sessionId }} />
       {s.masteryMoved.length > 0 && (
         <section className="mt-10">
           <h2 className="text-xl font-semibold">Mastery moved</h2>
@@ -68,6 +71,7 @@ function Done() {
                   {m.wasSure && <Badge className="bg-wrong-soft text-wrong">you were sure</Badge>}
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">{m.correctAnswer}</p>
+                <ModelLabel model={m.generatedBy} />
               </li>
             ))}
           </ul>
@@ -76,7 +80,6 @@ function Done() {
       <p className="mt-10 rounded-lg bg-learning-soft p-4">
         <span className="font-semibold">Coach:</span> {s.nextLine}
       </p>
-      {s.kind === 'session' && <SessionTrace sessionId={s.sessionId} />}
       <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center">
         {placed ? (
           <Button asChild className="h-12 w-full px-6 sm:w-auto">

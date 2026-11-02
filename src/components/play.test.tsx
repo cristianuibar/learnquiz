@@ -5,11 +5,13 @@ import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { Route as playRoute } from '@/routes/play.$sessionId'
 import { Route as appRootRoute } from '@/routes/__root'
-import { answerItem, getSession, getSessionTrace, transcribeAnswer } from '@/server/play'
+import { answerItem, getSession, nextItem, transcribeAnswer } from '@/server/play'
+import { getModelTrace } from '@/server/model-trace'
 import type { Reveal, SessionView } from '@/lib/learning/types'
 
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
-vi.mock('@/server/play', () => ({ answerItem: vi.fn(), getSession: vi.fn(), getSessionTrace: vi.fn(), transcribeAnswer: vi.fn(), nextItem: vi.fn(), endSession: vi.fn(), reportItem: vi.fn() }))
+vi.mock('@/server/play', () => ({ answerItem: vi.fn(), getSession: vi.fn(), transcribeAnswer: vi.fn(), nextItem: vi.fn(), endSession: vi.fn(), reportItem: vi.fn() }))
+vi.mock('@/server/model-trace', () => ({ getModelTrace: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => 't1' }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: async () => ({ user: { id: 'u1', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false }) }))
@@ -24,7 +26,7 @@ beforeEach(() => {
 })
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); finishPermission = undefined })
 
-async function renderPlay(voiceEnabled: boolean | null = true, permissionPending = false) {
+async function renderPlay(voiceEnabled: boolean | null = true, permissionPending = false, format: 'cloze' | 'short' = 'cloze') {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   stopTrack = vi.fn()
   const mic = { getTracks: () => [{ stop: stopTrack }] } as unknown as MediaStream
@@ -56,11 +58,12 @@ async function renderPlay(voiceEnabled: boolean | null = true, permissionPending
   const initial: SessionView = {
     id: 's1', kind: 'session', topicId: 't1', topicTitle: 'Algebra', progress: { position: 1, total: 1 }, ended: false,
     ...(voiceEnabled === null ? {} : { voiceEnabled }),
-    item: { id: 'i1', conceptId: 'c1', conceptName: 'Variables', format: 'cloze', stem: 'x + 1 = 2; x = ____', options: [], difficulty: 1 },
+    item: { id: 'i1', conceptId: 'c1', conceptName: 'Variables', format, stem: format === 'short' ? 'Explain why subtracting one preserves equality.' : 'x + 1 = 2; x = ____', options: [], difficulty: 1 },
   }
   vi.mocked(getSession).mockResolvedValue(initial)
   vi.mocked(transcribeAnswer).mockReset().mockResolvedValue('one')
   vi.mocked(answerItem).mockReset().mockResolvedValue({ correct: true, correctAnswer: '1', state: 'A', mixUps: [], explanation: 'Subtract one.' } as unknown as Reveal)
+  vi.mocked(nextItem).mockReset()
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
   const play = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId', loader: playRoute.options.loader, component: playRoute.options.component })
   const router = createRouter({ routeTree: rootRoute.addChildren([play]), history: createMemoryHistory({ initialEntries: ['/play/s1'] }) })
@@ -68,7 +71,7 @@ async function renderPlay(voiceEnabled: boolean | null = true, permissionPending
   document.body.appendChild(container)
   const root = createRoot(container)
   await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
-  return { container, mic, async cleanup() {
+  return { container, mic, initial, async cleanup() {
     await act(async () => root.unmount())
     container.remove()
     delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT
@@ -79,6 +82,47 @@ async function key(container: HTMLElement, type: 'keydown' | 'keyup') {
   await act(async () => button(container, type === 'keydown' ? 'Hold to answer by voice' : 'Release to transcribe')
     .dispatchEvent(new KeyboardEvent(type, { key: ' ', bubbles: true, cancelable: true })))
 }
+
+it.each([
+  { format: 'mcq', repeats: false },
+  { format: 'cloze', repeats: false },
+  { format: 'short', repeats: false },
+  { format: 'cloze', repeats: true },
+] as const)('focuses the next $format question after Continue (repeats: $repeats)', async ({ format, repeats }) => {
+  const { container, initial, cleanup } = await renderPlay(false)
+  const nextView: SessionView = {
+    ...initial,
+    progress: { position: 2, total: 2 },
+    item: repeats ? initial.item : { ...initial.item!, id: 'i2', format, stem: 'What is 2 + 2?', options: format === 'mcq' ? [{ id: 'four', text: '4' }, { id: 'five', text: '5' }] : [] },
+  }
+  if (repeats) {
+    const reveal = {
+      attemptId: 'a1', correct: false, correctAnswer: '1', state: 'C' as const, mixUps: [], explanation: 'Subtract one.',
+      score: 0, feedback: null, missingPoints: [],
+      chosenFeedback: null, sourceQuote: null, returnsThisSession: true, pKnownBefore: 0.1, pKnownAfter: 0.05,
+    }
+    vi.mocked(answerItem).mockResolvedValueOnce(reveal)
+  }
+  vi.mocked(nextItem).mockReset().mockResolvedValue(nextView)
+  try {
+    await act(async () => {
+      const input = container.querySelector<HTMLInputElement>('#answer')!
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, repeats ? '0' : '1')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      container.querySelector<HTMLInputElement>(`input[value="${repeats ? 'unsure' : 'sure'}"]`)!.click()
+    })
+    await act(async () => { button(container, 'Check').click() })
+    await act(async () => {
+      const next = button(container, 'Continue')
+      next.focus()
+      next.click()
+    })
+    expect(nextItem).toHaveBeenCalledWith({ data: { sessionId: 's1', why: undefined } })
+    expect(document.activeElement?.textContent).toBe(nextView.item!.stem)
+    expect(document.activeElement?.tagName).toBe('H1')
+    expect(button(container, 'Check').disabled).toBe(true)
+  } finally { await cleanup() }
+})
 
 it('records, uploads WAV, lets the learner edit the transcript, and checks the edited answer', async () => {
   const { container, cleanup } = await renderPlay()
@@ -113,21 +157,23 @@ it('records, uploads WAV, lets the learner edit the transcript, and checks the e
 it.each([
   { planner: 'muse-wonder-1.0', ok: true },
   { planner: 'planned by rules', ok: false },
-])('opens the session trace with $planner and its per-step reasons', async ({ planner, ok }) => {
-  vi.mocked(getSessionTrace).mockReset().mockResolvedValue({
-    planner,
-    steps: [{ reason: 'Review variables before they fade.' }],
-    calls: [{ id: 'plan1', purpose: 'plan', model: 'muse-wonder-1.0', latencyMs: 120, ok }],
+] as const)('opens the model trace with $planner and its per-step reasons', async ({ planner, ok }) => {
+  vi.mocked(getModelTrace).mockReset().mockResolvedValue({
+    planning: { planner, steps: [{ reason: 'Review variables before they fade.' }] },
+    totalCostUsd: 0,
+    calls: [{ id: 'plan1', purpose: 'plan', model: 'muse-wonder-1.0', latencyMs: 120, ok, promptTokens: 10, completionTokens: 20, reasoningTokens: 0, costUsd: 0, createdAt: 1 }],
   })
   const { container, cleanup } = await renderPlay(false)
   try {
     expect(container.textContent).toContain('x + 1 = 2')
-    await act(async () => button(container, 'Session trace').click())
-    expect(getSessionTrace).toHaveBeenCalledWith({ data: { sessionId: 's1' } })
-    expect(container.textContent).toContain(planner)
-    expect(container.textContent).toContain('plan · muse-wonder-1.0')
-    expect(container.textContent).toContain('Review variables before they fade.')
-    expect(container.textContent).toContain(ok ? 'succeeded' : 'failed')
+    await act(async () => button(container, 'Model trace').click())
+    expect(getModelTrace).toHaveBeenCalledWith({ data: { scope: 'session', sessionId: 's1' } })
+    const dialog = document.querySelector('[role="dialog"]')!
+    expect(dialog.textContent).toContain(planner)
+    expect(dialog.textContent).toContain('muse-wonder-1.0')
+    expect(dialog.textContent).toContain('plan')
+    expect(dialog.textContent).toContain('Review variables before they fade.')
+    expect(dialog.textContent).toContain(ok ? 'Succeeded' : 'Failed')
   } finally { await cleanup() }
 })
 
@@ -190,5 +236,41 @@ it.each([false, null])('offers typing when voice availability is %s', async (voi
     await act(async () => { button(container, 'Check').click() })
     expect(answerItem).toHaveBeenCalledWith({ data: expect.objectContaining({ answer: { text: '1' }, confidence: 'sure' }) })
     expect(container.textContent).toContain('Correct, you were sure')
+  } finally { await cleanup() }
+})
+
+it.each([false, true])('submits a short answer and shows its reveal (ungraded=%s)', async (ungraded) => {
+  const { container, initial, cleanup } = await renderPlay(false, false, 'short')
+  try {
+    vi.mocked(answerItem).mockResolvedValueOnce({
+      attemptId: ungraded ? null : 'a1', state: ungraded ? 'ungraded' : 'D', correct: false,
+      score: ungraded ? null : 0.5, feedback: ungraded ? 'Compare your answer with the model answer.' : 'Explain why both sides stay equal.',
+      missingPoints: ungraded ? [] : ['Subtract the same amount from both sides.'],
+      correctAnswer: 'Equal changes preserve equality.', explanation: 'Both sides change by the same amount.',
+      chosenFeedback: null, sourceQuote: 'Subtract equal quantities.', mixUps: [], returnsThisSession: false, pKnownBefore: 0.6, pKnownAfter: 0.6,
+    })
+    const input = container.querySelector<HTMLInputElement>('#answer')!
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'Both sides get smaller.')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      container.querySelector<HTMLInputElement>('input[value="sure"]')!.click()
+    })
+    await act(async () => { button(container, 'Check').click() })
+    expect(answerItem).toHaveBeenCalledWith({ data: expect.objectContaining({ answer: { text: 'Both sides get smaller.' } }) })
+    const status = container.querySelector('[role="status"]')!
+    if (ungraded) {
+      expect(status.querySelector('h2')?.textContent).toBe('Could not grade this answer')
+      expect(status.textContent).toContain('Equal changes preserve equality.')
+      expect(status.textContent).toContain('Compare your answer with the model answer.')
+      expect(status.querySelector('#why')).toBeNull()
+    } else {
+      expect(status.textContent).toContain('Score: 50%')
+      expect(status.textContent).toContain('Explain why both sides stay equal.')
+      expect(status.textContent).toContain('Subtract the same amount from both sides.')
+    }
+    vi.mocked(nextItem).mockResolvedValueOnce({ ...initial, item: { ...initial.item!, id: 'i2', stem: 'Next question' } })
+    await act(async () => { button(container, ungraded ? 'Continue' : 'Got it').click() })
+    expect(nextItem).toHaveBeenCalledWith({ data: { sessionId: 's1', why: undefined } })
+    expect(container.textContent).toContain('Next question')
   } finally { await cleanup() }
 })

@@ -33,9 +33,10 @@ vi.mock('@/lib/llm/client', async (importOriginal) => {
 
 vi.mock('cloudflare:workers', () => ({ env: {} }))
 
-import { endSession, getSession, getSessionTrace, nextItem, startSession } from './play'
+import { answerItem, endSession, getSession, nextItem, startPlacement, startSession } from './play'
 import { getEnv } from '@/server/env'
-import { getTopicPath } from './curriculum'
+import { getConceptItems, getTopicPath } from './curriculum'
+import { getModelTrace } from './model-trace'
 
 type Method = 'run' | 'all' | 'values' | 'get'
 
@@ -141,16 +142,15 @@ describe('Wonder session planning', () => {
     const [url, request] = fetchModel.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('https://llm.example/v1/chat/completions')
     expect(JSON.parse(request.body as string).model).toBe('muse-wonder-1.0')
-    expect(scalar(raw, 'SELECT learner_id, session_id, purpose, model, ok FROM model_calls')).toEqual({
-      learner_id: 'u1', session_id: sessionId, purpose: 'plan', model: 'muse-wonder-1.0', ok: 1,
+    expect(scalar(raw, 'SELECT learner_id, session_id, topic_id, purpose, model, ok FROM model_calls')).toEqual({
+      learner_id: 'u1', session_id: sessionId, topic_id: 't1', purpose: 'plan', model: 'muse-wonder-1.0', ok: 1,
     })
     expect((await getSession({ data: { sessionId } })).item?.id).toBe('i2')
-    const trace = await getSessionTrace({ data: { sessionId } })
-    expect(trace).toMatchObject({ planner: 'muse-wonder-1.0', steps: steps.map(({ reason }) => ({ reason })), calls: [
-      { purpose: 'plan', model: 'muse-wonder-1.0', ok: true },
-    ] })
+    const trace = await getModelTrace({ data: { scope: 'session', sessionId } })
+    expect(trace.planning).toEqual({ planner: 'muse-wonder-1.0', steps: steps.map(({ reason }) => ({ reason })) })
+    expect(trace.calls).toEqual([expect.objectContaining({ purpose: 'plan', model: 'muse-wonder-1.0', ok: true })])
     vi.mocked(requireLearnerId).mockResolvedValueOnce('u2')
-    await expect(getSessionTrace({ data: { sessionId } })).rejects.toMatchObject({ status: 404 })
+    await expect(getModelTrace({ data: { scope: 'session', sessionId } })).rejects.toMatchObject({ status: 404 })
   })
 
   it.each([
@@ -168,9 +168,9 @@ describe('Wonder session planning', () => {
     fetchModel.mockImplementation(reply)
     const { sessionId } = await startSession({ data: { topicId: 't1' } })
     expect(JSON.parse(scalar(raw, 'SELECT item_ids_json FROM sessions').item_ids_json as string)).toEqual(['i1', 'i2', 'i3'])
-    const trace = await getSessionTrace({ data: { sessionId } })
-    expect(trace.planner).toBe('planned by rules')
-    expect(trace.steps).toHaveLength(3)
+    const trace = await getModelTrace({ data: { scope: 'session', sessionId } })
+    expect(trace.planning?.planner).toBe('planned by rules')
+    expect(trace.planning?.steps).toHaveLength(3)
     expect(trace.calls).toEqual([expect.objectContaining({ purpose: 'plan', model: 'muse-wonder-1.0', ok: false })])
     expect(fetchModel).toHaveBeenCalledTimes(1)
     expect((await getSession({ data: { sessionId } })).item?.id).toBe('i1')
@@ -194,7 +194,7 @@ describe('Wonder session planning', () => {
     await vi.advanceTimersByTimeAsync(1)
     const { sessionId } = await starting
     expect(signal?.aborted).toBe(true)
-    expect(await getSessionTrace({ data: { sessionId } })).toMatchObject({ planner: 'planned by rules', calls: [{ ok: false, latencyMs: 4000 }] })
+    expect(await getModelTrace({ data: { scope: 'session', sessionId } })).toMatchObject({ planning: { planner: 'planned by rules' }, calls: [{ ok: false, latencyMs: 4000 }] })
     expect((await getSession({ data: { sessionId } })).item?.id).toBe('i1')
   })
 
@@ -204,7 +204,7 @@ describe('Wonder session planning', () => {
       for (let i = 0; i < 20; i++) log.run(`cap-${i}`, 'u1', 'items', 'muse-spark-1.3', 0, 1, Date.now())
     } else getEnv().LLM_PROFILE = 'ollama'
     const { sessionId } = await startSession({ data: { topicId: 't1' } })
-    expect(await getSessionTrace({ data: { sessionId } })).toMatchObject({ planner: 'planned by rules', calls: [] })
+    expect(await getModelTrace({ data: { scope: 'session', sessionId } })).toMatchObject({ planning: { planner: 'planned by rules' }, calls: [] })
     expect(fetchModel).not.toHaveBeenCalled()
   })
 })
@@ -234,6 +234,35 @@ describe('learner practice and unit unlocks', () => {
   })
   afterEach(() => {
     vi.useRealTimers()
+  })
+
+  it('only exposes the learner\'s answered active questions in Path after placement', async () => {
+    seedFrontier(raw, 8, false)
+    raw.prepare('UPDATE items SET status = ? WHERE id = ?').run('reported', 'i7')
+    raw.prepare('UPDATE items SET status = ? WHERE id = ?').run('rejected', 'i8')
+    raw.prepare('DELETE FROM learner_item WHERE item_id NOT IN (?, ?)').run('i7', 'i8')
+    raw.prepare('INSERT INTO learner_item (learner_id, item_id, due, stability, difficulty, state) VALUES (?, ?, ?, ?, ?, ?)')
+      .run('u2', 'i6', Date.now(), 1, 5, 2)
+
+    const { sessionId } = await startPlacement({ data: { topicId: 't1' } })
+    const { item } = await getSession({ data: { sessionId } })
+    // Being served a question must not reveal its answers before submission.
+    expect(await getConceptItems({ data: { conceptId: 'c1' } })).toEqual({ items: [] })
+    await answerItem({ data: { sessionId, itemId: item!.id, answer: { text: '1' }, confidence: 'sure', responseMs: 1000 } })
+    await endSession({ data: { sessionId } })
+
+    expect((await getTopicPath({ data: { topicId: 't1' } })).learner.placed).toBe(true)
+    expect(await getConceptItems({ data: { conceptId: 'c1' } })).toEqual({
+      items: [{
+        id: item!.id, format: 'cloze', difficultyPrior: 1, generatedBy: null,
+        payload: {
+          format: 'cloze', stem: 'Solve x + 1 = 2: x = ____.', options: [], accepted_answers: ['1'], model_answer: '1',
+          explanation: 'Subtract 1 from both sides.', difficulty: 1, source_quote: null, grounded: false, bloom: 'apply',
+        },
+      }],
+    })
+    vi.mocked(requireLearnerId).mockResolvedValueOnce('u2')
+    expect(await getConceptItems({ data: { conceptId: 'c1' } })).toEqual({ items: [] })
   })
 
   it('keeps unit 2 locked in another learner\'s Path and practice after placement', async () => {

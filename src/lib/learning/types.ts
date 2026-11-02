@@ -10,18 +10,22 @@ export type ItemView = {
   stem: string
   options: { id: string; text: string }[] // mcq only, shuffled server-side
   difficulty: number
+  generatedBy?: string | null
 }
 
 // Learner answer: mcq sends the option id, cloze and short send text.
 export type Answer = { optionId?: string; text?: string }
 
 // (correct, confidence) decides the reveal state: A correct+sure, B correct+unsure/guess, C wrong+unsure/guess, D wrong+sure.
-export type RevealState = 'A' | 'B' | 'C' | 'D'
+export type RevealState = 'A' | 'B' | 'C' | 'D' | 'ungraded'
 
 export type Reveal = {
-  attemptId: string
+  attemptId: string | null // no scored attempt when grading is unavailable
   state: RevealState
   correct: boolean
+  score: number | null // 0..1; null when grading is unavailable
+  feedback: string | null
+  missingPoints: string[]
   correctAnswer: string // option text, or accepted answers joined with " / "
   chosenFeedback: string | null // why the chosen option is wrong (mcq, states C and D)
   explanation: string
@@ -34,10 +38,9 @@ export type Reveal = {
 
 export type Progress = { position: number; total: number } // 1-based position of the current item
 
-export type SessionTrace = {
-  planner: string
-  steps: { reason: string }[]
-  calls: { id: string; purpose: string; model: string; latencyMs: number; ok: boolean }[]
+export type SessionPlanning = {
+  planner: 'muse-wonder-1.0' | 'planned by rules'
+  steps: { itemId: string; reason: string }[]
 }
 
 export type SessionView = {
@@ -62,7 +65,8 @@ export type SummaryView = {
   streak: number
   level: number | null // placement result, or the current level
   levelLine: string | null // two sentences: what you know, where you will grow
+  levelLineModel: string | null
   masteryMoved: { unitId: string; unitName: string; before: number; after: number }[]
-  mistakes: { itemId: string; stem: string; correctAnswer: string; wasSure: boolean }[]
+  mistakes: { itemId: string; stem: string; correctAnswer: string; wasSure: boolean; generatedBy: string | null }[]
   nextLine: string // coach: what happens next time
 }
