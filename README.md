@@ -20,7 +20,11 @@ Built solo by Cristian Uibar for the Meta Global AI Developer Hackathon
 | Spoken answers | Muse Voice Transcribe 1.0 |
 | Open-weights path | Muse Spark Open via Baseten, Muse Glimmer via Ollama for the local edition |
 
-Every model call is logged to the `model_calls` table. The in-app trace is planned.
+Every model call is logged to the `model_calls` table. Open **Model trace** on a
+session summary or the Path screen to see each call's purpose, model, latency,
+tokens and USD cost, plus the total. Generated paths, questions and placement
+feedback name the model that wrote them. Traces are private to the learner.
+Topic links and model labels are recorded for newly generated content.
 
 ## Stack
 

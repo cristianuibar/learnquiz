@@ -123,6 +123,7 @@ async function viewOf(db: Db, session: SessionRow, topic: Pick<TopicRow, 'title'
       { id: row.id, conceptId: concept.id, conceptName: concept.name, format: payload.format, difficultyPrior: row.difficultyPrior, payload },
       session.id + row.id,
     )
+    item.generatedBy = row.generatedBy
   }
   const placement = session.kind === 'placement'
   return {
@@ -143,6 +144,7 @@ export const startPlacement = createServerFn({ method: 'POST' })
     const learnerId = await requireLearnerId()
     const db = getDb()
     const topic = await ownedTopic(db, learnerId, data.topicId)
+    const sessionId = crypto.randomUUID()
     const [unitRows, conceptRows] = await Promise.all([
       db.select({ id: units.id }).from(units).where(eq(units.topicId, topic.id)).orderBy(asc(units.order)),
       db.select().from(concepts).where(eq(concepts.topicId, topic.id)).orderBy(asc(concepts.order)),
@@ -155,13 +157,12 @@ export const startPlacement = createServerFn({ method: 'POST' })
 
     // A failed concept keeps the others' stored items, so a retry only regenerates what is missing.
     const generated = await Promise.all(
-      picks.map((c) => ensureConceptItems(db, learnerId, c, topic, { targetDifficulty: PLACEMENT.start, spread: true })),
+      picks.map((c) => ensureConceptItems(db, learnerId, c, topic, { targetDifficulty: PLACEMENT.start, spread: true, sessionId })),
     )
     const pool = generated.flatMap((list, i) => list.map((it) => ({ id: it.id, conceptId: picks[i].id, difficulty: it.difficultyPrior })))
     const first = pickNext(PLACEMENT.start, pool, [])
     if (!first) throw httpError('Could not generate placement questions', 502)
 
-    const sessionId = crypto.randomUUID()
     const plan: PlacementPlan = { position: 0, answered: false, workingLevel: PLACEMENT.start, log: [], pool }
     // itemIdsJson holds the items served so far (the first is picked here); nextItem appends the rest.
     await db.insert(sessions).values({
@@ -182,6 +183,7 @@ export const startSession = createServerFn({ method: 'POST' })
     const learnerId = await requireLearnerId()
     const db = getDb()
     const topic = await ownedTopic(db, learnerId, data.topicId)
+    const sessionId = crypto.randomUUID()
     const now = new Date()
     const [lt, scheduled, frontier] = await Promise.all([
       loadLearnerTopic(db, learnerId, topic.id),
@@ -207,7 +209,7 @@ export const startSession = createServerFn({ method: 'POST' })
     const top = frontier.slice(0, 4)
     const generated = await Promise.all(top.map(async (f) => {
       try {
-        return await ensureConceptItems(db, learnerId, f.concept, topic, { targetDifficulty, unseen: seen })
+        return await ensureConceptItems(db, learnerId, f.concept, topic, { targetDifficulty, unseen: seen, sessionId })
       } catch (error) {
         // Defer capped generation when stored reviews are due; other failures still surface.
         if (
@@ -253,7 +255,6 @@ export const startSession = createServerFn({ method: 'POST' })
       },
       unitStart: Object.fromEntries((await unitMastery(db, learnerId, topic.id)).map((u) => [u.unitId, u.mastery])),
     }
-    const sessionId = crypto.randomUUID()
     await db.insert(sessions).values({
       id: sessionId,
       learnerId,
@@ -301,7 +302,7 @@ export const transcribeAnswer = createServerFn({ method: 'POST' })
     } catch (e) {
       throw httpError(e instanceof Error ? e.message : 'Invalid recording.', 400)
     }
-    return transcribeAudio({ audio: data.audio, learnerId, sessionId: session.id })
+    return transcribeAudio({ audio: data.audio, learnerId, sessionId: session.id, topicId: session.topicId })
   })
 
 export const answerItem = createServerFn({ method: 'POST' })
@@ -531,11 +532,12 @@ ${log.map((l) => `- ${concept.get(l.itemId) ?? 'unknown'}: ${l.correct ? 'right'
       maxTokens: 2000,
       learnerId,
       sessionId: session.id,
+      topicId: topic.id,
     })
-    return line
+    return { levelLine: line, levelLineModel: getEnv().LLM_MODEL }
   } catch (e) {
     console.error('placement line failed, using template', e instanceof Error ? e.message : e)
-    return fallback
+    return { levelLine: fallback, levelLineModel: null }
   }
 }
 
@@ -551,7 +553,7 @@ async function finalise(db: Db, learnerId: string, session: SessionRow, topic: T
   // A placement abandoned before its first answer changes nothing but its end time.
   if ('log' in plan && plan.log.length) {
     const level = levelResult(plan.log)
-    const [unitRows, conceptRows, levelLine] = await Promise.all([
+    const [unitRows, conceptRows, line] = await Promise.all([
       db.select({ id: units.id, order: units.order }).from(units).where(eq(units.topicId, topic.id)),
       db.select({ id: concepts.id, unitId: concepts.unitId }).from(concepts).where(eq(concepts.topicId, topic.id)),
       placementLine(db, learnerId, session, topic, plan.log, level),
@@ -582,7 +584,7 @@ async function finalise(db: Db, learnerId: string, session: SessionRow, topic: T
       // The placement id is the session id, and the reveal line rides along in log_json.
       db
         .insert(placements)
-        .values({ id: session.id, learnerId, topicId: topic.id, logJson: JSON.stringify({ log: plan.log, levelLine }), levelResult: level, createdAt: now })
+        .values({ id: session.id, learnerId, topicId: topic.id, logJson: JSON.stringify({ log: plan.log, ...line }), levelResult: level, createdAt: now })
         .onConflictDoNothing(),
     )
   } else if (!('log' in plan)) {
@@ -621,7 +623,7 @@ async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: 
     loadLearnerTopic(db, learnerId, topic.id),
     db.select({ total: count() }).from(attempts).where(eq(attempts.sessionId, session.id)),
     db
-      .select({ itemId: attempts.itemId, confidence: attempts.confidence, gradeJson: attempts.gradeJson, payloadJson: items.payloadJson })
+      .select({ itemId: attempts.itemId, confidence: attempts.confidence, gradeJson: attempts.gradeJson, payloadJson: items.payloadJson, generatedBy: items.generatedBy })
       .from(attempts)
       .innerJoin(items, eq(items.id, attempts.itemId))
       .where(and(eq(attempts.sessionId, session.id), eq(attempts.learnerId, learnerId), eq(attempts.correct, false)))
@@ -649,6 +651,7 @@ async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: 
         stem: (JSON.parse(w.payloadJson) as ItemPayload).stem,
         correctAnswer: (JSON.parse(w.gradeJson ?? '{}') as { correctAnswer?: string }).correctAnswer ?? '',
         wasSure: w.confidence === 'sure',
+        generatedBy: w.generatedBy,
       },
     ]),
   )
@@ -664,6 +667,7 @@ async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: 
     streak: lt.streakCount,
     level: lt.level,
     levelLine: placement ? ((JSON.parse(placement.logJson) as { levelLine?: string }).levelLine ?? null) : null,
+    levelLineModel: placement ? ((JSON.parse(placement.logJson) as { levelLineModel?: string }).levelLineModel ?? null) : null,
     masteryMoved: mastery
       .filter((u) => u.unitId in before && Math.abs(u.mastery - before[u.unitId]) > 0.001)
       .map((u) => ({ unitId: u.unitId, unitName: u.unitName, before: before[u.unitId], after: u.mastery })),

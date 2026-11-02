@@ -5,6 +5,7 @@ import { ChoiceGroup } from '@/components/choice-group'
 import { ConfidencePicker } from '@/components/confidence-picker'
 import { InlineError, RouteError, errorMessage } from '@/components/inline-error'
 import { ProgressHeader } from '@/components/progress-header'
+import { ModelLabel } from '@/components/model-label'
 import { RevealCard } from '@/components/reveal-card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -203,6 +204,7 @@ function Play({ initial }: { initial: SessionView }) {
             <ConfidencePicker value={confidence} onChange={setConfidence} />
           </form>
         )}
+        {item && <ModelLabel model={item.generatedBy} />}
         {error && <InlineError message={error.message} onRetry={error.retry} />}
       </div>
       {!view.ended && item && (

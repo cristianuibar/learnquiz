@@ -10,6 +10,7 @@ export type ItemView = {
   stem: string
   options: { id: string; text: string }[] // mcq only, shuffled server-side
   difficulty: number
+  generatedBy?: string | null
 }
 
 // Learner answer: mcq sends the option id, cloze and short send text.
@@ -56,7 +57,8 @@ export type SummaryView = {
   streak: number
   level: number | null // placement result, or the current level
   levelLine: string | null // two sentences: what you know, where you will grow
+  levelLineModel: string | null
   masteryMoved: { unitId: string; unitName: string; before: number; after: number }[]
-  mistakes: { itemId: string; stem: string; correctAnswer: string; wasSure: boolean }[]
+  mistakes: { itemId: string; stem: string; correctAnswer: string; wasSure: boolean; generatedBy: string | null }[]
   nextLine: string // coach: what happens next time
 }
