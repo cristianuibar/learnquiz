@@ -104,9 +104,9 @@ beforeAll(() => {
   for (const [userId, orgId, role] of [['owner', 'northwind', 'owner'], ['employee', 'northwind', 'member'], ['other-owner', 'other-org', 'owner']]) {
     raw.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, 1)').run(userId, orgId, userId, role)
   }
-  for (const [id, orgId, userId] of [['picker', 'northwind', 'owner'], ['other-role', 'other-org', 'other-owner']]) {
+  for (const [id, orgId] of [['picker', 'northwind'], ['other-role', 'other-org']]) {
     raw.prepare('INSERT INTO job_roles (id, org_id, name, created_at) VALUES (?, ?, ?, 1)').run(id, orgId, 'Warehouse picker')
-    raw.prepare("INSERT INTO topics (id, job_role_id, learner_id, title, status, created_at) VALUES (?, ?, ?, ?, 'draft', 1)").run(`${id}-topic`, id, userId, 'Warehouse picker')
+    raw.prepare("INSERT INTO topics (id, job_role_id, title, status, created_at) VALUES (?, ?, ?, 'draft', 1)").run(`${id}-topic`, id, 'Warehouse picker')
   }
   const source = raw.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, created_at, deleted_at) VALUES (?, ?, 'text', ?, ?, ?, ?)")
   source.run('packing', 'picker-topic', 'Packing and returns', documents[1], 2, null)

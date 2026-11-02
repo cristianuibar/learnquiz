@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "45e2d50d-3f2c-41cb-b237-a44a6d025028",
+  "id": "7cb4a71c-d9b1-4eec-935a-66a8bc690432",
   "prevId": "0596bced-7d46-4fa9-beb9-38b652f0d286",
   "tables": {
     "attempts": {
@@ -296,14 +296,6 @@
         },
         "grounded": {
           "name": "grounded",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "critical": {
-          "name": "critical",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -1144,13 +1136,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "deleted_at": {
-          "name": "deleted_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -1175,18 +1160,18 @@
           "notNull": true,
           "autoincrement": false
         },
-        "job_role_id": {
-          "name": "job_role_id",
+        "learner_id": {
+          "name": "learner_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "learner_id": {
-          "name": "learner_id",
+        "job_role_id": {
+          "name": "job_role_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "title": {
@@ -1235,7 +1220,21 @@
           "isUnique": true
         }
       },
-      "foreignKeys": {},
+      "foreignKeys": {
+        "topics_job_role_id_job_roles_id_fk": {
+          "name": "topics_job_role_id_job_roles_id_fk",
+          "tableFrom": "topics",
+          "tableTo": "job_roles",
+          "columnsFrom": [
+            "job_role_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
