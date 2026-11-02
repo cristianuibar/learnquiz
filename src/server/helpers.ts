@@ -5,6 +5,7 @@ import { chatJson, LlmError } from '@/lib/llm/client'
 import { itemsPrompt, selfCheckPrompt } from '@/lib/llm/prompts'
 import { ItemBatch, ItemPayload, SelfCheck } from '@/lib/llm/schemas'
 import { assertWithinDailyCap } from '@/server/model-cap'
+import { getEnv } from '@/server/env'
 
 // Server-only helpers shared by the server-function files. They live apart from them so no server-only import reaches the client bundle.
 
@@ -29,13 +30,14 @@ export async function loadPKnown(db: Db, learnerId: string, topicId: string) {
   return new Map(rows.map((r) => [r.conceptId, r.pKnown]))
 }
 
-export type StoredItem = { id: string; format: ItemPayload['format']; difficultyPrior: number; payload: ItemPayload }
+export type StoredItem = { id: string; format: ItemPayload['format']; difficultyPrior: number; payload: ItemPayload; generatedBy: string | null }
 
 export const asItem = (r: typeof items.$inferSelect): StoredItem => ({
   id: r.id,
   format: r.format as ItemPayload['format'],
   difficultyPrior: r.difficultyPrior,
   payload: JSON.parse(r.payloadJson) as ItemPayload,
+  generatedBy: r.generatedBy,
 })
 
 // Returns the concept's active items, generating a batch first when fewer than 6 exist. The caller has checked that the learner owns the topic.
@@ -44,7 +46,7 @@ export async function ensureConceptItems(
   learnerId: string,
   concept: typeof concepts.$inferSelect,
   topic: typeof topics.$inferSelect,
-  opts: { targetDifficulty: number; spread?: boolean; unseen?: Set<string> },
+  opts: { targetDifficulty: number; spread?: boolean; unseen?: Set<string>; sessionId?: string },
 ): Promise<StoredItem[]> {
   const existing = await db
     .select()
@@ -81,6 +83,8 @@ export async function ensureConceptItems(
         }),
         maxTokens: 16000,
         learnerId,
+        topicId: topic.id,
+        sessionId: opts.sessionId,
       })
       const drafted = batch.items.flatMap((i) => {
         const ok = ItemPayload.safeParse(i)
@@ -97,6 +101,8 @@ export async function ensureConceptItems(
             ...selfCheckPrompt({ items: drafted }),
             reasoningEffort: 'minimal',
             learnerId,
+            topicId: topic.id,
+            sessionId: opts.sessionId,
           })
         ).results
       } catch (e) {
@@ -123,11 +129,12 @@ export async function ensureConceptItems(
     topicId: topic.id,
     format: payload.format,
     payloadJson: JSON.stringify(payload),
+    generatedBy: getEnv().LLM_MODEL,
     difficultyPrior: payload.difficulty,
     checkJson: check === null ? null : JSON.stringify(check),
     createdAt: now,
   }))
   const [first, ...rest] = chunks(rows, 10).map((r) => db.insert(items).values(r))
   await db.batch([first, ...rest])
-  return [...existing.map(asItem), ...rows.map((r, i) => ({ id: r.id, format: r.format, difficultyPrior: r.difficultyPrior, payload: kept[i].payload }))]
+  return [...existing.map(asItem), ...rows.map((r, i) => ({ id: r.id, format: r.format, difficultyPrior: r.difficultyPrior, payload: kept[i].payload, generatedBy: r.generatedBy }))]
 }

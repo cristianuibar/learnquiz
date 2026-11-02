@@ -15,6 +15,7 @@ vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => 'topic' }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/curriculum', () => ({ getTopicPath: vi.fn(), getConceptItems: vi.fn() }))
+vi.mock('@/server/model-trace', () => ({ getModelTrace: vi.fn() }))
 vi.mock('@/server/play', () => ({
   answerItem: vi.fn(), getSession: vi.fn(), nextItem: vi.fn(), endSession: vi.fn(), reportItem: vi.fn(), startPlacement: vi.fn(), startSession: vi.fn(),
 }))
@@ -27,8 +28,8 @@ beforeEach(() => {
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
   vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'learner', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false })
   vi.mocked(getTopicPath).mockResolvedValue({
-    topic: { id: 'topic', title: 'Arithmetic', goal: null, status: 'ready' },
-    learner: { level: 1, levelLine: null, placed: false, xp: 0, streak: 0 }, units: [], edges: [],
+    topic: { id: 'topic', title: 'Arithmetic', goal: null, status: 'ready', generatedBy: null },
+    learner: { level: 1, levelLine: null, levelLineModel: null, placed: false, xp: 0, streak: 0 }, units: [], edges: [],
   })
   vi.mocked(getSession).mockResolvedValue({
     id: 'session', kind: 'session', topicId: 'topic', topicTitle: 'Arithmetic', ended: false,
