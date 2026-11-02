@@ -33,7 +33,7 @@ it('keeps staff navigation while enabling, testing and disabling notifications f
   Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: { register: vi.fn(async () => registration), ready: Promise.resolve(registration) } })
   const publicKey = btoa('public-key').replace(/=+$/, '')
   vi.mocked(getPushSettings).mockResolvedValue({ publicKey, isStaff: true, endpoints: [] })
-  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'staff', name: 'Staff', role: 'admin', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false })
+  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'staff', name: 'Staff', role: 'admin', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [{ name: 'Acme', slug: 'acme' }] })
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader })
   const me = createRoute({ getParentRoute: () => rootRoute, path: '/me/', beforeLoad: meRoute.options.beforeLoad, loader: meRoute.options.loader, component: meRoute.options.component })
   const admin = createRoute({ getParentRoute: () => rootRoute, path: '/admin', component: () => <h1>Staff area</h1> })
@@ -45,6 +45,7 @@ it('keeps staff navigation while enabling, testing and disabling notifications f
   try {
     await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
     expect(container.querySelector('a[href="/admin"]')?.textContent).toBe('Staff area')
+    expect(container.querySelector('a[href="/org/acme"]')?.textContent).toBe('Acme portal')
     expect(container.querySelector('h2')?.textContent).toBe('Notifications')
     expect(requestPermission).not.toHaveBeenCalled()
     expect(button('Send test push').disabled).toBe(true)
