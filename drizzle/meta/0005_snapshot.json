@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "ebf362fb-da7f-4c33-9bb8-a0361896e709",
+  "id": "7cb4a71c-d9b1-4eec-935a-66a8bc690432",
   "prevId": "0596bced-7d46-4fa9-beb9-38b652f0d286",
   "tables": {
     "attempts": {
@@ -320,13 +320,6 @@
         "image_alt": {
           "name": "image_alt",
           "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "image_generation_started_at": {
-          "name": "image_generation_started_at",
-          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1171,7 +1164,14 @@
           "name": "learner_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "job_role_id": {
+          "name": "job_role_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "title": {
@@ -1211,8 +1211,30 @@
           "autoincrement": false
         }
       },
-      "indexes": {},
-      "foreignKeys": {},
+      "indexes": {
+        "topics_job_role_id_unique": {
+          "name": "topics_job_role_id_unique",
+          "columns": [
+            "job_role_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "topics_job_role_id_job_roles_id_fk": {
+          "name": "topics_job_role_id_job_roles_id_fk",
+          "tableFrom": "topics",
+          "tableTo": "job_roles",
+          "columnsFrom": [
+            "job_role_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
