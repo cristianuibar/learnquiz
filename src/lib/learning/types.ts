@@ -42,6 +42,7 @@ export type SessionView = {
   progress: Progress
   item: ItemView | null // null when the session has ended
   ended: boolean
+  voiceEnabled?: boolean // Missing capability keeps voice controls disabled.
 }
 
 export type SummaryView = {

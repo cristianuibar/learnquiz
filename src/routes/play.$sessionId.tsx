@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Working } from '@/components/working'
+import { VoiceAnswer } from '@/components/voice-answer'
 import type { Confidence, Reveal, SessionView } from '@/lib/learning/types'
 import { answerItem, endSession, getSession, nextItem, reportItem } from '@/server/play'
 
@@ -51,6 +52,7 @@ function Play({ initial }: { initial: SessionView }) {
   const [why, setWhy] = useState('')
   const [reported, setReported] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [voiceBusy, setVoiceBusy] = useState(false)
   const [error, setError] = useState<{ message: string; retry: () => void } | null>(null)
   const shownAt = useRef(Date.now())
 
@@ -88,7 +90,7 @@ function Play({ initial }: { initial: SessionView }) {
   }
 
   function submitCheck() {
-    if (!item || !ready || busy) return
+    if (!item || !ready || busy || voiceBusy) return
     const responseMs = Date.now() - shownAt.current
     void run(async () => {
       const answer = item.format === 'mcq' ? { optionId: choice } : { text: choice.trim() }
@@ -188,10 +190,14 @@ function Play({ initial }: { initial: SessionView }) {
                   className="h-12"
                   value={choice}
                   onChange={(e) => setChoice(e.target.value)}
-                  maxLength={500}
+                  maxLength={1000}
+                  disabled={voiceBusy}
                   autoComplete="off"
                   autoFocus
                 />
+                {view.voiceEnabled && (
+                  <VoiceAnswer key={item.id} sessionId={view.id} itemId={item.id} disabled={busy} onTranscript={setChoice} onBusyChange={setVoiceBusy} />
+                )}
               </div>
             )}
             <ConfidencePicker value={confidence} onChange={setConfidence} />
@@ -207,7 +213,7 @@ function Play({ initial }: { initial: SessionView }) {
             type="submit"
             form="play"
             autoFocus={Boolean(reveal)}
-            disabled={busy || (!reveal && !ready)}
+            disabled={busy || voiceBusy || (!reveal && !ready)}
             className="h-12 w-full px-6"
           >
             {reveal ? (reveal.state === 'D' ? 'Got it' : 'Continue') : 'Check'}
