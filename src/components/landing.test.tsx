@@ -30,7 +30,10 @@ vi.mock('@/server/env', () => ({ getEnv: () => ({}) }))
 vi.mock('@/server/auth', () => ({ facebookEnabled: () => false }))
 vi.mock('@/server/session', () => ({ getSessionUser: vi.fn(), getLearnerId: async () => null }))
 vi.mock('@/lib/auth-client', () => ({
-  authClient: { signIn: { email: async ({ email }: { email: string }) => {
+  authClient: { signOut: async () => {
+    vi.mocked(getSessionUser).mockResolvedValue(null)
+    return { error: null }
+  }, signIn: { email: async ({ email }: { email: string }) => {
     const id = email.split('@')[0]
     vi.mocked(getSessionUser).mockResolvedValue({ id, name: id, isAnonymous: false } as never)
     return { error: null }
@@ -121,16 +124,27 @@ it.each([
   } finally { await cleanup() }
 })
 
-it('lets an owner train and return to each managed company from Profile', async () => {
+it('lets an owner leave the portal to train, return through Profile and sign out', async () => {
   vi.mocked(getSessionUser).mockResolvedValue({ id: 'owner', name: 'Owner', isAnonymous: false } as never)
-  const { container, router, cleanup } = await renderApp('/start')
+  const { container, router, cleanup } = await renderApp('/')
   try {
+    expect(router.state.location.pathname).toBe('/org/northwind')
+    expect(container.querySelector('h1')?.textContent).toBe('Northwind')
+    await act(async () => { container.querySelector<HTMLAnchorElement>('header a')!.click(); await router.load() })
+    expect(router.state.location.pathname).toBe('/start')
     expect(container.querySelector('h1')?.textContent).toBe('What do you want to learn?')
     await act(async () => { container.querySelector<HTMLAnchorElement>('a[href="/me"]')!.click(); await router.load() })
     expect([...container.querySelectorAll('a[href^="/org/"]')].map((a) => a.textContent)).toEqual(['Northwind portal', 'Contoso portal'])
     await act(async () => { container.querySelector<HTMLAnchorElement>('a[href="/org/contoso"]')!.click(); await router.load() })
     expect(router.state.location.pathname).toBe('/org/contoso')
     expect(container.querySelector('h1')?.textContent).toBe('Contoso')
+    await act(async () => { container.querySelector<HTMLAnchorElement>('header a')!.click(); await router.load() })
+    await act(async () => { container.querySelector<HTMLAnchorElement>('a[href="/me"]')!.click(); await router.load() })
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('main button')!.click()
+      await vi.waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    })
+    expect(container.querySelector('h1')?.textContent).toBe('Quiz it, until you learn it')
   } finally { await cleanup() }
 })
 
