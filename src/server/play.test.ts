@@ -1,7 +1,7 @@
 import { DatabaseSync } from 'node:sqlite'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { chatJson, LlmError } from '@/lib/llm/client'
 
 // Only external boundaries are faked: the server-fn transport, auth, the model
@@ -38,8 +38,9 @@ type Method = 'run' | 'all' | 'values' | 'get'
 
 function makeDb() {
   const raw = new DatabaseSync(':memory:')
-  const ddl = readFileSync(new URL('../../drizzle/0000_scaffold.sql', import.meta.url), 'utf8')
-  raw.exec(ddl.replaceAll('--> statement-breakpoint', ''))
+  for (const file of readdirSync('drizzle').filter((f) => f.endsWith('.sql')).sort()) {
+    raw.exec(readFileSync(`drizzle/${file}`, 'utf8').replaceAll('--> statement-breakpoint', ''))
+  }
 
   const runOne = (sqlText: string, params: unknown[], method: Method): { rows: unknown[] } => {
     const stmt = raw.prepare(sqlText)
@@ -60,13 +61,13 @@ function makeDb() {
   const db = drizzle(
     async (sqlText, params, method) => runOne(sqlText, params, method),
     async (batch) => {
-      raw.exec('BEGIN')
+      raw.exec('SAVEPOINT batch')
       try {
         const out = batch.map((q) => runOne(q.sql, q.params, q.method))
-        raw.exec('COMMIT')
+        raw.exec('RELEASE batch')
         return out
       } catch (e) {
-        raw.exec('ROLLBACK')
+        raw.exec('ROLLBACK TO batch; RELEASE batch')
         throw e
       }
     },
@@ -74,6 +75,12 @@ function makeDb() {
   holder.db = db
   return raw
 }
+
+// Migrate once, then isolate each action scenario without rebuilding the schema.
+const sharedDb = makeDb()
+beforeEach(() => sharedDb.exec('SAVEPOINT test'))
+afterEach(() => sharedDb.exec('ROLLBACK TO test; RELEASE test'))
+afterAll(() => sharedDb.close())
 
 function seedTopicAndLearner(raw: DatabaseSync, xp: number) {
   raw
@@ -110,12 +117,11 @@ describe('startSession frontier replenishment', () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-10-29T12:00:00Z'))
     vi.mocked(chatJson).mockClear()
-    raw = makeDb()
+    raw = sharedDb
     seedTopicAndLearner(raw, 0)
   })
   afterEach(() => {
     vi.useRealTimers()
-    raw.close()
   })
 
   it.each([
@@ -155,7 +161,7 @@ describe('startSession frontier replenishment', () => {
 })
 
 it('credits the session bonus once when two finishing nextItem calls race (practice)', async () => {
-  const raw = makeDb()
+  const raw = sharedDb
   seedTopicAndLearner(raw, 100)
   const plan = JSON.stringify({
     queue: ['i1'],
@@ -188,7 +194,7 @@ it('credits the session bonus once when two finishing nextItem calls race (pract
 })
 
 it('writes exactly one placement when two finishing nextItem calls race (placement)', async () => {
-  const raw = makeDb()
+  const raw = sharedDb
   seedTopicAndLearner(raw, 0)
   raw.prepare('INSERT INTO units (id, topic_id, "order", name, summary, unlocked_at) VALUES (?, ?, ?, ?, ?, ?)').run('un1', 't1', 0, 'Basics', '', null)
   raw

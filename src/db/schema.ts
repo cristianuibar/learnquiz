@@ -5,10 +5,11 @@ import { integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite
 
 export const topics = sqliteTable('topics', {
   id: text('id').primaryKey(),
+  jobRoleId: text('job_role_id').unique(), // One shared curriculum per company role; null for personal topics.
   learnerId: text('learner_id').notNull(),
   title: text('title').notNull(),
   goal: text('goal'),
-  status: text('status', { enum: ['generating', 'ready', 'failed'] }).notNull().default('generating'),
+  status: text('status', { enum: ['draft', 'generating', 'ready', 'failed'] }).notNull().default('generating'),
   createdAt: integer('created_at').notNull(),
 })
 
@@ -18,6 +19,7 @@ export const sources = sqliteTable('sources', {
   kind: text('kind', { enum: ['text', 'url', 'pdf', 'image'] }).notNull(),
   title: text('title').notNull(),
   bodyText: text('body_text').notNull(),
+  deletedAt: integer('deleted_at'),
   createdAt: integer('created_at').notNull(),
 })
 
@@ -42,6 +44,7 @@ export const concepts = sqliteTable('concepts', {
   sourceQuote: text('source_quote'),
   misconceptionsJson: text('misconceptions_json').notNull().default('[]'),
   grounded: integer('grounded', { mode: 'boolean' }).notNull().default(false),
+  critical: integer('critical', { mode: 'boolean' }).notNull().default(false),
   visual: integer('visual', { mode: 'boolean' }).notNull().default(false),
   imageKey: text('image_key'),
   imageAlt: text('image_alt'),
