@@ -18,6 +18,15 @@ export type ValidatedSkeleton = {
 const norm = (s: string) => s.replace(/\s+/g, ' ').trim()
 const key = (s: string) => norm(s).toLowerCase()
 
+// Match whitespace, case and quote-style variants, retaining the exact source substring.
+export function findSourceQuote(quote: string | null, source: string | null | undefined): string | null {
+  const pattern = quote && norm(quote).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/ /g, '\\s+')
+    .replace(/["“”]/g, '["“”]')
+    .replace(/['‘’]/g, "['‘’]")
+  return source && pattern ? source.match(new RegExp(pattern, 'iu'))?.[0] ?? null : null
+}
+
 export function validateSkeleton(skeleton: CurriculumSkeleton, sourceText?: string | null): ValidatedSkeleton {
   const notes: string[] = []
   const source = sourceText?.trim() ? sourceText : null
@@ -29,13 +38,8 @@ export function validateSkeleton(skeleton: CurriculumSkeleton, sourceText?: stri
     concepts: u.concepts.map((c) => {
       const id = crypto.randomUUID()
       if (!byName.has(key(c.name))) byName.set(key(c.name), id)
-      // Match whitespace, case and quote-style variants, retaining the exact source substring.
       const quote = c.source_quote && norm(c.source_quote)
-      const pattern = quote?.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        .replace(/ /g, '\\s+')
-        .replace(/["“”]/g, '["“”]')
-        .replace(/['‘’]/g, "['‘’]")
-      const kept = source && pattern ? source.match(new RegExp(pattern, 'iu'))?.[0] ?? null : null
+      const kept = findSourceQuote(quote, source)
       if (quote && source && !kept) notes.push(`dropped quote not found in source: ${c.name}`)
       return { id, name: c.name, summary: c.summary, sourceQuote: kept, grounded: kept !== null, misconceptions: c.misconceptions }
     }),

@@ -1,7 +1,7 @@
 import { DatabaseSync } from 'node:sqlite'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { chatJson, LlmError } from '@/lib/llm/client'
 
 // Only external boundaries are faked: the server-fn transport, auth, the model
@@ -32,14 +32,18 @@ vi.mock('@/lib/llm/client', () => ({
 
 vi.mock('cloudflare:workers', () => ({ env: {} }))
 
-import { endSession, nextItem, startSession } from './play'
+import { answerItem, endSession, getSession, nextItem, startPlacement, startSession } from './play'
 
 type Method = 'run' | 'all' | 'values' | 'get'
 
+let sharedDb: DatabaseSync | undefined
+
 function makeDb() {
+  if (sharedDb) return sharedDb
   const raw = new DatabaseSync(':memory:')
-  const ddl = readFileSync(new URL('../../drizzle/0000_scaffold.sql', import.meta.url), 'utf8')
-  raw.exec(ddl.replaceAll('--> statement-breakpoint', ''))
+  for (const file of readdirSync('drizzle').filter((f) => f.endsWith('.sql')).sort()) {
+    raw.exec(readFileSync(`drizzle/${file}`, 'utf8').replaceAll('--> statement-breakpoint', ''))
+  }
 
   const runOne = (sqlText: string, params: unknown[], method: Method): { rows: unknown[] } => {
     const stmt = raw.prepare(sqlText)
@@ -60,20 +64,29 @@ function makeDb() {
   const db = drizzle(
     async (sqlText, params, method) => runOne(sqlText, params, method),
     async (batch) => {
-      raw.exec('BEGIN')
+      raw.exec('SAVEPOINT batch')
       try {
         const out = batch.map((q) => runOne(q.sql, q.params, q.method))
-        raw.exec('COMMIT')
+        raw.exec('RELEASE batch')
         return out
       } catch (e) {
-        raw.exec('ROLLBACK')
+        raw.exec('ROLLBACK TO batch')
+        raw.exec('RELEASE batch')
         throw e
       }
     },
   )
   holder.db = db
+  sharedDb = raw
   return raw
 }
+
+beforeEach(() => { makeDb().exec('SAVEPOINT test') })
+afterEach(() => {
+  makeDb().exec('ROLLBACK TO test')
+  makeDb().exec('RELEASE test')
+})
+afterAll(() => sharedDb?.close())
 
 function seedTopicAndLearner(raw: DatabaseSync, xp: number) {
   raw
@@ -88,6 +101,42 @@ function seedTopicAndLearner(raw: DatabaseSync, xp: number) {
 
 const scalar = (raw: DatabaseSync, sqlText: string, ...params: (string | number)[]) =>
   (raw.prepare(sqlText).get(...params) as unknown as Record<string, unknown> | undefined) ?? {}
+
+it.each(['session', 'placement'])('skips retired questions in a queued %s, including reloads', async (kind) => {
+  const raw = makeDb()
+  seedTopicAndLearner(raw, 0)
+  seedFrontier(raw, 3, false)
+  raw.prepare("UPDATE items SET status = 'retired' WHERE id IN ('i1', 'i2')").run()
+  const plan = {
+    position: 0, answered: false,
+    ...(kind === 'placement'
+      ? { workingLevel: 1, log: [], pool: ['i1', 'i2', 'i3'].map((id) => ({ id, conceptId: 'c1', difficulty: 1 })) }
+      : { queue: ['i1', 'i2', 'i3'], reinserted: [], reasons: { due: 3, frontier: 0, closers: 0 }, unitStart: {} }),
+  }
+  raw.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, item_ids_json, plan_json, started_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run('queued', 'u1', 't1', kind, JSON.stringify(kind === 'placement' ? ['i1'] : ['i1', 'i2', 'i3']), JSON.stringify(plan), 1)
+  expect((await getSession({ data: { sessionId: 'queued' } })).item?.id).toBe('i3')
+  expect(scalar(raw, 'SELECT COUNT(*) AS n FROM attempts').n).toBe(0)
+  raw.prepare("UPDATE items SET status = 'retired' WHERE id = 'i3'").run()
+  await expect(answerItem({ data: { sessionId: 'queued', itemId: 'i3', answer: { text: '1' }, confidence: 'sure', responseMs: 100 } }))
+    .rejects.toMatchObject({ status: 404 })
+  expect((await getSession({ data: { sessionId: 'queued' } })).ended).toBe(true)
+  expect((await nextItem({ data: { sessionId: 'queued' } })).item).toBeNull()
+})
+
+it.each(['session', 'placement'])('excludes retired questions from a new %s', async (kind) => {
+  const raw = makeDb()
+  seedTopicAndLearner(raw, 0)
+  seedFrontier(raw, 7, true)
+  raw.prepare("UPDATE items SET status = 'retired' WHERE id = 'i1'").run()
+  raw.prepare("DELETE FROM learner_item WHERE item_id <> 'i1'").run()
+  const result = await (kind === 'placement' ? startPlacement : startSession)({ data: { topicId: 't1' } })
+  const stored = scalar(raw, 'SELECT item_ids_json, plan_json FROM sessions WHERE id = ?', result.sessionId)
+  const plan = JSON.parse(stored.plan_json as string)
+  expect(JSON.parse(stored.item_ids_json as string)).toEqual(kind === 'placement' ? ['i2'] : ['i2', 'i3', 'i4', 'i5', 'i6', 'i7'])
+  if (kind === 'placement') expect(plan.pool.map((i: { id: string }) => i.id)).toEqual(['i2', 'i3', 'i4', 'i5', 'i6', 'i7'])
+  expect((await getSession({ data: result })).item?.id).toBe('i2')
+})
 
 function seedFrontier(raw: DatabaseSync, itemCount: number, hasDue: boolean) {
   raw.prepare('INSERT INTO units (id, topic_id, "order", name, unlocked_at) VALUES (?, ?, ?, ?, ?)').run('un1', 't1', 0, 'Basics', 1)
@@ -115,7 +164,6 @@ describe('startSession frontier replenishment', () => {
   })
   afterEach(() => {
     vi.useRealTimers()
-    raw.close()
   })
 
   it.each([

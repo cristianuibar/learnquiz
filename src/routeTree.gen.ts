@@ -20,6 +20,7 @@ import { Route as PlaySessionIdRouteImport } from './routes/play.$sessionId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as OrgSlugIndexRouteImport } from './routes/org.$slug.index'
 import { Route as OrgSlugPeopleRouteImport } from './routes/org.$slug.people'
+import { Route as OrgSlugQuestionsRouteImport } from './routes/org.$slug.questions'
 import { Route as PlaySessionIdDoneRouteImport } from './routes/play.$sessionId_.done'
 import { Route as TTopicIdPathRouteImport } from './routes/t.$topicId.path'
 
@@ -78,6 +79,11 @@ const OrgSlugPeopleRoute = OrgSlugPeopleRouteImport.update({
   path: '/org/$slug/people',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OrgSlugQuestionsRoute = OrgSlugQuestionsRouteImport.update({
+  id: '/org/$slug/questions',
+  path: '/org/$slug/questions',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlaySessionIdDoneRoute = PlaySessionIdDoneRouteImport.update({
   id: '/play/$sessionId_/done',
   path: '/play/$sessionId/done',
@@ -100,6 +106,7 @@ export interface FileRoutesByFullPath {
   '/me/': typeof MeIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/org/$slug/people': typeof OrgSlugPeopleRoute
+  '/org/$slug/questions': typeof OrgSlugQuestionsRoute
   '/play/$sessionId/done': typeof PlaySessionIdDoneRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
   '/org/$slug/': typeof OrgSlugIndexRoute
@@ -115,6 +122,7 @@ export interface FileRoutesByTo {
   '/me': typeof MeIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/org/$slug/people': typeof OrgSlugPeopleRoute
+  '/org/$slug/questions': typeof OrgSlugQuestionsRoute
   '/play/$sessionId/done': typeof PlaySessionIdDoneRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
   '/org/$slug': typeof OrgSlugIndexRoute
@@ -131,6 +139,7 @@ export interface FileRoutesById {
   '/me/': typeof MeIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/org/$slug/people': typeof OrgSlugPeopleRoute
+  '/org/$slug/questions': typeof OrgSlugQuestionsRoute
   '/play/$sessionId_/done': typeof PlaySessionIdDoneRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
   '/org/$slug/': typeof OrgSlugIndexRoute
@@ -148,6 +157,7 @@ export interface FileRouteTypes {
     | '/me/'
     | '/api/auth/$'
     | '/org/$slug/people'
+    | '/org/$slug/questions'
     | '/play/$sessionId/done'
     | '/t/$topicId/path'
     | '/org/$slug/'
@@ -163,6 +173,7 @@ export interface FileRouteTypes {
     | '/me'
     | '/api/auth/$'
     | '/org/$slug/people'
+    | '/org/$slug/questions'
     | '/play/$sessionId/done'
     | '/t/$topicId/path'
     | '/org/$slug'
@@ -178,6 +189,7 @@ export interface FileRouteTypes {
     | '/me/'
     | '/api/auth/$'
     | '/org/$slug/people'
+    | '/org/$slug/questions'
     | '/play/$sessionId_/done'
     | '/t/$topicId/path'
     | '/org/$slug/'
@@ -194,6 +206,7 @@ export interface RootRouteChildren {
   MeIndexRoute: typeof MeIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   OrgSlugPeopleRoute: typeof OrgSlugPeopleRoute
+  OrgSlugQuestionsRoute: typeof OrgSlugQuestionsRoute
   PlaySessionIdDoneRoute: typeof PlaySessionIdDoneRoute
   TTopicIdPathRoute: typeof TTopicIdPathRoute
   OrgSlugIndexRoute: typeof OrgSlugIndexRoute
@@ -278,6 +291,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrgSlugPeopleRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/org/$slug/questions': {
+      id: '/org/$slug/questions'
+      path: '/org/$slug/questions'
+      fullPath: '/org/$slug/questions'
+      preLoaderRoute: typeof OrgSlugQuestionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/play/$sessionId_/done': {
       id: '/play/$sessionId_/done'
       path: '/play/$sessionId/done'
@@ -306,6 +326,7 @@ const rootRouteChildren: RootRouteChildren = {
   MeIndexRoute: MeIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   OrgSlugPeopleRoute: OrgSlugPeopleRoute,
+  OrgSlugQuestionsRoute: OrgSlugQuestionsRoute,
   PlaySessionIdDoneRoute: PlaySessionIdDoneRoute,
   TTopicIdPathRoute: TTopicIdPathRoute,
   OrgSlugIndexRoute: OrgSlugIndexRoute,

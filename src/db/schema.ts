@@ -5,6 +5,7 @@ import { integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite
 
 export const topics = sqliteTable('topics', {
   id: text('id').primaryKey(),
+  orgId: text('org_id'), // null for personal topics
   learnerId: text('learner_id').notNull(),
   title: text('title').notNull(),
   goal: text('goal'),
@@ -68,7 +69,9 @@ export const items = sqliteTable('items', {
   difficultyPrior: integer('difficulty_prior').notNull().default(3),
   eloDifficulty: real('elo_difficulty'),
   checkJson: text('check_json'),
-  status: text('status', { enum: ['active', 'rejected', 'reported'] }).notNull().default('active'),
+  status: text('status', { enum: ['active', 'rejected', 'reported', 'retired'] }).notNull().default('active'),
+  reviewedBy: text('reviewed_by'),
+  reviewedAt: integer('reviewed_at'),
   createdAt: integer('created_at').notNull(),
 })
 
