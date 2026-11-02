@@ -129,7 +129,8 @@ afterEach(() => {
 
 it('retains critical safety and scanning concepts when creating a personal topic', async () => {
   const sourceText = procedures.flatMap((u) => u.steps.map((s) => s[1])).join('\n')
-  await curriculum.createTopic({ data: { topic: 'Warehouse picker', sourceText } })
+  const { topicId } = await curriculum.createTopic({ data: { topic: 'Warehouse picker', sourceText } })
+  expect((await curriculum.getTopicPath({ data: { topicId } })).topic.generatedBy).toBe('muse-spark-1.3')
   const rows = await db.select().from(concepts)
   expect(rows.find((c) => c.name === 'Wear safety boots')).toMatchObject({ critical: true })
   expect(rows.find((c) => c.name === 'Scan the SKU')).toMatchObject({ critical: true })
@@ -147,6 +148,7 @@ const storedPath = () => ({
 it('builds one ready role topic from every live document with grounded critical steps in procedure order', async () => {
   await expect(generate()).resolves.toEqual({ topicId: 'picker-topic' })
   expect(topicState()).toEqual({ status: 'ready' })
+  expect(raw.prepare("SELECT generated_by FROM topics WHERE id = 'picker-topic'").get()).toEqual({ generated_by: 'muse-spark-1.3' })
   expect(storedPath()).toEqual({ units: { n: 4 }, concepts: { n: 16 }, edges: { n: 12 } })
   const rows = raw.prepare(`SELECT c.name, c.source_id, c.source_quote, c.critical, c.grounded, s.body_text
     FROM concepts c JOIN units u ON u.id = c.unit_id LEFT JOIN sources s ON s.id = c.source_id
@@ -164,7 +166,7 @@ it('builds one ready role topic from every live document with grounded critical 
   expect(prompt.indexOf(documents[0])).toBeLessThan(prompt.indexOf(documents[1]))
   expect(prompt).not.toContain('Obsolete rule:')
   expect(prompt).not.toContain('Foreign rule:')
-  expect(raw.prepare("SELECT purpose, ok FROM model_calls WHERE learner_id = 'owner'").all()).toEqual([{ purpose: 'curriculum', ok: 1 }])
+  expect(raw.prepare("SELECT purpose, ok, topic_id FROM model_calls WHERE learner_id = 'owner'").all()).toEqual([{ purpose: 'curriculum', ok: 1, topic_id: 'picker-topic' }])
   // Repeated requests preserve the shared path and cannot create duplicate concepts.
   await expect(generate()).rejects.toMatchObject({ status: 409 })
   expect(storedPath()).toEqual({ units: { n: 4 }, concepts: { n: 16 }, edges: { n: 12 } })

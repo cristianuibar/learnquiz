@@ -3,6 +3,7 @@ import { HeadContent, Outlet, Scripts, createRootRoute, redirect, useLocation } 
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 import { BottomNav } from '@/components/bottom-nav'
+import { RouteError } from '@/components/inline-error'
 import { TopBar } from '@/components/top-bar'
 import { getLatestTopicIdFn } from '@/server/latest-topic'
 import { getSessionFn } from '@/server/session-fn'
@@ -17,6 +18,7 @@ export const Route = createRootRoute({
     return session
   },
   loader: ({ context }) => (context.user ? getLatestTopicIdFn() : null),
+  errorComponent: RouteError,
   notFoundComponent: () => (
     <main className="mx-auto w-full max-w-xl px-4 pt-8">
       <p className="text-lg font-medium">Page not found.</p>

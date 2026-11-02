@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "95f912d7-3361-45b2-b128-2d04222b327d",
+  "id": "7f6eba53-aa74-4f37-892b-b0af0462a4ef",
   "prevId": "b482ddec-64d9-4f31-bd7d-800e65f218a1",
   "tables": {
     "attempts": {
@@ -296,14 +296,6 @@
         },
         "grounded": {
           "name": "grounded",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "critical": {
-          "name": "critical",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -760,6 +752,45 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "learner_unit": {
+      "name": "learner_unit",
+      "columns": {
+        "learner_id": {
+          "name": "learner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "unit_id": {
+          "name": "unit_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "unlocked_at": {
+          "name": "unlocked_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "learner_unit_learner_id_unit_id_pk": {
+          "columns": [
+            "learner_id",
+            "unit_id"
+          ],
+          "name": "learner_unit_learner_id_unit_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "member_role_assignments": {
       "name": "member_role_assignments",
       "columns": {
@@ -1091,13 +1122,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "deleted_at": {
-          "name": "deleted_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -1120,13 +1144,6 @@
           "type": "text",
           "primaryKey": true,
           "notNull": true,
-          "autoincrement": false
-        },
-        "job_role_id": {
-          "name": "job_role_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
           "autoincrement": false
         },
         "learner_id": {
@@ -1166,15 +1183,7 @@
           "autoincrement": false
         }
       },
-      "indexes": {
-        "topics_job_role_id_unique": {
-          "name": "topics_job_role_id_unique",
-          "columns": [
-            "job_role_id"
-          ],
-          "isUnique": true
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},

@@ -9,6 +9,7 @@ export const topics = sqliteTable('topics', {
   learnerId: text('learner_id').notNull(),
   title: text('title').notNull(),
   goal: text('goal'),
+  generatedBy: text('generated_by'),
   status: text('status', { enum: ['draft', 'generating', 'ready', 'failed'] }).notNull().default('generating'),
   createdAt: integer('created_at').notNull(),
 })
@@ -68,6 +69,7 @@ export const items = sqliteTable('items', {
   topicId: text('topic_id').notNull(),
   format: text('format', { enum: ['mcq', 'cloze', 'short', 'image', 'order'] }).notNull(),
   payloadJson: text('payload_json').notNull(), // ItemPayload from src/lib/llm/schemas.ts
+  generatedBy: text('generated_by'),
   difficultyPrior: integer('difficulty_prior').notNull().default(3),
   eloDifficulty: real('elo_difficulty'),
   checkJson: text('check_json'),
@@ -88,6 +90,16 @@ export const learnerTopic = sqliteTable(
     xp: integer('xp').notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.learnerId, t.topicId] })],
+)
+
+export const learnerUnit = sqliteTable(
+  'learner_unit',
+  {
+    learnerId: text('learner_id').notNull(),
+    unitId: text('unit_id').notNull(),
+    unlockedAt: integer('unlocked_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.learnerId, t.unitId] })],
 )
 
 export const learnerConcept = sqliteTable(
@@ -177,6 +189,7 @@ export const modelCalls = sqliteTable('model_calls', {
   id: text('id').primaryKey(),
   learnerId: text('learner_id'),
   sessionId: text('session_id'),
+  topicId: text('topic_id'),
   purpose: text('purpose').notNull(),
   model: text('model').notNull(),
   latencyMs: integer('latency_ms').notNull(),
