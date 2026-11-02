@@ -9,10 +9,9 @@ import { gradeAnswer, revealState, toItemView } from '@/lib/learning/grade'
 import { levelResult, nextLevel, pickNext, PLACEMENT, shouldStop } from '@/lib/learning/placement'
 import { composeSession, reinsert, SESSION_BONUS, streakAfter, xpFor } from '@/lib/learning/session'
 import type { Confidence, ItemView, Reveal, SessionView, SummaryView } from '@/lib/learning/types'
-import { chatJson, transcribeAudio } from '@/lib/llm/client'
+import { chatJson, isVoiceEnabled, transcribeAudio } from '@/lib/llm/client'
 import type { ItemPayload } from '@/lib/llm/schemas'
 import { validateVoiceWav } from '@/lib/voice'
-import { getEnv } from '@/server/env'
 import { chunks, ensureConceptItems, httpError, loadPKnown, mean, targetFor } from '@/server/helpers'
 import { requireLearnerId } from '@/server/session'
 
@@ -133,7 +132,7 @@ async function viewOf(db: Db, session: SessionRow, topic: Pick<TopicRow, 'title'
     progress: { position: plan.position + 1, total: placement ? Math.max(PLACEMENT_TOTAL, plan.position + 1) : ids.length },
     item,
     ended,
-    voiceEnabled: getEnv().VOICE_ENABLED === 'true' && getEnv().LLM_PROFILE === 'meta',
+    voiceEnabled: isVoiceEnabled(),
   }
 }
 
@@ -287,7 +286,7 @@ export const transcribeAnswer = createServerFn({ method: 'POST' })
   })
   .handler(async ({ data }): Promise<string> => {
     const learnerId = await requireLearnerId()
-    if (getEnv().VOICE_ENABLED !== 'true' || getEnv().LLM_PROFILE !== 'meta') throw httpError('Voice answers are unavailable.', 404)
+    if (!isVoiceEnabled()) throw httpError('Voice answers are unavailable.', 404)
     const db = getDb()
     const { session } = await loadSession(db, learnerId, data.sessionId)
     const plan = readPlan(session)

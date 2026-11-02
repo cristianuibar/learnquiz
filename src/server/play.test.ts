@@ -23,6 +23,7 @@ vi.mock('@/db', () => ({ getDb: () => holder.db }))
 vi.mock('@/server/session', () => ({ requireLearnerId: vi.fn(async () => 'u1') }))
 
 vi.mock('@/lib/llm/client', () => ({
+  isVoiceEnabled: () => false,
   chatJson: vi.fn(async () => ({ line: 'You know the basics and will grow from here.' })),
   LlmError: class LlmError extends Error {
     constructor(message: string, public status: number) {

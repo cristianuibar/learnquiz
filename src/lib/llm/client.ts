@@ -3,10 +3,11 @@ import { z } from 'zod'
 import { getDb } from '@/db'
 import { modelCalls } from '@/db/schema'
 import { isOverDailyCap, utcDayStart } from '@/lib/limits'
+import { META_MODELS, PROVIDERS, type ModelJob } from '@/lib/llm/models'
 import { getEnv } from '@/server/env'
 import { assertWithinDailyCap } from '@/server/model-cap'
 
-// USD per million tokens; reasoning tokens bill as output. Unlisted models cost 0.
+// USD per million tokens; reasoning tokens bill as output. Unlisted prices are unknown.
 export const PRICES: Record<string, { in: number; out: number }> = {
   'muse-spark-1.3': { in: 1.25, out: 4.25 },
 }
@@ -23,9 +24,46 @@ export class LlmError extends Error {
 type Usage = { prompt_tokens?: number; completion_tokens?: number; completion_tokens_details?: { reasoning_tokens?: number } }
 type Message = { role: 'system' | 'user' | 'assistant'; content: string }
 
+function jobModel(job: ModelJob) {
+  const env = getEnv()
+  try {
+    // Wrangler JSON bindings are objects; .dev.vars can supply JSON strings.
+    const mapping: unknown = typeof env.JOB_MODELS === 'string' ? JSON.parse(env.JOB_MODELS) : env.JOB_MODELS === undefined ? {} : env.JOB_MODELS
+    const jobs = z.record(z.string(), z.unknown()).parse(mapping)
+    const selected = jobs[job] === undefined
+      ? { provider: env.LLM_PROFILE, model: job === 'voice' ? 'muse-voice-transcribe-1.0' : job === 'image' ? env.IMAGE_MODEL : env.LLM_MODEL }
+      : z.object({ provider: z.enum(['meta', 'baseten', 'fireworks']), model: z.string().min(1) }).parse(jobs[job])
+    const modelId = selected.provider === 'fireworks' ? selected.model.replace(/^accounts\/fireworks\/models\//, '') : selected.model
+    if (!META_MODELS.has(modelId)) throw new Error('Only Meta models are supported')
+    const provider = selected.provider === 'ollama'
+      ? { baseUrl: env.LLM_BASE_URL, keyBinding: 'LLM_API_KEY' as const, jsonMode: 'json_object' as const }
+      : PROVIDERS[selected.provider]
+    if (!provider) throw new Error('Unknown provider')
+    return {
+      ...selected,
+      baseUrl: (selected.provider === env.LLM_PROFILE ? env.LLM_BASE_URL : provider.baseUrl).replace(/\/$/, ''),
+      apiKey: env[provider.keyBinding] || (selected.provider === env.LLM_PROFILE ? env.LLM_API_KEY : undefined),
+      jsonMode: provider.jsonMode,
+    }
+  } catch {
+    // Configuration errors must never include bindings or credentials.
+    throw new LlmError(`Invalid model configuration for ${job}.`, 503)
+  }
+}
+
+export function isVoiceEnabled(): boolean {
+  if (getEnv().VOICE_ENABLED !== 'true') return false
+  try {
+    const selected = jobModel('voice')
+    return selected.provider === 'meta' && selected.model === 'muse-voice-transcribe-1.0'
+  } catch {
+    return false
+  }
+}
+
 // Calls the model for JSON matching `schema`; one retry with the error appended, then throws LlmError.
 export async function chatJson<T>(opts: {
-  purpose: string
+  purpose: ModelJob
   schema: z.ZodType<T>
   schemaName: string
   system: string
@@ -35,18 +73,19 @@ export async function chatJson<T>(opts: {
   learnerId?: string | null
   sessionId?: string | null
 }): Promise<T> {
-  const env = getEnv()
-  const meta = env.LLM_PROFILE === 'meta'
+  const selected = jobModel(opts.purpose)
+  const log = { ...opts, model: selected.model }
+  const strict = selected.jsonMode === 'json_schema'
   // Strict json_schema is a Meta feature; other profiles get json_object plus the schema in the prompt.
   const { $schema: _, ...jsonSchema } = z.toJSONSchema(opts.schema)
   const messages: Message[] = [
     {
       role: 'system',
-      content: meta ? opts.system : `${opts.system}\n\nReply with one JSON object matching this JSON Schema:\n${JSON.stringify(jsonSchema)}`,
+      content: strict ? opts.system : `${opts.system}\n\nReply with one JSON object matching this JSON Schema:\n${JSON.stringify(jsonSchema)}`,
     },
     { role: 'user', content: opts.user },
   ]
-  const clean = (s: string) => (env.LLM_API_KEY ? s.replaceAll(env.LLM_API_KEY, '[redacted]') : s).slice(0, 300)
+  const clean = (s: string) => (selected.apiKey ? s.replaceAll(selected.apiKey, '[redacted]') : s).slice(0, 300)
 
   let failure = ''
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -73,15 +112,15 @@ export async function chatJson<T>(opts: {
     try {
       let res: Response
       try {
-        res = await fetch(`${env.LLM_BASE_URL}/chat/completions`, {
+        res = await fetch(`${selected.baseUrl}/chat/completions`, {
           method: 'POST',
-          headers: { 'content-type': 'application/json', ...(env.LLM_API_KEY && { authorization: `Bearer ${env.LLM_API_KEY}` }) },
+          headers: { 'content-type': 'application/json', ...(selected.apiKey && { authorization: `Bearer ${selected.apiKey}` }) },
           body: JSON.stringify({
-            model: env.LLM_MODEL,
+            model: selected.model,
             messages,
             max_tokens: opts.maxTokens ?? 8192, // reasoning tokens spend this budget too
-            ...(meta && opts.reasoningEffort && { reasoning_effort: opts.reasoningEffort }),
-            response_format: meta
+            ...(selected.provider === 'meta' && opts.reasoningEffort && { reasoning_effort: opts.reasoningEffort }),
+            response_format: strict
               ? { type: 'json_schema', json_schema: { name: opts.schemaName, strict: true, schema: jsonSchema } }
               : { type: 'json_object' },
           }),
@@ -105,11 +144,11 @@ export async function chatJson<T>(opts: {
       }
       const parsed = opts.schema.safeParse(json)
       if (!parsed.success) throw new Error(z.prettifyError(parsed.error))
-      await logCall(opts, started, usage, null)
+      await logCall(log, started, usage, null)
       return parsed.data
     } catch (e) {
       failure = clean(e instanceof Error ? e.message : String(e))
-      await logCall(opts, started, usage, failure)
+      await logCall(log, started, usage, failure)
       // Only bad output is worth a second try; transport and HTTP errors fail fast.
       if (e instanceof LlmError) throw new LlmError(`LLM request failed (${e.status})`, e.status)
       // A cut-off reply is never echoed back: it is huge and the model only needs to be told to be brief.
@@ -127,19 +166,19 @@ export async function chatJson<T>(opts: {
 
 // The one-shot voice contract uses a JSON request part and a WAV audio part.
 export async function transcribeAudio(opts: { audio: File; learnerId: string; sessionId: string }): Promise<string> {
-  const env = getEnv()
-  if (env.VOICE_ENABLED !== 'true' || env.LLM_PROFILE !== 'meta') throw new LlmError('Voice answers are unavailable.', 404)
+  if (!isVoiceEnabled()) throw new LlmError('Voice answers are unavailable.', 404)
+  const selected = jobModel('voice')
   await assertWithinDailyCap(getDb(), opts.learnerId)
-  const model = 'muse-voice-transcribe-1.0'
+  const model = selected.model
   const log = { learnerId: opts.learnerId, sessionId: opts.sessionId, purpose: 'voice', model }
   const started = Date.now()
   try {
     const body = new FormData()
     body.append('request', new Blob([JSON.stringify({ model, mode: 'PUSH_TO_TALK', audioEncoding: 'WAV' })], { type: 'application/json' }))
     body.append('audio', opts.audio, 'answer.wav')
-    const res = await fetch(`${env.LLM_BASE_URL.replace(/\/$/, '')}/asr/transcribe`, {
+    const res = await fetch(`${selected.baseUrl}/asr/transcribe`, {
       method: 'POST',
-      headers: { ...(env.LLM_API_KEY && { authorization: `Bearer ${env.LLM_API_KEY}` }) },
+      headers: { ...(selected.apiKey && { authorization: `Bearer ${selected.apiKey}` }) },
       body,
       signal: AbortSignal.timeout(120_000),
     })
@@ -158,17 +197,16 @@ export async function transcribeAudio(opts: { audio: File; learnerId: string; se
 }
 
 async function logCall(
-  opts: { purpose: string; model?: string; learnerId?: string | null; sessionId?: string | null },
+  opts: { purpose: string; model: string; learnerId?: string | null; sessionId?: string | null },
   started: number,
   usage: Usage | undefined,
   error: string | null,
 ) {
   try {
-    const env = getEnv()
     const promptTokens = usage?.prompt_tokens ?? 0
     const completionTokens = usage?.completion_tokens ?? 0
-    const model = opts.model ?? env.LLM_MODEL
-    const price = PRICES[model] ?? { in: 0, out: 0 }
+    const model = opts.model
+    const price = PRICES[model.replace(/^accounts\/fireworks\/models\//, '')]
     await getDb()
       .insert(modelCalls)
       .values({
@@ -181,7 +219,7 @@ async function logCall(
         promptTokens,
         completionTokens,
         reasoningTokens: usage?.completion_tokens_details?.reasoning_tokens ?? 0,
-        costUsd: (promptTokens * price.in + completionTokens * price.out) / 1_000_000,
+        costUsd: price ? (promptTokens * price.in + completionTokens * price.out) / 1_000_000 : null,
         ok: error === null,
         error,
         createdAt: Date.now(),

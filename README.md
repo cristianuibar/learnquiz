@@ -58,11 +58,37 @@ In the Cloudflare dashboard, add a WAF rate limiting rule for the same zone: POS
 requests to learnquiz.com, 10 per minute per IP, block. The worker also caps each
 learner at 20 model calls per day and pasted sources at 20,000 characters.
 
-Config (`wrangler.jsonc` vars and secrets): `LLM_PROFILE` (`meta`, `baseten`, `ollama`),
-`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, `IMAGE_MODEL`, `VOICE_ENABLED`,
+`JOB_MODELS` in `wrangler.jsonc` maps each job (`curriculum`, `items`, `self_check`,
+`plan`, `grade`, `image`, `voice`, and the placement result's `placement_line`) to
+`{ "provider": "meta", "model": "muse-spark-1.3" }`. Only the Meta models listed in
+`src/lib/llm/models.ts` are accepted. Each request and its call-log row use the
+selected model, including failed attempts and retries. Image, plan and grade
+mappings reserve those jobs for their planned features.
+
+Calls without a known price, including Wonder and Image, record `cost_usd = null`
+and add no monetary charge to cost totals. They still count toward the daily
+model-call cap. Billing rates and units for these models will be added separately.
+
+| Provider | Base URL | Secret binding | JSON mode |
+| --- | --- | --- | --- |
+| `meta` | `https://api.meta.ai/v1` | `LLM_API_KEY` | Strict JSON Schema |
+| `baseten` | `https://inference.baseten.co/v1` | `BASETEN_API_KEY` | JSON object with schema in the prompt |
+| `fireworks` | `https://api.fireworks.ai/inference/v1` | `FIREWORKS_API_KEY` | JSON object with schema in the prompt |
+
+For example, set `self_check` to `{ "provider": "baseten", "model": "muse-spark-open" }`
+and supply `BASETEN_API_KEY` to use a second model for checking generated items.
+Use the provider's deployed model ID; Fireworks also accepts the
+`accounts/fireworks/models/` prefix. All JSON output is validated locally and
+invalid output gets one retry. Provider and network errors fail immediately.
+
+Unmapped jobs retain `LLM_PROFILE`, `LLM_MODEL` (or `IMAGE_MODEL` for images, Muse
+Voice Transcribe 1.0 for voice). `LLM_BASE_URL` overrides the URL for `LLM_PROFILE`;
+that profile may also fall back to `LLM_API_KEY` for its secret. `.dev.vars` can
+override `JOB_MODELS` with a JSON string. Other config: `VOICE_ENABLED`,
 `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET`.
 
-With `VOICE_ENABLED=true` and `LLM_PROFILE=meta`, text-answer questions offer a
+With `VOICE_ENABLED=true` and the voice job mapped to Meta's Muse Voice
+Transcribe 1.0, text-answer questions offer a
 hold-to-talk button. Allow microphone access, hold to speak (up to one minute),
 then release. Edit the transcript before choosing confidence and pressing Check.
 Recordings are converted locally to mono 16-bit 24 kHz WAV, as required by the
@@ -75,8 +101,9 @@ Staff (the `/admin` area, `requireStaff()`): make a user staff once they have si
 `pnpm exec wrangler d1 execute learnquiz --remote --command "UPDATE user SET role='admin' WHERE email='you@example.com'"`
 (drop `--remote` for the local database).
 
-Local edition: point `LLM_PROFILE=ollama` and `LLM_BASE_URL` at an Ollama or llama.cpp
-server running Muse Glimmer; images and voice switch off.
+Local edition: set `JOB_MODELS={}`, `LLM_PROFILE=ollama`, `LLM_MODEL=muse-glimmer`
+and point `LLM_BASE_URL` at an Ollama or llama.cpp server running Muse Glimmer;
+voice switches off.
 
 ## Disclosure for the judges
 
