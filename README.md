@@ -17,7 +17,7 @@ Built solo by Cristian Uibar for the Meta Global AI Developer Hackathon
 | Curriculum skeleton, question generation, self-check | Muse Spark 1.3 (Meta Model API, JSON-schema output) |
 | Session planning with tools (coach), planned | Muse Wonder 1.0 |
 | Diagrams and visual questions, planned | Muse Image 1.0 |
-| Spoken answers, planned | Muse Voice Transcribe 1.0 |
+| Spoken answers | Muse Voice Transcribe 1.0 |
 | Open-weights path | Muse Spark Open via Baseten, Muse Glimmer via Ollama for the local edition |
 
 Every model call is logged to the `model_calls` table. The in-app trace is planned.
@@ -49,6 +49,15 @@ learner at 20 model calls per day and pasted sources at 20,000 characters.
 Config (`wrangler.jsonc` vars and secrets): `LLM_PROFILE` (`meta`, `baseten`, `ollama`),
 `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, `IMAGE_MODEL`, `VOICE_ENABLED`,
 `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET`.
+
+With `VOICE_ENABLED=true` and `LLM_PROFILE=meta`, text-answer questions offer a
+hold-to-talk button. Allow microphone access, hold to speak (up to one minute),
+then release. Edit the transcript before choosing confidence and pressing Check.
+Recordings are converted locally to mono 16-bit 24 kHz WAV, as required by the
+[Meta voice cookbook](https://github.com/meta-models/meta-model-cookbook/tree/main/06_muse_voice/01_voice_api_fundamentals),
+and sent to `/v1/asr/transcribe`; recordings are not stored. Each transcription
+counts toward the daily model-call cap and logs a `voice` call. Voice is disabled
+by default; typing remains available when recording or transcription fails.
 
 Staff (the `/admin` area, `requireStaff()`): make a user staff once they have signed up:
 `pnpm exec wrangler d1 execute learnquiz --remote --command "UPDATE user SET role='admin' WHERE email='you@example.com'"`

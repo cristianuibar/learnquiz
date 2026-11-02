@@ -9,8 +9,10 @@ import { gradeAnswer, revealState, toItemView } from '@/lib/learning/grade'
 import { levelResult, nextLevel, pickNext, PLACEMENT, shouldStop } from '@/lib/learning/placement'
 import { composeSession, reinsert, SESSION_BONUS, streakAfter, xpFor } from '@/lib/learning/session'
 import type { Confidence, ItemView, Reveal, SessionView, SummaryView } from '@/lib/learning/types'
-import { chatJson } from '@/lib/llm/client'
+import { chatJson, transcribeAudio } from '@/lib/llm/client'
 import type { ItemPayload } from '@/lib/llm/schemas'
+import { validateVoiceWav } from '@/lib/voice'
+import { getEnv } from '@/server/env'
 import { chunks, ensureConceptItems, httpError, loadPKnown, mean, targetFor } from '@/server/helpers'
 import { requireLearnerId } from '@/server/session'
 
@@ -130,6 +132,7 @@ async function viewOf(db: Db, session: SessionRow, topic: Pick<TopicRow, 'title'
     progress: { position: plan.position + 1, total: placement ? Math.max(PLACEMENT_TOTAL, plan.position + 1) : ids.length },
     item,
     ended,
+    voiceEnabled: getEnv().VOICE_ENABLED === 'true' && getEnv().LLM_PROFILE === 'meta',
   }
 }
 
@@ -272,6 +275,32 @@ export const getSession = createServerFn({ method: 'GET' })
     // A reload during the reveal moves on: the answer is already recorded.
     if (session.endedAt === null && plan.answered) return advance(db, learnerId, session, topic, plan)
     return viewOf(db, session, topic, plan)
+  })
+
+export const transcribeAnswer = createServerFn({ method: 'POST' })
+  .validator((data: unknown) => {
+    if (!(data instanceof FormData)) throw httpError('A recording is required.', 400)
+    return z.object({ sessionId: z.string().min(1), itemId: z.string().min(1), audio: z.instanceof(File) }).parse({
+      sessionId: data.get('sessionId'), itemId: data.get('itemId'), audio: data.get('audio'),
+    })
+  })
+  .handler(async ({ data }): Promise<string> => {
+    const learnerId = await requireLearnerId()
+    if (getEnv().VOICE_ENABLED !== 'true' || getEnv().LLM_PROFILE !== 'meta') throw httpError('Voice answers are unavailable.', 404)
+    const db = getDb()
+    const { session } = await loadSession(db, learnerId, data.sessionId)
+    const plan = readPlan(session)
+    if (session.endedAt !== null || plan.answered || (JSON.parse(session.itemIdsJson) as string[])[plan.position] !== data.itemId) {
+      throw httpError('That is not the current question', 409)
+    }
+    const { payload } = await loadItem(db, session.topicId, data.itemId)
+    if (payload.format === 'mcq') throw httpError('Choose an answer for this question.', 400)
+    try {
+      await validateVoiceWav(data.audio)
+    } catch (e) {
+      throw httpError(e instanceof Error ? e.message : 'Invalid recording.', 400)
+    }
+    return transcribeAudio({ audio: data.audio, learnerId, sessionId: session.id })
   })
 
 export const answerItem = createServerFn({ method: 'POST' })

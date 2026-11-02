@@ -1,0 +1,163 @@
+// @vitest-environment happy-dom
+import { act } from 'react'
+import { createRoot } from 'react-dom/client'
+import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet, RouterProvider } from '@tanstack/react-router'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { Route as playRoute } from '@/routes/play.$sessionId'
+import { Route as appRootRoute } from '@/routes/__root'
+import { answerItem, getSession, transcribeAnswer } from '@/server/play'
+import type { Reveal, SessionView } from '@/lib/learning/types'
+
+vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
+vi.mock('@/server/play', () => ({ answerItem: vi.fn(), getSession: vi.fn(), transcribeAnswer: vi.fn(), nextItem: vi.fn(), endSession: vi.fn(), reportItem: vi.fn() }))
+vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
+vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => 't1' }))
+vi.mock('@/server/session-fn', () => ({ getSessionFn: async () => ({ user: { id: 'u1', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false }) }))
+
+let stopTrack: ReturnType<typeof vi.fn>
+let finishPermission: ((stream: MediaStream) => void) | undefined
+beforeEach(() => {
+  vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
+    matches: query.includes('prefers-reduced-motion'), media: query, onchange: null,
+    addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}, dispatchEvent: () => true,
+  }))
+})
+afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); finishPermission = undefined })
+
+async function renderPlay(voiceEnabled = true, permissionPending = false) {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+  stopTrack = vi.fn()
+  const mic = { getTracks: () => [{ stop: stopTrack }] } as unknown as MediaStream
+  vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: vi.fn(() => permissionPending
+    ? new Promise<MediaStream>((resolve) => { finishPermission = resolve }) : Promise.resolve(mic)) } })
+  vi.stubGlobal('MediaRecorder', class {
+    state = 'inactive'
+    mimeType = 'audio/webm;codecs=opus'
+    ondataavailable?: (event: { data: Blob }) => void
+    onstop?: () => void
+    start() { this.state = 'recording' }
+    stop() {
+      this.state = 'inactive'
+      this.ondataavailable?.({ data: new Blob(['encoded audio']) })
+      void this.onstop?.()
+    }
+  })
+  // Browser codecs/audio rendering are the external boundary. The application
+  // still encodes its WAV and submits the real upload shape.
+  vi.stubGlobal('AudioContext', class {
+    decodeAudioData() { return Promise.resolve({ duration: 1 }) }
+    close() { return Promise.resolve() }
+  })
+  vi.stubGlobal('OfflineAudioContext', class {
+    destination = {}
+    createBufferSource() { return { buffer: null, connect() {}, start() {} } }
+    startRendering() { return Promise.resolve({ getChannelData: () => new Float32Array(24_000).fill(0.25) }) }
+  })
+  const initial: SessionView = {
+    id: 's1', kind: 'session', topicId: 't1', topicTitle: 'Algebra', progress: { position: 1, total: 1 }, ended: false, voiceEnabled,
+    item: { id: 'i1', conceptId: 'c1', conceptName: 'Variables', format: 'cloze', stem: 'x + 1 = 2; x = ____', options: [], difficulty: 1 },
+  }
+  vi.mocked(getSession).mockResolvedValue(initial)
+  vi.mocked(transcribeAnswer).mockReset().mockResolvedValue('one')
+  vi.mocked(answerItem).mockReset().mockResolvedValue({ correct: true, correctAnswer: '1', state: 'A', mixUps: [], explanation: 'Subtract one.' } as unknown as Reveal)
+  const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
+  const play = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId', loader: playRoute.options.loader, component: playRoute.options.component })
+  const router = createRouter({ routeTree: rootRoute.addChildren([play]), history: createMemoryHistory({ initialEntries: ['/play/s1'] }) })
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
+  return { container, mic, async cleanup() {
+    await act(async () => root.unmount())
+    container.remove()
+    delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT
+  } }
+}
+const button = (container: HTMLElement, label: string) => [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === label)!
+async function key(container: HTMLElement, type: 'keydown' | 'keyup') {
+  await act(async () => button(container, type === 'keydown' ? 'Hold to answer by voice' : 'Release to transcribe')
+    .dispatchEvent(new KeyboardEvent(type, { key: ' ', bubbles: true, cancelable: true })))
+}
+
+it('records, uploads WAV, lets the learner edit the transcript, and checks the edited answer', async () => {
+  const { container, cleanup } = await renderPlay()
+  try {
+    expect(container.textContent).toContain('x + 1 = 2')
+    await key(container, 'keydown')
+    expect(button(container, 'Check').disabled).toBe(true)
+    await key(container, 'keyup')
+    expect(stopTrack).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(transcribeAnswer)).toHaveBeenCalledTimes(1)
+    const upload = vi.mocked(transcribeAnswer).mock.calls[0][0]!.data as FormData
+    expect(upload.get('sessionId')).toBe('s1')
+    expect(upload.get('itemId')).toBe('i1')
+    const bytes = await (upload.get('audio') as File).arrayBuffer()
+    expect(new DataView(bytes).getUint32(24, true)).toBe(24_000)
+    expect(new DataView(bytes).getInt16(44, true)).toBe(8192)
+    const input = container.querySelector<HTMLInputElement>('#answer')!
+    expect(input.value).toBe('one')
+    expect(input.disabled).toBe(false)
+    expect(answerItem).not.toHaveBeenCalled()
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '1')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      container.querySelector<HTMLInputElement>('input[value="sure"]')!.click()
+    })
+    await act(async () => { button(container, 'Check').click() })
+    expect(answerItem).toHaveBeenCalledWith({ data: expect.objectContaining({ answer: { text: '1' }, confidence: 'sure' }) })
+    expect(container.textContent).toContain('Correct, you were sure')
+  } finally { await cleanup() }
+})
+
+it('keeps typed input after a transcription failure', async () => {
+  const { container, cleanup } = await renderPlay()
+  try {
+    const input = container.querySelector<HTMLInputElement>('#answer')!
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'my draft')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    vi.mocked(transcribeAnswer).mockRejectedValueOnce(new Error('Voice transcription failed. Please try again.'))
+    await key(container, 'keydown'); await key(container, 'keyup')
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe('Voice transcription failed. Please try again.')
+    expect(input.value).toBe('my draft')
+    expect(input.disabled).toBe(false)
+  } finally { await cleanup() }
+})
+
+it('stops a microphone granted after the learner releases the button', async () => {
+  const { container, mic, cleanup } = await renderPlay(true, true)
+  try {
+    await key(container, 'keydown')
+    await act(async () => button(container, 'Hold to answer by voice').dispatchEvent(new KeyboardEvent('keyup', { key: ' ', bubbles: true })))
+    await act(async () => finishPermission!(mic))
+    expect(stopTrack).toHaveBeenCalledTimes(1)
+    expect(transcribeAnswer).not.toHaveBeenCalled()
+    expect(container.querySelector<HTMLInputElement>('#answer')!.disabled).toBe(false)
+  } finally { await cleanup() }
+})
+
+it('discards a canceled permission request while a new recording is pending', async () => {
+  const { container, mic, cleanup } = await renderPlay(true, true)
+  try {
+    await key(container, 'keydown')
+    const firstPermission = finishPermission!
+    await act(async () => button(container, 'Hold to answer by voice').dispatchEvent(new Event('pointercancel', { bubbles: true })))
+    await key(container, 'keydown')
+    const secondPermission = finishPermission!
+    await act(async () => firstPermission(mic))
+    expect(stopTrack).toHaveBeenCalledTimes(1)
+    expect(container.querySelector<HTMLInputElement>('#answer')!.disabled).toBe(true)
+    await act(async () => secondPermission(mic))
+    expect(button(container, 'Release to transcribe')).toBeDefined()
+    expect(transcribeAnswer).not.toHaveBeenCalled()
+  } finally { await cleanup() }
+})
+
+it('offers typing when voice is disabled', async () => {
+  const { container, cleanup } = await renderPlay(false)
+  try {
+    expect(container.querySelector<HTMLInputElement>('#answer')!.disabled).toBe(false)
+    expect(button(container, 'Hold to answer by voice')).toBeUndefined()
+  } finally { await cleanup() }
+})

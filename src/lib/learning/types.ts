@@ -42,6 +42,7 @@ export type SessionView = {
   progress: Progress
   item: ItemView | null // null when the session has ended
   ended: boolean
+  voiceEnabled: boolean
 }
 
 export type SummaryView = {
