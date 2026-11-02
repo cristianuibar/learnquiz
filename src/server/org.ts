@@ -6,7 +6,7 @@ import { getDb } from '@/db'
 import { invitation, member, organization, user } from '@/db/auth-schema'
 import { jobRoles, memberRoleAssignments } from '@/db/schema'
 import { getAuth } from '@/server/auth'
-import { requireOrgAdmin } from '@/server/authz'
+import { requireOrgReader } from '@/server/authz'
 import { getEnv } from '@/server/env'
 import { httpError } from '@/server/helpers'
 import { getSessionUser } from '@/server/session'
@@ -47,14 +47,14 @@ export const createCompany = createServerFn({ method: 'POST' })
 export const getOrgOverview = createServerFn({ method: 'GET' })
   .validator(Slug)
   .handler(async ({ data }) => {
-    const { org } = await requireOrgAdmin(data.slug)
-    return { name: org.name, slug: org.slug, roles: await rolesOf(org.id) }
+    const { org, readOnly } = await requireOrgReader(data.slug)
+    return { name: org.name, slug: org.slug, roles: await rolesOf(org.id), readOnly }
   })
 
 export const getPeople = createServerFn({ method: 'GET' })
   .validator(Slug)
   .handler(async ({ data }) => {
-    const { org } = await requireOrgAdmin(data.slug)
+    const { org, readOnly } = await requireOrgReader(data.slug)
     const db = getDb()
     const [roles, members, invites] = await Promise.all([
       rolesOf(org.id),
@@ -66,14 +66,14 @@ export const getPeople = createServerFn({ method: 'GET' })
         .leftJoin(jobRoles, eq(jobRoles.id, memberRoleAssignments.jobRoleId))
         .where(eq(member.organizationId, org.id))
         .orderBy(asc(member.createdAt)),
-      db
+      readOnly ? [] : db
         .select({ id: invitation.id, name: invitation.inviteeName, email: invitation.email, jobRole: jobRoles.name, expiresAt: invitation.expiresAt })
         .from(invitation)
         .leftJoin(jobRoles, eq(jobRoles.id, invitation.jobRoleId))
         .where(and(eq(invitation.organizationId, org.id), eq(invitation.status, 'pending')))
         .orderBy(desc(invitation.createdAt)),
     ])
-    return { id: org.id, name: org.name, slug: org.slug, baseUrl: getEnv().BETTER_AUTH_URL, roles, members, invites: invites.map((i) => ({ ...i, expired: i.expiresAt.getTime() < Date.now() })) }
+    return { id: org.id, name: org.name, slug: org.slug, baseUrl: getEnv().BETTER_AUTH_URL, roles, members, readOnly, invites: invites.map((i) => ({ ...i, expired: i.expiresAt.getTime() < Date.now() })) }
   })
 
 // Public on purpose: the invitation id is the secret in the invite link, and the page needs it before the invitee has an account.

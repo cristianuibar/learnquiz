@@ -14,7 +14,7 @@ vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => null }))
 
-it('opens all four training sections from the learner’s profile and redirects signed-out visitors', async () => {
+it.each(['user', 'admin'])('opens training progress for %s, preserves staff access, and redirects signed-out visitors', async (role) => {
   const day = 86_400_000
   const start = Date.UTC(2026, 10, 2)
   vi.mocked(getProfile).mockResolvedValue({
@@ -26,7 +26,7 @@ it('opens all four training sections from the learner’s profile and redirects 
     sessionCounts: { week: 7, total: 7 },
   })
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
-  let user: { id: string; name: string; isAnonymous: boolean } | null = { id: 'learner', name: 'Learner', isAnonymous: false }
+  let user: { id: string; name: string; isAnonymous: boolean; role: string } | null = { id: 'learner', name: 'Learner', isAnonymous: false, role }
   vi.mocked(getSessionFn).mockImplementation(async () => ({ user, facebookEnabled: false, needsDisclosure: false }))
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
   const me = createRoute({ getParentRoute: () => rootRoute, path: '/me', beforeLoad: meRoute.options.beforeLoad, component: meRoute.options.component })
@@ -38,6 +38,8 @@ it('opens all four training sections from the learner’s profile and redirects 
   const root = createRoot(container)
   try {
     await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
+    const staffLink = [...container.querySelectorAll('a')].find((a) => a.textContent === 'Staff area')
+    expect(staffLink?.getAttribute('href')).toBe(role === 'admin' ? '/admin' : undefined)
     await act(async () => {
       const link = [...container.querySelectorAll('a')].find((a) => a.textContent === 'Training progress')!
       expect(link.getAttribute('href')).toBe('/me/profile')

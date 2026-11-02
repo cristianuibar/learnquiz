@@ -4,6 +4,7 @@ import { getDb } from '@/db'
 import { modelCalls } from '@/db/schema'
 import { isOverDailyCap, utcDayStart } from '@/lib/limits'
 import { getEnv } from '@/server/env'
+import { assertWithinDailyCap } from '@/server/model-cap'
 
 // USD per million tokens; reasoning tokens bill as output. Unlisted models cost 0.
 export const PRICES: Record<string, { in: number; out: number }> = {
@@ -33,6 +34,7 @@ export async function chatJson<T>(opts: {
   maxTokens?: number
   learnerId?: string | null
   sessionId?: string | null
+  topicId?: string | null
 }): Promise<T> {
   const env = getEnv()
   const meta = env.LLM_PROFILE === 'meta'
@@ -124,8 +126,40 @@ export async function chatJson<T>(opts: {
   throw new LlmError(`LLM output invalid after retry: ${failure}`, 422)
 }
 
+// The one-shot voice contract uses a JSON request part and a WAV audio part.
+export async function transcribeAudio(opts: { audio: File; learnerId: string; sessionId: string; topicId: string }): Promise<string> {
+  const env = getEnv()
+  if (env.VOICE_ENABLED !== 'true' || env.LLM_PROFILE !== 'meta') throw new LlmError('Voice answers are unavailable.', 404)
+  await assertWithinDailyCap(getDb(), opts.learnerId)
+  const model = 'muse-voice-transcribe-1.0'
+  const log = { learnerId: opts.learnerId, sessionId: opts.sessionId, topicId: opts.topicId, purpose: 'voice', model }
+  const started = Date.now()
+  try {
+    const body = new FormData()
+    body.append('request', new Blob([JSON.stringify({ model, mode: 'PUSH_TO_TALK', audioEncoding: 'WAV' })], { type: 'application/json' }))
+    body.append('audio', opts.audio, 'answer.wav')
+    const res = await fetch(`${env.LLM_BASE_URL.replace(/\/$/, '')}/asr/transcribe`, {
+      method: 'POST',
+      headers: { ...(env.LLM_API_KEY && { authorization: `Bearer ${env.LLM_API_KEY}` }) },
+      body,
+      signal: AbortSignal.timeout(120_000),
+    })
+    if (!res.ok) throw new LlmError(`Voice request failed (HTTP ${res.status}).`, res.status === 429 ? 429 : 502)
+    const result = await res.json() as { transcript?: unknown }
+    if (typeof result.transcript !== 'string' || !result.transcript.trim()) throw new LlmError('No speech was recognised. Please try again.', 422)
+    if (result.transcript.trim().length > 1000) throw new LlmError('Please record a shorter answer.', 422)
+    await logCall(log, started, undefined, null)
+    return result.transcript.trim()
+  } catch (e) {
+    // Never log the recording, transcript, credentials or provider response body.
+    const error = e instanceof LlmError ? e : new LlmError('Voice transcription failed. Please try again.', 502)
+    await logCall(log, started, undefined, error.message)
+    throw error
+  }
+}
+
 async function logCall(
-  opts: { purpose: string; learnerId?: string | null; sessionId?: string | null },
+  opts: { purpose: string; model?: string; learnerId?: string | null; sessionId?: string | null; topicId?: string | null },
   started: number,
   usage: Usage | undefined,
   error: string | null,
@@ -134,15 +168,17 @@ async function logCall(
     const env = getEnv()
     const promptTokens = usage?.prompt_tokens ?? 0
     const completionTokens = usage?.completion_tokens ?? 0
-    const price = PRICES[env.LLM_MODEL] ?? { in: 0, out: 0 }
+    const model = opts.model ?? env.LLM_MODEL
+    const price = PRICES[model] ?? { in: 0, out: 0 }
     await getDb()
       .insert(modelCalls)
       .values({
         id: crypto.randomUUID(),
         learnerId: opts.learnerId ?? null,
         sessionId: opts.sessionId ?? null,
+        topicId: opts.topicId ?? null,
         purpose: opts.purpose,
-        model: env.LLM_MODEL,
+        model,
         latencyMs: Date.now() - started,
         promptTokens,
         completionTokens,

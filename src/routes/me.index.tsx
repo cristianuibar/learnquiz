@@ -26,6 +26,7 @@ function Me() {
       <Link to="/me/profile" className="flex min-h-12 items-center rounded-lg border p-4 font-medium text-primary focus-visible:outline-2">
         Training progress
       </Link>
+      {user.role === 'admin' && <Link to="/admin" className="inline-flex min-h-11 items-center rounded-md underline focus-visible:ring-[3px] focus-visible:ring-ring/50">Staff area</Link>}
       {!user.isAnonymous && (
         <Button variant="outline" className="h-12 w-full px-6 sm:w-auto sm:self-start" onClick={signOut}>
           Sign out
