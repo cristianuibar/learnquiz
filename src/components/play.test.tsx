@@ -92,10 +92,14 @@ it.each([
     progress: { position: 2, total: 2 },
     item: repeats ? initial.item : { ...initial.item!, id: 'i2', format, stem: 'What is 2 + 2?', options: format === 'mcq' ? [{ id: 'four', text: '4' }, { id: 'five', text: '5' }] : [] },
   }
-  if (repeats) vi.mocked(answerItem).mockResolvedValueOnce({
-    attemptId: 'a1', correct: false, correctAnswer: '1', state: 'C', mixUps: [], explanation: 'Subtract one.',
-    chosenFeedback: null, sourceQuote: null, returnsThisSession: true, pKnownBefore: 0.1, pKnownAfter: 0.05,
-  })
+  if (repeats) {
+    const reveal = {
+      attemptId: 'a1', correct: false, correctAnswer: '1', state: 'C' as const, mixUps: [], explanation: 'Subtract one.',
+      score: 0, feedback: null, missingPoints: [],
+      chosenFeedback: null, sourceQuote: null, returnsThisSession: true, pKnownBefore: 0.1, pKnownAfter: 0.05,
+    }
+    vi.mocked(answerItem).mockResolvedValueOnce(reveal)
+  }
   vi.mocked(nextItem).mockReset().mockResolvedValue(nextView)
   try {
     await act(async () => {
