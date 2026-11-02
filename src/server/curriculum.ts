@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, asc, count, desc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '@/db'
-import { conceptEdges, concepts, items, learnerTopic, placements, sources, topics, units } from '@/db/schema'
+import { conceptEdges, concepts, items, learnerTopic, learnerUnit, placements, sources, topics, units } from '@/db/schema'
 import { validateSkeleton, fallbackSkeleton } from '@/lib/curriculum/validate'
 import { chatJson, LlmError } from '@/lib/llm/client'
 import { curriculumPrompt } from '@/lib/llm/prompts'
@@ -109,7 +109,12 @@ export const getTopicPath = createServerFn({ method: 'GET' })
     if (!topic) throw httpError('Topic not found', 404)
 
     const [unitRows, conceptRows, edges, counts, known, [lt], [placement]] = await Promise.all([
-      db.select().from(units).where(eq(units.topicId, topic.id)).orderBy(asc(units.order)),
+      db
+        .select({ id: units.id, order: units.order, name: units.name, summary: units.summary, unlockedAt: learnerUnit.unlockedAt })
+        .from(units)
+        .leftJoin(learnerUnit, and(eq(learnerUnit.unitId, units.id), eq(learnerUnit.learnerId, learnerId)))
+        .where(eq(units.topicId, topic.id))
+        .orderBy(asc(units.order)),
       db.select().from(concepts).where(eq(concepts.topicId, topic.id)).orderBy(asc(concepts.order)),
       db.select({ fromId: conceptEdges.fromId, toId: conceptEdges.toId }).from(conceptEdges).where(eq(conceptEdges.topicId, topic.id)),
       db

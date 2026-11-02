@@ -87,6 +87,16 @@ export const learnerTopic = sqliteTable(
   (t) => [primaryKey({ columns: [t.learnerId, t.topicId] })],
 )
 
+export const learnerUnit = sqliteTable(
+  'learner_unit',
+  {
+    learnerId: text('learner_id').notNull(),
+    unitId: text('unit_id').notNull(),
+    unlockedAt: integer('unlocked_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.learnerId, t.unitId] })],
+)
+
 export const learnerConcept = sqliteTable(
   'learner_concept',
   {

@@ -5,7 +5,7 @@ import { admin, anonymous, organization } from 'better-auth/plugins'
 import { tanstackStartCookies } from 'better-auth/tanstack-start'
 import { and, eq, inArray } from 'drizzle-orm'
 import { getDb, authSchema } from '@/db'
-import { attempts, badges, jobRoles, learnerConcept, learnerItem, learnerTopic, memberRoleAssignments, modelCalls, placements, sessions, topics } from '@/db/schema'
+import { attempts, badges, jobRoles, learnerConcept, learnerItem, learnerTopic, learnerUnit, memberRoleAssignments, modelCalls, placements, sessions, topics } from '@/db/schema'
 import { getEnv } from '@/server/env'
 
 export function facebookEnabled(): boolean {
@@ -14,7 +14,7 @@ export function facebookEnabled(): boolean {
 }
 
 // Tables keyed by learner_id. The guest user row is deleted after linking, so its data must move to the new user first. A new table keyed by learner_id must be added here.
-const LEARNER_TABLES = [topics, learnerTopic, learnerConcept, learnerItem, attempts, placements, sessions, modelCalls, badges]
+const LEARNER_TABLES = [topics, learnerTopic, learnerUnit, learnerConcept, learnerItem, attempts, placements, sessions, modelCalls, badges]
 
 async function moveGuestData(guestId: string, userId: string) {
   const db = getDb()
