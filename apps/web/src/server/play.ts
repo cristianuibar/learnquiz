@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, count, eq, exists, getTableColumns, gte, inArray, isNull, lt, lte, ne, or, sql, type SQL } from 'drizzle-orm'
+import { and, asc, count, eq, getTableColumns, gte, inArray, isNull, lt, lte, ne, sql, type SQL } from 'drizzle-orm'
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core'
 import { z } from 'zod'
 import { getDb, type Db } from '@/db'
@@ -19,6 +19,7 @@ import { validateVoiceWav } from '@/lib/voice'
 import { plural } from '@/lib/utils'
 import { asItem, chunks, ensureConceptItems, httpError, loadPKnown, mean, targetFor } from '@/server/helpers'
 import { requireLearnerId } from '@/server/session'
+import { learnerCanAccess } from '@/server/topic-access'
 import { assertWithinDailyCap } from '@/server/model-cap'
 
 // shortcut: 12 instead of the spec's 20 while generation is slow, raise it once items are generated ahead of play.
@@ -61,25 +62,11 @@ function insertIf<T extends SQLiteTable>(db: Db, table: T, when: SQL, row: T['$i
   return db.insert(table).select(sql`select ${sql.join(values, sql`, `)} where ${when}`)
 }
 
-// The learner's own topic, or the topic of an active role they are assigned to in a company they belong to.
-const playable = (db: Db, learnerId: string) =>
-  or(
-    eq(topics.learnerId, learnerId),
-    exists(
-      db
-        .select({ one: sql`1` })
-        .from(memberRoleAssignments)
-        .innerJoin(member, and(eq(member.userId, memberRoleAssignments.userId), eq(member.organizationId, memberRoleAssignments.orgId)))
-        .innerJoin(jobRoles, and(eq(jobRoles.id, memberRoleAssignments.jobRoleId), eq(jobRoles.orgId, memberRoleAssignments.orgId), eq(jobRoles.status, 'active')))
-        .where(and(eq(memberRoleAssignments.userId, learnerId), eq(memberRoleAssignments.jobRoleId, topics.jobRoleId))),
-    ),
-  )
-
 async function ownedTopic(db: Db, learnerId: string, topicId: string) {
   const [topic] = await db
     .select()
     .from(topics)
-    .where(and(eq(topics.id, topicId), playable(db, learnerId)))
+    .where(and(eq(topics.id, topicId), learnerCanAccess(db, learnerId)))
   if (!topic) throw httpError('Topic not found', 404)
   if (topic.status !== 'ready') throw httpError('This topic is not ready yet', 409)
   // A role topic has no learner_topic row until the member first plays it (defaults as in curriculum.ts).
@@ -92,7 +79,7 @@ async function loadSession(db: Db, learnerId: string, sessionId: string) {
     .select({ session: sessions, topic: topics })
     .from(sessions)
     .innerJoin(topics, eq(topics.id, sessions.topicId))
-    .where(and(eq(sessions.id, sessionId), eq(sessions.learnerId, learnerId), playable(db, learnerId)))
+    .where(and(eq(sessions.id, sessionId), eq(sessions.learnerId, learnerId), learnerCanAccess(db, learnerId)))
   if (!row) throw httpError('Session not found', 404)
   return row
 }

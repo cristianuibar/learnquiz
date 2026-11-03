@@ -108,7 +108,7 @@ function RoleDetail() {
               <RoleDocumentForm slug={slug} roleId={role.id} roleName={role.name} onUploaded={() => router.invalidate()} />
               {documents.length > 0 && (
                 <div className="mt-4 flex flex-col gap-2">
-                  <Button type="button" className="h-11 self-start px-6" disabled={building} onClick={buildCurriculum}>
+                  <Button type="button" className="self-start px-6" disabled={building} onClick={buildCurriculum}>
                     {building ? 'Building…' : 'Build curriculum'}
                   </Button>
                   {buildError && <p role="alert" className="text-sm font-medium text-wrong">{buildError}</p>}
@@ -175,7 +175,7 @@ function ConceptItem({ concept: c, slug, readOnly }: { concept: Concept; slug: s
         <div className="mt-2 flex flex-wrap items-center gap-3">
           {c.genError && <p className="text-sm text-wrong">{c.genError}</p>}
           {!readOnly && (
-            <Button type="button" variant="outline" className="min-h-11" disabled={busy} onClick={() => run(() => retry({ data: { slug, conceptId: c.id } }))}>
+            <Button type="button" variant="secondary" disabled={busy} onClick={() => run(() => retry({ data: { slug, conceptId: c.id } }))}>
               Retry
             </Button>
           )}
@@ -193,7 +193,7 @@ function ConceptItem({ concept: c, slug, readOnly }: { concept: Concept; slug: s
             />
             Critical<span className="sr-only">: {c.name}</span>
           </label>
-          <Button type="button" variant="outline" className="min-h-11" onClick={() => { setFields({}); setError(''); setEditing(true) }}>
+          <Button type="button" variant="secondary" onClick={() => { setFields({}); setError(''); setEditing(true) }}>
             Edit<span className="sr-only"> {c.name}</span>
           </Button>
         </div>
@@ -203,7 +203,7 @@ function ConceptItem({ concept: c, slug, readOnly }: { concept: Concept; slug: s
         <form className="mt-3 flex flex-col gap-4" onSubmit={save}>
           <div className="flex flex-col gap-2">
             <Label htmlFor={`name-${c.id}`}>Concept name</Label>
-            <Input id={`name-${c.id}`} name="name" className="h-11" defaultValue={c.name} maxLength={80} required aria-invalid={!!fields.name || undefined} aria-describedby={fields.name ? `name-${c.id}-error` : undefined} />
+            <Input id={`name-${c.id}`} name="name" defaultValue={c.name} maxLength={80} required aria-invalid={!!fields.name || undefined} aria-describedby={fields.name ? `name-${c.id}-error` : undefined} />
             {fields.name && <p id={`name-${c.id}-error`} role="alert" className="text-sm font-medium text-wrong">{fields.name}</p>}
           </div>
           <div className="flex flex-col gap-2">
@@ -222,8 +222,8 @@ function ConceptItem({ concept: c, slug, readOnly }: { concept: Concept; slug: s
             {fields.summary && <p id={`summary-${c.id}-error`} role="alert" className="text-sm font-medium text-wrong">{fields.summary}</p>}
           </div>
           <div className="flex gap-2">
-            <Button type="submit" className="min-h-11 px-6" disabled={busy}>{busy ? 'Saving…' : 'Save'}</Button>
-            <Button type="button" variant="outline" className="min-h-11 px-6" disabled={busy} onClick={() => setEditing(false)}>Cancel</Button>
+            <Button type="submit" className="px-6" disabled={busy}>{busy ? 'Saving…' : 'Save'}</Button>
+            <Button type="button" variant="secondary" className="px-6" disabled={busy} onClick={() => setEditing(false)}>Cancel</Button>
           </div>
         </form>
       )}
@@ -259,7 +259,7 @@ function DocumentItem({ doc: d, slug, roleId, roleName, canChange }: { doc: Deta
       {canChange && (
         <>
           <RoleDocumentForm slug={slug} roleId={roleId} roleName={roleName} replaces={d} onUploaded={() => router.invalidate()} />
-          <Button type="button" variant="outline" className="mt-2 min-h-11" disabled={busy} onClick={run}>
+          <Button type="button" variant="secondary" className="mt-2" disabled={busy} onClick={run}>
             Retire<span className="sr-only"> {d.title}</span>
           </Button>
           {error && <p role="alert" className="mt-2 text-sm font-medium text-wrong">{error}</p>}

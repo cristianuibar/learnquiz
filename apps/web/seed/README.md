@@ -5,7 +5,8 @@ Warehouse picker role. It imports the original [warehouse SOP](northwind-sop.md)
 through the role curriculum pipeline, retaining grounded quotes and critical
 steps. Question generation and self-check build initial banks for three
 representative concepts, including a critical scanning step. Every model call
-uses the normal call log and daily limit.
+uses the normal call log and daily limit. One authored multiple-choice question
+about a location label carries an SVG image, stored in the local `MEDIA` R2 bucket.
 
 Use Node 24 and install the project's dependencies. Apply the existing migrations
 to the selected database first. For local D1:

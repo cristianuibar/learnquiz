@@ -29,7 +29,7 @@ export function ConceptDiagram({ conceptId }: { conceptId: string }) {
       ) : !error && <p role="status" className="text-sm text-muted-foreground">{result?.status === 'pending' ? 'The diagram is being prepared.' : 'Preparing diagram…'}</p>}
       {error && <p role="alert" className="text-sm text-wrong">{error}</p>}
       {(error || result?.status === 'pending') && (
-        <Button variant="outline" className="mt-2 min-h-12" onClick={() => setRetry((n) => n + 1)}>Retry diagram</Button>
+        <Button variant="secondary" className="mt-2" onClick={() => setRetry((n) => n + 1)}>Retry diagram</Button>
       )}
     </div>
   )

@@ -142,7 +142,7 @@ function Concept({
     <li className="rounded-lg border p-4">
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="font-medium">{concept.name}</h3>
-        {concept.grounded && <Badge variant="outline">From your material</Badge>}
+        {concept.grounded && <Badge variant="neutral">From your material</Badge>}
         {concept.itemCount > 0 && <span className="text-sm text-muted-foreground">{plural(concept.itemCount, 'question', 'questions')}</span>}
       </div>
       <p className="mt-1 text-sm text-muted-foreground">{concept.summary}</p>
@@ -155,8 +155,8 @@ function Concept({
         concept.itemCount > 0 &&
         !error && (
           <Button
-            variant="outline"
-            className="mt-4 h-12 px-6"
+            variant="secondary"
+            className="mt-4 px-6"
             aria-expanded={open}
             aria-controls={listId}
             onClick={() => (items === null ? void show() : setOpen(!open))}

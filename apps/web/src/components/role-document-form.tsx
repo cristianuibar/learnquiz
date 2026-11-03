@@ -48,11 +48,11 @@ export function RoleDocumentForm({ slug, roleId, roleName, onUploaded, replaces 
         <p id={`${uid}-doc-help`} className="text-sm text-muted-foreground">{helpText}</p>
         <div className="flex flex-col gap-2">
           <Label htmlFor={`${uid}-doc-title`}>{replaces ? 'Document title (optional)' : 'Document title'}</Label>
-          <Input id={`${uid}-doc-title`} name="title" className="h-11" maxLength={200} placeholder={replaces?.title} />
+          <Input id={`${uid}-doc-title`} name="title" maxLength={200} placeholder={replaces?.title} />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor={`${uid}-doc-file`}>PDF</Label>
-          <Input id={`${uid}-doc-file`} name="file" type="file" accept="application/pdf,.pdf" className="h-11" aria-describedby={`${uid}-doc-help`} />
+          <Input id={`${uid}-doc-file`} name="file" type="file" accept="application/pdf,.pdf" aria-describedby={`${uid}-doc-help`} />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor={`${uid}-doc-text`}>Or paste the text</Label>
@@ -60,7 +60,7 @@ export function RoleDocumentForm({ slug, roleId, roleName, onUploaded, replaces 
         </div>
         {error && <p role="alert" className="text-sm font-medium text-wrong">{error}</p>}
         {added && <p role="status" className="text-sm font-medium">Document added.</p>}
-        <Button type="submit" className="h-11 self-end px-6" disabled={busy}>
+        <Button type="submit" className="self-end px-6" disabled={busy}>
           {busy ? 'Uploading…' : replaces ? 'Replace document' : 'Add document'}
         </Button>
       </form>

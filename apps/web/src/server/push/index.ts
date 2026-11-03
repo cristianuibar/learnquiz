@@ -8,7 +8,7 @@ import { getEnv } from '@/server/env'
 import { httpError } from '@/server/helpers'
 import { getSessionUser } from '@/server/session'
 import { decodeKey, importSubscriberKey } from './crypto'
-import { sendPush } from './sender'
+import { EXPO_TOKEN, sendPush } from './sender'
 
 // Subscriber-supplied URLs must never turn this Worker into an arbitrary HTTP client.
 const Endpoint = z.string().max(2048).refine((value) => {
@@ -20,6 +20,10 @@ const Endpoint = z.string().max(2048).refine((value) => {
     return false
   }
 }, 'Unsupported push service')
+export const ExpoToken = z.string().max(2048).regex(EXPO_TOKEN)
+const Timezone = z.string().max(100).refine((value) => {
+  try { new Intl.DateTimeFormat('en', { timeZone: value }); return true } catch { return false }
+}, 'Choose a valid timezone')
 const EndpointInput = z.object({ endpoint: Endpoint })
 const SubscriptionInput = EndpointInput.extend({ keys: z.object({
   p256dh: z.string().refine((value) => /^[A-Za-z0-9_-]{87}$/.test(value) && decodeKey(value)[0] === 4, 'Invalid public key'),
@@ -58,9 +62,7 @@ export const getPushSettings = createServerFn({ method: 'GET' }).handler(async (
 
 export const savePushPreferences = createServerFn({ method: 'POST' }).validator(z.object({
   paused: z.boolean(), startMinute: z.number().int().min(0).max(1439), endMinute: z.number().int().min(1).max(1440),
-  timezone: z.string().max(100).refine((value) => {
-    try { new Intl.DateTimeFormat('en', { timeZone: value }); return true } catch { return false }
-  }, 'Choose a valid timezone'),
+  timezone: Timezone,
 }).refine((data) => data.startMinute < data.endMinute, 'Working hours must end after they start')).handler(async ({ data }) => {
   const user = checkAccount(await getSessionUser())
   const values = { ...data, updatedAt: Date.now() }
@@ -93,7 +95,23 @@ export const subscribe = createServerFn({ method: 'POST' }).validator(Subscripti
   return { subscribed: true }
 })
 
-export const unsubscribe = createServerFn({ method: 'POST' }).validator(EndpointInput).handler(async ({ data }) => {
+export const subscribeExpo = createServerFn({ method: 'POST' }).validator(z.object({ token: ExpoToken, timezone: Timezone.optional() })).handler(async ({ data }) => {
+  const user = checkAccount(await getSessionUser())
+  const db = getDb()
+  const now = Date.now()
+  await db.batch([
+    // A shared phone moves to whoever registers last.
+    db.insert(pushSubscriptions).values({ id: crypto.randomUUID(), userId: user.id, endpoint: data.token, p256dh: '', auth: '', createdAt: now })
+      .onConflictDoUpdate({ target: pushSubscriptions.endpoint, set: { userId: user.id } }),
+    db.insert(pushPrefs).values({ userId: user.id, enabled: true, paused: false, startMinute: 540, endMinute: 1020, timezone: data.timezone ?? 'UTC', updatedAt: now })
+      .onConflictDoUpdate({ target: pushPrefs.userId, set: { enabled: true, updatedAt: now } }),
+  ])
+  return { subscribed: true }
+})
+
+const AnyEndpointInput = z.object({ endpoint: z.union([Endpoint, ExpoToken]) })
+
+export const unsubscribe = createServerFn({ method: 'POST' }).validator(AnyEndpointInput).handler(async ({ data }) => {
   const user = checkAccount(await getSessionUser())
   const db = getDb()
   await db.batch([
@@ -103,14 +121,14 @@ export const unsubscribe = createServerFn({ method: 'POST' }).validator(Endpoint
   return { subscribed: false }
 })
 
-export const sendTestPush = createServerFn({ method: 'POST' }).validator(EndpointInput).handler(async ({ data }) => {
+export const sendTestPush = createServerFn({ method: 'POST' }).validator(AnyEndpointInput).handler(async ({ data }) => {
   const user = checkAccount(await requireStaff())
   const db = getDb()
   const subscription = await db.select({ subscription: pushSubscriptions }).from(pushSubscriptions)
     .innerJoin(pushPrefs, and(eq(pushPrefs.userId, pushSubscriptions.userId), eq(pushPrefs.enabled, true)))
     .where(and(eq(pushSubscriptions.userId, user.id), eq(pushSubscriptions.endpoint, data.endpoint))).get()
   if (!subscription) throw httpError('Enable notifications on this browser first', 404)
-  const result = await sendPush(db, subscription.subscription, vapidConfig(), { title: 'Learn Quiz', body: 'Your test notification arrived. You’re ready to learn.', url: '/me' })
+  const result = await sendPush(db, subscription.subscription, ExpoToken.safeParse(data.endpoint).success ? null : vapidConfig(), { title: 'Learn Quiz', body: 'Your test notification arrived. You’re ready to learn.', url: '/me' })
   if (result.outcome === 'gone') throw httpError('This subscription expired. Disable notifications, then enable them again.', 410)
   if (result.outcome === 'skipped') throw httpError('Pushes are paused or outside your working hours.', 409)
   if (result.outcome !== 'accepted') throw httpError('The push service could not accept the notification. Try again.', 502)

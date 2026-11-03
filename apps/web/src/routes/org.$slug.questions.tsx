@@ -81,8 +81,8 @@ function QuestionCard({ question, slug }: { question: Question; slug: string }) 
             <label className="flex flex-col gap-2">Source quote<Textarea name="source_quote" defaultValue={p.source_quote ?? ''} maxLength={300} /></label>
             <p className="text-sm text-muted-foreground">Keep a supporting passage from the source. Saving clears the previous approval.</p>
             <div className="flex flex-wrap gap-2">
-              <Button type="submit" className="h-11">Save changes</Button>
-              <Button type="button" variant="outline" className="h-11" onClick={() => { setEditing(false); setError('') }}>Cancel</Button>
+              <Button type="submit">Save changes</Button>
+              <Button type="button" variant="secondary" onClick={() => { setEditing(false); setError('') }}>Cancel</Button>
             </div>
           </fieldset>
         </form>
@@ -93,9 +93,9 @@ function QuestionCard({ question, slug }: { question: Question; slug: string }) 
           <p>{p.explanation}</p>
           {p.source_quote ? <blockquote className="border-l-2 pl-3 text-sm"><p className="font-medium">Source quote</p>{p.source_quote}</blockquote> : <p className="text-sm text-muted-foreground">No source quote</p>}
           <div className="flex flex-wrap gap-2">
-            <Button className="h-11" disabled={busy || question.status === 'retired'} onClick={() => void act('approve')}>Approve</Button>
-            <Button variant="outline" className="h-11" disabled={busy} onClick={() => { setEditing(true); setError(''); setMessage('') }}>Edit</Button>
-            <Button variant="destructive" className="h-11" disabled={busy || question.status === 'retired'} onClick={() => void act('retire')}>Retire</Button>
+            <Button disabled={busy || question.status === 'retired'} onClick={() => void act('approve')}>Approve</Button>
+            <Button variant="secondary" disabled={busy} onClick={() => { setEditing(true); setError(''); setMessage('') }}>Edit</Button>
+            <Button variant="secondary" disabled={busy || question.status === 'retired'} onClick={() => void act('retire')}>Retire</Button>
           </div>
         </>
       )}

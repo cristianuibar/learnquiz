@@ -21,7 +21,7 @@ vi.mock('@/server/env', () => ({ getEnv: () => holder.env }))
 vi.mock('@/server/session', () => ({ getSessionUser: vi.fn() }))
 vi.mock('@tanstack/react-start/server', () => ({ setResponseStatus: vi.fn() }))
 
-import { getPushSettings, savePushPreferences, sendTestPush, subscribe, unsubscribe } from './index'
+import { getPushSettings, savePushPreferences, sendTestPush, subscribe, subscribeExpo, unsubscribe } from './index'
 import { sendPush } from './sender'
 import type { Db } from '@/db'
 import type { pushSubscriptions } from '@/db/schema'
@@ -245,4 +245,87 @@ it('rejects invalid working hours and timezones without changing saved preferenc
     await expect(savePushPreferences({ data: { ...preferences, ...invalid } })).rejects.toThrow()
   }
   expect((await getPushSettings()).prefs).toEqual(preferences)
+})
+
+const token = 'ExponentPushToken[abc-123_X]'
+const expoUrl = 'https://exp.host/--/api/v2/push/send'
+const expoSubscription = () => rows('SELECT id, user_id AS userId, endpoint, p256dh, auth, created_at AS createdAt FROM push_subscriptions')[0] as typeof pushSubscriptions.$inferSelect
+const expoPayload = { title: 'What is 2 + 2?', body: '', url: '/play/quick/i1' }
+
+it('accepts only Expo tokens in subscribeExpo and never lets web subscribe store one', async () => {
+  for (const bad of [endpoint, 'ExponentPushToken[]', 'ExponentPushToken[abc] ', 'ExpoPushToken[abc]']) {
+    await expect(subscribeExpo({ data: { token: bad } })).rejects.toThrow()
+  }
+  await expect(subscribeExpo({ data: { token, timezone: 'not-a-timezone' } })).rejects.toThrow()
+  expect(rows('SELECT * FROM push_subscriptions')).toEqual([])
+  expect(rows('SELECT * FROM push_prefs')).toEqual([])
+  await expect(subscribe({ data: { endpoint: token, keys } })).rejects.toThrow('Unsupported push service')
+  expect(rows('SELECT * FROM push_subscriptions')).toEqual([])
+})
+
+it('moves an Expo token to the latest account, enables prefs and unsubscribes by token', async () => {
+  await subscribeExpo({ data: { token } })
+  vi.mocked(getSessionUser).mockResolvedValue(learner as never)
+  await subscribeExpo({ data: { token, timezone: 'America/New_York' } })
+  expect(rows('SELECT user_id, endpoint, p256dh, auth FROM push_subscriptions')).toEqual([{ user_id: 'learner', endpoint: token, p256dh: '', auth: '' }])
+  expect(rows("SELECT enabled, paused, start_minute, end_minute, timezone FROM push_prefs WHERE user_id = 'learner'"))
+    .toEqual([{ enabled: 1, paused: 0, start_minute: 540, end_minute: 1020, timezone: 'America/New_York' }])
+  await unsubscribe({ data: { endpoint: token } })
+  expect(rows('SELECT * FROM push_subscriptions')).toEqual([])
+  expect(rows("SELECT enabled FROM push_prefs WHERE user_id = 'learner'")).toEqual([{ enabled: 0 }])
+})
+
+it.each([{ ttl: undefined, expected: 300 }, { ttl: 60, expected: 60 }])('sends Expo pushes without VAPID (ttl $ttl)', async ({ ttl, expected }) => {
+  holder.env = {}
+  await subscribeExpo({ data: { token } })
+  http.mockResolvedValueOnce(Response.json({ data: { status: 'ok', id: 'x' } }))
+  await expect(sendPush(holder.db as Db, expoSubscription(), null, expoPayload, ttl)).resolves.toEqual({ outcome: 'accepted', status: 200 })
+  expect(http).toHaveBeenCalledTimes(1)
+  const [destination, init] = http.mock.calls[0]
+  expect(destination).toBe(expoUrl)
+  expect(init).toMatchObject({ method: 'POST', redirect: 'error', headers: { 'Content-Type': 'application/json', Accept: 'application/json' } })
+  expect(init!.signal).toBeInstanceOf(AbortSignal)
+  const logId = rows('SELECT id FROM push_log')[0].id
+  expect(JSON.parse(init!.body as string)).toEqual({ to: token, title: expoPayload.title, priority: 'high', ttl: expected, channelId: 'questions', data: { url: `/play/quick/i1?pushId=${logId}` } })
+  expect(rows('SELECT outcome, http_status FROM push_log')).toEqual([{ outcome: 'accepted', http_status: 200 }])
+})
+
+it.each([
+  { error: 'DeviceNotRegistered', outcome: 'gone', remaining: 0 },
+  { error: 'MessageRateExceeded', outcome: 'failed', remaining: 1 },
+])('maps Expo ticket error $error to $outcome', async ({ error, outcome, remaining }) => {
+  holder.env = {}
+  await subscribeExpo({ data: { token } })
+  http.mockResolvedValueOnce(Response.json({ data: { status: 'error', details: { error } } }))
+  expect((await sendPush(holder.db as Db, expoSubscription(), null, expoPayload)).outcome).toBe(outcome)
+  expect(rows('SELECT outcome, http_status FROM push_log')).toEqual([{ outcome, http_status: 200 }])
+  expect(rows('SELECT COUNT(*) AS n FROM push_subscriptions')).toEqual([{ n: remaining }])
+})
+
+it('treats non-2xx, malformed and network-failed Expo responses as failed', async () => {
+  holder.env = {}
+  await subscribeExpo({ data: { token } })
+  http.mockResolvedValueOnce(new Response('nope', { status: 500 })).mockResolvedValueOnce(new Response('not json', { status: 200 })).mockRejectedValueOnce(new Error('down'))
+  for (const status of [500, 200, null]) expect(await sendPush(holder.db as Db, expoSubscription(), null, expoPayload)).toEqual({ outcome: 'failed', status })
+  expect(rows('SELECT COUNT(*) AS n FROM push_subscriptions')).toEqual([{ n: 1 }])
+})
+
+it('does not delete a token that moved to another account while the push was in flight', async () => {
+  holder.env = {}
+  await subscribeExpo({ data: { token } })
+  http.mockImplementationOnce(async () => {
+    vi.mocked(getSessionUser).mockResolvedValue(learner as never)
+    await subscribeExpo({ data: { token } })
+    return Response.json({ data: { status: 'error', details: { error: 'DeviceNotRegistered' } } })
+  })
+  await sendPush(holder.db as Db, expoSubscription(), null, expoPayload)
+  expect(rows('SELECT user_id FROM push_subscriptions')).toEqual([{ user_id: 'learner' }])
+})
+
+it('sends a staff test push to an Expo token without VAPID configuration', async () => {
+  holder.env = {}
+  await subscribeExpo({ data: { token } })
+  http.mockResolvedValueOnce(Response.json({ data: { status: 'ok' } }))
+  await expect(sendTestPush({ data: { endpoint: token } })).resolves.toEqual({ sent: true })
+  expect(http.mock.calls[0][0]).toBe(expoUrl)
 })

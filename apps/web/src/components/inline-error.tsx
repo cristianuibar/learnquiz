@@ -41,7 +41,7 @@ export function InlineError({ message, onRetry }: { message: string; onRetry: ()
   return (
     <div role="alert" className="flex flex-wrap items-center gap-3">
       <p className="text-sm font-medium text-wrong">{message}</p>
-      <Button variant="outline" className="h-12 px-6" onClick={onRetry}>
+      <Button variant="secondary" className="px-6" onClick={onRetry}>
         Try again
       </Button>
     </div>
@@ -57,12 +57,12 @@ function PermissionError({ message }: { message: string }) {
     <div role="alert" className="flex flex-col gap-3">
       <p className="text-sm font-medium text-wrong">{message}</p>
       <div className="flex flex-wrap gap-3">
-        <Button asChild className="h-12 px-6">
+        <Button asChild className="px-6">
           <Link to="/today">Go to Today</Link>
         </Button>
         <Button
-          variant="outline"
-          className="h-12 px-6"
+          variant="secondary"
+          className="px-6"
           disabled={busy}
           onClick={async () => {
             setBusy(true)
