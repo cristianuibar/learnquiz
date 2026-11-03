@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { getDb } from '@/db'
 import { member, user } from '@/db/auth-schema'
 import { attempts, concepts, jobRoles, learnerConcept, memberRoleAssignments, sessions, topics, units } from '@/db/schema'
+import { benchmarkMet } from '@/lib/learning/profile'
 import { requireOrgAdmin } from '@/server/authz'
 import { httpError, mean } from '@/server/helpers'
 import { requireLearnerId } from '@/server/session'
@@ -75,7 +76,9 @@ export const getProfile = createServerFn({ method: 'GET' })
       if (attempt.at >= startedAt) break
       knownAtStart.set(attempt.conceptId, attempt.after)
     }
-    const proficientAtStart = startedAt <= now && knownAtStart.size > 0 && [...knownAtStart.values()].every((p) => p >= benchmark)
+    const met = (k: Map<string, number>) => benchmarkMet(conceptRows.map((c) => ({ id: c.id, critical: c.critical, pKnown: k.get(c.id) ?? 0 })), benchmark)
+    const critical = new Set(conceptRows.filter((c) => c.critical).map((c) => c.id))
+    const proficientAtStart = startedAt <= now && met(knownAtStart)
     let achievedAt = role?.proficientAt ?? (proficientAtStart ? startedAt : null)
     const errors = new Map<string, { id: string; conceptId: string; at: number; correctedAt: number | null }>()
     let cursor = 0
@@ -86,8 +89,8 @@ export const getProfile = createServerFn({ method: 'GET' })
         const attempt = history[cursor++]
         known.set(attempt.conceptId, attempt.after)
         if (attempt.at >= date) attemptCount++
-        if (attempt.at >= startedAt && achievedAt === null && known.size > 0 && [...known.values()].every((p) => p >= benchmark)) achievedAt = attempt.at
-        if (!attempt.correct && attempt.confidence === 'sure') {
+        if (attempt.at >= startedAt && achievedAt === null && met(known)) achievedAt = attempt.at
+        if (!attempt.correct && attempt.confidence === 'sure' && critical.has(attempt.conceptId)) {
           errors.set(attempt.itemId, { id: attempt.id, conceptId: attempt.conceptId, at: attempt.at, correctedAt: null })
         } else if (attempt.correct) {
           const error = errors.get(attempt.itemId)
