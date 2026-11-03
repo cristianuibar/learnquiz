@@ -17,6 +17,8 @@ jest.mock('./lib/session-store', () => ({
   useSession: jest.fn(),
 }))
 jest.mock('./lib/api', () => ({ api: jest.fn() }))
+// Profile imports sign-out, which needs the native secure store.
+jest.mock('./lib/auth', () => ({ signOut: jest.fn() }))
 // The real Today screen loads /today; this file only checks that the route is reachable.
 jest.mock('./app/(tabs)/today', () => ({
   __esModule: true,
@@ -112,4 +114,77 @@ test('the actual router replays a held target after startup, sign-in and disclos
   expect(navigation.getPathname()).toBe('/play/session-1')
   expect(navigation.getSearchParams()).toMatchObject({ from: 'notification' })
   expect(takeHeldTarget()).toBeNull()
+})
+
+function liveSession(initial: ReturnType<typeof useSession>) {
+  let snapshot = initial
+  const listeners = new Set<() => void>()
+  const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } }
+  jest.mocked(useSession).mockImplementation(() => useSyncExternalStore(subscribe, () => snapshot))
+  return {
+    set(next: ReturnType<typeof useSession>) { snapshot = next; listeners.forEach((listener) => listener()) },
+  }
+}
+
+function undisclosed(session: ReturnType<typeof liveSession>) {
+  return { ...ready, needsDisclosure: true, setDisclosed: () => session.set(ready) }
+}
+
+test('Got it falls back to Today when the held link still cannot open', async () => {
+  const session = liveSession(ready)
+  session.set(undisclosed(session))
+  holdTarget('/sign-in')
+  const navigation = renderRouter('src/app', { initialUrl: '/' })
+  await navigation
+  expect(navigation.getPathname()).toBe('/welcome')
+  jest.mocked(api).mockResolvedValue({ roleTopicId: null })
+  await fireEvent.press(screen.getByRole('button', { name: 'Got it' }))
+  expect(api).toHaveBeenCalledTimes(1)
+  expect(navigation.getPathname()).toBe('/today')
+  expect(screen.getByText('Today screen')).toBeOnTheScreen()
+})
+
+test('Got it can be retried after a failed save and then opens the held link', async () => {
+  const session = liveSession(ready)
+  session.set(undisclosed(session))
+  holdTarget('/settings')
+  const navigation = renderRouter('src/app', { initialUrl: '/' })
+  await navigation
+  expect(navigation.getPathname()).toBe('/welcome')
+  jest.mocked(api).mockRejectedValueOnce(new Error('network down')).mockResolvedValueOnce({ roleTopicId: null })
+  await fireEvent.press(screen.getByRole('button', { name: 'Got it' }))
+  expect(screen.getByText("Couldn't save. Check your connection and try again.")).toBeOnTheScreen()
+  expect(navigation.getPathname()).toBe('/welcome')
+  await fireEvent.press(screen.getByRole('button', { name: 'Got it', disabled: false }))
+  expect(api).toHaveBeenCalledTimes(2)
+  expect(navigation.getPathname()).toBe('/settings')
+})
+
+test('Got it sends one acknowledge while the first tap is pending', async () => {
+  const session = liveSession(ready)
+  session.set(undisclosed(session))
+  const navigation = renderRouter('src/app', { initialUrl: '/welcome' })
+  await navigation
+  let resolve!: (value: unknown) => void
+  jest.mocked(api).mockReturnValue(new Promise((done) => { resolve = done }) as ReturnType<typeof api>)
+  const gotIt = screen.getByRole('button', { name: 'Got it' })
+  await fireEvent.press(gotIt)
+  await fireEvent.press(gotIt)
+  expect(api).toHaveBeenCalledTimes(1)
+  expect(screen.getByRole('button', { name: 'Got it', busy: true })).toBeDisabled()
+  await act(async () => { resolve({ roleTopicId: null }) })
+  expect(navigation.getPathname()).toBe('/today')
+})
+
+test('review mode from Profile shows the branded copy and Got it returns without acknowledging', async () => {
+  jest.mocked(useSession).mockReturnValue({ ...ready, branding: { name: 'Northwind', accent: null, logoUrl: null } })
+  const navigation = renderRouter('src/app', { initialUrl: '/profile' })
+  await navigation
+  await fireEvent.press(screen.getByRole('link', { name: 'What we record' }))
+  expect(navigation.getPathname()).toBe('/welcome')
+  expect(screen.getByText('You and Northwind’s training admins.')).toBeOnTheScreen()
+  await fireEvent.press(screen.getByRole('button', { name: 'Got it' }))
+  expect(api).not.toHaveBeenCalled()
+  expect(navigation.getPathname()).toBe('/profile')
+  expect(screen.getByRole('header', { name: 'Training progress' })).toBeOnTheScreen()
 })

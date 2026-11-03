@@ -74,24 +74,3 @@ test('rejection propagates unchanged with no local acceptance and no held consum
   expect(setDisclosed).not.toHaveBeenCalled()
   expect(takeHeldTarget).not.toHaveBeenCalled()
 })
-
-test('failure followed by successful retry accepts locally and consumes held target', async () => {
-  const failure = new Error('network down')
-  const setDisclosed = jest.fn()
-  const takeHeldTarget = jest.fn((): string | null => '/unit/abc')
-  let attempt = 0
-  const acknowledge = (): Promise<unknown> => {
-    attempt += 1
-    return attempt === 1 ? Promise.reject(failure) : Promise.resolve(undefined)
-  }
-  await expect(acknowledgeDisclosure({ acknowledge, setDisclosed, takeHeldTarget })).rejects.toBe(
-    failure,
-  )
-  expect(setDisclosed).not.toHaveBeenCalled()
-  expect(takeHeldTarget).not.toHaveBeenCalled()
-  await expect(
-    acknowledgeDisclosure({ acknowledge, setDisclosed, takeHeldTarget }),
-  ).resolves.toBe('/unit/abc')
-  expect(setDisclosed).toHaveBeenCalledTimes(1)
-  expect(takeHeldTarget).toHaveBeenCalledTimes(1)
-})
