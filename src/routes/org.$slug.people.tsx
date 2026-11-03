@@ -3,6 +3,7 @@ import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { renderSVG } from 'uqr'
 import { RouteError, useFocusInvalid } from '@/components/inline-error'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { authClient } from '@/lib/auth-client'
@@ -16,7 +17,7 @@ export const Route = createFileRoute('/org/$slug/people')({
 
 type Invite = ReturnType<typeof Route.useLoaderData>['invites'][number]
 
-function InviteRow({ invite, link, onCancel }: { invite: Invite; link: string; onCancel: () => void }) {
+function InviteRow({ invite, link, onRevoke }: { invite: Invite; link: string; onRevoke: () => Promise<void> }) {
   const [copied, setCopied] = useState(false)
   const [qr, setQr] = useState(false)
   return (
@@ -46,9 +47,31 @@ function InviteRow({ invite, link, onCancel }: { invite: Invite; link: string; o
             </Button>
           </>
         )}
-        <Button variant="ghost" className="h-11 px-4" onClick={onCancel}>
-          Cancel
-        </Button>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="ghost" className="h-11 px-4">
+              Revoke invite
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Revoke invite?</DialogTitle>
+              <DialogDescription>The link stops working for {invite.email}.</DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button variant="outline" className="h-11 px-4">
+                  Keep invite
+                </Button>
+              </DialogClose>
+              <DialogClose asChild>
+                <Button variant="destructive" className="h-11 px-4" onClick={onRevoke}>
+                  Revoke invite
+                </Button>
+              </DialogClose>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
       {qr && <img alt={`QR code for the invite link of ${invite.name}`} className="size-56" src={`data:image/svg+xml,${encodeURIComponent(renderSVG(link))}`} />}
     </li>
@@ -93,9 +116,9 @@ function People() {
     await router.invalidate()
   }
 
-  async function cancel(invitationId: string) {
+  async function revoke(invitationId: string) {
     const { error } = await authClient.organization.cancelInvitation({ invitationId })
-    if (error) return setError(error.message ?? 'Could not cancel the invite')
+    if (error) return setError(error.message ?? 'Could not revoke the invite')
     await router.invalidate()
   }
 
@@ -143,7 +166,7 @@ function People() {
           <h2 className="text-xl font-semibold">Invited</h2>
           <ul className="mt-4 flex flex-col gap-3">
             {org.invites.map((i) => (
-              <InviteRow key={i.id} invite={i} link={`${org.baseUrl}/join/${i.id}`} onCancel={() => cancel(i.id)} />
+              <InviteRow key={i.id} invite={i} link={`${org.baseUrl}/join/${i.id}`} onRevoke={() => revoke(i.id)} />
             ))}
           </ul>
         </section>

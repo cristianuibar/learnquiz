@@ -108,7 +108,7 @@ it('backfills one draft topic per existing role and preserves personal topics', 
 it.each(['owner', 'admin'])('%s creates and lists roles with defaults or custom targets in their own company', async (id) => {
   vi.mocked(getSessionUser).mockResolvedValue({ id } as never)
   const role = await createRole({ data: { slug: 'alpha', name: 'Support specialist' } })
-  const custom = await createRole({ data: { slug: 'alpha', name: 'Team lead', benchmark: 0.9, onboardingDays: 45 } })
+  const custom = await createRole({ data: { slug: 'alpha', name: 'Team lead', benchmark: 90, onboardingDays: 45 } })
   const org = await listRoles({ data: { slug: 'alpha' } })
   expect(org).toMatchObject({ name: 'Alpha', slug: 'alpha' })
   expect(org.roles).toHaveLength(3)
@@ -149,9 +149,11 @@ it('reports assigned training stages, unresolved critical errors and company pro
   concept.run('scan', topic, 'warehouse', 'Scan each item', 'Scan each item.', 1)
   concept.run('pick', topic, 'warehouse', 'Read the pick ticket', 'Read the pick ticket.', 0)
   concept.run('foreign', foreignTopic, 'other-unit', 'Other company safety', 'Other company safety.', 1)
+  concept.run('extra', topic, 'warehouse', 'Label returns', 'Label returns.', 0)
   const known = sqlite.prepare('INSERT INTO learner_concept (learner_id, concept_id, p_known, updated_at) VALUES (?, ?, ?, ?)')
   known.run('member', 'scan', 0.4, start)
   for (const id of ['scan', 'pick']) known.run('admin', id, 0.95, start + 4 * day)
+  known.run('admin', 'extra', 0.8, start + 4 * day) // below benchmark, but mean and critical concepts meet it
   known.run('other-owner', 'foreign', 0.99, start + day)
   sqlite.prepare('INSERT INTO invitation (id, organization_id, email, expires_at, inviter_id, job_role_id, invitee_name) VALUES (?, ?, ?, ?, ?, ?, ?)')
     .run('waiting', 'org-a', 'waiting@x.test', Date.now() + day, 'owner', 'legacy-role', 'Waiting')
@@ -184,6 +186,14 @@ it('rolls back the role when its draft topic cannot be stored', async () => {
   expect(sqlite.prepare('SELECT id FROM job_roles WHERE name = ?').all('Unavailable')).toEqual([])
 })
 
+it('stores a whole-percentage benchmark as a fraction and rejects decimals as a field error', async () => {
+  const role = await createRole({ data: { slug: 'alpha', name: 'Cashier', benchmark: 85 } })
+  expect(sqlite.prepare('SELECT benchmark FROM job_roles WHERE id = ?').get(role.id)).toEqual({ benchmark: 0.85 })
+  const decimal = await (async () => createRole({ data: { slug: 'alpha', name: 'Decimal', benchmark: 85.5 } }))().catch((e: unknown) => e)
+  expect(fieldErrors(decimal)).toEqual({ benchmark: 'Enter a whole percentage from 50 to 100' })
+  expect(sqlite.prepare('SELECT id FROM job_roles WHERE name = ?').all('Decimal')).toEqual([])
+})
+
 it('turns a whitespace-only role name into a friendly message and per-field error', async () => {
   const role = await (async () => createRole({ data: { slug: 'alpha', name: '   ' } }))().catch((e: unknown) => e)
   expect(errorMessage(role)).toBe('Enter a role name')
@@ -192,4 +202,12 @@ it('turns a whitespace-only role name into a friendly message and per-field erro
   expect(errorMessage(company)).toBe('Enter a role name')
   expect(fieldErrors(company)).toEqual({ roleName: 'Enter a role name' })
   expect(sqlite.prepare('SELECT id FROM organization WHERE slug = ?').all('new-company')).toEqual([])
+})
+
+it('rejects a role name that matches an existing role after trimming and case folding', async () => {
+  await createRole({ data: { slug: 'alpha', name: 'Customer Support' } })
+  const duplicate = await (async () => createRole({ data: { slug: 'alpha', name: 'customer support ' } }))().catch((e: unknown) => e)
+  expect(duplicate).toMatchObject({ status: 409 })
+  expect(fieldErrors(duplicate)).toEqual({ name: 'A role with this name already exists' })
+  expect(sqlite.prepare("SELECT name FROM job_roles WHERE lower(trim(name)) = 'customer support'").all()).toEqual([{ name: 'Customer Support' }])
 })

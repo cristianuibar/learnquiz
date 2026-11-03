@@ -61,6 +61,8 @@ export const concepts = sqliteTable('concepts', {
   imageGenerationStartedAt: integer('image_generation_started_at'),
   genStatus: text('gen_status', { enum: ['pending', 'generating', 'ready', 'failed'] }).notNull().default('ready'),
   genError: text('gen_error'),
+  // Claim time of the background item generation; a stale claim is picked up again.
+  genStartedAt: integer('gen_started_at'),
 })
 
 export const conceptEdges = sqliteTable(

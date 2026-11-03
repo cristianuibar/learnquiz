@@ -61,3 +61,21 @@ it.each([
   })
   expect(result.notes).toEqual(expected === null ? ['dropped quote not found in source: Concept'] : [])
 })
+
+it('does not ground a quote that appears in more than one document', () => {
+  const concept = (name: string, quote: string) => ({
+    name, summary: 'Summary', visual: false, prerequisites: [], source_quote: quote, critical: false, misconceptions: [],
+  })
+  const result = validateSkeleton({
+    units: [{ name: 'Unit', summary: 'Unit summary', concepts: [concept('Shared', 'Lock the cabinet.'), concept('Policy only', 'Report every loss.')] }],
+  }, [
+    { id: 'sop', bodyText: 'SOP step 3, per policy: Lock the cabinet.' },
+    { id: 'policy', bodyText: 'Lock the cabinet. Report every loss.' },
+  ])
+
+  expect(result.units[0].concepts.map((c) => ({ sourceId: c.sourceId, sourceQuote: c.sourceQuote, grounded: c.grounded }))).toEqual([
+    { sourceId: null, sourceQuote: null, grounded: false },
+    { sourceId: 'policy', sourceQuote: 'Report every loss.', grounded: true },
+  ])
+  expect(result.notes).toEqual(['dropped quote found in more than one source: Shared'])
+})

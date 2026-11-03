@@ -23,6 +23,7 @@ vi.mock('@/server/auth', () => ({
 }))
 vi.mock('cloudflare:workers', () => ({
   env: { LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://llm.example', LLM_MODEL: 'muse-spark-1.3' },
+  waitUntil: () => {}, // the background question drain is covered in concept-gen.test.ts
 }))
 
 const procedures: { name: string; steps: [string, string, boolean][] }[] = [
@@ -153,6 +154,7 @@ it('builds one ready role topic from every live document with grounded critical 
   expect(topicState()).toEqual({ status: 'ready' })
   expect(raw.prepare("SELECT generated_by FROM topics WHERE id = 'picker-topic'").get()).toEqual({ generated_by: 'muse-spark-1.3' })
   expect(storedPath()).toEqual({ units: { n: 4 }, concepts: { n: 16 }, edges: { n: 12 } })
+  expect(raw.prepare('SELECT DISTINCT gen_status FROM concepts WHERE topic_id = \'picker-topic\'').all()).toEqual([{ gen_status: 'pending' }])
   const rows = raw.prepare(`SELECT c.name, c.source_id, c.source_quote, c.critical, c.visual, c.grounded, s.body_text
     FROM concepts c JOIN units u ON u.id = c.unit_id LEFT JOIN sources s ON s.id = c.source_id
     WHERE c.topic_id = 'picker-topic' ORDER BY u."order", c."order"`).all()

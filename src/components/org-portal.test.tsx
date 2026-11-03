@@ -7,12 +7,12 @@ import { Route as appRootRoute } from '@/routes/__root'
 import { Route as orgRoute } from '@/routes/org.$slug'
 import { Route as peopleRoute } from '@/routes/org.$slug.people'
 import { Route as signInRoute } from '@/routes/sign-in'
-import { authClient } from '@/lib/auth-client'
 import { getPeople } from '@/server/org'
 import { getSessionFn } from '@/server/session-fn'
 
 vi.mock('@/server/org', () => ({ getPeople: vi.fn() }))
-vi.mock('@/lib/auth-client', () => ({ authClient: { organization: { inviteMember: vi.fn() } } }))
+const { cancelInvitation, inviteMember } = vi.hoisted(() => ({ cancelInvitation: vi.fn(), inviteMember: vi.fn() }))
+vi.mock('@/lib/auth-client', () => ({ authClient: { organization: { cancelInvitation, inviteMember } } }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => null }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
@@ -81,11 +81,47 @@ it('shows the company nav on portal pages, trimmed for Learn Quiz staff', async 
   }
 })
 
+it('asks before revoking an invite and keeps it pending when dismissed', async () => {
+  const invite = { id: 'inv1', name: 'Ana', email: 'ana@acme.test', jobRole: 'Cashier', expired: false }
+  let invites = [invite]
+  vi.mocked(getPeople).mockImplementation(async () => ({ id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles: [], members: [], readOnly: false, invites }) as never)
+  cancelInvitation.mockImplementation(async () => { invites = []; return { error: null } })
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'u', name: 'U', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] } as never)
+  const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
+  const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, component: orgRoute.options.component })
+  const people = createRoute({ getParentRoute: () => org, path: '/people', loader: peopleRoute.options.loader as (ctx: { params: { slug: string } }) => ReturnType<typeof getPeople>, component: peopleRoute.options.component })
+  const router = createRouter({ routeTree: rootRoute.addChildren([org.addChildren([people])]), history: createMemoryHistory({ initialEntries: ['/org/x/people'] }) })
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  const button = (scope: Element, name: string) => [...scope.querySelectorAll('button')].find((b) => b.textContent === name)
+  const dialog = () => document.querySelector('[role="dialog"]')
+  try {
+    await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
+    await act(async () => { button(container, 'Revoke invite')!.click() })
+    expect(dialog()!.textContent).toContain('The link stops working for ana@acme.test.')
+    await act(async () => { button(dialog()!, 'Keep invite')!.click() })
+    expect(dialog()).toBeNull()
+    expect(cancelInvitation).not.toHaveBeenCalled()
+    expect(container.textContent).toContain('ana@acme.test')
+
+    await act(async () => { button(container, 'Revoke invite')!.click() })
+    await act(async () => { button(dialog()!, 'Revoke invite')!.click() })
+    await vi.waitFor(() => expect(container.textContent).not.toContain('ana@acme.test'))
+    expect(cancelInvitation).toHaveBeenCalledTimes(1)
+    expect(cancelInvitation).toHaveBeenCalledWith({ invitationId: 'inv1' })
+  } finally {
+    await act(async () => root.unmount())
+    container.remove()
+    delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT
+  }
+})
+
 it('focuses the invalid field on the invite form and ties its message to it', async () => {
   vi.mocked(getPeople).mockResolvedValue({ id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles: [{ id: 'r1', name: 'Cashier' }], members: [], readOnly: false, invites: [] } as never)
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   vi.mocked(getSessionFn).mockImplementation(async () => ({ user: { id: 'u', name: 'U', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] }))
-  const invite = vi.mocked(authClient.organization.inviteMember)
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
   const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, component: orgRoute.options.component })
   const people = createRoute({ getParentRoute: () => org, path: '/people', loader: peopleRoute.options.loader as (ctx: { params: { slug: string } }) => ReturnType<typeof getPeople>, component: peopleRoute.options.component })
@@ -102,24 +138,24 @@ it('focuses the invalid field on the invite form and ties its message to it', as
   const message = (id: string) => document.getElementById(field(id).getAttribute('aria-describedby')!)?.textContent
   try {
     await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
-    invite.mockResolvedValueOnce({ error: { message: 'Could not create the invite' } } as never)
+    inviteMember.mockResolvedValueOnce({ error: { message: 'Could not create the invite' } } as never)
     await type('name', 'Sam')
     await type('email', 'a@b.co')
     await submit()
     expect(container.textContent).toContain('Could not create the invite')
-    invite.mockClear()
+    inviteMember.mockClear()
     await type('name', '   ')
     await submit()
     expect(container.textContent).not.toContain('Could not create the invite')
     expect(field('name').getAttribute('aria-invalid')).toBe('true')
     expect(message('name')).toBe('Enter a name')
     expect(document.activeElement).toBe(field('name'))
-    expect(invite).not.toHaveBeenCalled()
+    expect(inviteMember).not.toHaveBeenCalled()
 
-    invite.mockResolvedValue({ error: { code: 'USER_IS_ALREADY_INVITED_TO_THIS_ORGANIZATION', message: 'User is already invited to this organization' } } as never)
+    inviteMember.mockResolvedValue({ error: { code: 'USER_IS_ALREADY_INVITED_TO_THIS_ORGANIZATION', message: 'User is already invited to this organization' } } as never)
     await type('name', 'Sam')
     await submit()
-    expect(invite).toHaveBeenCalledTimes(1)
+    expect(inviteMember).toHaveBeenCalledTimes(1)
     expect(field('name').getAttribute('aria-invalid')).toBeNull()
     expect(field('email').getAttribute('aria-invalid')).toBe('true')
     expect(message('email')).toBe('User is already invited to this organization')
