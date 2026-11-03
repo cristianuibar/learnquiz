@@ -96,7 +96,9 @@ export type SummaryView = {
   levelLineModel: string | null
   endedEarly: boolean // placement stopped before its question limit because it had enough answers
   masteryMoved: { unitId: string; unitName: string; before: number; after: number }[]
-  mistakes: { itemId: string; stem: string; correctAnswer: string; wasSure: boolean; generatedBy: string | null }[]
+  mistakes: { itemId: string; conceptName: string; stem: string; correctAnswer: string; wasSure: boolean; generatedBy: string | null }[]
+  benchmark: number | null // the role's benchmark; null for a personal topic
+  reviewsLeft: number // active items due now on the topic after the session
   nextLine: string // coach: what happens next time
 }
 

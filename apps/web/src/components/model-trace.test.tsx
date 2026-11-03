@@ -32,7 +32,7 @@ it.each(['topic', 'session'] as const)('opens the %s trace from its page and ret
   })
   vi.mocked(endSession).mockResolvedValue({
     sessionId: 's1', kind: 'session', topicId: 't1', durationMs: 60000, correct: 1, total: 1, ungraded: 0, xp: 10, streak: 1,
-    level: 3, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], nextLine: 'Practise equations.', endedEarly: false,
+    level: 3, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], benchmark: null, reviewsLeft: 0, nextLine: 'Practise equations.', endedEarly: false,
   })
   vi.mocked(getModelTrace).mockReset().mockRejectedValueOnce(new Error('Trace unavailable')).mockResolvedValue({
     calls: [

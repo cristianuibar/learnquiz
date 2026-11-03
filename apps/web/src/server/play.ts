@@ -17,6 +17,7 @@ import { gradePrompt } from '@/lib/llm/prompts'
 import { Grade, type ItemPayload } from '@/lib/llm/schemas'
 import { validateVoiceWav } from '@/lib/voice'
 import { plural } from '@/lib/utils'
+import { dueCount } from '@/server/due'
 import { asItem, chunks, ensureConceptItems, httpError, loadPKnown, mean, targetFor } from '@/server/helpers'
 import { requireLearnerId } from '@/server/session'
 import { assertWithinDailyCap } from '@/server/model-cap'
@@ -874,8 +875,8 @@ async function finalise(db: Db, learnerId: string, session: SessionRow, topic: T
       db.select({ answered: count() }).from(attempts).where(eq(attempts.sessionId, session.id)),
     ])
     const ids = JSON.parse(session.itemIdsJson) as string[]
-    // The bonus is for finishing the queue with at least one scored answer, not for leaving early or for ungraded items.
-    bonus = answered > 0 && (finished || (plan.answered && plan.position >= ids.length - 1)) ? SESSION_BONUS : 0
+    // The bonus is for finishing the queue with at least one scored answer, not for leaving early or for ungraded items; a quick question shows no bonus.
+    bonus = session.kind !== 'mini' && answered > 0 && (finished || (plan.answered && plan.position >= ids.length - 1)) ? SESSION_BONUS : 0
     const { streakCount, lastSessionAt } = streakAfter(lt, new Date(now), answered)
     stmts.push(
       db
@@ -900,13 +901,14 @@ async function finalise(db: Db, learnerId: string, session: SessionRow, topic: T
 
 async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: TopicRow): Promise<SummaryView> {
   const plan = readPlan(session)
-  const [lt, [{ total }], wrong, mastery, frontier, [{ reviews }], [placement]] = await Promise.all([
+  const [lt, [{ total }], wrong, mastery, frontier, [{ reviews }], reviewsLeft, role, [placement]] = await Promise.all([
     loadLearnerTopic(db, learnerId, topic.id),
     db.select({ total: count() }).from(attempts).where(eq(attempts.sessionId, session.id)),
     db
-      .select({ itemId: attempts.itemId, confidence: attempts.confidence, gradeJson: attempts.gradeJson, payloadJson: items.payloadJson, generatedBy: items.generatedBy })
+      .select({ itemId: attempts.itemId, conceptName: concepts.name, confidence: attempts.confidence, gradeJson: attempts.gradeJson, payloadJson: items.payloadJson, generatedBy: items.generatedBy })
       .from(attempts)
       .innerJoin(items, eq(items.id, attempts.itemId))
+      .innerJoin(concepts, eq(concepts.id, attempts.conceptId))
       .where(and(eq(attempts.sessionId, session.id), eq(attempts.learnerId, learnerId), eq(attempts.correct, false)))
       .orderBy(asc(attempts.at)),
     unitMastery(db, learnerId, topic.id),
@@ -916,6 +918,8 @@ async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: 
       .from(learnerItem)
       .innerJoin(items, eq(items.id, learnerItem.itemId))
       .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topic.id), eq(items.status, 'active'), lte(learnerItem.due, Date.now() + DAY))),
+    dueCount(db, learnerId, topic.id, Date.now()),
+    topic.jobRoleId ? db.select({ benchmark: jobRoles.benchmark }).from(jobRoles).where(eq(jobRoles.id, topic.jobRoleId)).get() : undefined,
     db
       .select({ logJson: placements.logJson })
       .from(placements)
@@ -931,6 +935,7 @@ async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: 
       w.itemId,
       {
         itemId: w.itemId,
+        conceptName: w.conceptName,
         stem: (JSON.parse(w.payloadJson) as ItemPayload).stem,
         correctAnswer: (JSON.parse(w.gradeJson ?? '{}') as { correctAnswer?: string }).correctAnswer ?? '',
         wasSure: w.confidence === 'sure',
@@ -939,6 +944,8 @@ async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: 
     ]),
   )
   const next = [reviews > 0 ? plural(reviews, 'review', 'reviews') : null, frontier[0]?.concept.name ?? null].filter(Boolean)
+  const firstSure = wrong.find((w) => w.confidence === 'sure')
+  const line = next.length ? `Next time: ${next.join(', then ')}.` : 'Next time: come back for fresh questions.'
   return {
     sessionId: session.id,
     kind: session.kind,
@@ -957,6 +964,8 @@ async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: 
       .filter((u) => u.unitId in before && Math.round(u.mastery * 100) !== Math.round(before[u.unitId] * 100)) // shown as whole percents
       .map((u) => ({ unitId: u.unitId, unitName: u.unitName, before: before[u.unitId], after: u.mastery })),
     mistakes: [...mistakes.values()],
-    nextLine: next.length ? `Next time: ${next.join(', then ')}.` : 'Next time: come back for fresh questions.',
+    benchmark: role?.benchmark ?? null,
+    reviewsLeft,
+    nextLine: firstSure ? `${line} ${firstSure.conceptName} comes back first.` : line,
   }
 }

@@ -1,8 +1,9 @@
 import type { Today } from '@learnquiz/api'
 import { createServerFn } from '@tanstack/react-start'
-import { and, count, countDistinct, desc, eq, gt, gte, inArray, lte, min, ne, sql } from 'drizzle-orm'
+import { and, count, countDistinct, desc, eq, gt, gte, inArray, min, ne, sql } from 'drizzle-orm'
 import { getDb } from '@/db'
 import { attempts, concepts, items, learnerItem, learnerTopic, placements, sessions, topics, units } from '@/db/schema'
+import { dueCount } from '@/server/due'
 import { loadPKnown } from '@/server/helpers'
 import { loadFrontier, SESSION_SIZE } from '@/server/play'
 import { getLearnerId } from '@/server/session'
@@ -56,15 +57,12 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
     return { topic: null, role, plan: null }
   }
   const topicId = topic.id
-  const [placement, lt, due, frontier, played, done, cleared, next] = await Promise.all([
+  const [placement, lt, dueN, frontier, played, done, cleared, next] = await Promise.all([
     db.select({ id: placements.id }).from(placements)
       .where(and(eq(placements.learnerId, learnerId), eq(placements.topicId, topicId))).limit(1).get(),
     db.select({ xp: learnerTopic.xp, streak: learnerTopic.streakCount, last: learnerTopic.lastSessionAt }).from(learnerTopic)
       .where(and(eq(learnerTopic.learnerId, learnerId), eq(learnerTopic.topicId, topicId))).get(),
-    db.select({ n: count() }).from(learnerItem)
-      .innerJoin(items, eq(items.id, learnerItem.itemId))
-      .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topicId), eq(items.status, 'active'), lte(learnerItem.due, now)))
-      .get(),
+    dueCount(db, learnerId, topicId, now),
     loadFrontier(db, learnerId, topicId),
     hasAttemptOn(topicId),
     // A finished session or placement today with at least 10 answers.
@@ -87,7 +85,6 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
       .get(),
     roleStats(),
   ])
-  const dueN = due?.n ?? 0
   const placed = Boolean(placement)
   const start = !placed && placeable ? 'placement' : 'session'
   const sessionDone = (done?.n ?? 0) > 0

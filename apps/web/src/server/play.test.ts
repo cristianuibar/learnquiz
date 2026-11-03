@@ -387,6 +387,49 @@ it('stamps proficient_at once when a role topic meets its benchmark and never cl
   expect(proficientAt()).toBe(now + 1000)
 })
 
+it('names the concept behind a sure-and-wrong answer and counts the active reviews still due', async () => {
+  const now = 1793620800000
+  vi.spyOn(Date, 'now').mockReturnValue(now)
+  seedTopicAndLearner(raw, 0)
+  seedFrontier(raw, 4, true)
+  raw.exec(`UPDATE learner_item SET due = ${now - 1} WHERE item_id IN ('i2', 'i3', 'i4'); UPDATE items SET status = 'reported' WHERE id = 'i4'`)
+  const { sessionId } = await startSession({ data: { topicId: 't1' } })
+  const { item } = await getSession({ data: { sessionId } })
+  await answerItem({ data: { sessionId, itemId: item!.id, answer: { text: '0' }, confidence: 'sure', responseMs: 1000 } })
+  const summary = await endSession({ data: { sessionId } })
+  const dueActive = scalar(raw, "SELECT COUNT(*) AS n FROM learner_item li JOIN items i ON i.id = li.item_id WHERE i.topic_id = 't1' AND i.status = 'active' AND li.due <= ?", now).n
+  expect(summary.benchmark).toBeNull()
+  expect(summary.mistakes).toEqual([expect.objectContaining({ conceptName: 'Variables' })])
+  expect(summary.nextLine).toMatch(/ Variables comes back first\.$/)
+  expect(summary.reviewsLeft).toBe(dueActive)
+  expect(summary.reviewsLeft).toBe(2)
+})
+
+it('reports the role benchmark, and a mini session earns no session bonus', async () => {
+  const now = 1793620800000
+  vi.spyOn(Date, 'now').mockReturnValue(now)
+  seedTopicAndLearner(raw, 0)
+  raw.prepare('INSERT INTO user (id, name, email) VALUES (?, ?, ?)').run('u1', 'Learner', 'learner@example.test')
+  seedFrontier(raw, 1, true)
+  const first = await startMiniSession({ data: { itemId: 'i1' } })
+  await answerItem({ data: { sessionId: first.sessionId, itemId: 'i1', answer: { text: '1' }, confidence: 'sure', responseMs: 1000 } })
+  await nextItem({ data: { sessionId: first.sessionId } })
+  const summary = await endSession({ data: { sessionId: first.sessionId } })
+  expect(summary).toMatchObject({ kind: 'mini', correct: 1, xp: 10, benchmark: null })
+  expect(scalar(raw, 'SELECT xp, streak_count, last_session_at FROM learner_topic WHERE topic_id = ?', 't1')).toEqual({ xp: 10, streak_count: 0, last_session_at: null }) // streaks need 10 answers
+
+  raw.prepare('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, ?)').run('org-a', 'Alpha', 'alpha', 1)
+  raw.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, ?)').run('m1', 'org-a', 'u1', 'member', 1)
+  raw.prepare('INSERT INTO job_roles (id, org_id, name, benchmark, created_at) VALUES (?, ?, ?, ?, ?)').run('role', 'org-a', 'Analyst', 0.5, 1)
+  raw.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES (?, ?, ?, ?)').run('u1', 'org-a', 'role', 1)
+  raw.prepare('UPDATE topics SET learner_id = NULL, job_role_id = ? WHERE id = ?').run('role', 't1')
+  const second = await startMiniSession({ data: { itemId: 'i1' } })
+  await answerItem({ data: { sessionId: second.sessionId, itemId: 'i1', answer: { text: '1' }, confidence: 'sure', responseMs: 1000 } })
+  await nextItem({ data: { sessionId: second.sessionId } })
+  expect(await endSession({ data: { sessionId: second.sessionId } })).toMatchObject({ kind: 'mini', xp: 10, benchmark: 0.5 })
+  expect(scalar(raw, 'SELECT xp FROM learner_topic WHERE topic_id = ?', 't1').xp).toBe(20)
+})
+
 it.each([
   ['no assignment', "DELETE FROM member_role_assignments"],
   ['an archived role', "UPDATE job_roles SET status = 'archived'"],
