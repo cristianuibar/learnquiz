@@ -7,15 +7,17 @@ import { generateImage, isImageEnabled } from '@/lib/llm/client'
 import { getEnv } from '@/server/env'
 import { httpError } from '@/server/helpers'
 import { getLearnerId, requireLearnerId } from '@/server/session'
+import { learnerCanAccess } from '@/server/topic-access'
 
 export type DiagramResult =
   | { status: 'ready'; image: { src: string; alt: string } }
   | { status: 'pending' | 'disabled' }
 
-async function ownedConcept(db: Db, learnerId: string, conceptId: string) {
+// Serving may reach a shared role topic; paid generation stays with topics the learner owns.
+async function accessibleConcept(db: Db, learnerId: string, conceptId: string, ownedOnly: boolean) {
   const [row] = await db.select({ concept: concepts, topic: topics.title })
     .from(concepts).innerJoin(topics, eq(topics.id, concepts.topicId))
-    .where(and(eq(concepts.id, conceptId), eq(topics.learnerId, learnerId)))
+    .where(and(eq(concepts.id, conceptId), ownedOnly ? eq(topics.learnerId, learnerId) : learnerCanAccess(db, learnerId)))
   return row
 }
 
@@ -24,7 +26,7 @@ export const generateConceptDiagram = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<DiagramResult> => {
     const learnerId = await requireLearnerId()
     const db = getDb()
-    const row = await ownedConcept(db, learnerId, data.conceptId)
+    const row = await accessibleConcept(db, learnerId, data.conceptId, true)
     if (!row) throw httpError('Concept not found', 404)
     const { concept } = row
     const ready = (alt: string): DiagramResult => ({ status: 'ready', image: { src: `/media/concepts/${encodeURIComponent(concept.id)}`, alt } })
@@ -65,7 +67,7 @@ export const generateConceptDiagram = createServerFn({ method: 'POST' })
 export const serveConceptDiagram = createServerOnlyFn(async (conceptId: string): Promise<Response> => {
   const learnerId = await getLearnerId()
   if (!learnerId) return new Response('Sign in first', { status: 401 })
-  const row = await ownedConcept(getDb(), learnerId, conceptId)
+  const row = await accessibleConcept(getDb(), learnerId, conceptId, false)
   if (!row?.concept.imageKey) return new Response('Diagram not found', { status: 404 })
   const object = await getEnv().MEDIA.get(row.concept.imageKey)
   if (!object) return new Response('Diagram not found', { status: 404 })

@@ -38,14 +38,17 @@ function Today() {
         <section className="mt-8 flex flex-col gap-2">
           <h2 className="text-xl font-semibold tracking-tight">Your role training</h2>
           <p>{role.name}: {role.topicTitle}</p>
+          {role.preparing && <p className="text-muted-foreground">Your training is being prepared</p>}
           <Link to="/me/profile" className="inline-flex min-h-11 items-center self-start rounded-md font-medium text-primary underline focus-visible:ring-[3px] focus-visible:ring-ring/50">
             Training progress
           </Link>
         </section>
       )}
-      <Link to="/start" className="mt-6 inline-flex min-h-12 items-center rounded-md underline focus-visible:ring-[3px] focus-visible:ring-ring/50">
-        Learn something new
-      </Link>
+      {!role && (
+        <Link to="/start" className="mt-6 inline-flex min-h-12 items-center rounded-md underline focus-visible:ring-[3px] focus-visible:ring-ring/50">
+          Learn something new
+        </Link>
+      )}
     </main>
   )
 }
