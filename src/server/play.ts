@@ -892,7 +892,7 @@ async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: 
     levelLineModel: stored?.levelLineModel ?? null,
     endedEarly,
     masteryMoved: mastery
-      .filter((u) => u.unitId in before && Math.abs(u.mastery - before[u.unitId]) > 0.001)
+      .filter((u) => u.unitId in before && Math.round(u.mastery * 100) !== Math.round(before[u.unitId] * 100)) // shown as whole percents
       .map((u) => ({ unitId: u.unitId, unitName: u.unitName, before: before[u.unitId], after: u.mastery })),
     mistakes: [...mistakes.values()],
     nextLine: next.length ? `Next time: ${next.join(', then ')}.` : 'Next time: come back for fresh questions.',
