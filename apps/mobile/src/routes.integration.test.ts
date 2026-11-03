@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
-import { act, renderRouter, screen } from 'expo-router/testing-library'
+import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library'
+import { api } from './lib/api'
 import { useSession } from './lib/session-store'
 import { holdTarget, takeHeldTarget } from './lib/held-target'
 
@@ -9,8 +10,14 @@ jest.mock('./lib/session-store', () => ({
   SessionProvider: ({ children }: { children: unknown }) => children,
   useSession: jest.fn(),
 }))
+jest.mock('./lib/api', () => ({ api: jest.fn() }))
 jest.mock('react-native-gesture-handler', () => ({ GestureHandlerRootView: 'View' }))
-jest.mock('react-native-keyboard-controller', () => ({ KeyboardProvider: 'View' }))
+jest.mock('react-native-keyboard-controller', () => ({
+  KeyboardProvider: 'View',
+  KeyboardAvoidingView: require('react-native').View,
+  KeyboardAwareScrollView: require('react-native').ScrollView,
+  useKeyboardState: () => false,
+}))
 jest.mock('expo-router/build/toolbar/native', () => ({ RouterToolbarHost: 'View', RouterToolbarItem: 'View' }))
 jest.mock(require.resolve('expo-glass-effect', { paths: [require.resolve('expo-router')] }), () => ({
   GlassView: 'View', isLiquidGlassAvailable: () => false, isGlassEffectAPIAvailable: () => false,
@@ -23,7 +30,7 @@ const signedOut = { status: 'signedOut' as const, user: null, needsDisclosure: f
   refresh: jest.fn(), setDisclosed: jest.fn() }
 const ready = { ...signedOut, status: 'ready' as const, user: { id: 'u1', name: 'Learner', isAnonymous: false } }
 
-beforeEach(() => { takeHeldTarget() })
+beforeEach(() => { takeHeldTarget(); jest.mocked(api).mockReset() })
 afterEach(() => { jest.useRealTimers() })
 
 test('the actual router sends a signed-out private link to sign-in', async () => {
@@ -40,7 +47,8 @@ test('the actual router sends an undisclosed private link to welcome', async () 
   const navigation = renderRouter('src/app', { initialUrl: '/play/session-1' })
   await navigation
   expect(navigation.getPathname()).toBe('/welcome')
-  expect(screen.getByText('Welcome')).toBeOnTheScreen()
+  expect(screen.getByText('Before you start')).toBeOnTheScreen()
+  expect(screen.getByRole('link', { name: 'Read the full privacy notice' })).toBeOnTheScreen()
 })
 
 test('the actual router opens private routes after disclosure', async () => {
@@ -80,9 +88,15 @@ test('the actual router replays a held target after startup, sign-in and disclos
   }
   await transition(signedOut)
   expect(navigation.getPathname()).toBe('/sign-in')
-  await transition({ ...ready, needsDisclosure: true })
+  const setDisclosed = () => {
+    snapshot = ready
+    listeners.forEach((listener) => listener())
+  }
+  await transition({ ...ready, needsDisclosure: true, setDisclosed })
   expect(navigation.getPathname()).toBe('/welcome')
-  await transition(ready)
+  jest.mocked(api).mockResolvedValue({ roleTopicId: null })
+  await fireEvent.press(screen.getByRole('button', { name: 'Got it' }))
+  expect(api).toHaveBeenCalledWith('/disclosure', { method: 'POST', body: {} })
   expect(navigation.getPathname()).toBe('/play/session-1')
   expect(navigation.getSearchParams()).toMatchObject({ from: 'notification' })
   expect(takeHeldTarget()).toBeNull()

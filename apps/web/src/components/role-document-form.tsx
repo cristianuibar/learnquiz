@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { useServerFn } from '@tanstack/react-start'
 import { errorMessage } from '@/components/inline-error'
 import { Button } from '@/components/ui/button'
@@ -10,7 +10,8 @@ import { uploadRoleDocument } from '@/server/role-documents'
 
 const helpText = `A PDF with selectable text up to ${MAX_ROLE_DOCUMENT_BYTES / (1024 * 1024)} MB, or pasted text up to ${MAX_ROLE_DOCUMENT_CHARS.toLocaleString('en-US')} characters.`
 
-export function RoleDocumentForm({ slug, roleId, roleName, onUploaded }: { slug: string; roleId: string; roleName: string; onUploaded: () => unknown }) {
+export function RoleDocumentForm({ slug, roleId, roleName, onUploaded, replaces }: { slug: string; roleId: string; roleName: string; onUploaded: () => unknown; replaces?: { id: string; title: string } }) {
+  const uid = useId()
   const upload = useServerFn(uploadRoleDocument)
   const [error, setError] = useState('')
   const [added, setAdded] = useState(false)
@@ -40,26 +41,27 @@ export function RoleDocumentForm({ slug, roleId, roleName, onUploaded }: { slug:
   return (
     <details className="mt-3">
       <summary className="inline-flex min-h-11 cursor-pointer items-center font-medium underline outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
-        Add a document
+        {replaces ? <>Replace<span className="sr-only"> {replaces.title}</span></> : 'Add a document'}
       </summary>
-      <form className="mt-3 flex flex-col gap-4" onSubmit={submit} aria-label={`Add a document for ${roleName}`}>
-        <p id={`${roleId}-doc-help`} className="text-sm text-muted-foreground">{helpText}</p>
+      <form className="mt-3 flex flex-col gap-4" onSubmit={submit} aria-label={replaces ? `Replace ${replaces.title}` : `Add a document for ${roleName}`}>
+        {replaces && <input type="hidden" name="replacesId" value={replaces.id} />}
+        <p id={`${uid}-doc-help`} className="text-sm text-muted-foreground">{helpText}</p>
         <div className="flex flex-col gap-2">
-          <Label htmlFor={`${roleId}-doc-title`}>Document title</Label>
-          <Input id={`${roleId}-doc-title`} name="title" maxLength={200} />
+          <Label htmlFor={`${uid}-doc-title`}>{replaces ? 'Document title (optional)' : 'Document title'}</Label>
+          <Input id={`${uid}-doc-title`} name="title" maxLength={200} placeholder={replaces?.title} />
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor={`${roleId}-doc-file`}>PDF</Label>
-          <Input id={`${roleId}-doc-file`} name="file" type="file" accept="application/pdf,.pdf" aria-describedby={`${roleId}-doc-help`} />
+          <Label htmlFor={`${uid}-doc-file`}>PDF</Label>
+          <Input id={`${uid}-doc-file`} name="file" type="file" accept="application/pdf,.pdf" aria-describedby={`${uid}-doc-help`} />
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor={`${roleId}-doc-text`}>Or paste the text</Label>
-          <Textarea id={`${roleId}-doc-text`} name="text" className="min-h-32" maxLength={MAX_ROLE_DOCUMENT_CHARS} aria-describedby={`${roleId}-doc-help`} />
+          <Label htmlFor={`${uid}-doc-text`}>Or paste the text</Label>
+          <Textarea id={`${uid}-doc-text`} name="text" className="min-h-32" maxLength={MAX_ROLE_DOCUMENT_CHARS} aria-describedby={`${uid}-doc-help`} />
         </div>
         {error && <p role="alert" className="text-sm font-medium text-wrong">{error}</p>}
         {added && <p role="status" className="text-sm font-medium">Document added.</p>}
         <Button type="submit" className="self-end px-6" disabled={busy}>
-          {busy ? 'Uploading…' : 'Add document'}
+          {busy ? 'Uploading…' : replaces ? 'Replace document' : 'Add document'}
         </Button>
       </form>
     </details>
