@@ -19,7 +19,8 @@ export function QuestionDock({
   onRetry: () => void
 }) {
   return (
-    <div className="sticky bottom-0 -mx-4 flex flex-col gap-3 border-t border-border bg-surface-page px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+    // A preceding form holding [data-compact-dock] (cloze, keyboard up) gets 8px padding and gap, no safe-area inset.
+    <div className="sticky bottom-0 -mx-4 flex flex-col gap-3 border-t border-border bg-surface-page px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] [form:has([data-compact-dock])~&]:gap-2 [form:has([data-compact-dock])~&]:pt-2 [form:has([data-compact-dock])~&]:pb-2">
       <fieldset disabled={locked} aria-busy={locked} className="min-w-0">
         <ConfidencePicker value={confidence} onChange={onConfidence} />
       </fieldset>

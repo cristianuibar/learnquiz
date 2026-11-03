@@ -123,7 +123,10 @@ function Play({ initial }: { initial: SessionView }) {
   }, [initial.id])
 
   useEffect(() => {
-    questionHeading.current?.focus()
+    const heading = questionHeading.current
+    // A format that autofocuses its field (cloze) keeps that focus.
+    if (heading && document.activeElement !== heading && heading.closest('form')?.contains(document.activeElement)) return
+    heading?.focus()
   }, [item?.id, progress.position])
 
   // Restored after mount so the server render and hydration match.

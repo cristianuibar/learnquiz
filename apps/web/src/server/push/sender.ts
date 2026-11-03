@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm'
 import type { Db } from '@/db'
 import { pushLog, pushPrefs, pushSubscriptions } from '@/db/schema'
 import { encryptPayload, vapidAuthorization, type VapidConfig } from './crypto'
+import { effectiveWindow, inWindow, pushContext } from './window'
 
 export const EXPO_TOKEN = /^ExponentPushToken\[[\w-]+\]$/
 
@@ -10,9 +11,12 @@ export async function sendPush(db: Db, subscription: typeof pushSubscriptions.$i
   // Check at delivery time as well as selection time so a queued push respects a pause.
   const [prefs] = await db.select().from(pushPrefs).where(eq(pushPrefs.userId, subscription.userId))
   if (!prefs?.enabled || prefs.paused) return { outcome: 'skipped', status: null }
-  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: prefs.timezone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date())
-  const minute = Number(parts.find((p) => p.type === 'hour')!.value) * 60 + Number(parts.find((p) => p.type === 'minute')!.value)
-  if (minute < prefs.startMinute || minute >= prefs.endMinute) return { outcome: 'skipped', status: null }
+  // A device can move to another account after selection; never send this account's question to it.
+  const [current] = await db.select({ id: pushSubscriptions.id }).from(pushSubscriptions).where(and(eq(pushSubscriptions.id, subscription.id),
+    eq(pushSubscriptions.userId, subscription.userId), eq(pushSubscriptions.endpoint, subscription.endpoint)))
+  if (!current) return { outcome: 'skipped', status: null }
+  // The same window the scheduler selects with, so the two cannot disagree.
+  if (!inWindow(effectiveWindow((await pushContext(db, subscription.userId)).company, prefs), Date.now())) return { outcome: 'skipped', status: null }
   const id = crypto.randomUUID()
   const url = new URL(payload.url, 'https://learnquiz.invalid')
   const match = /^\/play\/quick\/([^/]+)\/?$/.exec(url.pathname)
