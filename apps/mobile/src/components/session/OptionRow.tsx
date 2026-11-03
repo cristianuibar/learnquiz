@@ -21,6 +21,8 @@ export function OptionRow({ ref, children, variant, selected, mark, disabled, st
   const label = mark === 'correct' ? 'Correct' : mark === 'wrong' ? 'Not quite' : undefined
   const FeedbackIcon = mark === 'wrong' ? X : Check
   const indicatorSize = space[4] + space[1]
+  // A marked check row keeps its square (chosen or not) and shows the feedback icon beside the word.
+  const keepBox = variant === 'check'
 
   return (
     <Pressable
@@ -54,8 +56,8 @@ export function OptionRow({ ref, children, variant, selected, mark, disabled, st
         outlineColor: colors.brand,
       }, typeof style === 'function' ? style(state) : style]}
     >
-      {feedback ? <FeedbackIcon size={indicatorSize} color={feedback} strokeWidth={2} accessible={false} /> : (
-        <View style={{
+      {feedback && !keepBox ? <FeedbackIcon size={indicatorSize} color={feedback} strokeWidth={2} accessible={false} /> : (
+        <View testID={variant === 'check' ? (selected ? 'check-box-checked' : 'check-box-empty') : undefined} style={{
           width: indicatorSize,
           height: indicatorSize,
           borderWidth: 2,
@@ -70,6 +72,7 @@ export function OptionRow({ ref, children, variant, selected, mark, disabled, st
         </View>
       )}
       <Text variant="bodyLg" muted={mark === 'rest'} style={{ flex: 1 }}>{children}</Text>
+      {feedback && keepBox && <FeedbackIcon size={indicatorSize} color={feedback} strokeWidth={2} accessible={false} />}
       {label && <Text variant="label" style={{ color: feedback }}>{label}</Text>}
     </Pressable>
   )
