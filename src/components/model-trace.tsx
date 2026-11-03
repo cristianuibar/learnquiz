@@ -48,6 +48,14 @@ export function ModelTrace({ scope }: { scope: Scope }) {
               {scope.scope === 'session' ? 'Session total' : 'Generation total'}: {usd(trace.totalCostUsd)}
             </p>
             <p className="text-sm text-muted-foreground">USD costs are the logged estimates. Totals include priced calls only. Output tokens include reasoning tokens.</p>
+            {trace.planning && (
+              <section aria-label="Session plan">
+                <h2 className="font-semibold">{trace.planning.planner}</h2>
+                <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm">
+                  {trace.planning.steps.map((step, i) => <li key={i}>{step.reason}</li>)}
+                </ol>
+              </section>
+            )}
             {trace.calls.length === 0 ? <p>No model calls recorded for this {scope.scope}.</p> : (
               <ol className="flex flex-col gap-4">
                 {trace.calls.map((call) => (
