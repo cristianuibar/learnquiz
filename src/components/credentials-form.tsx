@@ -5,11 +5,16 @@ import { Label } from '@/components/ui/label'
 import { authClient } from '@/lib/auth-client'
 
 // Email and password sign-up or sign-in. A given `email` is locked (invite links); `defaultEmail` only prefills. A guest session is linked by Better Auth, so guest data follows the account.
-export function CredentialsForm({ email, defaultEmail, name, initial = 'up', onDone }: { email?: string; defaultEmail?: string; name?: string; initial?: 'up' | 'in'; onDone: () => Promise<void> }) {
-  const [mode, setMode] = useState(initial)
+export function CredentialsForm({ email, defaultEmail, name, initial = 'up', onModeChange, onDone }: { email?: string; defaultEmail?: string; name?: string; initial?: 'up' | 'in'; onModeChange?: (mode: 'up' | 'in') => void; onDone: () => Promise<void> }) {
+  const [mode, setModeState] = useState(initial)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const up = mode === 'up'
+
+  function setMode(next: 'up' | 'in') {
+    setModeState(next)
+    onModeChange?.(next)
+  }
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
