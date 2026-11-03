@@ -26,6 +26,7 @@ import { Route as OrgNewRouteImport } from './routes/org.new'
 import { Route as PlaySessionIdRouteImport } from './routes/play.$sessionId'
 import { Route as AdminCompaniesSlugRouteImport } from './routes/admin.companies_.$slug'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
 import { Route as MediaConceptsConceptIdRouteImport } from './routes/media/concepts/$conceptId'
 import { Route as OrgSlugIndexRouteImport } from './routes/org.$slug.index'
 import { Route as OrgSlugPeopleRouteImport } from './routes/org.$slug.people'
@@ -124,6 +125,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiV1SplatRoute = ApiV1SplatRouteImport.update({
+  id: '/api/v1/$',
+  path: '/api/v1/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MediaConceptsConceptIdRoute = MediaConceptsConceptIdRouteImport.update({
   id: '/media/concepts/$conceptId',
   path: '/media/concepts/$conceptId',
@@ -203,6 +209,7 @@ export interface FileRoutesByFullPath {
   '/me/': typeof MeIndexRoute
   '/admin/companies/$slug': typeof AdminCompaniesSlugRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/v1/$': typeof ApiV1SplatRoute
   '/media/concepts/$conceptId': typeof MediaConceptsConceptIdRoute
   '/org/$slug/people': typeof OrgSlugPeopleRoute
   '/org/$slug/questions': typeof OrgSlugQuestionsRoute
@@ -232,6 +239,7 @@ export interface FileRoutesByTo {
   '/me': typeof MeIndexRoute
   '/admin/companies/$slug': typeof AdminCompaniesSlugRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/v1/$': typeof ApiV1SplatRoute
   '/media/concepts/$conceptId': typeof MediaConceptsConceptIdRoute
   '/org/$slug/people': typeof OrgSlugPeopleRoute
   '/org/$slug/questions': typeof OrgSlugQuestionsRoute
@@ -264,6 +272,7 @@ export interface FileRoutesById {
   '/me/': typeof MeIndexRoute
   '/admin/companies_/$slug': typeof AdminCompaniesSlugRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/v1/$': typeof ApiV1SplatRoute
   '/media/concepts/$conceptId': typeof MediaConceptsConceptIdRoute
   '/org/$slug/people': typeof OrgSlugPeopleRoute
   '/org/$slug/questions': typeof OrgSlugQuestionsRoute
@@ -297,6 +306,7 @@ export interface FileRouteTypes {
     | '/me/'
     | '/admin/companies/$slug'
     | '/api/auth/$'
+    | '/api/v1/$'
     | '/media/concepts/$conceptId'
     | '/org/$slug/people'
     | '/org/$slug/questions'
@@ -326,6 +336,7 @@ export interface FileRouteTypes {
     | '/me'
     | '/admin/companies/$slug'
     | '/api/auth/$'
+    | '/api/v1/$'
     | '/media/concepts/$conceptId'
     | '/org/$slug/people'
     | '/org/$slug/questions'
@@ -357,6 +368,7 @@ export interface FileRouteTypes {
     | '/me/'
     | '/admin/companies_/$slug'
     | '/api/auth/$'
+    | '/api/v1/$'
     | '/media/concepts/$conceptId'
     | '/org/$slug/people'
     | '/org/$slug/questions'
@@ -385,6 +397,7 @@ export interface RootRouteChildren {
   PlaySessionIdRoute: typeof PlaySessionIdRoute
   MeIndexRoute: typeof MeIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiV1SplatRoute: typeof ApiV1SplatRoute
   MediaConceptsConceptIdRoute: typeof MediaConceptsConceptIdRoute
   PlaySessionIdDoneRoute: typeof PlaySessionIdDoneRoute
   PlayQuickItemIdRoute: typeof PlayQuickItemIdRoute
@@ -511,6 +524,13 @@ declare module '@tanstack/react-router' {
       path: '/api/auth/$'
       fullPath: '/api/auth/$'
       preLoaderRoute: typeof ApiAuthSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/$': {
+      id: '/api/v1/$'
+      path: '/api/v1/$'
+      fullPath: '/api/v1/$'
+      preLoaderRoute: typeof ApiV1SplatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/media/concepts/$conceptId': {
@@ -653,6 +673,7 @@ const rootRouteChildren: RootRouteChildren = {
   PlaySessionIdRoute: PlaySessionIdRoute,
   MeIndexRoute: MeIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiV1SplatRoute: ApiV1SplatRoute,
   MediaConceptsConceptIdRoute: MediaConceptsConceptIdRoute,
   PlaySessionIdDoneRoute: PlaySessionIdDoneRoute,
   PlayQuickItemIdRoute: PlayQuickItemIdRoute,

@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Working } from '@/components/working'
 import { startPlacement, startSession } from '@/server/play'
 
-// Starts a placement or a session (up to 40 s of question writing), then opens it.
+// Starts a placement or a session, then opens it. Placement writes questions (~45 s); a session usually
+// starts in seconds, since the next concepts' questions are written ahead during the previous session.
 export function StartButton({
   topicId,
   placement,
@@ -35,7 +36,14 @@ export function StartButton({
     }
   }
 
-  if (working) return <Working label={placement ? 'Writing your first questions' : 'Picking your questions'} />
+  if (working) {
+    return (
+      <Working
+        label={placement ? 'Writing your first questions' : 'Picking your questions'}
+        seconds={placement ? 45 : 15}
+      />
+    )
+  }
   if (error) return <InlineError message={error} onRetry={go} />
   return (
     <Button variant={variant} className="h-12 w-full px-6 sm:w-auto" onClick={go}>
