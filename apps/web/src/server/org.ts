@@ -2,10 +2,12 @@ import { createServerFn } from '@tanstack/react-start'
 import { getRequestHeaders } from '@tanstack/react-start/server'
 import { and, asc, count, desc, eq, gt, lte, max, notExists, or } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/sqlite-core'
+import type { InviteView } from '@learnquiz/api/invite'
+import { brandProblem } from '@learnquiz/tokens'
 import { z } from 'zod'
 import { getDb } from '@/db'
 import { invitation, member, organization, user } from '@/db/auth-schema'
-import { attempts, concepts, jobRoles, learnerConcept, memberRoleAssignments, sessions, topics } from '@/db/schema'
+import { attempts, concepts, jobRoles, learnerConcept, memberRoleAssignments, orgSettings, sessions, topics } from '@/db/schema'
 import { WEEK, benchmarkMet } from '@/lib/learning/profile'
 import { getAuth } from '@/server/auth'
 import { requireOrgAdmin, requireOrgReader } from '@/server/authz'
@@ -199,16 +201,18 @@ export const getPeople = createServerFn({ method: 'GET' })
 // Public on purpose: the invitation id is the secret in the invite link, and the page needs it before the invitee has an account.
 export const getInvite = createServerFn({ method: 'GET' })
   .validator(z.object({ id: z.string().min(1).max(100) }))
-  .handler(async ({ data }) => {
+  .handler(async ({ data }): Promise<InviteView | null> => {
     const row = await getDb()
-      .select({ company: organization.name, email: invitation.email, name: invitation.inviteeName, status: invitation.status, expiresAt: invitation.expiresAt })
+      .select({ company: organization.name, email: invitation.email, name: invitation.inviteeName, status: invitation.status, expiresAt: invitation.expiresAt, roleName: jobRoles.name, accent: orgSettings.accent })
       .from(invitation)
       .innerJoin(organization, eq(organization.id, invitation.organizationId))
+      .innerJoin(jobRoles, and(eq(jobRoles.id, invitation.jobRoleId), eq(jobRoles.orgId, invitation.organizationId)))
+      .leftJoin(orgSettings, eq(orgSettings.orgId, invitation.organizationId))
       .where(eq(invitation.id, data.id))
       .get()
     if (!row) return null
-    const status = row.status === 'pending' && row.expiresAt.getTime() < Date.now() ? 'expired' : row.status
+    const status = row.status === 'pending' && row.expiresAt.getTime() < Date.now() ? 'expired' : (row.status as InviteView['status'])
     const viewer = await getSessionUser()
     const otherAccount = !!viewer && !viewer.isAnonymous && viewer.email.toLowerCase() !== row.email.toLowerCase()
-    return { company: row.company, email: row.email, name: row.name, status, otherAccount }
+    return { company: row.company, email: row.email, name: row.name, status, otherAccount, roleName: row.roleName, accent: row.accent !== null && brandProblem(row.accent) === null ? row.accent : null, logoUrl: null }
   })
