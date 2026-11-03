@@ -4,10 +4,12 @@ import { act, render, screen } from '@testing-library/react-native'
 import * as SecureStore from 'expo-secure-store'
 import { AsyncStorage } from 'expo-sqlite/kv-store'
 import * as auth from './auth'
+import { api } from './api'
 import { getToken, signIn } from './auth'
 import { deferReplay, holdTarget, takeHeldTarget, takeReplayTarget } from './held-target'
 import { clearPrefix, getJSON, setJSON } from './kv'
 import { endSession, SessionProvider, useSession } from './session-store'
+import { tokenFingerprint } from './token-fingerprint'
 
 // Real auth, api, kv and session store; only the native stores and fetch are fakes.
 jest.mock('expo-secure-store', () => ({
@@ -17,13 +19,27 @@ jest.mock('expo-secure-store', () => ({
 }))
 jest.mock('expo-sqlite/kv-store', () => {
   const values = new Map<string, string>()
-  return { AsyncStorage: {
+  // failRemove: keys whose delete fails. holdSet: the next write of that key
+  // waits until release() and only then lands, like a slow SQLite write.
+  const control = { failRemove: new Set<string>(), holdSet: null as string | null, held: [] as (() => void)[] }
+  return { control, AsyncStorage: {
     getItemAsync: async (key: string) => values.get(key) ?? null,
-    setItemAsync: async (key: string, value: string) => { values.set(key, value) },
-    removeItemAsync: async (key: string) => values.delete(key),
+    setItemAsync: async (key: string, value: string) => {
+      if (control.holdSet === key) {
+        control.holdSet = null
+        await new Promise<void>((resolve) => { control.held.push(resolve) })
+      }
+      values.set(key, value)
+    },
+    removeItemAsync: async (key: string) => {
+      if (control.failRemove.has(key)) throw new Error('SQLite busy')
+      return values.delete(key)
+    },
     getAllKeysAsync: async () => [...values.keys()],
   } }
 })
+type KvControl = { failRemove: Set<string>; holdSet: string | null; held: (() => void)[] }
+const kvControl = (): KvControl => (jest.requireMock('expo-sqlite/kv-store') as { control: KvControl }).control
 
 type Reply = { status: number; data?: unknown; token?: string } | 'offline'
 let replies: Record<string, Reply>
@@ -60,6 +76,9 @@ const online = (user: typeof learnerA) => ({
 
 beforeEach(async () => {
   keysAtReady = {}
+  kvControl().failRemove.clear()
+  kvControl().holdSet = null
+  kvControl().held = []
   await clearPrefix('')
   // Leave each test with a stored bearer for learner A, as after an earlier launch.
   replies = { '/api/auth/sign-in/email': { status: 200, data: {}, token: 'token-a' } }
@@ -155,6 +174,84 @@ test("a new learner's sign-in with no signal never shows the previous learner of
   await mount()
   expect(screen.getByText('ready:-:offline')).toBeOnTheScreen()
   expect(getToken()).toBe('token-b')
+})
+
+test("a failed delete of A's saved session during B's sign-in never shows A to B offline", async () => {
+  replies = online(learnerA)
+  const first = await mount()
+  expect(screen.getByText('ready:Ana:online')).toBeOnTheScreen()
+
+  kvControl().failRemove.add('lq:session')
+  replies = { '/api/v1/session': 'offline', '/api/auth/sign-in/email': { status: 200, data: {}, token: 'token-b' } }
+  await act(async () => { await signIn('bo@example.com', 'password') })
+  expect(screen.getByText('ready:-:offline')).toBeOnTheScreen()
+
+  // B's next offline refresh, after a relaunch.
+  await first.unmount()
+  await mount()
+  expect(screen.getByText('ready:-:offline')).toBeOnTheScreen()
+  expect(getToken()).toBe('token-b')
+})
+
+test("A's save landing after A's 401 and B's sign-in never shows A to B offline", async () => {
+  kvControl().holdSet = 'lq:session'
+  replies = { ...online(learnerA), '/api/v1/today': { status: 401, data: { error: 'Session expired' } } }
+  const first = await mount()
+  expect(kvControl().held).toHaveLength(1)
+
+  await act(async () => { await api('/today').catch(() => {}) })
+  expect(screen.getByText('signedOut:-:online')).toBeOnTheScreen()
+  replies = { '/api/v1/session': 'offline', '/api/auth/sign-in/email': { status: 200, data: {}, token: 'token-b' } }
+  await act(async () => { await signIn('bo@example.com', 'password') })
+  expect(screen.getByText('ready:-:offline')).toBeOnTheScreen()
+
+  // A's write lands only now, after both the 401 cleanup and B's sign-in. The
+  // epoch moved, so the save takes its write back.
+  await act(async () => { kvControl().held.forEach((release) => release()) })
+  await expect(getJSON('lq:session')).resolves.toBeNull()
+  await first.unmount()
+  await mount()
+  expect(screen.getByText('ready:-:offline')).toBeOnTheScreen()
+  expect(getToken()).toBe('token-b')
+})
+
+test("A's save landing after B's user switch and clear is taken back", async () => {
+  replies = { ...online(learnerA), '/api/auth/organization/accept-invitation': { status: 200, data: {} } }
+  await mount()
+  expect(screen.getByText('ready:Ana:online')).toBeOnTheScreen()
+  // A refresh of A's session whose save is still in flight.
+  kvControl().holdSet = 'lq:session'
+  await act(async () => { await auth.acceptInvitation('invitation-1') })
+  expect(kvControl().held).toHaveLength(1)
+
+  // B signs in on the same phone without signing A out; B's switch clears lq:.
+  replies = { ...online(learnerB), '/api/auth/sign-in/email': { status: 200, data: {}, token: 'token-b' } }
+  await act(async () => { await signIn('bo@example.com', 'password') })
+  expect(screen.getByText('ready:Bo:online')).toBeOnTheScreen()
+  await act(async () => { kvControl().held.forEach((release) => release()) })
+  const raw = await AsyncStorage.getItemAsync('lq:session')
+  expect(raw ?? '').not.toContain('user-a')
+})
+
+test('the saved session is bound to a fingerprint of its bearer, never the bearer itself', async () => {
+  replies = online(learnerA)
+  await mount()
+  expect(screen.getByText('ready:Ana:online')).toBeOnTheScreen()
+  const raw = await AsyncStorage.getItemAsync('lq:session')
+  expect(raw).not.toBeNull()
+  expect(raw).not.toContain('token-a')
+  expect(JSON.parse(raw!)).toMatchObject({ owner: tokenFingerprint('token-a'), user: { id: 'user-a' } })
+})
+
+test('a saved session without a matching fingerprint is ignored offline and deleted', async () => {
+  replies = { '/api/v1/session': 'offline' }
+  for (const owner of [undefined, tokenFingerprint('token-b')]) {
+    await setJSON('lq:session', { owner, user: learnerB, needsDisclosure: false, branding: null })
+    const view = await mount()
+    expect(screen.getByText('ready:-:offline')).toBeOnTheScreen()
+    await expect(getJSON('lq:session')).resolves.toBeNull()
+    await view.unmount()
+  }
 })
 
 describe('endSession', () => {

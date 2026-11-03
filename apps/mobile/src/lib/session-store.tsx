@@ -5,6 +5,7 @@ import { api, ApiError, authCall } from './api'
 import { getToken, handleUnauthorized, loadToken, signOut, subscribeAuth } from './auth'
 import { releaseReplayHolds } from './held-target'
 import * as kv from './kv'
+import { tokenFingerprint } from './token-fingerprint'
 
 export type { Branding, SessionUser } from '@learnquiz/api'
 
@@ -21,22 +22,54 @@ type Session = State & { refresh(): Promise<void>; setDisclosed(): void }
 const signedOut: State = { status: 'signedOut', user: null, needsDisclosure: false, branding: null }
 const SessionContext = createContext<Session | null>(null)
 
-// The last session the server confirmed. It is an `lq:` key, so sign-out and
-// 401 cleanup erase it with the rest of the learner's data.
+// The last session the server confirmed, bound to the bearer it was confirmed
+// under: owner is a fingerprint of that token, never the token. It is an `lq:`
+// key, so sign-out and 401 cleanup erase it with the rest of the learner's data.
 const SESSION_KEY = 'lq:session'
-type StoredSession = Pick<SessionResponse, 'needsDisclosure'> & { user: SessionUser; branding: Branding | null }
+type SessionView = Pick<SessionResponse, 'needsDisclosure'> & { user: SessionUser; branding: Branding | null }
+type StoredSession = SessionView & { owner: string }
+
+// Moves on sign-out and a 401 (both emit signedOut) and on a user switch, always
+// before their cleanup. A save started under an older epoch never writes, so no
+// learner's session can land after the cleanup that ended it.
+let sessionEpoch = 0
+
+function isStored(value: unknown): value is StoredSession {
+  const record = value as Partial<StoredSession> | null
+  return typeof record?.owner === 'string' && typeof record.user?.id === 'string'
+}
 
 async function readStored(): Promise<StoredSession | null> {
   try {
-    const stored = await kv.getJSON<StoredSession>(SESSION_KEY)
-    return typeof stored?.user?.id === 'string' ? stored : null
+    const stored = await kv.getJSON<unknown>(SESSION_KEY)
+    return isStored(stored) ? stored : null
   } catch {
     return null
   }
 }
 
-function writeStored(value: StoredSession) {
-  return kv.setJSON(SESSION_KEY, value).catch(() => {})
+// The saved session only for the bearer it was saved under. Anything else (another
+// bearer's, or no owner at all) is ignored and deleted best-effort, so a failed
+// delete can never show one learner's session to another.
+async function restoreStored(token: string): Promise<StoredSession | null> {
+  let stored: unknown = null
+  try { stored = await kv.getJSON<unknown>(SESSION_KEY) } catch { return null }
+  if (isStored(stored) && stored.owner === tokenFingerprint(token)) return stored
+  if (stored !== null) await kv.remove(SESSION_KEY).catch(() => {})
+  return null
+}
+
+// Writes only while the epoch the save started under is current, checked right
+// before the write. If the epoch moved while the write was in flight, the write
+// is taken back (when it is still this bearer's record).
+async function saveStored(token: string, view: SessionView, epoch: number): Promise<StoredSession> {
+  const record: StoredSession = { ...view, owner: tokenFingerprint(token) }
+  if (epoch !== sessionEpoch) return record
+  try { await kv.setJSON(SESSION_KEY, record) } catch { return record }
+  if (epoch !== sessionEpoch && (await readStored())?.owner === record.owner) {
+    await kv.remove(SESSION_KEY).catch(() => {})
+  }
+  return record
 }
 
 // How long sign-out may wait on its own steps before the local session is cleared
@@ -71,21 +104,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const request = useRef(0)
   const stored = useRef<StoredSession | null>(null)
   const offline = useRef(false)
-  const bearer = useRef<string | null>(null)
   const refresh = useCallback(async () => {
     const current = ++request.current
     let token: string | null = null
-    const stale = () => current !== request.current || token !== getToken()
+    let epoch = sessionEpoch
+    const stale = () => current !== request.current || token !== getToken() || epoch !== sessionEpoch
     try {
       token = await loadToken()
       if (current !== request.current) return
       if (!token) { setState(signedOut); return }
-      // A bearer from another sign-in this run: the stored session may be another
-      // learner's, so it must not stand in for this one, now or on a relaunch.
-      const newBearer = bearer.current !== null && bearer.current !== token
-      bearer.current = token
-      if (newBearer) await kv.remove(SESSION_KEY).catch(() => {})
-      if (stale()) return
       let session: Pick<SessionResponse, 'user' | 'needsDisclosure'>
       try {
         session = await api<SessionResponse>('/session')
@@ -93,7 +120,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (stale()) return
         if (error instanceof ApiError && error.status === 401) { await handleUnauthorized(); return }
         // No signal or a server error: keep the token and show the signed-in shell.
-        const last = newBearer ? null : await readStored()
+        const last = await restoreStored(token)
         if (stale()) return
         stored.current = last
         offline.current = true
@@ -106,10 +133,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const user = session.user
       const last = await readStored()
       if (stale()) return
-      // Another learner (or an unknown one) used this phone: drop their drafts and
-      // caches before this learner's screens can read them.
-      if (last?.user.id !== user.id) await kv.clearPrefix('lq:')
-      if (stale()) return
+      // Another learner (or an unknown one) used this phone: end every older save
+      // first, then drop their drafts and caches before this learner's screens read them.
+      if (last?.user.id !== user.id) {
+        epoch = ++sessionEpoch
+        await kv.clearPrefix('lq:')
+        if (stale()) return
+      }
       let branding: Branding | null
       try {
         branding = await api<Branding | null>('/branding')
@@ -120,9 +150,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
       if (stale()) return
       const next = { user, needsDisclosure: session.needsDisclosure, branding }
-      await writeStored(next)
+      const saved = await saveStored(token, next, epoch)
       if (stale()) return
-      stored.current = next
+      stored.current = saved
       offline.current = false
       setState({ status: 'ready', ...next })
     } catch {
@@ -135,6 +165,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsubscribe = subscribeAuth((event) => {
       // Sign-out also ends every hold on held-link replay (an unfinished join).
+      if (event === 'signedOut') {
+        // The epoch moves before auth's cleanup runs: no older save can land after it.
+        sessionEpoch++
+        stored.current = null
+      }
       if (event === 'signedOut') { request.current++; releaseReplayHolds(); setState(signedOut) }
       else void refresh()
     })
@@ -148,9 +183,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const setDisclosed = useCallback(() => {
     setState((previous) => ({ ...previous, needsDisclosure: false }))
     // An offline relaunch must not show the disclosure again.
-    if (stored.current) {
+    const token = getToken()
+    if (stored.current && token && stored.current.owner === tokenFingerprint(token)) {
       stored.current = { ...stored.current, needsDisclosure: false }
-      void writeStored(stored.current)
+      void saveStored(token, stored.current, sessionEpoch)
     }
   }, [])
 
