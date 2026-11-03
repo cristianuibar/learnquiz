@@ -203,19 +203,23 @@ it('retires questions when the document is replaced after generation read it but
   expect(raw.prepare("SELECT status, COUNT(*) AS n FROM items WHERE source_id = 'co-topic-src' GROUP BY status").all()).toEqual([{ status: 'retired', n: 6 }])
 })
 
-it('sends the source document only when the concept has lost its quote', async () => {
+it('sends the source document for a replacement version or a lost quote, not for a version-1 quote', async () => {
   raw.exec("DELETE FROM concepts WHERE id <> 'c00'")
-  raw.exec("UPDATE sources SET body_text = 'Scan the bin twice.' WHERE id = 'co-topic-src'")
+  raw.exec("UPDATE concepts SET source_quote = 'Scan the bin.' WHERE id = 'c00'")
   const userMessages = () => fetchModel.mock.calls
     .map(([, init]) => JSON.parse(init!.body as string))
     .filter((b) => b.response_format.json_schema.name === 'item_batch')
     .map((b) => b.messages.find((m: { role: string }) => m.role === 'user').content as string)
+  const sent = async (version: number, quote: string | null) => {
+    raw.exec('DELETE FROM items')
+    raw.prepare("UPDATE sources SET body_text = 'Do not scan the bin.', version = ? WHERE id = 'co-topic-src'").run(version)
+    raw.prepare("UPDATE concepts SET source_quote = ?, gen_status = 'pending', gen_started_at = NULL WHERE id = 'c00'").run(quote)
+    fetchModel.mockClear()
+    await drainConceptQueue()
+    return userMessages().map((m) => m.includes('Do not scan the bin.'))
+  }
 
-  await drainConceptQueue()
-  expect(userMessages().map((m) => m.includes('Scan the bin twice.'))).toEqual([false])
-
-  raw.exec("DELETE FROM items; UPDATE concepts SET source_quote = NULL, gen_status = 'pending', gen_started_at = NULL WHERE id = 'c00'")
-  fetchModel.mockClear()
-  await drainConceptQueue()
-  expect(userMessages().map((m) => m.includes('Scan the bin twice.'))).toEqual([true])
+  expect(await sent(1, 'Scan the bin.')).toEqual([false])
+  expect(await sent(2, 'Scan the bin.')).toEqual([true])
+  expect(await sent(1, null)).toEqual([true])
 })

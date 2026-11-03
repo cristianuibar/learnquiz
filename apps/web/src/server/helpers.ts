@@ -92,7 +92,8 @@ export async function generateConceptItems(
           spread: opts.spread,
           formats: ['mcq', 'cloze', 'short'],
           sourceQuote: concept.sourceQuote,
-          sourceText: concept.sourceQuote ? null : source?.bodyText ?? null,
+          // A replacement version always sends the document: a kept quote can still match while the revision changes its meaning.
+          sourceText: source && source.version > 1 ? source.bodyText : concept.sourceQuote ? null : source?.bodyText ?? null,
           avoidStems,
         }),
         maxTokens: 16000,
