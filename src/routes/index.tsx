@@ -9,7 +9,7 @@ export const Route = createFileRoute('/')({
     if (context.user) {
       const company = context.adminCompanies[0]
       if (company) throw redirect({ to: '/org/$slug', params: { slug: company.slug } })
-      throw redirect({ to: '/start' })
+      throw redirect({ to: '/today' })
     }
   },
   component: Landing,

@@ -1,0 +1,147 @@
+import { readFileSync, readdirSync } from 'node:fs'
+import { DatabaseSync } from 'node:sqlite'
+import { drizzle } from 'drizzle-orm/sqlite-proxy'
+import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
+import * as schema from '@/db/schema'
+import * as authSchema from '@/db/auth-schema'
+
+const state = vi.hoisted(() => ({ db: null as unknown, user: 'owner-a' as string | null, active: null as string | null, anonymous: false, bucket: { put: vi.fn(), delete: vi.fn() } }))
+
+// Fake only the server transport, session and Cloudflare bindings. Validators,
+// admin checks, SQL, PDF extraction and the upload handler execute for real.
+vi.mock('@tanstack/react-start', () => ({
+  createServerFn: () => {
+    const builder = (validate: (value: unknown) => unknown = (value) => value) => ({
+      validator: (schema: { parse?: (value: unknown) => unknown } | ((value: unknown) => unknown)) => builder(typeof schema === 'function' ? schema : (value) => schema.parse!(value)),
+      handler: (handler: (input: { data: unknown }) => unknown) => (input?: { data: unknown }) => handler({ data: validate(input?.data) }),
+    })
+    return builder()
+  },
+}))
+vi.mock('@tanstack/react-start/server', () => ({ getRequestHeaders: () => new Headers() }))
+vi.mock('@/db', () => ({ getDb: () => state.db }))
+vi.mock('@/server/env', () => ({ getEnv: () => ({ MEDIA: state.bucket }) }))
+vi.mock('@/server/session', () => ({ getSessionUser: async () => state.user ? { id: state.user, isAnonymous: state.anonymous } : null }))
+vi.mock('@/server/auth', () => ({ getAuth: () => ({ api: { getSession: async () => state.user ? { user: { id: state.user, isAnonymous: state.anonymous }, session: { activeOrganizationId: state.active } } : null } }) }))
+
+import { MAX_ROLE_DOCUMENT_CHARS } from '@/lib/limits'
+import { uploadRoleDocument } from './role-documents'
+
+let sqlite: DatabaseSync
+beforeAll(() => {
+  sqlite = new DatabaseSync(':memory:')
+  for (const file of readdirSync('drizzle').filter((f) => f.endsWith('.sql')).sort()) {
+    sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8').replaceAll('--> statement-breakpoint', ''))
+  }
+  for (const id of ['owner-a', 'member-a', 'owner-b']) {
+    sqlite.prepare('INSERT INTO user (id, name, email) VALUES (?, ?, ?)').run(id, id, `${id}@example.test`)
+  }
+  for (const [id, slug] of [['org-a', 'acme'], ['org-b', 'globex']]) {
+    sqlite.prepare('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, ?)').run(id, slug, slug, 1)
+  }
+  for (const [user, org, role] of [['owner-a', 'org-a', 'owner'], ['member-a', 'org-a', 'member'], ['owner-b', 'org-b', 'owner']]) {
+    sqlite.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, ?)').run(user, org, user, role, 1)
+  }
+  for (const [role, org] of [['role-a', 'org-a'], ['role-b', 'org-b']]) {
+    sqlite.prepare('INSERT INTO job_roles (id, org_id, name, created_at) VALUES (?, ?, ?, ?)').run(role, org, role, 1)
+    sqlite.prepare("INSERT INTO topics (id, org_id, job_role_id, title, status, created_at) VALUES (?, ?, ?, ?, 'draft', ?)").run(`topic-${role}`, org, role, role, 1)
+  }
+  const run = (sql: string, params: unknown[], method: string) => {
+    const statement = sqlite.prepare(sql)
+    statement.setReturnArrays(true)
+    const args = params as (string | number | null)[]
+    if (method === 'run') { statement.run(...args); return { rows: [] } }
+    return { rows: (method === 'get' ? statement.get(...args) : statement.all(...args)) as unknown[] }
+  }
+  state.db = drizzle(async (sql, params, method) => run(sql, params, method), async (queries) => {
+    sqlite.exec('SAVEPOINT batch')
+    try {
+      const results = queries.map((query) => run(query.sql, query.params, query.method))
+      sqlite.exec('RELEASE batch')
+      return results
+    } catch (error) { sqlite.exec('ROLLBACK TO batch; RELEASE batch'); throw error }
+  }, { schema: { ...schema, ...authSchema } })
+})
+beforeEach(() => {
+  sqlite.exec('BEGIN')
+  state.user = 'owner-a'
+  state.active = null
+  state.anonymous = false
+  vi.resetAllMocks()
+  state.bucket.put.mockResolvedValue({})
+  state.bucket.delete.mockResolvedValue(undefined)
+})
+afterEach(() => sqlite.exec('ROLLBACK'))
+afterAll(() => sqlite.close())
+
+const SENTENCE = 'Forklifts stop at the red line.'
+
+// Minimal PDF 1.4 with one Helvetica page; xref offsets are computed from the bytes.
+function pdf(content: string) {
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ]
+  let out = '%PDF-1.4\n'
+  const offsets = objects.map((object, i) => {
+    const offset = out.length
+    out += `${i + 1} 0 obj\n${object}\nendobj\n`
+    return offset
+  })
+  const xref = out.length
+  out += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`
+  for (const offset of offsets) out += `${String(offset).padStart(10, '0')} 00000 n \n`
+  out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`
+  return new File([Buffer.from(out, 'latin1')], 'Forklift Safety.pdf', { type: 'application/pdf' })
+}
+const textPdf = () => pdf(`BT /F1 12 Tf 72 720 Td (${SENTENCE}) Tj ET`)
+
+function form(fields: Record<string, string | File>) {
+  const data = new FormData()
+  for (const [key, value] of Object.entries({ slug: 'acme', roleId: 'role-a', ...fields })) data.set(key, value)
+  return data
+}
+const sourceRows = () => sqlite.prepare('SELECT * FROM sources').all()
+
+it('stores an uploaded PDF in R2 and records its extracted text against the role topic', async () => {
+  const result = await uploadRoleDocument({ data: form({ file: textPdf() }) })
+  const key = `orgs/org-a/roles/role-a/sources/${result.sourceId}.pdf`
+  expect(result).toEqual({ sourceId: result.sourceId, topicId: 'topic-role-a', r2Key: key, chars: SENTENCE.length })
+  expect(state.bucket.put).toHaveBeenCalledTimes(1)
+  expect(state.bucket.put.mock.calls[0][0]).toBe(key)
+  expect(state.bucket.put.mock.calls[0][1].byteLength).toBe((await textPdf().arrayBuffer()).byteLength)
+  expect(sqlite.prepare('SELECT * FROM sources WHERE id = ?').get(result.sourceId)).toMatchObject({
+    topic_id: 'topic-role-a', kind: 'pdf', version: 1, uploaded_by: 'owner-a', r2_key: key, title: 'Forklift Safety', body_text: SENTENCE,
+  })
+})
+
+it.each([
+  ['an admin of another company', 'owner-b', 'acme', 'role-a', 403],
+  ['a plain member', 'member-a', 'acme', 'role-a', 403],
+  ['an admin using a role of another company', 'owner-b', 'globex', 'role-a', 404],
+] as const)('refuses %s before any storage write or row', async (_label, user, slug, roleId, status) => {
+  state.user = user
+  await expect(uploadRoleDocument({ data: form({ slug, roleId, file: textPdf() }) })).rejects.toMatchObject({ status })
+  expect(state.bucket.put).not.toHaveBeenCalled()
+  expect(sourceRows()).toEqual([])
+})
+
+it('rejects a PDF with no text layer without storing it', async () => {
+  await expect(uploadRoleDocument({ data: form({ file: pdf('') }) })).rejects.toMatchObject({ status: 422 })
+  expect(state.bucket.put).not.toHaveBeenCalled()
+  expect(sourceRows()).toEqual([])
+})
+
+it('rejects pasted text over the cap and saves pasted text within it as a text source without R2', async () => {
+  await expect(uploadRoleDocument({ data: form({ title: 'Too long', text: 'a'.repeat(MAX_ROLE_DOCUMENT_CHARS + 1) }) })).rejects.toMatchObject({ status: 413 })
+  expect(sourceRows()).toEqual([])
+  const result = await uploadRoleDocument({ data: form({ title: 'Dock rules', text: 'Wear a vest on the dock.' }) })
+  expect(result).toEqual({ sourceId: result.sourceId, topicId: 'topic-role-a', r2Key: null, chars: 24 })
+  expect(sqlite.prepare('SELECT * FROM sources').all()).toEqual([expect.objectContaining({
+    id: result.sourceId, kind: 'text', title: 'Dock rules', body_text: 'Wear a vest on the dock.', r2_key: null, version: 1, uploaded_by: 'owner-a',
+  })])
+  expect(state.bucket.put).not.toHaveBeenCalled()
+})

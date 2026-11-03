@@ -9,12 +9,14 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vite
 import { Route as appRootRoute } from '@/routes/__root'
 import { Route as indexRoute } from '@/routes/index'
 import { Route as meRoute } from '@/routes/me.index'
+import { Route as orgLayoutRoute } from '@/routes/org.$slug'
 import { Route as orgRoute } from '@/routes/org.$slug.index'
 import { Route as rolesRoute } from '@/routes/org.$slug.roles'
 import { Route as signInRoute } from '@/routes/sign-in'
 import { Route as startRoute } from '@/routes/start'
+import { Route as todayRoute } from '@/routes/today'
 import { Route as welcomeRoute } from '@/routes/welcome'
-import { getSessionUser } from '@/server/session'
+import { getLearnerId, getSessionUser } from '@/server/session'
 
 const holder = vi.hoisted(() => ({ db: null as unknown }))
 
@@ -36,7 +38,7 @@ vi.mock('@/server/auth', () => ({
     return user && { user, session: { activeOrganizationId: null } }
   } } }),
 }))
-vi.mock('@/server/session', () => ({ getSessionUser: vi.fn(), getLearnerId: async () => null }))
+vi.mock('@/server/session', () => ({ getSessionUser: vi.fn(), getLearnerId: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({
   authClient: { signOut: async () => {
     vi.mocked(getSessionUser).mockResolvedValue(null)
@@ -44,6 +46,9 @@ vi.mock('@/lib/auth-client', () => ({
   }, signIn: { email: async ({ email }: { email: string }) => {
     const id = email.split('@')[0]
     vi.mocked(getSessionUser).mockResolvedValue({ id, name: id, isAnonymous: false } as never)
+    return { error: null }
+  } }, signUp: { email: async () => {
+    vi.mocked(getSessionUser).mockResolvedValue({ id: 'guest', name: 'Gina', isAnonymous: false } as never)
     return { error: null }
   } } },
 }))
@@ -56,7 +61,7 @@ beforeAll(() => {
   for (const file of readdirSync('drizzle').filter((f) => f.endsWith('.sql')).sort()) {
     sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8').replaceAll('--> statement-breakpoint', ''))
   }
-  for (const id of ['owner', 'admin', 'combined', 'employee', 'standalone']) {
+  for (const id of ['owner', 'admin', 'combined', 'employee', 'standalone', 'learner', 'guest', 'newguest']) {
     sqlite.prepare('INSERT INTO user (id, name, email) VALUES (?, ?, ?)').run(id, id, `${id}@example.test`)
     sqlite.prepare('INSERT INTO consents (user_id, kind, accepted_at) VALUES (?, ?, ?)').run(id, 'disclosure-v1', 1)
   }
@@ -80,6 +85,7 @@ beforeAll(() => {
 beforeEach(() => {
   sqlite.exec('BEGIN')
   vi.mocked(getSessionUser).mockResolvedValue(null)
+  vi.mocked(getLearnerId).mockImplementation(async () => (await getSessionUser())?.id ?? null)
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
 })
 afterEach(() => {
@@ -90,13 +96,18 @@ afterAll(() => sqlite.close())
 
 async function renderApp(initialEntry = '/sign-in') {
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, component: appRootRoute.options.component, loader: appRootRoute.options.loader })
+  const orgLayout = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgLayoutRoute.options.beforeLoad, component: orgLayoutRoute.options.component })
   const routes = [
     createRoute({ getParentRoute: () => rootRoute, path: '/', beforeLoad: indexRoute.options.beforeLoad, component: indexRoute.options.component }),
     createRoute({ getParentRoute: () => rootRoute, path: '/sign-in', beforeLoad: signInRoute.options.beforeLoad, validateSearch: signInRoute.options.validateSearch, component: signInRoute.options.component }),
+    createRoute({ getParentRoute: () => rootRoute, path: '/join/$token', component: () => <h1>Join</h1> }),
     createRoute({ getParentRoute: () => rootRoute, path: '/start', validateSearch: startRoute.options.validateSearch, component: startRoute.options.component }),
+    createRoute({ getParentRoute: () => rootRoute, path: '/today', beforeLoad: todayRoute.options.beforeLoad, loader: todayRoute.options.loader, errorComponent: todayRoute.options.errorComponent, component: todayRoute.options.component }),
     createRoute({ getParentRoute: () => rootRoute, path: '/me', beforeLoad: meRoute.options.beforeLoad, loader: meRoute.options.loader, component: meRoute.options.component }),
-    createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', loader: orgRoute.options.loader as (ctx: { params: { slug: string } }) => unknown, errorComponent: orgRoute.options.errorComponent, component: orgRoute.options.component }),
-    createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug/roles', loader: rolesRoute.options.loader as (ctx: { params: { slug: string } }) => unknown, errorComponent: rolesRoute.options.errorComponent, component: rolesRoute.options.component }),
+    orgLayout.addChildren([
+      createRoute({ getParentRoute: () => orgLayout, path: '/', loader: orgRoute.options.loader as (ctx: { params: { slug: string } }) => unknown, errorComponent: orgRoute.options.errorComponent, component: orgRoute.options.component }),
+      createRoute({ getParentRoute: () => orgLayout, path: '/roles', loader: rolesRoute.options.loader as (ctx: { params: { slug: string } }) => unknown, errorComponent: rolesRoute.options.errorComponent, component: rolesRoute.options.component }),
+    ]),
     createRoute({ getParentRoute: () => rootRoute, path: '/welcome', beforeLoad: welcomeRoute.options.beforeLoad, validateSearch: welcomeRoute.options.validateSearch, component: welcomeRoute.options.component }),
   ]
   const router = createRouter({ routeTree: rootRoute.addChildren(routes), history: createMemoryHistory({ initialEntries: [initialEntry] }) })
@@ -130,6 +141,21 @@ it.each([
       await act(async () => { await router.navigate({ to: '/me' }) })
       expect(container.querySelectorAll('a[href^="/org/"]')).toHaveLength(0)
     }
+  } finally { await cleanup() }
+})
+
+it('prefills an editable email from the sign-in link and returns to the redirect', async () => {
+  const { container, router, cleanup } = await renderApp('/sign-in?email=learner%40example.test&redirect=%2Fjoin%2Finvite')
+  try {
+    const email = container.querySelector<HTMLInputElement>('#email')!
+    expect(email.value).toBe('learner@example.test')
+    expect(email.readOnly).toBe(false)
+    container.querySelector<HTMLInputElement>('#password')!.value = 'test-password'
+    await act(async () => {
+      container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+      await vi.waitFor(() => expect(router.state.location.pathname).toBe('/join/invite'))
+    })
+    expect(container.querySelector('h1')?.textContent).toBe('Join')
   } finally { await cleanup() }
 })
 
@@ -176,17 +202,74 @@ it('requires disclosure before sending an owner to the portal', async () => {
   } finally { await cleanup() }
 })
 
+function seedTopic(learnerId: string) {
+  const now = Date.now()
+  sqlite.prepare("INSERT INTO topics (id, learner_id, title, status, created_at) VALUES ('t1', ?, 'Spanish verbs', 'ready', 1)").run(learnerId)
+  sqlite.prepare("INSERT INTO units (id, topic_id, \"order\", name) VALUES ('u1', 't1', 0, 'Unit')").run()
+  sqlite.prepare("INSERT INTO concepts (id, topic_id, unit_id, \"order\", name, summary) VALUES ('c1', 't1', 'u1', 0, 'Concept', 'Summary')").run()
+  for (const [id, due] of [['i1', now - 1000], ['i2', now + 86_400_000]] as const) {
+    sqlite.prepare("INSERT INTO items (id, concept_id, topic_id, format, payload_json, created_at) VALUES (?, 'c1', 't1', 'mcq', '{}', 1)").run(id)
+    sqlite.prepare('INSERT INTO learner_item (learner_id, item_id, due, stability, difficulty, state) VALUES (?, ?, ?, 1, 5, 2)').run(learnerId, id, due)
+  }
+  sqlite.prepare("INSERT INTO learner_topic (learner_id, topic_id, streak_count, xp) VALUES (?, 't1', 4, 120)").run(learnerId)
+  sqlite.prepare("INSERT INTO placements (id, learner_id, topic_id, log_json, created_at) VALUES ('p1', ?, 't1', '{}', 1)").run(learnerId)
+}
+
+it('signs in a learner with a ready topic and lands on Today', async () => {
+  seedTopic('learner')
+  const { container, router, cleanup } = await renderApp()
+  try {
+    container.querySelector<HTMLInputElement>('#email')!.value = 'learner@example.test'
+    container.querySelector<HTMLInputElement>('#password')!.value = 'test-password'
+    await act(async () => {
+      container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+      await vi.waitFor(() => expect(router.state.location.pathname).toBe('/today'))
+    })
+    expect(container.querySelector('h1')?.textContent).toBe('Spanish verbs')
+    expect(container.querySelector('main')?.textContent).toContain('1 item due')
+    expect(container.querySelector('main')?.textContent).toContain('Streak 4 · 120 XP')
+    expect([...container.querySelectorAll('main button')].map((b) => b.textContent)).toEqual(['Start session'])
+    expect(container.querySelector('a[href="/start"]')?.textContent).toBe('Learn something new')
+  } finally { await cleanup() }
+})
+
+it('sends a guest who creates an account to Today with their topic', async () => {
+  seedTopic('guest')
+  vi.mocked(getSessionUser).mockResolvedValue({ id: 'guest', name: 'Guest', isAnonymous: true } as never)
+  const { container, router, cleanup } = await renderApp()
+  try {
+    await act(async () => { container.querySelector<HTMLButtonElement>('form button[type="button"]')!.click() })
+    container.querySelector<HTMLInputElement>('#name')!.value = 'Gina'
+    container.querySelector<HTMLInputElement>('#email')!.value = 'gina@example.test'
+    container.querySelector<HTMLInputElement>('#password')!.value = 'test-password'
+    await act(async () => {
+      container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+      await vi.waitFor(() => expect(router.state.location.pathname).toBe('/today'))
+    })
+    expect(container.querySelector('h1')?.textContent).toBe('Spanish verbs')
+  } finally { await cleanup() }
+})
+
+it('sends a new guest without a topic from Today to Start', async () => {
+  vi.mocked(getSessionUser).mockResolvedValue({ id: 'newguest', name: 'Guest', isAnonymous: true } as never)
+  const { container, router, cleanup } = await renderApp('/today')
+  try {
+    expect(router.state.location.pathname).toBe('/start')
+    expect(container.querySelector('h1')?.textContent).toBe('What do you want to learn?')
+  } finally { await cleanup() }
+})
+
 it('lists job roles without links to pages that do not exist', async () => {
   sqlite.prepare('INSERT INTO job_roles (id, org_id, name, created_at) VALUES (?, ?, ?, ?)').run('barista', 'northwind', 'Barista', 1)
   sqlite.prepare('INSERT INTO topics (id, job_role_id, title, created_at) VALUES (?, ?, ?, ?)').run('barista-topic', 'barista', 'Barista', 1)
   vi.mocked(getSessionUser).mockResolvedValue({ id: 'owner', name: 'Owner', isAnonymous: false } as never)
   const { container, router, cleanup } = await renderApp('/org/northwind')
   try {
-    await act(async () => { container.querySelector<HTMLAnchorElement>('a[href="/org/northwind/roles"]')!.click(); await router.load() })
+    await act(async () => { container.querySelector<HTMLAnchorElement>('nav[aria-label="Company"] a[href="/org/northwind/roles"]')!.click(); await router.load() })
     expect(container.querySelector('h1')?.textContent).toBe('Job roles')
     expect(container.querySelector('main li')?.textContent).toContain('Barista')
     for (const a of container.querySelectorAll<HTMLAnchorElement>('main a')) {
-      expect(router.matchRoutes(a.getAttribute('href')!).at(-1)?.pathname).toBe(a.getAttribute('href'))
+      expect(router.matchRoutes(a.getAttribute('href')!).at(-1)?.pathname.replace(/(.)\/$/, '$1')).toBe(a.getAttribute('href'))
     }
   } finally { await cleanup() }
 })

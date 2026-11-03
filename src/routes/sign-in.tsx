@@ -5,7 +5,10 @@ import { authClient } from '@/lib/auth-client'
 import { sitePath } from '@/lib/utils'
 
 export const Route = createFileRoute('/sign-in')({
-  validateSearch: (search: Record<string, unknown>): { redirect?: string } => ({ redirect: sitePath(search.redirect) }),
+  validateSearch: (search: Record<string, unknown>): { redirect?: string; email?: string } => {
+    const email = typeof search.email === 'string' ? search.email.trim() : ''
+    return { redirect: sitePath(search.redirect), email: email && email.length <= 254 ? email : undefined }
+  },
   beforeLoad: ({ context }) => {
     if (context.user && !context.user.isAnonymous) throw redirect({ to: '/' })
   },
@@ -14,7 +17,7 @@ export const Route = createFileRoute('/sign-in')({
 
 function SignIn() {
   const { facebookEnabled } = Route.useRouteContext()
-  const { redirect: next = '/' } = Route.useSearch()
+  const { redirect: next = '/', email } = Route.useSearch()
   const router = useRouter()
 
   return (
@@ -22,6 +25,7 @@ function SignIn() {
       <h1 className="text-3xl font-bold tracking-tight">Sign in</h1>
       <CredentialsForm
         initial="in"
+        defaultEmail={email}
         onDone={async () => {
           await router.navigate({ href: next })
           await router.invalidate()

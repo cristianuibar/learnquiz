@@ -3,6 +3,12 @@
 // Longest pasted source kept in D1 and sent to the model: about a chapter excerpt.
 export const MAX_SOURCE_TEXT_CHARS = 20_000
 
+// Longest extracted or pasted text kept for one company role document.
+export const MAX_ROLE_DOCUMENT_CHARS = 60_000
+
+// Largest original file (PDF) a company admin can upload for a role document.
+export const MAX_ROLE_DOCUMENT_BYTES = 10 * 1024 * 1024
+
 // Model calls per learner per UTC day, counted in model_calls. Guests stay low to stop a
 // looping guest script; a full onboarding (curriculum, placement items and line) uses about 8.
 // Signed-in accounts get room for a topic, placement and several sessions of written answers
