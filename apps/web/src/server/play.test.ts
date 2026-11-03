@@ -393,6 +393,28 @@ it('stamps proficient_at once when a role topic meets its benchmark and never cl
   expect(proficientAt()).toBe(now + 1000)
 })
 
+it('keeps the proficiency stamp when a concurrent answer drops the benchmark right after it is met', async () => {
+  seedTopicAndLearner(raw, 0)
+  raw.prepare('INSERT INTO user (id, name, email) VALUES (?, ?, ?)').run('u1', 'Learner', 'learner@example.test')
+  raw.prepare('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, ?)').run('org-a', 'Alpha', 'alpha', 1)
+  raw.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, ?)').run('m1', 'org-a', 'u1', 'member', 1)
+  raw.prepare('INSERT INTO job_roles (id, org_id, name, benchmark, created_at) VALUES (?, ?, ?, ?, ?)').run('role', 'org-a', 'Analyst', 0.5, 1)
+  raw.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES (?, ?, ?, ?)').run('u1', 'org-a', 'role', 1)
+  raw.prepare('UPDATE topics SET learner_id = NULL, job_role_id = ? WHERE id = ?').run('role', 't1')
+  raw.prepare('DELETE FROM learner_topic WHERE topic_id = ?').run('t1')
+  seedFrontier(raw, 7, true)
+  raw.prepare("DELETE FROM learner_item WHERE item_id <> 'i1'").run()
+  raw.prepare('INSERT INTO learner_concept (learner_id, concept_id, p_known, n_attempts, updated_at) VALUES (?, ?, ?, ?, ?)').run('u1', 'c1', 0.3, 1, 1)
+  const now = 1793620800000
+  vi.spyOn(Date, 'now').mockReturnValue(now)
+  const sessionIds = [(await startSession({ data: { topicId: 't1' } })).sessionId, (await startSession({ data: { topicId: 't1' } })).sessionId]
+  // Both answers are in flight at once: the right one lifts c1 over the benchmark, the wrong one lands after it and drops c1 below.
+  await Promise.all(sessionIds.map((sessionId, i) => answerItem({ data: { sessionId, itemId: 'i1', answer: { text: i === 0 ? '1' : '0' }, confidence: 'sure', responseMs: 1000 } })))
+  expect((raw.prepare('SELECT correct, p_known_after >= 0.5 AS met FROM attempts ORDER BY rowid').all() as { correct: number; met: number }[]).map((a) => [a.correct, a.met])).toEqual([[1, 1], [0, 0]])
+  expect(scalar(raw, 'SELECT p_known < 0.5 AS low FROM learner_concept WHERE concept_id = ?', 'c1').low).toBe(1)
+  expect(scalar(raw, 'SELECT proficient_at FROM member_role_assignments WHERE user_id = ?', 'u1').proficient_at).toBe(now)
+})
+
 it('hides a reported question from the reporter only, and keeps one open flag per learner', async () => {
   seedTopicAndLearner(raw, 0)
   raw.prepare('INSERT INTO user (id, name, email) VALUES (?, ?, ?)').run('u1', 'Learner', 'learner@example.test')
