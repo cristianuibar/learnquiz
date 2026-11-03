@@ -26,6 +26,15 @@ async function moveGuestData(guestId: string, userId: string) {
   ])
 }
 
+// The app and API live on app.learnquiz.com; the apex learnquiz.com still serves the app until the marketing site takes it over.
+const APP_ORIGINS = ['https://app.learnquiz.com', 'https://learnquiz.com']
+
+// Share the session cookie across learnquiz.com and its subdomains, so a sign-in on the apex carries over to the app host.
+function isLearnquizHost(url: string): boolean {
+  const host = new URL(url).hostname
+  return host === 'learnquiz.com' || host.endsWith('.learnquiz.com')
+}
+
 const PEOPLE_ENDPOINTS = ['/organization/list-members', '/organization/list-invitations', '/organization/get-full-organization']
 
 // Per call: Cloudflare bindings are only valid inside a request.
@@ -35,7 +44,8 @@ export function createAuth(transportPlugins: BetterAuthPlugin[] = []) {
     database: drizzleAdapter(getDb(), { provider: 'sqlite', schema: authSchema }),
     baseURL: env.BETTER_AUTH_URL,
     secret: env.BETTER_AUTH_SECRET,
-    trustedOrigins: [env.BETTER_AUTH_URL],
+    trustedOrigins: [...new Set([env.BETTER_AUTH_URL, ...APP_ORIGINS])],
+    advanced: isLearnquizHost(env.BETTER_AUTH_URL) ? { crossSubDomainCookies: { enabled: true, domain: 'learnquiz.com' } } : {},
     // shortcut: no email service, so no email verification; add it with invite emails when a provider is chosen.
     emailAndPassword: { enabled: true },
     socialProviders: facebookEnabled()

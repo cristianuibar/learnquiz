@@ -1,6 +1,6 @@
 import { createEmptyCard, fsrs, Rating, State, type Card, type Grade } from 'ts-fsrs'
 import type { learnerItem } from '@/db/schema'
-import type { Confidence } from './types'
+import type { Confidence } from '@learnquiz/api'
 
 export type LearnerItemRow = Omit<typeof learnerItem.$inferSelect, 'learnerId' | 'itemId'>
 // What FSRS owns; lastWrongConfidentAt is set by the caller.

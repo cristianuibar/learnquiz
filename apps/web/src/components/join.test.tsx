@@ -108,6 +108,32 @@ it('offers to sign in as the invited address instead of joining from another acc
   }
 })
 
+it('re-enables the sign-in button and shows an error when sign-out is rejected offline', async () => {
+  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'owner', name: 'Owner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })
+  getInvite.mockResolvedValue({ ...invite, otherAccount: true })
+  signOut.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+  signOut.mockResolvedValueOnce({ error: null })
+  const { router, container, cleanup } = await mount()
+  try {
+    const button = container.querySelector('button')!
+    await act(async () => {
+      button.click()
+      await vi.waitFor(() => expect(signOut).toHaveBeenCalledTimes(1))
+    })
+    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toBe('Could not sign out'))
+    expect(button.disabled).toBe(false)
+    expect(router.state.location.pathname).toBe('/join/invite')
+
+    await act(async () => {
+      button.click()
+      await vi.waitFor(() => expect(router.state.location.pathname).toBe('/sign-in'))
+    })
+    expect(signOut).toHaveBeenCalledTimes(2)
+  } finally {
+    await cleanup()
+  }
+})
+
 it.each([
   { viewer: { id: 'learner', name: 'Learner', isAnonymous: false }, label: 'Continue to Today', path: '/today', search: {} },
   { viewer: null, label: 'Sign in as learner@example.test', path: '/sign-in', search: { redirect: '/today', email: 'learner@example.test' } },

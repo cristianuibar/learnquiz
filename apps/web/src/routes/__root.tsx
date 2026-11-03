@@ -1,4 +1,5 @@
-import { useEffect, type CSSProperties } from 'react'
+import { useEffect } from 'react'
+import { brandCss } from '@learnquiz/tokens'
 import { HeadContent, Outlet, Scripts, createRootRoute, redirect, useLocation } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
@@ -37,7 +38,7 @@ export const Route = createRootRoute({
         name: 'viewport',
         content: 'width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content',
       },
-      { name: 'theme-color', content: loaderData?.branding?.accent ?? '#00785f' },
+      { name: 'theme-color', content: loaderData?.branding?.accent ?? '#0E5A73' },
       { name: 'mobile-web-app-capable', content: 'yes' },
       { name: 'apple-mobile-web-app-capable', content: 'yes' },
       { name: 'apple-mobile-web-app-title', content: 'Learn Quiz' },
@@ -83,13 +84,14 @@ function Root() {
 function RootDocument({ children }: { children: React.ReactNode }) {
   const data = Route.useLoaderData()
   const accent = data?.branding?.accent
-  const style = accent ? { '--primary': accent, '--ring': accent, '--accent': `color-mix(in srgb, ${accent} 10%, white)`, '--accent-foreground': 'var(--foreground)' } as CSSProperties : undefined
+  const css = accent ? brandCss(accent) : ''
   return (
     <html lang="en">
       <head>
         <HeadContent />
+        {css && <style dangerouslySetInnerHTML={{ __html: css }} />}
       </head>
-      <body className="font-sans antialiased [overflow-wrap:anywhere]" style={style}>
+      <body className="font-sans antialiased [overflow-wrap:anywhere]">
         {children}
         {import.meta.env.DEV && (
           <TanStackDevtools

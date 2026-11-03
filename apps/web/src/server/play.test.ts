@@ -30,6 +30,7 @@ vi.mock('@/lib/llm/client', async (importOriginal) => {
     ...client,
     chatJson: vi.fn(async (opts) => opts.purpose === 'plan'
       ? client.chatJson(opts) : { line: 'You know the basics and will grow from here.' }),
+    chatJsonWithModel: vi.fn(async () => ({ data: { line: 'You know the basics and will grow from here.' }, model: 'muse-spark-1.3' })),
   }
 })
 
@@ -430,6 +431,35 @@ describe('learner practice and unit unlocks', () => {
     vi.useRealTimers()
   })
 
+  it.each([
+    { format: 'mcq', kind: 'session', answer: { optionId: 'b' }, correct: true, xp: 10, critical: true, sourceVersion: 3, correctOptionIds: ['b'] },
+    { format: 'mcq', kind: 'session', answer: { optionId: 'a' }, correct: false, xp: 0, critical: false, sourceVersion: null, correctOptionIds: ['b'] },
+    { format: 'mcq', kind: 'placement', answer: { optionId: 'b' }, correct: true, xp: 0, critical: true, sourceVersion: 3, correctOptionIds: ['b'] },
+    { format: 'cloze', kind: 'session', answer: { text: '1' }, correct: true, xp: 10, critical: false, sourceVersion: null, correctOptionIds: null },
+  ] as const)('reveals $format grading and $xp XP for a $kind answer $answer', async ({ format, kind, answer, correct, xp, critical, sourceVersion, correctOptionIds }) => {
+    seedFrontier(raw, 6, true)
+    raw.prepare("DELETE FROM learner_item WHERE item_id <> 'i1'").run()
+    const payload = JSON.parse(scalar(raw, 'SELECT payload_json FROM items WHERE id = ?', 'i1').payload_json as string)
+    const options = format === 'mcq'
+      ? ['a', 'b', 'c', 'd'].map((id) => ({ id, text: id === 'b' ? '1' : id, is_correct: id === 'b', feedback: '' }))
+      : []
+    raw.prepare('UPDATE items SET format = ?, payload_json = ?, source_version = ? WHERE id = ?')
+      .run(format, JSON.stringify({ ...payload, format, options }), sourceVersion, 'i1')
+    raw.prepare('UPDATE concepts SET critical = ? WHERE id = ?').run(Number(critical), 'c1')
+    const { sessionId } = await (kind === 'placement' ? startPlacement : startSession)({ data: { topicId: 't1' } })
+
+    expect((await getSession({ data: { sessionId } })).item).toMatchObject({
+      format, blank: format === 'cloze' ? { numeric: true } : null, image: null,
+    })
+    const reveal = await answerItem({ data: { sessionId, itemId: 'i1', answer, confidence: 'sure', responseMs: 1000 } })
+
+    expect(reveal).toMatchObject({ correct, xp, critical, correctOptionIds, sourceVersion, detail: null })
+    expect(scalar(raw, 'SELECT xp, correct_count FROM sessions WHERE id = ?', sessionId)).toEqual({ xp, correct_count: Number(correct) })
+    expect(scalar(raw, 'SELECT xp FROM learner_topic').xp).toBe(xp)
+    expect(scalar(raw, 'SELECT correct FROM attempts').correct).toBe(Number(correct))
+    expect(await nextItem({ data: { sessionId } })).toMatchObject({ ended: false, item: { id: 'i2' } })
+  })
+
   it('continues a large placement pool within the D1 parameter limit and skips retired questions', async () => {
     seedFrontier(raw, 205, false)
     const { sessionId } = await startPlacement({ data: { topicId: 't1' } })
@@ -682,6 +712,7 @@ it('writes exactly one placement when two finishing nextItem calls race (placeme
   expect(scalar(raw, 'SELECT ended_at AS endedAt FROM sessions WHERE id = ?', 's1').endedAt).not.toBeNull()
   const summary = await endSession({ data: { sessionId: 's1' } })
   expect(summary.level).toBe(4)
+  expect(summary.levelLineModel).toBe('muse-spark-1.3')
   expect(summary.levelLine).toBe('You know the basics and will grow from here.')
 })
 
