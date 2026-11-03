@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { RouteError } from '@/components/inline-error'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -41,8 +41,7 @@ function Settings() {
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 pt-8 pb-16">
-      <Link to="/org/$slug" params={{ slug: settings.slug }} className="inline-flex min-h-11 items-center rounded-md underline focus-visible:ring-[3px] focus-visible:ring-ring/50">Company overview</Link>
-      <h1 className="mt-4 text-3xl font-bold tracking-tight">Company settings</h1>
+      <h1 className="text-3xl font-bold tracking-tight">Company settings</h1>
       <form className="mt-8 flex flex-col gap-6" onSubmit={save} onChange={() => setSaved(false)}>
         <input type="hidden" name="slug" value={settings.slug} />
         <div className="flex flex-col gap-2">
