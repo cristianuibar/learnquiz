@@ -4,6 +4,7 @@ import { act, render, screen } from '@testing-library/react-native'
 import { api } from './api'
 import { getToken, handleUnauthorized, loadToken, subscribeAuth } from './auth'
 import { SessionProvider, useSession } from './session-store'
+import { deferReplay, holdTarget, takeHeldTarget, takeReplayTarget } from './held-target'
 
 jest.mock('./api', () => ({ api: jest.fn() }))
 jest.mock('./auth', () => ({ getToken: jest.fn(), loadToken: jest.fn(), handleUnauthorized: jest.fn(), subscribeAuth: jest.fn() }))
@@ -71,4 +72,16 @@ test('offline startup resolves the splash gate and supports a later retry', asyn
   jest.mocked(api).mockResolvedValueOnce({ user, needsDisclosure: false }).mockResolvedValueOnce(null)
   await act(async () => { await current.refresh() })
   expect(screen.getByText('ready:Learner:false:-')).toBeOnTheScreen()
+})
+
+test('signing out releases every hold on held-link replay', async () => {
+  jest.mocked(api).mockResolvedValueOnce({ user, needsDisclosure: false }).mockResolvedValueOnce(null)
+  await mount()
+  takeHeldTarget()
+  holdTarget('/unit/u1')
+  deferReplay()
+  deferReplay()
+  expect(takeReplayTarget()).toBeNull()
+  await act(async () => { event('signedOut') })
+  expect(takeReplayTarget()).toBe('/unit/u1')
 })

@@ -33,6 +33,11 @@ jest.mock('expo-router/build/toolbar/native', () => ({ RouterToolbarHost: 'View'
 jest.mock(require.resolve('expo-glass-effect', { paths: [require.resolve('expo-router')] }), () => ({
   GlassView: 'View', isLiquidGlassAvailable: () => false, isGlassEffectAPIAvailable: () => false,
 }))
+// The real join screen fetches its invite; this file only checks that the route is reachable.
+jest.mock('./app/join/[invitationId]', () => ({
+  __esModule: true,
+  default: () => require('react').createElement(require('react-native').Text, null, 'Join'),
+}))
 jest.mock('expo-constants', () => ({
   __esModule: true, default: { executionEnvironment: 'standalone', expoConfig: { scheme: 'learnquiz' } },
 }))
