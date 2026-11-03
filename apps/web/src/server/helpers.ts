@@ -2,7 +2,7 @@ import { and, desc, eq, lt, or } from 'drizzle-orm'
 import type { Db } from '@/db'
 import { concepts, items, learnerConcept, sources, topics } from '@/db/schema'
 import { chatJson, jobModel, LlmError } from '@/lib/llm/client'
-import { itemsPrompt, selfCheckPrompt } from '@/lib/llm/prompts'
+import { ENABLED_FORMATS, itemsPrompt, selfCheckPrompt } from '@/lib/llm/prompts'
 import { ItemBatch, ItemPayload, SelfCheck } from '@/lib/llm/schemas'
 import { assertWithinDailyCap } from '@/server/model-cap'
 
@@ -124,7 +124,6 @@ export async function generateConceptItems(
           misconceptions,
           targetDifficulty: opts.targetDifficulty,
           spread: opts.spread,
-          formats: ['mcq', 'cloze', 'short'],
           sourceQuote: concept.sourceQuote,
           avoidStems,
         }),
@@ -135,8 +134,9 @@ export async function generateConceptItems(
         sessionId: opts.sessionId,
       })
       const drafted = batch.items.flatMap((i) => {
+        // A valid draft in a format learners cannot answer yet is dropped, whatever the prompt asked for.
         const ok = ItemPayload.safeParse(i)
-        return ok.success ? [ok.data] : []
+        return ok.success && ENABLED_FORMATS.includes(ok.data.format) ? [ok.data] : []
       })
       if (!drafted.length) continue
       let verdicts: SelfCheck['results'] | null = null
