@@ -2,6 +2,7 @@ import type { Today } from '@learnquiz/api'
 import { createServerFn } from '@tanstack/react-start'
 import { and, count, countDistinct, desc, eq, gt, gte, inArray, min, ne, sql } from 'drizzle-orm'
 import { getDb } from '@/db'
+import { onboardingDay } from '@/lib/learning/profile'
 import { streakShown } from '@/lib/learning/session'
 import { attempts, concepts, items, learnerItem, learnerTopic, placements, sessions, topics, units } from '@/db/schema'
 import { dueCount } from '@/server/due'
@@ -28,7 +29,7 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
   if (assigned) {
     const ready = assigned.topic.status === 'ready'
     const days = assigned.onboardingDays
-    const day = Math.min(Math.max(Math.floor((now - assigned.assignedAt) / DAY) + 1, 1), days)
+    const day = onboardingDay(assigned.assignedAt, now, days)
     role = { name: assigned.roleName, company: assigned.company, topicTitle: assigned.topic.title, preparing: !ready, mastery: null, benchmark: assigned.benchmark, day, days, building: null }
     if (ready) placeable = await rolePlayable(db, assigned.topic)
     if (ready) topic = { id: assigned.topic.id, title: assigned.topic.title }
