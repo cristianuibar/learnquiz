@@ -16,13 +16,13 @@ import { chatJson, DailyCapError, isVoiceEnabled, jobModel, transcribeAudio } fr
 import { gradePrompt } from '@/lib/llm/prompts'
 import { Grade, type ItemPayload } from '@/lib/llm/schemas'
 import { validateVoiceWav } from '@/lib/voice'
+import { plural } from '@/lib/utils'
 import { asItem, chunks, ensureConceptItems, httpError, loadPKnown, mean, targetFor } from '@/server/helpers'
 import { requireLearnerId } from '@/server/session'
 import { assertWithinDailyCap } from '@/server/model-cap'
 
 // shortcut: 12 instead of the spec's 20 while generation is slow, raise it once items are generated ahead of play.
 const SESSION_SIZE = 12
-const PLACEMENT_TOTAL = 10 // what the header shows while placement runs; it may take up to PLACEMENT.max
 const CLOSER_MIN = 0.7
 const DAY = 86_400_000
 
@@ -165,7 +165,7 @@ async function viewOf(db: Db, session: SessionRow, topic: TopicRow, plan: Placem
     kind: session.kind,
     topicId: session.topicId,
     topicTitle: topic.title,
-    progress: { position: plan.position + 1, total: placement ? Math.max(PLACEMENT_TOTAL, plan.position + 1) : ids.length },
+    progress: { position: plan.position + 1, total: placement ? Math.max(PLACEMENT.max, plan.position + 1) : ids.length },
     item,
     ended,
     voiceEnabled: isVoiceEnabled(),
@@ -845,8 +845,8 @@ async function finalise(db: Db, learnerId: string, session: SessionRow, topic: T
       db.select({ answered: count() }).from(attempts).where(eq(attempts.sessionId, session.id)),
     ])
     const ids = JSON.parse(session.itemIdsJson) as string[]
-    // The bonus is for finishing the queue, not for leaving early.
-    bonus = plan.answered && plan.position >= ids.length - 1 ? SESSION_BONUS : 0
+    // The bonus is for finishing the queue with at least one scored answer, not for leaving early or for ungraded items.
+    bonus = answered > 0 && plan.answered && plan.position >= ids.length - 1 ? SESSION_BONUS : 0
     const { streakCount, lastSessionAt } = streakAfter(lt, new Date(now), answered)
     stmts.push(
       db
@@ -893,6 +893,8 @@ async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: 
       .where(and(eq(placements.id, session.id), eq(placements.learnerId, learnerId))),
   ])
 
+  const stored = placement ? (JSON.parse(placement.logJson) as { log?: { level: number }[]; levelLine?: string; levelLineModel?: string }) : null
+  const endedEarly = !!stored?.log && stored.log.length < PLACEMENT.max && shouldStop(stored.log)
   const before = 'unitStart' in plan ? plan.unitStart : {}
   // One entry per missed item; a later miss of the same item replaces the earlier one.
   const mistakes = new Map(
@@ -907,7 +909,7 @@ async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: 
       },
     ]),
   )
-  const next = [reviews > 0 ? `${reviews} review${reviews === 1 ? '' : 's'}` : null, frontier[0]?.concept.name ?? null].filter(Boolean)
+  const next = [reviews > 0 ? plural(reviews, 'review', 'reviews') : null, frontier[0]?.concept.name ?? null].filter(Boolean)
   return {
     sessionId: session.id,
     kind: session.kind,
@@ -919,8 +921,9 @@ async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: 
     xp: session.xp,
     streak: lt.streakCount,
     level: lt.level,
-    levelLine: placement ? ((JSON.parse(placement.logJson) as { levelLine?: string }).levelLine ?? null) : null,
-    levelLineModel: placement ? ((JSON.parse(placement.logJson) as { levelLineModel?: string }).levelLineModel ?? null) : null,
+    levelLine: stored?.levelLine ?? null,
+    levelLineModel: stored?.levelLineModel ?? null,
+    endedEarly,
     masteryMoved: mastery
       .filter((u) => u.unitId in before && Math.abs(u.mastery - before[u.unitId]) > 0.001)
       .map((u) => ({ unitId: u.unitId, unitName: u.unitName, before: before[u.unitId], after: u.mastery })),

@@ -5,12 +5,13 @@ import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet
 import { expect, it, vi } from 'vitest'
 import { Route as appRootRoute } from '@/routes/__root'
 import { Route as orgRoute } from '@/routes/org.$slug'
+import { Route as indexRoute } from '@/routes/org.$slug.index'
 import { Route as peopleRoute } from '@/routes/org.$slug.people'
 import { Route as signInRoute } from '@/routes/sign-in'
-import { getPeople } from '@/server/org'
+import { getOrgOverview, getPeople } from '@/server/org'
 import { getSessionFn } from '@/server/session-fn'
 
-vi.mock('@/server/org', () => ({ getPeople: vi.fn() }))
+vi.mock('@/server/org', () => ({ getPeople: vi.fn(), getOrgOverview: vi.fn() }))
 const { cancelInvitation, inviteMember } = vi.hoisted(() => ({ cancelInvitation: vi.fn(), inviteMember: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: { organization: { cancelInvitation, inviteMember } } }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
@@ -118,6 +119,69 @@ it('asks before revoking an invite and keeps it pending when dismissed', async (
   }
 })
 
+async function renderAt(path: string, leaf: { path: string; loader: (ctx: { params: { slug: string } }) => unknown; component: typeof peopleRoute.options.component }) {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'u', name: 'U', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] } as never)
+  const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
+  const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, component: orgRoute.options.component })
+  const router = createRouter({ routeTree: rootRoute.addChildren([org.addChildren([createRoute({ getParentRoute: () => org, ...leaf })])]), history: createMemoryHistory({ initialEntries: [path] }) })
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
+  return {
+    container,
+    cleanup: async () => {
+      await act(async () => root.unmount())
+      container.remove()
+      delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT
+    },
+  }
+}
+
+it('shows status, progress toward benchmark and last active for each person', async () => {
+  const training = { stage: 'onboarding', progress: 0.5, daysToProficiency: null, criticalConfidentErrors: 0 }
+  vi.mocked(getPeople).mockResolvedValue({
+    id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles: [], readOnly: false,
+    invites: [{ id: 'inv1', name: 'Ana', email: 'ana@acme.test', jobRole: 'Cashier', expiresAt: 0, expired: false }],
+    members: [
+      { id: 'm1', userId: 'u1', name: 'Ben', email: 'ben@acme.test', role: 'member', jobRole: 'Cashier', lastActiveAt: Date.UTC(2026, 2, 5), training },
+      { id: 'm2', userId: 'u2', name: 'Cy', email: 'cy@acme.test', role: 'member', jobRole: 'Cashier', lastActiveAt: null, training: { ...training, stage: 'proficient', progress: 1 } },
+    ],
+  } as never)
+  const { container, cleanup } = await renderAt('/org/x/people', { path: '/people', loader: peopleRoute.options.loader as (ctx: { params: { slug: string } }) => ReturnType<typeof getPeople>, component: peopleRoute.options.component })
+  try {
+    const items = [...container.querySelectorAll('li')].map((li) => li.textContent)
+    expect(items.some((t) => t!.includes('Ana') && t!.includes('Invited'))).toBe(true)
+    const ben = items.find((t) => t!.includes('Ben'))!
+    expect(ben).toContain('Active')
+    expect(ben).toContain('50% of benchmark')
+    expect(ben).toContain('Last active: 5 Mar 2026')
+    const cy = items.find((t) => t!.includes('Cy'))!
+    expect(cy).toContain('Proficient')
+    expect(cy).toContain('Last active: -')
+    expect(container.querySelector('progress[aria-label="Progress toward benchmark"]')).not.toBeNull()
+  } finally {
+    await cleanup()
+  }
+})
+
+it('shows the training figures on the overview, with a dash for unknown values', async () => {
+  vi.mocked(getOrgOverview).mockResolvedValue({
+    id: 'org', name: 'Acme', slug: 'x', readOnly: false, roles: [{ id: 'r1', name: 'Cashier' }],
+    training: { employees: 4, proficientEmployees: 1, daysToProficiency: null, criticalErrorsThisWeek: 2, documentsToReview: null },
+  } as never)
+  const { container, cleanup } = await renderAt('/org/x', { path: '/', loader: indexRoute.options.loader as (ctx: { params: { slug: string } }) => ReturnType<typeof getOrgOverview>, component: indexRoute.options.component })
+  try {
+    const figures = Object.fromEntries([...container.querySelectorAll('dl > div')].map((d) => [d.querySelector('dt')!.textContent, d.querySelector('dd')!.textContent]))
+    expect(figures).toEqual({
+      Employees: '4', Proficient: '1', 'Average days to proficiency': '-', 'Critical-step errors this week': '2', 'Documents waiting for review': '-',
+    })
+  } finally {
+    await cleanup()
+  }
+})
+
 it('focuses the invalid field on the invite form and ties its message to it', async () => {
   vi.mocked(getPeople).mockResolvedValue({ id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles: [{ id: 'r1', name: 'Cashier' }], members: [], readOnly: false, invites: [] } as never)
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
@@ -161,6 +225,48 @@ it('focuses the invalid field on the invite form and ties its message to it', as
     expect(message('email')).toBe('User is already invited to this organization')
     expect(document.activeElement).toBe(field('email'))
   } finally {
+    await act(async () => root.unmount())
+    container.remove()
+    delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT
+  }
+})
+
+it('brings a new invite\'s Copy link and its expanded QR code into view', async () => {
+  const old = { id: 'inv0', name: 'Bo', email: 'bo@acme.test', jobRole: 'Cashier', expired: false }
+  let invites = [old]
+  vi.mocked(getPeople).mockImplementation(async () => ({ id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles: [{ id: 'r1', name: 'Cashier' }], members: [], readOnly: false, invites }) as never)
+  inviteMember.mockReset().mockImplementation(async () => { invites = [{ id: 'inv1', name: 'Sam', email: 'sam@acme.test', jobRole: 'Cashier', expired: false }, old]; return { data: { id: 'inv1' }, error: null } })
+  const scrolled: Element[] = []
+  const scroll = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(function (this: Element) { scrolled.push(this) })
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+  vi.mocked(getSessionFn).mockImplementation(async () => ({ user: { id: 'u', name: 'U', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] }))
+  const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
+  const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, component: orgRoute.options.component })
+  const people = createRoute({ getParentRoute: () => org, path: '/people', loader: peopleRoute.options.loader as (ctx: { params: { slug: string } }) => ReturnType<typeof getPeople>, component: peopleRoute.options.component })
+  const router = createRouter({ routeTree: rootRoute.addChildren([org.addChildren([people])]), history: createMemoryHistory({ initialEntries: ['/org/x/people'] }) })
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  const field = (id: string) => container.querySelector<HTMLInputElement>('#' + id)!
+  const type = (id: string, value: string) => act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field(id), value)
+    field(id).dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  const row = (email: string) => [...container.querySelectorAll('li')].find((li) => li.textContent?.includes(email))!
+  const button = (scope: Element, name: string) => [...scope.querySelectorAll('button')].find((b) => b.textContent === name)!
+  try {
+    await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
+    expect(scrolled).toEqual([])
+    await type('name', 'Sam')
+    await type('email', 'sam@acme.test')
+    await act(async () => { container.querySelector('form')!.requestSubmit() })
+    await vi.waitFor(() => expect(document.activeElement).toBe(button(row('sam@acme.test'), 'Copy link')))
+    expect(scrolled).toEqual([row('sam@acme.test')])
+
+    await act(async () => { button(row('sam@acme.test'), 'QR code').click() })
+    expect(scrolled.at(-1)).toBe(row('sam@acme.test').querySelector('img[alt="QR code for the invite link of Sam"]'))
+  } finally {
+    scroll.mockRestore()
     await act(async () => root.unmount())
     container.remove()
     delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT

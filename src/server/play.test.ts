@@ -713,3 +713,19 @@ it('refuses prepareNextSession for another learner\'s session', async () => {
   vi.mocked(requireLearnerId).mockResolvedValueOnce('u2')
   await expect(prepareNextSession({ data: { sessionId: 's1' } })).rejects.toMatchObject({ status: 404 })
 })
+
+it.each([
+  [8, true],
+  [12, false],
+])('reports a %i-answer placement as endedEarly=%s', async (answers, endedEarly) => {
+  seedTopicAndLearner(raw, 0)
+  const plan = JSON.stringify({
+    position: answers - 1, answered: true, workingLevel: 3,
+    log: Array.from({ length: answers }, () => ({ itemId: 'i1', correct: true, confidence: 'sure', level: 3 })),
+    pool: [],
+  })
+  raw.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, plan_json, started_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .run('s1', 'u1', 't1', 'placement', plan, Date.now())
+
+  expect((await endSession({ data: { sessionId: 's1' } })).endedEarly).toBe(endedEarly)
+})

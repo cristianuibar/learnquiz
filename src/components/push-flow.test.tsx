@@ -52,7 +52,7 @@ it.each([
   { total: 1, canPrompt: false, standalone: false, expected: false },
 ])('offers opt-in after the first completed summary (total=$total, first=$canPrompt, standalone=$standalone)', async ({ total, canPrompt, standalone, expected }) => {
   vi.mocked(endSession).mockResolvedValue({ sessionId: 's1', kind: 'session', topicId: 't1', durationMs: 1000, correct: total, total, ungraded: 0, xp: 0,
-    streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], nextLine: 'Come back soon.' } satisfies SummaryView)
+    streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], nextLine: 'Come back soon.', endedEarly: false } satisfies SummaryView)
   vi.mocked(getPushSettings).mockResolvedValue({ publicKey: 'public-key', isStaff: false, endpoints: [], canPrompt,
     prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' } })
   vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('iPhone')
@@ -76,13 +76,25 @@ it.each([
 
 it.each([0, 3])('shows the not-graded count on the summary only when answers were ungraded (ungraded=%s)', async (ungraded) => {
   vi.mocked(endSession).mockResolvedValue({ sessionId: 's1', kind: 'session', topicId: 't1', durationMs: 1000, correct: 9, total: 10, ungraded, xp: 0,
-    streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], nextLine: 'Come back soon.' } satisfies SummaryView)
+    streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], nextLine: 'Come back soon.', endedEarly: false } satisfies SummaryView)
   vi.mocked(getPushSettings).mockResolvedValue({ publicKey: 'public-key', isStaff: false, endpoints: [], canPrompt: false,
     prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' } })
   const { container, cleanup } = await renderApp('/play/s1/done')
   try {
     const score = [...container.querySelectorAll('span')].find((span) => span.textContent?.startsWith('9 of 10 correct'))
     expect(score?.textContent).toBe(ungraded ? '9 of 10 correct · 3 not graded' : '9 of 10 correct')
+  } finally { await cleanup() }
+})
+
+it.each([true, false])('explains a placement that ended early only when it did (endedEarly=%s)', async (endedEarly) => {
+  vi.mocked(endSession).mockResolvedValue({ sessionId: 's1', kind: 'placement', topicId: 't1', durationMs: 1000, correct: 6, total: 8, ungraded: 0, xp: 0,
+    streak: 0, level: 3, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], nextLine: 'Come back soon.', endedEarly } satisfies SummaryView)
+  vi.mocked(getPushSettings).mockResolvedValue({ publicKey: 'public-key', isStaff: false, endpoints: [], canPrompt: false,
+    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' } })
+  const { container, cleanup } = await renderApp('/play/s1/done')
+  try {
+    expect(container.querySelector('h1')?.textContent).toContain('level 3')
+    expect(container.textContent?.includes('Placement stopped early: it had enough answers to place you.')).toBe(endedEarly)
   } finally { await cleanup() }
 })
 

@@ -7,9 +7,12 @@ material. A company owner creates a job role and invites teammates with a link o
 code. Each learner pastes the material they need to learn, takes a placement quiz, and
 practises with questions matched to their level and due for review.
 
-The company portal currently covers setup, job-role membership and invitations.
-Learning paths belong to individual learners: shared company document libraries,
-automatic role-to-curriculum assignment and employee progress dashboards are not yet
+The company portal currently covers setup, job-role membership, invitations and
+employee progress. **People** shows each person's status (invited, active or
+proficient), progress toward the role benchmark and last activity; the **Overview**
+counts employees, proficient employees, average days to proficiency and critical-step
+errors this week. Learning paths belong to individual learners: shared company
+document libraries and automatic role-to-curriculum assignment are not yet
 shipped.
 
 Built solo by Cristian Uibar for the Meta Global AI Developer Hackathon

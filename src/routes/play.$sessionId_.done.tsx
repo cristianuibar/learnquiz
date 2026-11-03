@@ -52,6 +52,9 @@ function Done() {
           </>
         )}
       </p>
+      {s.kind === 'placement' && s.endedEarly && (
+        <p className="mt-2 text-muted-foreground">Placement stopped early: it had enough answers to place you.</p>
+      )}
       <ModelTrace key={s.sessionId} scope={{ scope: 'session', sessionId: s.sessionId }} />
       {s.masteryMoved.length > 0 && (
         <section className="mt-10">
@@ -77,7 +80,7 @@ function Done() {
           <ul className="mt-4 flex flex-col gap-3">
             {s.mistakes.map((m) => (
               <li key={m.itemId} className="rounded-lg border p-4">
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col-reverse items-start gap-2 sm:flex-row sm:justify-between sm:gap-3">
                   <p className="font-medium">{m.stem}</p>
                   {m.wasSure && <Badge className="bg-wrong-soft text-wrong">you were sure</Badge>}
                 </div>

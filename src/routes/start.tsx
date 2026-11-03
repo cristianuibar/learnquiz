@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
+import { errorMessage } from '@/components/inline-error'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -57,7 +58,7 @@ function Start() {
       const { sessionId } = await place({ data: { topicId: created.current.topicId } })
       await router.navigate({ to: '/play/$sessionId', params: { sessionId } })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong')
+      setError(errorMessage(err))
       setStatus('idle')
     }
   }

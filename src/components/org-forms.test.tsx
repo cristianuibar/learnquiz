@@ -52,10 +52,10 @@ function described(container: HTMLElement, id: string) {
   return { input, text: target?.textContent }
 }
 
-it('shows a plain role-name message on /org/new for whitespace-only input', async () => {
+it.each(['   ', ' '])('shows a plain role-name message on /org/new for whitespace-only input %j', async (role) => {
   const container = await mount('/org/new', newRoute.options.component!, '/org/new')
   await type(container.querySelector<HTMLInputElement>('#name')!, 'Acme')
-  await type(container.querySelector<HTMLInputElement>('#role')!, '   ')
+  await type(container.querySelector<HTMLInputElement>('#role')!, role)
   await submit(container)
   const { input, text } = described(container, 'role')
   expect(text).toBe('Enter a role name')
@@ -65,9 +65,9 @@ it('shows a plain role-name message on /org/new for whitespace-only input', asyn
   expect(container.textContent).not.toContain('"code"')
 })
 
-it('shows a plain role-name message on the roles screen for whitespace-only input', async () => {
+it.each(['   ', ' '])('shows a plain role-name message on the roles screen for whitespace-only input %j', async (role) => {
   const container = await mount('/org/$slug/roles', rolesRoute.options.component!, '/org/x/roles', () => ({ slug: 'x', name: 'Acme', roles: [] }))
-  await type(container.querySelector<HTMLInputElement>('#name')!, '   ')
+  await type(container.querySelector<HTMLInputElement>('#name')!, role)
   await submit(container)
   const { input, text } = described(container, 'name')
   expect(text).toBe('Enter a role name')
@@ -85,6 +85,12 @@ it('sends the entered whole percentage and shows the stored benchmark on the rol
   await type(container.querySelector<HTMLInputElement>('#benchmark')!, '85')
   await submit(container)
   expect(createRole).toHaveBeenCalledWith({ data: expect.objectContaining({ benchmark: 85 }) })
+})
+
+it('words the training state on the role card instead of the raw status', async () => {
+  const container = await mount('/org/$slug/roles', rolesRoute.options.component!, '/org/x/roles', () => ({ slug: 'x', name: 'Acme', roles: [{ id: 'r', name: 'Cashier', benchmark: 0.85, onboardingDays: 30, topicId: 't', topicStatus: 'draft' }] }))
+  expect(container.textContent).toContain('No documents yet')
+  expect(container.textContent).not.toContain(' · draft')
 })
 
 it('links a server benchmark error to its field without showing JSON', async () => {

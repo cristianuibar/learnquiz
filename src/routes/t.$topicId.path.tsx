@@ -11,7 +11,7 @@ import { StartButton } from '@/components/start-button'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Working } from '@/components/working'
-import { cn } from '@/lib/utils'
+import { cn, plural } from '@/lib/utils'
 import { getConceptItems, getTopicPath } from '@/server/curriculum'
 
 type Item = Awaited<ReturnType<typeof getConceptItems>>['items'][number]
@@ -91,7 +91,7 @@ function Path() {
                 })
               }}>
                 <summary className="flex min-h-12 cursor-pointer items-center text-sm font-medium">
-                  {unit.concepts.length} concepts
+                  {plural(unit.concepts.length, 'concept', 'concepts')}
                 </summary>
                 <ul className="mt-2 flex flex-col gap-3">
                   {unit.concepts.map((concept) => (
@@ -143,7 +143,7 @@ function Concept({
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="font-medium">{concept.name}</h3>
         {concept.grounded && <Badge variant="outline">From your material</Badge>}
-        {concept.itemCount > 0 && <span className="text-sm text-muted-foreground">{concept.itemCount} questions</span>}
+        {concept.itemCount > 0 && <span className="text-sm text-muted-foreground">{plural(concept.itemCount, 'question', 'questions')}</span>}
       </div>
       <p className="mt-1 text-sm text-muted-foreground">{concept.summary}</p>
       {showDiagram && concept.visual && <ConceptDiagram conceptId={concept.id} />}

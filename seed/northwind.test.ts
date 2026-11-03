@@ -2,11 +2,13 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { getAuth } from '@/server/auth'
+import { drainConceptQueue } from '@/server/concept-gen'
 import { getOrgOverview, getPeople } from '@/server/org'
 import { NORTHWIND, seedNorthwind } from './northwind'
 
 const request = vi.hoisted(() => ({ headers: new Headers() }))
-const bindings = vi.hoisted(() => ({ waitUntil: () => {}, env: {
+const background = vi.hoisted(() => [] as Promise<unknown>[])
+const bindings = vi.hoisted(() => ({ waitUntil: (task: Promise<unknown>) => { background.push(task) }, env: {
   DB: null as unknown,
   BETTER_AUTH_URL: 'http://127.0.0.1:8800',
   BETTER_AUTH_SECRET: '',
@@ -119,7 +121,9 @@ const skeleton = () => ({ units: procedures.map((unit) => ({
 
 const reply = (value: unknown) => Response.json({ choices: [{ message: { content: JSON.stringify(value) }, finish_reason: 'stop' }] })
 const fetchModel = vi.fn<typeof fetch>()
+const shortOnly = new Set<string>()
 beforeEach(() => {
+  shortOnly.clear()
   raw.exec('SAVEPOINT test')
   request.headers = new Headers()
   vi.useFakeTimers({ toFake: ['Date'] })
@@ -132,7 +136,14 @@ beforeEach(() => {
     if (schema !== 'item_batch') throw new Error(`Unexpected model schema: ${schema}`)
     const prompt = body.messages[1].content as string
     const concept = prompt.match(/^Concept: (.+)$/m)![1]
-    const quote = prompt.match(/^Quote: "(.+)"$/m)![1]
+    const quote = prompt.match(/^Quote: "([\s\S]+?)"$/m)![1]
+    if (shortOnly.has(concept)) {
+      return reply({ items: Array.from({ length: 6 }, (_, index) => ({
+        format: 'short', stem: `${concept}: explain the step. (${index + 1})`, options: [],
+        accepted_answers: [], model_answer: quote, explanation: quote, difficulty: 3,
+        source_quote: quote, grounded: true, bloom: 'apply',
+      })) })
+    }
     return reply({ items: Array.from({ length: 6 }, (_, index) => ({
       format: 'mcq', stem: `${concept}: which action follows the procedure? (${index + 1})`,
       options: [
@@ -169,28 +180,32 @@ it('seeds the three employee stages through the real SOP pipeline and preserves 
   expect(raw.prepare('SELECT body_text FROM sources WHERE id = ?').get(NORTHWIND.sourceId)).toEqual({ body_text: sopText.trim() })
   expect(raw.prepare('SELECT status, generated_by FROM topics WHERE id = ?').get(result.topicId)).toEqual({ status: 'ready', generated_by: 'muse-spark-1.3' })
   expect(raw.prepare('SELECT COUNT(*) AS n FROM concepts WHERE topic_id = ? AND grounded = 1').get(result.topicId)).toEqual({ n: 16 })
-  const calls = raw.prepare('SELECT purpose, ok, COUNT(*) AS n FROM model_calls GROUP BY purpose, ok ORDER BY purpose').all()
-  expect(calls).toEqual([
-    { purpose: 'curriculum', ok: 1, n: 1 },
-    { purpose: 'items', ok: 1, n: 3 },
-    { purpose: 'self_check', ok: 1, n: 3 },
-  ])
-  expect(result.questions).toBe(18)
-  expect(raw.prepare('SELECT COUNT(*) AS n FROM items WHERE topic_id = ? AND generated_by = ? AND json_extract(check_json, \'$.keep\') = 1').get(result.topicId, 'muse-spark-1.3')).toEqual({ n: 18 })
+  // The company question queue drains every seeded concept, not only the three the seed generates itself.
+  await Promise.all(background.splice(0))
+  while (await drainConceptQueue()) { /* the cron drain repeats until nothing is due */ }
+  expect(raw.prepare(`SELECT gen_status AS status, COUNT(*) AS n FROM concepts c WHERE topic_id = ?
+    AND (SELECT COUNT(*) FROM items i WHERE i.concept_id = c.id AND i.status = 'active') >= 6 GROUP BY gen_status`).all(result.topicId)).toEqual([{ status: 'ready', n: 16 }])
+  const calls = raw.prepare('SELECT purpose, ok, COUNT(*) AS n FROM model_calls GROUP BY purpose, ok ORDER BY purpose').all() as { purpose: string; ok: number; n: number }[]
+  expect(calls.filter((call) => !call.ok)).toEqual([])
+  expect(calls.find((call) => call.purpose === 'curriculum')).toEqual({ purpose: 'curriculum', ok: 1, n: 1 })
+  const questions = raw.prepare('SELECT COUNT(*) AS n FROM items WHERE topic_id = ? AND status = \'active\'').get(result.topicId) as { n: number }
+  expect(raw.prepare('SELECT COUNT(*) AS n FROM items WHERE topic_id = ? AND generated_by = ? AND json_extract(check_json, \'$.keep\') = 1').get(result.topicId, 'muse-spark-1.3')).toEqual(questions)
   expect(raw.prepare(`SELECT c.critical, a.correct, a.confidence FROM attempts a
     JOIN concepts c ON c.id = a.concept_id JOIN user u ON u.id = a.learner_id WHERE u.email = ?`).all(NORTHWIND.emails.onboarding)).toEqual([{ critical: 1, correct: 0, confidence: 'sure' }])
   expect(raw.prepare('SELECT id FROM user WHERE email = ?').all(NORTHWIND.emails.invited)).toEqual([])
 
   await signIn(NORTHWIND.emails.owner, secret.ownerPassword)
   const people = await getPeople({ data: { slug: result.slug } })
-  expect(people.members.map(({ email, training }) => ({ email, training }))).toEqual(expect.arrayContaining([
-    { email: NORTHWIND.emails.owner, training: null },
-    { email: NORTHWIND.emails.onboarding, training: { stage: 'onboarding', daysToProficiency: null, criticalConfidentErrors: 1 } },
-    { email: NORTHWIND.emails.proficient, training: { stage: 'proficient', daysToProficiency: 6, criticalConfidentErrors: 0 } },
+  const { known } = raw.prepare(`SELECT AVG(COALESCE(lc.p_known, 0)) AS known FROM concepts c
+    LEFT JOIN learner_concept lc ON lc.concept_id = c.id AND lc.learner_id = (SELECT id FROM user WHERE email = ?) WHERE c.topic_id = ?`).get(NORTHWIND.emails.onboarding, result.topicId) as { known: number }
+  expect(people.members.map(({ email, training, lastActiveAt }) => ({ email, training, lastActiveAt }))).toEqual(expect.arrayContaining([
+    { email: NORTHWIND.emails.owner, training: null, lastActiveAt: null },
+    { email: NORTHWIND.emails.onboarding, training: { stage: 'onboarding', progress: expect.closeTo(known / 0.85, 10), daysToProficiency: null, criticalConfidentErrors: 1 }, lastActiveAt: now - 86_400_000 - 60_000 },
+    { email: NORTHWIND.emails.proficient, training: { stage: 'proficient', progress: 1, daysToProficiency: 6, criticalConfidentErrors: 0 }, lastActiveAt: now - 4 * 86_400_000 - 60_000 },
   ]))
   expect(people.members).toHaveLength(3)
   expect(people.invites).toEqual([expect.objectContaining({ email: NORTHWIND.emails.invited, expired: false, jobRole: 'Warehouse picker' })])
-  expect(await getOrgOverview({ data: { slug: result.slug } })).toMatchObject({ training: { proficientEmployees: 1, daysToProficiency: 6 } })
+  expect(await getOrgOverview({ data: { slug: result.slug } })).toMatchObject({ training: { employees: 2, proficientEmployees: 1, daysToProficiency: 6, criticalErrorsThisWeek: 1, documentsToReview: null } })
   await signIn(NORTHWIND.emails.onboarding, secret.learnerPassword)
 
   raw.prepare('UPDATE learner_concept SET p_known = 0.32 WHERE learner_id = (SELECT id FROM user WHERE email = ?)').run(NORTHWIND.emails.onboarding)
@@ -198,11 +213,14 @@ it('seeds the three employee stages through the real SOP pipeline and preserves 
   const attempts = raw.prepare('SELECT * FROM attempts ORDER BY id').all()
   const accounts = raw.prepare('SELECT id, user_id, password FROM account ORDER BY id').all()
   const modelCalls = fetchModel.mock.calls.length
-  await expect(seedNorthwind({ sopText, ...passwords(), now: now + 86_400_000 })).resolves.toEqual(result)
+  // A topic seeded before it carried its company is repaired on rerun.
+  raw.prepare('UPDATE topics SET org_id = NULL WHERE id = ?').run(result.topicId)
+  await expect(seedNorthwind({ sopText, ...passwords(), now: now + 86_400_000 })).resolves.toEqual({ ...result, questions: questions.n })
   expect(raw.prepare('SELECT * FROM learner_concept ORDER BY learner_id, concept_id').all()).toEqual(progress)
   expect(raw.prepare('SELECT * FROM attempts ORDER BY id').all()).toEqual(attempts)
   expect(raw.prepare('SELECT id, user_id, password FROM account ORDER BY id').all()).toEqual(accounts)
   expect(fetchModel).toHaveBeenCalledTimes(modelCalls)
+  expect(raw.prepare('SELECT o.slug FROM topics t JOIN organization o ON o.id = t.org_id WHERE t.id = ?').get(result.topicId)).toEqual({ slug: NORTHWIND.slug })
   await signIn(NORTHWIND.emails.owner, secret.ownerPassword)
 })
 
@@ -215,4 +233,19 @@ it('refuses to overwrite an unrelated company using the reserved slug', async ()
   expect(raw.prepare('SELECT COUNT(*) AS n FROM user').get()).toEqual({ n: 0 })
   expect(raw.prepare('SELECT COUNT(*) AS n FROM job_roles').get()).toEqual({ n: 0 })
   expect(fetchModel).not.toHaveBeenCalled()
+})
+
+it('regenerates the critical step on rerun when no multiple-choice question was kept', async () => {
+  const secret = passwords()
+  // Every critical scanning step the seed may choose: the self-check keeps no multiple-choice question for them.
+  const scanning = ['Hold discrepancies', 'Scan the location', 'Resolve scan mismatches']
+  scanning.forEach((name) => shortOnly.add(name))
+  await expect(seedNorthwind({ sopText, ...secret, now })).rejects.toMatchObject({ status: 422 })
+  await Promise.all(background.splice(0))
+  expect(raw.prepare(`SELECT DISTINCT i.format FROM items i JOIN concepts c ON c.id = i.concept_id WHERE c.name IN (?, ?, ?)`).all(...scanning)).toEqual([{ format: 'short' }])
+
+  shortOnly.clear()
+  await expect(seedNorthwind({ sopText, ...secret, now })).resolves.toMatchObject({ slug: NORTHWIND.slug, concepts: 16 })
+  expect(raw.prepare(`SELECT c.critical, i.format, a.correct FROM attempts a JOIN items i ON i.id = a.item_id JOIN concepts c ON c.id = a.concept_id
+    JOIN user u ON u.id = a.learner_id WHERE u.email = ?`).all(NORTHWIND.emails.onboarding)).toEqual([{ critical: 1, format: 'mcq', correct: 0 }])
 })
