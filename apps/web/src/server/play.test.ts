@@ -679,7 +679,7 @@ describe('learner practice and unit unlocks', () => {
       .run('src-old', 't1', 'text', 'Handbook', 'Old handbook.', Date.now(), 1)
     raw.prepare("UPDATE concepts SET source_id = 'src-old' WHERE id = 'c1'").run()
 
-    await expect(startSession({ data: { topicId: 't1' } })).rejects.toMatchObject({ status: 409, message: 'Nothing to practise yet' })
+    await expect(startSession({ data: { topicId: 't1' } })).rejects.toMatchObject({ status: 409, message: 'Nothing to practice yet' })
     expect(chatJson).not.toHaveBeenCalled()
     expect(scalar(raw, 'SELECT COUNT(*) AS n FROM model_calls').n).toBe(0)
   })
