@@ -75,13 +75,23 @@ it('shows a plain role-name message on the roles screen for whitespace-only inpu
   expect(container.textContent).not.toContain('"code"')
 })
 
+it('sends the entered whole percentage and shows the stored benchmark on the role card', async () => {
+  vi.mocked(createRole).mockResolvedValue({ id: 'r' } as never)
+  const container = await mount('/org/$slug/roles', rolesRoute.options.component!, '/org/x/roles', () => ({ slug: 'x', name: 'Acme', roles: [{ id: 'r', name: 'Cashier', benchmark: 0.85, onboardingDays: 30, topicId: 't', topicStatus: 'draft' }] }))
+  expect(container.textContent).toContain('Benchmark: 85%')
+  await type(container.querySelector<HTMLInputElement>('#name')!, 'Cashier')
+  await type(container.querySelector<HTMLInputElement>('#benchmark')!, '85')
+  await submit(container)
+  expect(createRole).toHaveBeenCalledWith({ data: expect.objectContaining({ benchmark: 85 }) })
+})
+
 it('links a server benchmark error to its field without showing JSON', async () => {
-  vi.mocked(createRole).mockRejectedValue(new Error(JSON.stringify([{ origin: 'number', code: 'too_big', path: ['benchmark'], message: 'Use a benchmark between 0 and 1' }])))
+  vi.mocked(createRole).mockRejectedValue(new Error(JSON.stringify([{ origin: 'number', code: 'too_big', path: ['benchmark'], message: 'Enter a whole percentage from 50 to 100' }])))
   const container = await mount('/org/$slug/roles', rolesRoute.options.component!, '/org/x/roles', () => ({ slug: 'x', name: 'Acme', roles: [] }))
   await type(container.querySelector<HTMLInputElement>('#name')!, 'Cashier')
   await submit(container)
   const { input, text } = described(container, 'benchmark')
-  expect(text).toBe('Use a benchmark between 0 and 1')
+  expect(text).toBe('Enter a whole percentage from 50 to 100')
   expect(input.getAttribute('aria-invalid')).toBe('true')
   expect(container.textContent).not.toContain('"code"')
 })
