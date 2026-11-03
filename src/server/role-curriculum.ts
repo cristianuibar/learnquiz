@@ -10,7 +10,7 @@ import { MAX_SOURCE_TEXT_CHARS } from '@/lib/limits'
 import { drainConceptQueue } from '@/server/concept-gen'
 import { runInBackground } from '@/server/env'
 import { chunks, httpError } from '@/server/helpers'
-import { assertWithinDailyCap } from '@/server/model-cap'
+import { assertWithinCompanyCap, assertWithinDailyCap } from '@/server/model-cap'
 
 export function curriculumWrites(db: Db, topicId: string, valid: ValidatedSkeleton, generatedBy: string | null, conceptGenStatus: 'pending' | 'ready' = 'ready') {
   const unitRows = valid.units.map((u, order) => ({ id: u.id, topicId, order, name: u.name, summary: u.summary }))
@@ -47,6 +47,7 @@ export async function buildRoleCurriculum({ orgId, ownerId, roleId }: { orgId: s
     throw httpError('Add documents with extracted text before building the curriculum.', 422)
   }
   await assertWithinDailyCap(db, ownerId)
+  await assertWithinCompanyCap(db, orgId)
   // Claim once; a repeat request must not duplicate the path or overwrite learner progress.
   const claimed = await db.update(topics).set({ status: 'generating' })
     .where(and(eq(topics.id, topicId), inArray(topics.status, ['draft', 'failed'])))
@@ -58,7 +59,7 @@ export async function buildRoleCurriculum({ orgId, ownerId, roleId }: { orgId: s
       skeleton = await chatJson({
         purpose: 'curriculum', schema: CurriculumSkeleton, schemaName: 'curriculum_skeleton',
         ...curriculumPrompt({ topic: row.topic.title, goal: row.topic.goal, levelHint: 3, sourceDocuments: documents }),
-        maxTokens: 16000, learnerId: ownerId, topicId,
+        maxTokens: 16000, learnerId: ownerId, orgId, topicId,
       })
     } catch (e) {
       if (e instanceof LlmError && e.status === 429) throw httpError(e.message, 429)

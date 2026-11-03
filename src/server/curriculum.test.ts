@@ -3,7 +3,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { concepts } from '@/db/schema'
-import { ACCOUNT_DAILY_MODEL_CALL_CAP } from '@/lib/limits'
+import { ACCOUNT_DAILY_MODEL_CALL_CAP, COMPANY_DAILY_MODEL_CALL_CAP } from '@/lib/limits'
 import * as curriculum from './curriculum'
 
 // Keep the handlers, validation, authorization, model client and database real.
@@ -227,6 +227,17 @@ it.each([
 it('refuses generation at the daily cap before changing the role topic', async () => {
   const log = raw.prepare("INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, created_at) VALUES (?, 'owner', 'curriculum', 'muse-spark-1.3', 0, 1, ?)")
   for (let i = 0; i < ACCOUNT_DAILY_MODEL_CALL_CAP; i++) log.run(`call-${i}`, Date.now())
+  await expect(generate()).rejects.toMatchObject({ status: 429 })
+  expect(topicState()).toEqual({ status: 'draft' })
+  expect(fetchModel).not.toHaveBeenCalled()
+})
+
+it('refuses generation once the company has spent its daily cap, before changing the role topic', async () => {
+  // Calls on another of the company's topics count against the same cap.
+  raw.exec("UPDATE topics SET org_id = 'northwind' WHERE id = 'picker-topic'")
+  raw.exec("INSERT INTO topics (id, org_id, title, status, created_at) VALUES ('co-spent', 'northwind', 'Packing', 'ready', 1)")
+  const log = raw.prepare("INSERT INTO model_calls (id, learner_id, topic_id, purpose, model, latency_ms, ok, created_at) VALUES (?, NULL, 'co-spent', 'items', 'muse-spark-1.3', 0, 1, ?)")
+  for (let i = 0; i < COMPANY_DAILY_MODEL_CALL_CAP; i++) log.run(`call-${i}`, Date.now())
   await expect(generate()).rejects.toMatchObject({ status: 429 })
   expect(topicState()).toEqual({ status: 'draft' })
   expect(fetchModel).not.toHaveBeenCalled()
