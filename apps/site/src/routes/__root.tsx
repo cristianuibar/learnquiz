@@ -1,6 +1,7 @@
 import { HeadContent, Link, Outlet, Scripts, createRootRoute, useMatch } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import styles from '../styles.css?url'
+import { themeBootstrap } from '../theme'
 
 export const Route = createRootRoute({
   head: () => ({
@@ -41,8 +42,9 @@ function RootLayout() {
 
 function RootDocument({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
         <HeadContent />
       </head>
       <body className="bg-surface-page font-sans text-body text-ink antialiased">

@@ -1,0 +1,7 @@
+export const signUpUrl = 'https://app.learnquiz.com/sign-in?mode=up&redirect=%2Forg%2Fnew'
+export const signInUrl = 'https://app.learnquiz.com/sign-in'
+export const learnOnYourOwnUrl = 'https://app.learnquiz.com/start'
+export const githubUrl = 'https://github.com/cristianuibar/learnquiz'
+export const demoVideoUrl: string = ''
+export const demoTranscriptUrl: string = ''
+export const androidApkUrl: string = ''

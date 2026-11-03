@@ -7,6 +7,7 @@ import { attempts, concepts, jobRoles, learnerConcept, memberRoleAssignments, se
 import { benchmarkMet } from '@/lib/learning/profile'
 import { requireOrgAdmin } from '@/server/authz'
 import { httpError, mean } from '@/server/helpers'
+import { liveConcept } from '@/server/live-concept'
 import { requireLearnerId } from '@/server/session'
 
 const DAY = 86_400_000
@@ -54,7 +55,7 @@ export const getProfile = createServerFn({ method: 'GET' })
       db.select({ id: concepts.id, unitId: concepts.unitId, name: concepts.name, critical: concepts.critical, pKnown: learnerConcept.pKnown })
         .from(concepts)
         .leftJoin(learnerConcept, and(eq(learnerConcept.conceptId, concepts.id), eq(learnerConcept.learnerId, learnerId)))
-        .where(eq(concepts.topicId, topic.id)).orderBy(asc(concepts.order)),
+        .where(and(eq(concepts.topicId, topic.id), liveConcept())).orderBy(asc(concepts.order)),
       db.select({ id: attempts.id, itemId: attempts.itemId, conceptId: attempts.conceptId, at: attempts.at, correct: attempts.correct, confidence: attempts.confidence, before: attempts.pKnownBefore, after: attempts.pKnownAfter })
         .from(attempts).innerJoin(concepts, eq(concepts.id, attempts.conceptId))
         .where(and(eq(attempts.learnerId, learnerId), eq(concepts.topicId, topic.id))).orderBy(asc(attempts.at), asc(attempts.id)),
