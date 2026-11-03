@@ -58,7 +58,7 @@ export function Screen({ children, dock, footer, contentContainerStyle, style, .
           paddingBottom: space[3] + bottom,
           borderTopWidth: 1,
           borderTopColor: colors.border,
-          gap: space[2],
+          gap: space[3],
         }}>
           {dock}
         </View>
