@@ -3,6 +3,7 @@ import { and, asc, eq, inArray } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '@/db'
 import { modelCalls, sessions, topics } from '@/db/schema'
+import type { SessionPlanning } from '@/lib/learning/types'
 import { httpError } from '@/server/helpers'
 import { requireLearnerId } from '@/server/session'
 
@@ -14,11 +15,17 @@ export const getModelTrace = createServerFn({ method: 'GET' })
   .handler(async ({ data }) => {
     const learnerId = await requireLearnerId()
     const db = getDb()
+    let planning: { planner: SessionPlanning['planner']; steps: { reason: string }[] } | undefined
     if (data.scope === 'session') {
-      const [owned] = await db.select({ id: sessions.id }).from(sessions)
+      const [owned] = await db.select({ planJson: sessions.planJson }).from(sessions)
         .innerJoin(topics, eq(topics.id, sessions.topicId))
         .where(and(eq(sessions.id, data.sessionId), eq(sessions.learnerId, learnerId), eq(topics.learnerId, learnerId)))
       if (!owned) throw httpError('Session not found', 404)
+      const plan = JSON.parse(owned.planJson ?? '{}') as { planning?: SessionPlanning }
+      if (plan.planning) {
+        // Keep item ids, question payloads and answer keys out of the trace.
+        planning = { planner: plan.planning.planner, steps: plan.planning.steps.map(({ reason }) => ({ reason })) }
+      }
     } else {
       const [owned] = await db.select({ id: topics.id }).from(topics)
         .where(and(eq(topics.id, data.topicId), eq(topics.learnerId, learnerId)))
@@ -41,5 +48,5 @@ export const getModelTrace = createServerFn({ method: 'GET' })
         ? eq(modelCalls.sessionId, data.sessionId)
         : and(eq(modelCalls.topicId, data.topicId), inArray(modelCalls.purpose, ['curriculum', 'items', 'self_check', 'diagram'])),
     )).orderBy(asc(modelCalls.createdAt), asc(modelCalls.id))
-    return { calls, totalCostUsd: calls.reduce((total, call) => total + (call.costUsd ?? 0), 0) }
+    return { calls, totalCostUsd: calls.reduce((total, call) => total + (call.costUsd ?? 0), 0), ...(planning && { planning }) }
   })

@@ -6,11 +6,13 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { Route as playRoute } from '@/routes/play.$sessionId'
 import { Route as appRootRoute } from '@/routes/__root'
 import { answerItem, getSession, nextItem, transcribeAnswer } from '@/server/play'
+import { getModelTrace } from '@/server/model-trace'
 import { generateConceptDiagram } from '@/server/diagrams'
 import type { Reveal, SessionView } from '@/lib/learning/types'
 
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
 vi.mock('@/server/play', () => ({ answerItem: vi.fn(), getSession: vi.fn(), transcribeAnswer: vi.fn(), nextItem: vi.fn(), endSession: vi.fn(), reportItem: vi.fn() }))
+vi.mock('@/server/model-trace', () => ({ getModelTrace: vi.fn() }))
 vi.mock('@/server/diagrams', () => ({ generateConceptDiagram: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
@@ -156,6 +158,29 @@ it('records, uploads WAV, lets the learner edit the transcript, and checks the e
   } finally { await cleanup() }
 })
 
+it.each([
+  { planner: 'muse-wonder-1.0', ok: true },
+  { planner: 'planned by rules', ok: false },
+] as const)('opens the model trace with $planner and its per-step reasons', async ({ planner, ok }) => {
+  vi.mocked(getModelTrace).mockReset().mockResolvedValue({
+    planning: { planner, steps: [{ reason: 'Review variables before they fade.' }] },
+    totalCostUsd: 0,
+    calls: [{ id: 'plan1', purpose: 'plan', model: 'muse-wonder-1.0', latencyMs: 120, ok, promptTokens: 10, completionTokens: 20, reasoningTokens: 0, costUsd: 0, createdAt: 1 }],
+  })
+  const { container, cleanup } = await renderPlay(false)
+  try {
+    expect(container.textContent).toContain('x + 1 = 2')
+    await act(async () => button(container, 'Model trace').click())
+    expect(getModelTrace).toHaveBeenCalledWith({ data: { scope: 'session', sessionId: 's1' } })
+    const dialog = document.querySelector('[role="dialog"]')!
+    expect(dialog.textContent).toContain(planner)
+    expect(dialog.textContent).toContain('muse-wonder-1.0')
+    expect(dialog.textContent).toContain('plan')
+    expect(dialog.textContent).toContain('Review variables before they fade.')
+    expect(dialog.textContent).toContain(ok ? 'Succeeded' : 'Failed')
+  } finally { await cleanup() }
+})
+
 it('keeps typed input after a transcription failure', async () => {
   const { container, cleanup } = await renderPlay()
   try {
@@ -240,7 +265,7 @@ it.each([false, true])('submits a short answer and shows its reveal (ungraded=%s
     expect(status.querySelector('img')?.getAttribute('src')).toBe('/media/concepts/c1')
     if (ungraded) {
       expect(status.querySelector('h2')?.textContent).toBe('Could not grade this answer')
-      expect(status.textContent).toContain('Equal changes preserve equality.')
+      expect(status.textContent).toMatch(/Your answerBoth sides get smaller\.The answer is Equal changes preserve equality\./)
       expect(status.textContent).toContain('Compare your answer with the model answer.')
       expect(status.querySelector('#why')).toBeNull()
     } else {

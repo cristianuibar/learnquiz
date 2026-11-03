@@ -97,6 +97,7 @@ it('returns every owned session call and exact costs, with generation scoped to 
 
 it.each(['placement', 'session'] as const)('traces real %s startup generation, retries and persisted model attribution', async (kind) => {
   getEnv().JOB_MODELS = {
+    plan: { provider: 'meta', model: 'muse-wonder-1.0' },
     curriculum: { provider: 'meta', model: 'muse-wonder-1.0' },
     items: { provider: 'meta', model: 'muse-wonder-1.0' },
     placement_line: { provider: 'meta', model: 'muse-wonder-1.0' },
@@ -112,9 +113,11 @@ it.each(['placement', 'session'] as const)('traces real %s startup generation, r
   }))
   let retry = true
   vi.stubGlobal('fetch', vi.fn(async (_url: string, request: RequestInit) => {
-    const name = JSON.parse(request.body as string).response_format.json_schema.name
+    const body = JSON.parse(request.body as string)
+    const name = body.response_format.json_schema.name
     const content = name === 'item_batch' && retry ? (retry = false, 'invalid JSON') : JSON.stringify(
       name === 'curriculum_skeleton' ? skeleton : name === 'item_batch' ? { items } :
+        name === 'session_plan' ? { steps: JSON.parse(body.messages[1].content).candidates.map((c: { itemId: string }) => ({ itemId: c.itemId, reason: 'Practise this concept before moving on.' })) } :
         name === 'self_check' ? { results: items.map((_, index) => ({ index, keep: true, reasons: [] })) } : { line: 'You know variables. Next, practise equations.' },
     )
     return Response.json({ choices: [{ message: { content } }], usage: { prompt_tokens: 100, completion_tokens: 200, completion_tokens_details: { reasoning_tokens: 20 } } })
@@ -125,7 +128,7 @@ it.each(['placement', 'session'] as const)('traces real %s startup generation, r
   const { sessionId } = await (kind === 'placement' ? startPlacement : startSession)({ data: { topicId } })
   const view = await getSession({ data: { sessionId } })
   const initialTrace = await getModelTrace({ data: { scope: 'session', sessionId } })
-  expect(initialTrace.calls).toHaveLength(kind === 'placement' ? 7 : 9)
+  expect(initialTrace.calls).toHaveLength(kind === 'placement' ? 7 : 10)
   expect(initialTrace.calls.filter((c) => !c.ok)).toHaveLength(1)
   if (kind === 'placement') {
     const row = raw.prepare('SELECT plan_json FROM sessions WHERE id = ?').get(sessionId) as { plan_json: string }
@@ -145,9 +148,12 @@ it.each(['placement', 'session'] as const)('traces real %s startup generation, r
     expect((await getTopicPath({ data: { topicId } })).learner.levelLineModel).toBe('muse-wonder-1.0')
   }
   const trace = await getModelTrace({ data: { scope: 'session', sessionId } })
-  expect(trace.calls).toHaveLength(kind === 'placement' ? 8 : 9)
+  expect(trace.calls).toHaveLength(kind === 'placement' ? 8 : 10)
   expect(trace.calls.map((c) => [c.model, c.costUsd])).toEqual(trace.calls.map((c) => c.purpose === 'self_check'
     ? ['muse-spark-1.3', 0.000975] : ['muse-wonder-1.0', null]))
+  if (kind === 'session') expect(trace.calls.filter((c) => c.purpose === 'plan')).toEqual([
+    expect.objectContaining({ model: 'muse-wonder-1.0', ok: true, costUsd: null }),
+  ])
   const total = raw.prepare('SELECT SUM(cost_usd) AS cost FROM model_calls WHERE session_id = ?').get(sessionId) as { cost: number }
   expect(trace.totalCostUsd).toBe(trace.calls.reduce((sum, c) => sum + (c.costUsd ?? 0), 0))
   expect(trace.totalCostUsd).toBeCloseTo(total.cost, 12)

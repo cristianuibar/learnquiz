@@ -6,7 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { Route as appRootRoute } from '@/routes/__root'
 import { Route as pathRoute } from '@/routes/t.$topicId.path'
 import { Route as playRoute } from '@/routes/play.$sessionId'
-import { getTopicPath } from '@/server/curriculum'
+import { getConceptItems, getTopicPath } from '@/server/curriculum'
 import { answerItem, getSession } from '@/server/play'
 import { getSessionFn } from '@/server/session-fn'
 
@@ -86,6 +86,33 @@ it.each(['session', 'path'] as const)('recovers an offline Path navigation when 
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
     await act(async () => { container.querySelector<HTMLButtonElement>('[role="alert"] button')!.click() })
     expect(container.querySelector('h1')?.textContent).toBe('Arithmetic')
+    expect(container.querySelector('[role="alert"]')).toBeNull()
+  } finally {
+    await cleanup()
+  }
+})
+
+it('shows the offline message for answered questions on Path and loads them with Try again online', async () => {
+  vi.mocked(getTopicPath).mockResolvedValue({
+    topic: { id: 'topic', title: 'Arithmetic', goal: null, status: 'ready', generatedBy: null },
+    learner: { level: 1, levelLine: null, levelLineModel: null, placed: false, xp: 0, streak: 0 },
+    units: [{ id: 'unit', order: 0, name: 'Basics', summary: '', mastery: 0, unlocked: true, concepts: [{ id: 'concept', order: 0, name: 'Addition', summary: '', visual: false, grounded: false, critical: false, itemCount: 1, pKnown: 0 }] }],
+    edges: [],
+  })
+  const { container, cleanup } = await renderApp('/t/topic/path')
+  try {
+    const showButton = () => [...container.querySelectorAll('button')].find((button) => button.textContent === 'Show answered questions')
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    vi.mocked(getConceptItems).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    await act(async () => { showButton()!.click() })
+    const alert = container.querySelector('[role="alert"]')
+    expect(alert?.textContent).toContain("You're offline")
+    expect(alert?.textContent).not.toContain('Failed to fetch')
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    vi.mocked(getConceptItems).mockResolvedValueOnce({ items: [] })
+    await act(async () => { alert!.querySelector('button')!.click() })
+    expect(getConceptItems).toHaveBeenLastCalledWith({ data: { conceptId: 'concept' } })
+    expect(container.querySelector('[role="status"]')?.textContent).toBe('No answered questions to review yet.')
     expect(container.querySelector('[role="alert"]')).toBeNull()
   } finally {
     await cleanup()

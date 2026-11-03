@@ -6,8 +6,8 @@ import type { z } from 'zod'
 import { chatJson, LlmError } from '@/lib/llm/client'
 import { requireLearnerId } from '@/server/session'
 
-// Only external boundaries are faked: the server-fn transport, auth, the model
-// client and the Cloudflare bindings. The handlers under test run for real
+// Only external boundaries are faked: the server-fn transport, auth, model HTTP
+// (the client for older placement/generation tests) and Cloudflare bindings. Handlers run for real
 // against an in-memory SQLite database speaking the drizzle proxy protocol.
 const holder = vi.hoisted(() => ({ db: null as unknown }))
 
@@ -24,24 +24,22 @@ vi.mock('@/db', () => ({ getDb: () => holder.db }))
 
 vi.mock('@/server/session', () => ({ requireLearnerId: vi.fn(async () => 'u1'), getSessionUser: async () => ({ id: 'u1', isAnonymous: false }) }))
 
-vi.mock('@/lib/llm/client', () => ({
-  isVoiceEnabled: () => false,
-  jobModel: () => ({ model: 'muse-spark-1.3' }),
-  chatJson: vi.fn(async () => ({ line: 'You know the basics and will grow from here.' })),
-  LlmError: class LlmError extends Error {
-    constructor(message: string, public status: number) {
-      super(message)
-    }
-  },
-  DailyCapError: class DailyCapError extends Error {
-    status = 429
-  },
-}))
+vi.mock('@/lib/llm/client', async (importOriginal) => {
+  const client = await importOriginal<typeof import('@/lib/llm/client')>()
+  return {
+    ...client,
+    chatJson: vi.fn(async (opts) => opts.purpose === 'plan'
+      ? client.chatJson(opts) : { line: 'You know the basics and will grow from here.' }),
+  }
+})
 
-vi.mock('cloudflare:workers', () => ({ env: {} }))
+
+vi.mock('cloudflare:workers', () => ({ env: { LLM_PROFILE: 'ollama', LLM_MODEL: 'muse-spark-1.3', LLM_BASE_URL: 'https://llm.example/v1' } }))
 
 import { answerItem, endSession, getSession, nextItem, startMiniSession, startPlacement, startSession } from './play'
+import { getEnv } from '@/server/env'
 import { getConceptItems, getTopicPath } from './curriculum'
+import { getModelTrace } from './model-trace'
 import { getPushSettings } from './push'
 
 type Method = 'run' | 'all' | 'values' | 'get'
@@ -107,6 +105,142 @@ function seedTopicAndLearner(raw: DatabaseSync, xp: number) {
 
 const scalar = (raw: DatabaseSync, sqlText: string, ...params: (string | number)[]) =>
   (raw.prepare(sqlText).get(...params) as unknown as Record<string, unknown> | undefined) ?? {}
+
+describe('Wonder session planning', () => {
+  const fetchModel = vi.fn()
+  const steps = [
+    { itemId: 'i2', reason: 'Start with the review most at risk of being forgotten.' },
+    { itemId: 'i1', reason: 'Reinforce variables with a second spaced review.' },
+    { itemId: 'i3', reason: 'Finish with a familiar concept.' },
+  ]
+  const response = (output: unknown) => Response.json({
+    choices: [{ message: { content: JSON.stringify(output) }, finish_reason: 'stop' }],
+    usage: { prompt_tokens: 100, completion_tokens: 50 },
+  })
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))
+    Object.assign(getEnv(), { LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://llm.example/v1', LLM_MODEL: 'muse-spark-1.3', JOB_MODELS: { plan: { provider: 'meta', model: 'muse-wonder-1.0' } } })
+    seedTopicAndLearner(raw, 0)
+    seedFrontier(raw, 3, true)
+    raw.exec(`
+      DELETE FROM learner_unit;
+      UPDATE learner_item SET due = 1 WHERE item_id = 'i2';
+      INSERT INTO learner_concept (learner_id, concept_id, p_known, updated_at) VALUES ('u1', 'c1', 0.8, 1);
+    `)
+    fetchModel.mockReset().mockImplementation(async () => response({ steps }))
+    vi.stubGlobal('fetch', fetchModel)
+  })
+  afterEach(() => {
+    getEnv().LLM_PROFILE = 'ollama'
+    getEnv().JOB_MODELS = undefined
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+    vi.useRealTimers()
+  })
+
+  it('starts with Wonder’s validated order and exposes its logged call and reasons in the owned trace', async () => {
+    const { sessionId } = await startSession({ data: { topicId: 't1' } })
+    const stored = scalar(raw, 'SELECT item_ids_json, plan_json FROM sessions WHERE id = ?', sessionId)
+    expect(JSON.parse(stored.item_ids_json as string)).toEqual(['i2', 'i1', 'i3'])
+    expect(JSON.parse(stored.plan_json as string)).toMatchObject({ planning: { planner: 'muse-wonder-1.0', steps } })
+    expect(fetchModel).toHaveBeenCalledTimes(1)
+    const [url, request] = fetchModel.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('https://llm.example/v1/chat/completions')
+    expect(JSON.parse(request.body as string).model).toBe('muse-wonder-1.0')
+    expect(scalar(raw, 'SELECT learner_id, session_id, topic_id, purpose, model, ok FROM model_calls')).toEqual({
+      learner_id: 'u1', session_id: sessionId, topic_id: 't1', purpose: 'plan', model: 'muse-wonder-1.0', ok: 1,
+    })
+    expect((await getSession({ data: { sessionId } })).item?.id).toBe('i2')
+    const trace = await getModelTrace({ data: { scope: 'session', sessionId } })
+    expect(trace.planning).toEqual({ planner: 'muse-wonder-1.0', steps: steps.map(({ reason }) => ({ reason })) })
+    expect(trace.calls).toEqual([expect.objectContaining({ purpose: 'plan', model: 'muse-wonder-1.0', ok: true })])
+    vi.mocked(requireLearnerId).mockResolvedValueOnce('u2')
+    await expect(getModelTrace({ data: { scope: 'session', sessionId } })).rejects.toMatchObject({ status: 404 })
+  })
+
+  it.each([
+    { profile: 'ollama', provider: 'meta', model: 'muse-wonder-1.0', url: 'https://api.meta.ai/v1/chat/completions' },
+    { profile: 'meta', provider: 'baseten', model: 'muse-spark-open', url: 'https://inference.baseten.co/v1/chat/completions' },
+  ] as const)('uses the configured $provider planner when the global profile is $profile', async ({ profile, provider, model, url }) => {
+    getEnv().LLM_PROFILE = profile
+    getEnv().JOB_MODELS = { plan: { provider, model } }
+
+    const { sessionId } = await startSession({ data: { topicId: 't1' } })
+
+    expect(JSON.parse(scalar(raw, 'SELECT item_ids_json FROM sessions').item_ids_json as string)).toEqual(['i2', 'i1', 'i3'])
+    expect(fetchModel).toHaveBeenCalledTimes(1)
+    const [calledUrl, request] = fetchModel.mock.calls[0] as [string, RequestInit]
+    expect(calledUrl).toBe(url)
+    expect(JSON.parse(request.body as string).model).toBe(model)
+    const trace = await getModelTrace({ data: { scope: 'session', sessionId } })
+    expect(trace.planning?.planner).toBe(model)
+    expect(trace.calls).toEqual([expect.objectContaining({ purpose: 'plan', model, ok: true, costUsd: null })])
+  })
+
+  it.each([
+    { name: 'unreachable model', reply: () => Promise.reject(new Error('connection refused')) },
+    { name: 'HTTP failure', reply: () => Promise.resolve(new Response('Unavailable', { status: 503 })) },
+    { name: 'malformed JSON', reply: () => Promise.resolve(Response.json({ choices: [{ message: { content: '{' } }] })) },
+    { name: 'unknown id', reply: () => Promise.resolve(response({ steps: [{ ...steps[0], itemId: 'foreign' }, ...steps.slice(1)] })) },
+    { name: 'duplicate id', reply: () => Promise.resolve(response({ steps: [steps[0], steps[0], steps[2]] })) },
+    { name: 'missing item', reply: () => Promise.resolve(response({ steps: steps.slice(1) })) },
+    { name: 'extra item', reply: () => Promise.resolve(response({ steps: [...steps, steps[0]] })) },
+    { name: 'empty reason', reply: () => Promise.resolve(response({ steps: [{ ...steps[0], reason: ' ' }, ...steps.slice(1)] })) },
+    { name: 'multiline reason', reply: () => Promise.resolve(response({ steps: [{ ...steps[0], reason: 'One\nTwo' }, ...steps.slice(1)] })) },
+    { name: 'misplaced closer', reply: () => Promise.resolve(response({ steps: [steps[2], steps[0], steps[1]] })) },
+  ])('starts the unchanged rules plan on $name, without retrying', async ({ reply }) => {
+    fetchModel.mockImplementation(reply)
+    const { sessionId } = await startSession({ data: { topicId: 't1' } })
+    expect(JSON.parse(scalar(raw, 'SELECT item_ids_json FROM sessions').item_ids_json as string)).toEqual(['i1', 'i2', 'i3'])
+    const trace = await getModelTrace({ data: { scope: 'session', sessionId } })
+    expect(trace.planning?.planner).toBe('planned by rules')
+    expect(trace.planning?.steps).toHaveLength(3)
+    expect(trace.calls).toEqual([expect.objectContaining({ purpose: 'plan', model: 'muse-wonder-1.0', ok: false })])
+    expect(fetchModel).toHaveBeenCalledTimes(1)
+    expect((await getSession({ data: { sessionId } })).item?.id).toBe('i1')
+  })
+
+  it('aborts Wonder at four seconds and starts the rules plan', async () => {
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation((ms) => {
+      const controller = new AbortController()
+      setTimeout(() => controller.abort(new DOMException('Timed out', 'TimeoutError')), ms)
+      return controller.signal
+    })
+    let signal: AbortSignal | undefined
+    fetchModel.mockImplementation((_url: string, request: RequestInit) => new Promise((_resolve, reject) => {
+      signal = request.signal as AbortSignal
+      signal.addEventListener('abort', () => reject(signal!.reason), { once: true })
+    }))
+    const starting = startSession({ data: { topicId: 't1' } })
+    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(3999)
+    expect(scalar(raw, 'SELECT COUNT(*) AS n FROM sessions').n).toBe(0)
+    await vi.advanceTimersByTimeAsync(1)
+    const { sessionId } = await starting
+    expect(signal?.aborted).toBe(true)
+    expect(await getModelTrace({ data: { scope: 'session', sessionId } })).toMatchObject({ planning: { planner: 'planned by rules' }, calls: [{ ok: false, latencyMs: 4000 }] })
+    expect((await getSession({ data: { sessionId } })).item?.id).toBe('i1')
+  })
+
+  it.each([
+    { name: 'guest at 20 calls', account: false, calls: 20, local: false, requests: 0 },
+    { name: 'account at 20 calls', account: true, calls: 20, local: false, requests: 1 },
+    { name: 'account at 150 calls', account: true, calls: 150, local: false, requests: 0 },
+    { name: 'local profile', account: false, calls: 0, local: true, requests: 0 },
+  ])('respects the daily cap and model routing for $name', async ({ account, calls, local, requests }) => {
+    if (account) raw.prepare('INSERT INTO user (id, name, email, is_anonymous) VALUES (?, ?, ?, ?)').run('u1', 'Learner', 'u1@example.test', 0)
+    const log = raw.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    for (let i = 0; i < calls; i++) log.run(`cap-${i}`, 'u1', 'items', 'muse-spark-1.3', 0, 1, Date.now())
+    if (local) { getEnv().LLM_PROFILE = 'ollama'; getEnv().JOB_MODELS = undefined }
+    const { sessionId } = await startSession({ data: { topicId: 't1' } })
+    const trace = await getModelTrace({ data: { scope: 'session', sessionId } })
+    expect(trace.planning?.planner).toBe(requests ? 'muse-wonder-1.0' : 'planned by rules')
+    expect(trace.calls).toEqual(requests ? [expect.objectContaining({ purpose: 'plan', model: 'muse-wonder-1.0', ok: true })] : [])
+    expect(fetchModel).toHaveBeenCalledTimes(requests)
+    expect(scalar(raw, 'SELECT COUNT(*) AS n FROM model_calls').n).toBe(calls + requests)
+  })
+})
 
 it('opens a notification once, records its open, and finishes after one wrong answer', async () => {
   const now = 1793620800000
@@ -192,6 +326,7 @@ it.each(['session', 'placement'])('excludes retired questions from a new %s', as
   expect(JSON.parse(stored.item_ids_json as string)).toEqual(kind === 'placement' ? ['i2'] : ['i2', 'i3', 'i4', 'i5', 'i6', 'i7'])
   if (kind === 'placement') expect(plan.pool.map((i: { id: string }) => i.id)).toEqual(['i2', 'i3', 'i4', 'i5', 'i6', 'i7'])
   expect((await getSession({ data: result })).item?.id).toBe('i2')
+
 })
 
 function seedFrontier(raw: DatabaseSync, itemCount: number, hasDue: boolean) {
@@ -244,8 +379,11 @@ describe('learner practice and unit unlocks', () => {
       .run('u2', 'i6', Date.now(), 1, 5, 2)
 
     const { sessionId } = await startPlacement({ data: { topicId: 't1' } })
-    const { item } = await getSession({ data: { sessionId } })
+    const served = await getSession({ data: { sessionId } })
+    const { item } = served
     // Being served a question must not reveal its answers before submission.
+    expect(JSON.stringify(served)).not.toMatch(/is_correct|accepted_answers|model_answer/)
+    expect(JSON.stringify(await nextItem({ data: { sessionId } }))).not.toMatch(/is_correct|accepted_answers|model_answer/)
     expect(await getConceptItems({ data: { conceptId: 'c1' } })).toEqual({ items: [] })
     await answerItem({ data: { sessionId, itemId: item!.id, answer: { text: '1' }, confidence: 'sure', responseMs: 1000 } })
     await endSession({ data: { sessionId } })

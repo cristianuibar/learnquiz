@@ -77,6 +77,12 @@ export function RevealCard({
       )}
       {state !== 'A' && (
         <div className="mt-2">
+          {ungraded && chosen && (
+            <div className="mb-2">
+              <p className="font-medium">Your answer</p>
+              <p className="mt-1 whitespace-pre-wrap break-words">{chosen}</p>
+            </div>
+          )}
           {(state === 'D' || ungraded) && <p className="font-medium">The answer is {reveal.correctAnswer}</p>}
           {wrong && reveal.chosenFeedback && (
             <p className="mt-2">{(chosen ? `You chose ${chosen}: ` : '') + reveal.chosenFeedback}</p>
