@@ -23,9 +23,11 @@ export async function processConcept(db: Db, conceptId: string): Promise<void> {
     ))
     .returning({ id: concepts.id })
   if (!claimed.length) return
-  // A status write must not mask the original handling.
+  // A status write must not mask the original handling. It only lands while this invocation still holds its claim:
+  // a reset (a replaced document) or a newer claim since then owns the concept, and must not be overwritten.
   const settle = (set: Partial<typeof concepts.$inferInsert>) =>
-    db.update(concepts).set(set).where(eq(concepts.id, conceptId)).then(() => {}, (e) => console.error('concept status write failed', e))
+    db.update(concepts).set(set)
+      .where(and(eq(concepts.id, conceptId), eq(concepts.genStatus, 'generating'), eq(concepts.genStartedAt, now))).then(() => {}, (e) => console.error('concept status write failed', e))
   try {
     const [row] = await db.select({ concept: concepts, topic: topics }).from(concepts)
       .innerJoin(topics, eq(topics.id, concepts.topicId)).where(eq(concepts.id, conceptId))

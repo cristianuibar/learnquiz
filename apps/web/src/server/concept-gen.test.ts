@@ -203,6 +203,27 @@ it('retires questions when the document is replaced after generation read it but
   expect(raw.prepare("SELECT status, COUNT(*) AS n FROM items WHERE source_id = 'co-topic-src' GROUP BY status").all()).toEqual([{ status: 'retired', n: 6 }])
 })
 
+it('keeps a concept reset by a document replacement pending, then regenerates it from the new version', async () => {
+  raw.exec("DELETE FROM concepts WHERE id <> 'c00'")
+  beforeSql = {
+    prefix: 'insert into "items"',
+    fn: () => {
+      raw.exec("UPDATE sources SET retired_at = 1 WHERE id = 'co-topic-src'")
+      raw.exec("INSERT INTO sources (id, topic_id, kind, title, body_text, version, created_at) VALUES ('co-topic-src-v2', 'co-topic', 'text', 'SOP', 'Scan the bin.', 3, 2)")
+      raw.exec("UPDATE concepts SET source_id = 'co-topic-src-v2', gen_status = 'pending', gen_started_at = NULL, gen_error = NULL WHERE id = 'c00'")
+    },
+  }
+  await drainConceptQueue()
+  expect(beforeSql).toBeNull()
+  expect(states()).toEqual([{ id: 'c00', gen_status: 'pending', gen_error: null }])
+  expect(one("SELECT COUNT(*) AS n FROM items WHERE concept_id = 'c00' AND status = 'active'")).toEqual({ n: 0 })
+
+  await drainConceptQueue()
+  expect(states()).toEqual([{ id: 'c00', gen_status: 'ready', gen_error: null }])
+  expect(raw.prepare("SELECT source_id, source_version, COUNT(*) AS n FROM items WHERE concept_id = 'c00' AND status = 'active' GROUP BY source_id, source_version").all())
+    .toEqual([{ source_id: 'co-topic-src-v2', source_version: 3, n: 6 }])
+})
+
 it('sends the source document for a replacement version or a lost quote, not for a version-1 quote', async () => {
   raw.exec("DELETE FROM concepts WHERE id <> 'c00'")
   raw.exec("UPDATE concepts SET source_quote = 'Scan the bin.' WHERE id = 'c00'")
