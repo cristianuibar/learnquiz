@@ -6,7 +6,7 @@ import {
   useFonts,
 } from '@expo-google-fonts/inter'
 import { useURL } from 'expo-linking'
-import { Stack, useRouter, type Href } from 'expo-router'
+import { Stack, usePathname, useRouter, type Href } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
@@ -48,6 +48,7 @@ export default function RootLayout() {
 function SessionRoutes({ fontsLoaded }: { fontsLoaded: boolean }) {
   const session = useSession()
   const router = useRouter()
+  const pathname = usePathname()
   const url = useURL()
   const lastURL = useRef<string | null>(null)
   const mounted = useRef(false)
@@ -63,13 +64,15 @@ function SessionRoutes({ fontsLoaded }: { fontsLoaded: boolean }) {
       if (target && !canOpenTarget(target, session)) holdTarget(target)
     }
     // The native router handles open links. Only replay links held by a gate.
-    if (!resolved) return
+    // index owns the gate's destination, including the protected sign-in screen
+    // being removed. Replaying here would race index's fallback and lose a link.
+    if (!resolved || pathname === '/' || pathname === '/sign-in') return
     const target = takeReplayTarget()
     if (target) {
       if (canOpenTarget(target, session)) router.replace(target as Href)
       else holdTarget(target)
     }
-  }, [url, session.status, session.needsDisclosure, resolved, router, replays])
+  }, [url, session.status, session.needsDisclosure, resolved, router, replays, pathname])
 
   useEffect(() => {
     if (resolved && !mounted.current) {
