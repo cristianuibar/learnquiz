@@ -7,11 +7,21 @@ import { holdTarget, takeHeldTarget } from './lib/held-target'
 jest.mock('./app/play/[sessionId]/index', () => ({ __esModule: true, default: () => null }))
 jest.mock('@expo-google-fonts/inter', () => ({ useFonts: () => [true, null] }))
 jest.mock('expo-splash-screen', () => ({ preventAutoHideAsync: jest.fn(), hideAsync: jest.fn() }))
+jest.mock('expo-notifications', () => ({
+  DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
+  getLastNotificationResponseAsync: jest.fn(async () => null),
+  addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+}))
 jest.mock('./lib/session-store', () => ({
   SessionProvider: ({ children }: { children: unknown }) => children,
   useSession: jest.fn(),
 }))
 jest.mock('./lib/api', () => ({ api: jest.fn() }))
+// The real Today screen loads /today; this file only checks that the route is reachable.
+jest.mock('./app/(tabs)/today', () => ({
+  __esModule: true,
+  default: () => require('react').createElement(require('react-native').Text, null, 'Today screen'),
+}))
 jest.mock('react-native-gesture-handler', () => ({ GestureHandlerRootView: 'View' }))
 jest.mock('react-native-keyboard-controller', () => ({
   KeyboardProvider: 'View',
@@ -73,6 +83,7 @@ test('the actual router keeps sign-in closed for a signed-in learner', async () 
   const navigation = renderRouter('src/app', { initialUrl: '/sign-in' })
   await navigation
   expect(navigation.getPathname()).toBe('/today')
+  expect(screen.getByText('Today screen')).toBeOnTheScreen()
   expect(screen.queryByText('Sign in')).toBeNull()
 })
 

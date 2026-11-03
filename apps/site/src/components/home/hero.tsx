@@ -1,29 +1,198 @@
-import { signInUrl, signUpUrl } from '../../site-config'
+import { useId, useRef, useState } from 'react'
+import { demoTranscriptUrl, demoVideoUrl, signUpUrl } from '../../site-config'
+import { Icon } from '../ui/icon'
+import { PhoneFrame } from '../ui/phone-frame'
 
-export function Hero() {
+const phoneLabel =
+  'Learn Quiz on a phone. Question 7 of 20: A pallet’s shrink wrap is torn on arrival. What do you do first? Four answers, then: How sure are you? Sure, Unsure or Guessing.'
+
+const options = [
+  'Re-wrap it and put it away as normal',
+  'Photograph the damage and note it on the delivery receipt',
+  'Move it straight to Quarantine bay Q1',
+  'Sign the receipt, then tell your lead',
+]
+const selectedOption = 1
+
+const videoTitle = 'Learn Quiz demo, 3 minutes'
+
+function youTubeId(url: URL): string | null {
+  const host = url.hostname.replace(/^(www|m)\./, '')
+  const segments = url.pathname.split('/').filter(Boolean)
+  if (host === 'youtu.be') return segments[0] ?? null
+  if (host !== 'youtube.com' && host !== 'youtube-nocookie.com') return null
+  if (segments[0] === 'embed' || segments[0] === 'shorts' || segments[0] === 'live') return segments[1] ?? null
+  if (segments[0] === 'watch') return url.searchParams.get('v')
+  return null
+}
+
+/** Parses an absolute https URL; anything else (other schemes, relative, garbage) is null. */
+function httpsUrl(value: string): URL | null {
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' ? url : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Turns the configured demo URL into the iframe src, or null when it is not an
+ * absolute https URL. YouTube links become a youtube-nocookie.com embed with
+ * captions on; any other https URL is used as given.
+ */
+export function demoEmbedUrl(videoUrl: string): string | null {
+  const url = httpsUrl(videoUrl)
+  if (!url) return null
+  const id = youTubeId(url)
+  if (!id) return videoUrl
+  const isEmbed = url.pathname.startsWith('/embed/')
+  const embed = new URL(`https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}`)
+  if (isEmbed) url.searchParams.forEach((value, key) => embed.searchParams.set(key, value))
+  embed.searchParams.set('cc_load_policy', '1')
+  return embed.toString()
+}
+
+function DemoVideo({ embedUrl, transcriptUrl }: { embedUrl: string; transcriptUrl: string | null }) {
+  const titleId = useId()
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const [open, setOpen] = useState(false)
+
+  function openVideo() {
+    setOpen(true)
+    dialogRef.current?.showModal()
+  }
+
+  function onClose() {
+    setOpen(false)
+    buttonRef.current?.focus()
+  }
+
   return (
-    <section id="top" aria-labelledby="hero-title" className="hero">
-      <div className="wrap grid items-center gap-12 lg:grid-cols-2">
-        <div>
-          <h1 id="hero-title" className="text-title-1 md:text-display">Train every new hire on your own procedures.</h1>
-          <p className="mt-6 text-body-lg text-ink-muted">
-            Upload your SOPs. Each employee gets five-minute quiz sessions and one question during the shift, in your company's words, until they know the job.
-          </p>
-          <div id="lqs-hero-cta" className="mt-8 flex flex-wrap items-center gap-4">
-            <a className="btn btn-accent" href={signUpUrl}>
-              Create a company account
-            </a>
-            <a className="btn btn-secondary" href={signInUrl}>Sign in</a>
-          </div>
+    <>
+      <button
+        ref={buttonRef}
+        className="btn btn-secondary btn-lg"
+        type="button"
+        aria-haspopup="dialog"
+        onClick={openVideo}
+      >
+        <Icon name="play" />
+        Watch the demo <span className="muted font-medium">3 min</span>
+      </button>
+      <dialog ref={dialogRef} className="video-dlg" aria-labelledby={titleId} onClose={onClose}>
+        <div className="video-head">
+          <h2 id={titleId} className="t-title2 flex-1">
+            {videoTitle}
+          </h2>
+          <button className="icon-btn" type="button" aria-label="Close" onClick={() => dialogRef.current?.close()}>
+            <Icon name="close" size={24} />
+          </button>
         </div>
-        <img
-          className="mx-auto h-auto w-[360px] max-w-full rounded-md border border-border"
-          src="/screens/Today.png"
-          width="360"
-          height="740"
-          fetchPriority="high"
-          alt="Learn Quiz Today screen for Northwind Logistics with a five-minute session, daily reviews, and warehouse picker mastery at 66% of an 85% benchmark."
-        />
+        <div className="video-frame relative">
+          {open ? (
+            <iframe
+              className="absolute inset-0 size-full border-0"
+              src={embedUrl}
+              title={videoTitle}
+              allow="encrypted-media; picture-in-picture"
+              allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
+            />
+          ) : null}
+        </div>
+        <p className="video-foot t-caption muted">
+          Captions on by default.
+          {transcriptUrl ? (
+            <>
+              {' '}
+              <a href={transcriptUrl} target="_blank" rel="noopener noreferrer">
+                Transcript
+              </a>
+            </>
+          ) : null}
+        </p>
+      </dialog>
+    </>
+  )
+}
+
+export function Hero({
+  videoUrl = demoVideoUrl,
+  transcriptUrl = demoTranscriptUrl,
+}: {
+  videoUrl?: string
+  transcriptUrl?: string
+}) {
+  const embedUrl = demoEmbedUrl(videoUrl)
+  const transcriptHref = httpsUrl(transcriptUrl) ? transcriptUrl : null
+  return (
+    <section className="hero" aria-labelledby="lqs-h1" id="top">
+      <div className="wrap">
+        <div className="hero-grid">
+          <div className="hero-copy">
+            <h1 id="lqs-h1" className="h-hero">
+              New hires learn the job from your own SOPs.
+            </h1>
+            <p className="lead max-w-[34em]">
+              Upload the procedures for a role. New hires practice them on their phone in five-minute sessions until
+              they reach your benchmark. Every explanation quotes your document.
+            </p>
+            <div className="hero-actions" id="lqs-hero-cta">
+              <a className="btn btn-accent btn-lg" href={signUpUrl}>
+                Create a company account
+              </a>
+              {embedUrl ? <DemoVideo embedUrl={embedUrl} transcriptUrl={transcriptHref} /> : null}
+            </div>
+          </div>
+
+          <figure className="hero-phone">
+            <PhoneFrame label={phoneLabel}>
+              <div className="p-topbar">
+                <span className="p-ico">
+                  <Icon name="close" size={24} />
+                </span>
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <div className="bar flex-1">
+                    <div className="bar-fill" style={{ width: '35%' }} />
+                  </div>
+                  <span className="t-overline num muted">7 of 20</span>
+                </div>
+                <span className="p-ico">
+                  <Icon name="volume" size={24} />
+                </span>
+              </div>
+              <div className="p-scroll">
+                <p className="t-title2">A pallet’s shrink wrap is torn on arrival. What do you do first?</p>
+                <div className="opt-list">
+                  {options.map((option, index) => (
+                    <div key={option} className={index === selectedOption ? 'opt is-selected' : 'opt'}>
+                      <span className="radio" />
+                      <span className="opt-text">{option}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="p-dock">
+                <div>
+                  <span className="conf-legend">How sure are you?</span>
+                  <div className="conf">
+                    <span className="conf-btn">Sure</span>
+                    <span className="conf-btn is-selected">
+                      <span className="conf-tick">
+                        <Icon name="check" size={16} />
+                      </span>
+                      Unsure
+                    </span>
+                    <span className="conf-btn">Guessing</span>
+                  </div>
+                </div>
+                <span className="p-btn p-btn-primary">Check</span>
+              </div>
+            </PhoneFrame>
+          </figure>
+        </div>
       </div>
     </section>
   )

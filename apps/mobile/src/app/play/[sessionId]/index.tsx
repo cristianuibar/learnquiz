@@ -15,11 +15,11 @@ import { useHeadingFocus } from '@/components/ui/Screen'
 import { Text } from '@/components/ui/Text'
 import { api } from '@/lib/api'
 import { answerBody, answerError } from '@/lib/session/answer'
-import { deleteDraft, readDraft, writeDraft } from '@/lib/session/draft'
+import { deleteDraft, draftForView, writeDraft } from '@/lib/session/draft'
+import { sessionRefetchError, type SessionError } from '@/lib/session/error'
 import { useSession } from '@/lib/session-store'
 import { useTheme } from '@/theme/ThemeProvider'
 
-type SessionError = { kind: 'load' | 'check' | 'next'; message: string }
 type Submission = ReturnType<typeof answerBody>
 const emptyDraft = (): Draft => ({ answer: {}, confidence: null })
 const emptyLocal = () => ({ reflection: '', readAloud: false })
@@ -53,7 +53,7 @@ function ActiveSession({ sessionId }: { sessionId: string }) {
 
   const active = useCallback(() => mounted.current && !leaving.current, [])
 
-  const applyView = useCallback(async (next: SessionView, signal: AbortSignal) => {
+  const applyView = useCallback(async (next: SessionView, signal: AbortSignal, checkedItemId?: string) => {
     if (!active() || signal.aborted) return
     const previousItemId = viewRef.current?.item?.id
     if (next.ended) {
@@ -69,12 +69,9 @@ function ActiveSession({ sessionId }: { sessionId: string }) {
       return
     }
 
-    // A missed item may return immediately at a new position with the same ID.
-    if (next.item?.id !== previousItemId || next.progress.position !== viewRef.current?.progress.position) {
-      const restored = next.item ? await readDraft(sessionId, next.item.id).catch(() => null) : null
-      if (!active() || signal.aborted) return
-      if (previousItemId) void deleteDraft(sessionId, previousItemId).catch(() => {})
-      const nextDraft = restored ?? emptyDraft()
+    const nextDraft = await draftForView(sessionId, viewRef.current, next, checkedItemId)
+    if (!active() || signal.aborted) return
+    if (nextDraft) {
       draftRef.current = nextDraft
       setDraft(nextDraft)
       setLocal(emptyLocal())
@@ -98,7 +95,7 @@ function ActiveSession({ sessionId }: { sessionId: string }) {
       await applyView(next, controller.signal)
       if (active() && !controller.signal.aborted) setError((current) => current?.kind === 'load' ? null : current)
     } catch {
-      if (active() && !controller.signal.aborted) setError({ kind: 'load', message: networkError })
+      if (active() && !controller.signal.aborted) setError(sessionRefetchError)
     } finally {
       if (request.current === controller) {
         request.current = null
@@ -189,9 +186,11 @@ function ActiveSession({ sessionId }: { sessionId: string }) {
       if (!active() || controller.signal.aborted) return
       if (answerError(failure) === 'resync') {
         resyncing = true
+        await deleteDraft(sessionId, item.id).catch(() => {})
+        if (!active() || controller.signal.aborted) return
         try {
           const next = await api<SessionView>(path, { signal: controller.signal })
-          if (active()) await applyView(next, controller.signal)
+          if (active()) await applyView(next, controller.signal, item.id)
           if (active() && !controller.signal.aborted) setError(null)
         } catch {
           if (active() && !controller.signal.aborted) setError({ kind: 'load', message: networkError })
