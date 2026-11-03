@@ -1,7 +1,7 @@
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from '@better-auth/drizzle-adapter'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
-import { admin, anonymous, organization } from 'better-auth/plugins'
+import { admin, anonymous, bearer, organization } from 'better-auth/plugins'
 import type { BetterAuthPlugin } from 'better-auth'
 import { and, eq, inArray } from 'drizzle-orm'
 import { getDb, authSchema } from '@/db'
@@ -83,6 +83,8 @@ export function createAuth(transportPlugins: BetterAuthPlugin[] = []) {
           },
         },
       }),
+      // Native clients send the session token as Authorization: Bearer; sign-in and sign-up return it in set-auth-token.
+      bearer(),
       ...transportPlugins, // Cookie transport must stay last when present.
     ],
   })
