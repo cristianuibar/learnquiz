@@ -38,9 +38,15 @@ export async function requireOrgAdmin(org: string) {
 }
 
 // Staff can inspect the existing portal without acquiring company membership or write permissions.
+// Staff who are owner or admin of the company itself get the full portal, like any other company admin.
 export async function requireOrgReader(org: string) {
   const user = await requireUser()
   if (user.role !== 'admin') return { user, ...(await checkMembership(getDb(), user.id, org, true)), readOnly: false }
+  const admin = await checkMembership(getDb(), user.id, org, true).catch((e: { status?: number }) => {
+    if (e.status === 403) return null
+    throw e
+  })
+  if (admin) return { user, ...admin, readOnly: false }
   await requireStaff()
   const company = await getDb().select().from(organization).where(eq(organization.slug, org)).get()
   if (!company) throw httpError('Company not found', 404)

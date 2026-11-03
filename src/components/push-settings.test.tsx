@@ -94,3 +94,38 @@ it('keeps staff navigation while enabling, testing and disabling notifications f
     Reflect.deleteProperty(navigator, 'serviceWorker')
   }
 })
+
+it("replaces another account's leftover browser subscription when enabling notifications", async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+  const sub = (endpoint: string, keys: { p256dh: string; auth: string }) => ({ endpoint, toJSON: () => ({ endpoint, keys }), unsubscribe: vi.fn(async () => true) })
+  const leftover = sub('https://fcm.googleapis.com/fcm/send/account-a', { p256dh: 'a-public-key', auth: 'a-auth-secret' })
+  const endpoint = 'https://fcm.googleapis.com/fcm/send/account-b'
+  const keys = { p256dh: 'b-public-key', auth: 'b-auth-secret' }
+  const created = sub(endpoint, keys)
+  const browserSubscribe = vi.fn(async () => created)
+  const registration = { pushManager: { getSubscription: vi.fn(async () => leftover), subscribe: browserSubscribe } }
+  vi.stubGlobal('PushManager', class {})
+  vi.stubGlobal('Notification', { requestPermission: vi.fn(async () => 'granted') })
+  Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: { register: vi.fn(async () => registration), ready: Promise.resolve(registration) } })
+  vi.mocked(getPushSettings).mockResolvedValue({ publicKey: btoa('public-key').replace(/=+$/, ''), isStaff: false, endpoints: [], prefs, canPrompt: false })
+  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'b', name: 'B', role: 'learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })
+  const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader })
+  const me = createRoute({ getParentRoute: () => rootRoute, path: '/me/', beforeLoad: meRoute.options.beforeLoad, loader: meRoute.options.loader, component: meRoute.options.component })
+  const router = createRouter({ routeTree: rootRoute.addChildren([me]), history: createMemoryHistory({ initialEntries: ['/me/'] }) })
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  try {
+    await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
+    await act(async () => [...container.querySelectorAll('button')].find((b) => b.textContent === 'Enable notifications')!.click())
+    expect(leftover.unsubscribe).toHaveBeenCalledOnce()
+    expect(browserSubscribe).toHaveBeenCalledOnce()
+    expect(subscribe).toHaveBeenCalledExactlyOnceWith({ data: { endpoint, keys } })
+    expect(container.querySelector('[role="status"]')?.textContent).toBe('Notifications enabled on this browser.')
+    expect(container.querySelector('[role="alert"]')).toBeNull()
+  } finally {
+    await act(async () => root.unmount())
+    container.remove()
+    Reflect.deleteProperty(navigator, 'serviceWorker')
+  }
+})

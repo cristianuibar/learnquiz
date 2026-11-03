@@ -139,6 +139,13 @@ it('allows staff to read the company portal without invite secrets or company wr
   await expect(getOrgOverview({ data: { slug: 'beta' } })).rejects.toMatchObject({ status: 403 })
 })
 
+it('gives staff who own a company the full portal for that company', async () => {
+  sqlite.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, ?)').run('staff-owner', 'alpha', accounts.get('staff')!.id, 'owner', NOW)
+  await expect(getPeople({ data: { slug: 'alpha' } })).resolves.toMatchObject({ readOnly: false, invites: [{ id: 'private-invite' }] })
+  await expect(getOrgOverview({ data: { slug: 'alpha' } })).resolves.toMatchObject({ readOnly: false })
+  await expect(getPeople({ data: { slug: 'beta' } })).resolves.toMatchObject({ readOnly: true, invites: [] })
+})
+
 it('searches users through the admin plugin and bans, revokes sessions, blocks sign-in and unbans', async () => {
   const learner = accounts.get('learner')!
   await expect(listUsers({ data: { search: 'learner@', field: 'email', offset: 0 } })).resolves.toMatchObject({ users: [{ id: learner.id }], total: 1 })

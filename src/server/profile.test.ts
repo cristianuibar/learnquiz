@@ -187,6 +187,16 @@ it('records proficiency only after every concept meets the benchmark, including 
   expect(profile.units[1].concepts[1]).toMatchObject({ name: 'First aid', pKnown: 0 })
 })
 
+it('records role proficiency by mean and critical concepts, and surfaces only critical confident errors', async () => {
+  seedWeek()
+  raw.exec("UPDATE learner_concept SET p_known = 0.95 WHERE concept_id = 'c1'; UPDATE learner_concept SET p_known = 0.7 WHERE concept_id = 'c2'; UPDATE attempts SET p_known_after = 0.95 WHERE id = 'a5'; UPDATE attempts SET confidence = 'sure' WHERE id = 'a2'")
+  raw.prepare('INSERT INTO job_roles (id, org_id, name, benchmark, created_at) VALUES (?, ?, ?, ?, ?)').run('role', 'org-a', 'Safety officer', 0.8, start)
+  raw.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES (?, ?, ?, ?)').run('learner-a', 'org-a', 'role', start)
+  const profile = await getProfile({ data: {} })
+  expect(profile.proficiency).toEqual({ achievedAt: start + 6 * DAY + 3600_000, days: 7, estimatedDays: null, projectedAt: null })
+  expect(profile.confidentErrors.map((e) => [e.id, e.conceptId])).toEqual([['a4', 'c1'], ['a0', 'c1']])
+})
+
 it('has no projection before training and refuses a target without a company', async () => {
   holder.user = { id: 'new-learner', name: 'New learner', isAnonymous: false }
   const profile = await getProfile({ data: {} })

@@ -265,7 +265,7 @@ it.each([false, true])('submits a short answer and shows its reveal (ungraded=%s
     expect(status.querySelector('img')?.getAttribute('src')).toBe('/media/concepts/c1')
     if (ungraded) {
       expect(status.querySelector('h2')?.textContent).toBe('Could not grade this answer')
-      expect(status.textContent).toContain('Equal changes preserve equality.')
+      expect(status.textContent).toMatch(/Your answerBoth sides get smaller\.The answer is Equal changes preserve equality\./)
       expect(status.textContent).toContain('Compare your answer with the model answer.')
       expect(status.querySelector('#why')).toBeNull()
     } else {

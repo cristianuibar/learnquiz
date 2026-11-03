@@ -50,7 +50,7 @@ it.each([
   { total: 1, canPrompt: true, standalone: true, expected: true },
   { total: 1, canPrompt: false, standalone: false, expected: false },
 ])('offers opt-in after the first completed summary (total=$total, first=$canPrompt, standalone=$standalone)', async ({ total, canPrompt, standalone, expected }) => {
-  vi.mocked(endSession).mockResolvedValue({ sessionId: 's1', kind: 'session', topicId: 't1', durationMs: 1000, correct: total, total, xp: 0,
+  vi.mocked(endSession).mockResolvedValue({ sessionId: 's1', kind: 'session', topicId: 't1', durationMs: 1000, correct: total, total, ungraded: 0, xp: 0,
     streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], nextLine: 'Come back soon.' } satisfies SummaryView)
   vi.mocked(getPushSettings).mockResolvedValue({ publicKey: 'public-key', isStaff: false, endpoints: [], canPrompt,
     prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' } })
@@ -71,6 +71,18 @@ it.each([
     }
     expect(requestPermission).not.toHaveBeenCalled()
   } finally { await cleanup(); Reflect.deleteProperty(navigator, 'serviceWorker') }
+})
+
+it.each([0, 3])('shows the not-graded count on the summary only when answers were ungraded (ungraded=%s)', async (ungraded) => {
+  vi.mocked(endSession).mockResolvedValue({ sessionId: 's1', kind: 'session', topicId: 't1', durationMs: 1000, correct: 9, total: 10, ungraded, xp: 0,
+    streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], nextLine: 'Come back soon.' } satisfies SummaryView)
+  vi.mocked(getPushSettings).mockResolvedValue({ publicKey: 'public-key', isStaff: false, endpoints: [], canPrompt: false,
+    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' } })
+  const { container, cleanup } = await renderApp('/play/s1/done')
+  try {
+    const score = [...container.querySelectorAll('span')].find((span) => span.textContent?.startsWith('9 of 10 correct'))
+    expect(score?.textContent).toBe(ungraded ? '9 of 10 correct · 3 not graded' : '9 of 10 correct')
+  } finally { await cleanup() }
 })
 
 it('opens a notification deep link through the quick route and redirects into focused play', async () => {

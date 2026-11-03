@@ -1,4 +1,4 @@
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { RouteError } from '@/components/inline-error'
 import { getOrgOverview } from '@/server/org'
 
@@ -31,32 +31,6 @@ function Overview() {
           ))}
         </ul>
       </section>
-      {!org.readOnly && (
-        <Link
-          to="/org/$slug/roles"
-          params={{ slug: org.slug }}
-          className="mt-6 inline-flex h-11 items-center rounded-md font-medium underline outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-        >
-          Manage job roles
-        </Link>
-      )}
-      <Link
-        to="/org/$slug/people"
-        params={{ slug: org.slug }}
-        className="mt-10 inline-flex h-11 items-center rounded-md font-medium underline outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-      >
-        People
-      </Link>
-      {!org.readOnly && (
-        <Link
-          to="/org/$slug/questions"
-          params={{ slug: org.slug }}
-          className="mt-10 ml-6 inline-flex h-11 items-center rounded-md font-medium underline outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-        >
-          Question review
-        </Link>
-      )}
-      {!org.readOnly && <Link to="/org/$slug/settings" params={{ slug: org.slug }} className="ml-6 inline-flex h-11 items-center rounded-md font-medium underline outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">Settings</Link>}
     </main>
   )
 }

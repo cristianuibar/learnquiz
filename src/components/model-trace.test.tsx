@@ -28,7 +28,7 @@ it.each(['topic', 'session'] as const)('opens the %s trace from its page and ret
     learner: { level: 3, levelLine: null, levelLineModel: null, placed: false, xp: 0, streak: 0 }, units: [], edges: [],
   })
   vi.mocked(endSession).mockResolvedValue({
-    sessionId: 's1', kind: 'session', topicId: 't1', durationMs: 60000, correct: 1, total: 1, xp: 10, streak: 1,
+    sessionId: 's1', kind: 'session', topicId: 't1', durationMs: 60000, correct: 1, total: 1, ungraded: 0, xp: 10, streak: 1,
     level: 3, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], nextLine: 'Practise equations.',
   })
   vi.mocked(getModelTrace).mockReset().mockRejectedValueOnce(new Error('Trace unavailable')).mockResolvedValue({

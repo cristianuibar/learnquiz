@@ -3,7 +3,7 @@ import { createFileRoute, redirect } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { Check, X } from 'lucide-react'
 import { ConceptDiagram } from '@/components/concept-diagram'
-import { RouteError } from '@/components/inline-error'
+import { InlineError, RouteError, errorMessage } from '@/components/inline-error'
 import { MasteryBar } from '@/components/mastery-bar'
 import { ModelLabel } from '@/components/model-label'
 import { ModelTrace } from '@/components/model-trace'
@@ -96,7 +96,7 @@ function Path() {
           </li>
         ))}
       </ol>
-      <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] -mx-4 mt-8 border-t bg-background px-4 py-4">
+      <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 -mx-4 mt-8 border-t bg-background px-4 py-4">
         <StartButton topicId={topic.id} placement={!learner.placed}>
           {learner.placed ? 'Start session' : 'Find my level'}
         </StartButton>
@@ -123,7 +123,7 @@ function Concept({
     try {
       setItems((await load({ data: { conceptId: concept.id } })).items)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong')
+      setError(errorMessage(err))
     }
     setWorking(false)
   }
@@ -143,16 +143,17 @@ function Concept({
         </div>
       ) : (
         concept.itemCount > 0 &&
-        items === null && (
+        items === null &&
+        !error && (
           <Button variant="outline" className="mt-4 h-12 px-6" onClick={show}>
             Show answered questions
           </Button>
         )
       )}
       {error && (
-        <p role="alert" className="mt-3 text-sm font-medium text-wrong">
-          {error}
-        </p>
+        <div className="mt-3">
+          <InlineError message={error} onRetry={() => void show()} />
+        </div>
       )}
       {items?.length === 0 && (
         <p role="status" className="mt-3 text-sm text-muted-foreground">

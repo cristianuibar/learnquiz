@@ -149,9 +149,11 @@ it('reports assigned training stages, unresolved critical errors and company pro
   concept.run('scan', topic, 'warehouse', 'Scan each item', 'Scan each item.', 1)
   concept.run('pick', topic, 'warehouse', 'Read the pick ticket', 'Read the pick ticket.', 0)
   concept.run('foreign', foreignTopic, 'other-unit', 'Other company safety', 'Other company safety.', 1)
+  concept.run('extra', topic, 'warehouse', 'Label returns', 'Label returns.', 0)
   const known = sqlite.prepare('INSERT INTO learner_concept (learner_id, concept_id, p_known, updated_at) VALUES (?, ?, ?, ?)')
   known.run('member', 'scan', 0.4, start)
   for (const id of ['scan', 'pick']) known.run('admin', id, 0.95, start + 4 * day)
+  known.run('admin', 'extra', 0.8, start + 4 * day) // below benchmark, but mean and critical concepts meet it
   known.run('other-owner', 'foreign', 0.99, start + day)
   sqlite.prepare('INSERT INTO invitation (id, organization_id, email, expires_at, inviter_id, job_role_id, invitee_name) VALUES (?, ?, ?, ?, ?, ?, ?)')
     .run('waiting', 'org-a', 'waiting@x.test', Date.now() + day, 'owner', 'legacy-role', 'Waiting')
@@ -199,4 +201,12 @@ it.each([0, 366, 2147483648])('rejects an onboarding period of %s days with a pe
   const role = await (async () => createRole({ data: { slug: 'alpha', name: 'Long onboarding', onboardingDays } }))().catch((e: unknown) => e)
   expect(fieldErrors(role)).toEqual({ onboardingDays: onboardingDays < 1 ? 'Use at least 1 day for the onboarding period' : 'Use at most 365 days for the onboarding period' })
   expect(sqlite.prepare('SELECT id FROM job_roles WHERE name = ?').all('Long onboarding')).toEqual([])
+})
+
+it('rejects a role name that matches an existing role after trimming and case folding', async () => {
+  await createRole({ data: { slug: 'alpha', name: 'Customer Support' } })
+  const duplicate = await (async () => createRole({ data: { slug: 'alpha', name: 'customer support ' } }))().catch((e: unknown) => e)
+  expect(duplicate).toMatchObject({ status: 409 })
+  expect(fieldErrors(duplicate)).toEqual({ name: 'A role with this name already exists' })
+  expect(sqlite.prepare("SELECT name FROM job_roles WHERE lower(trim(name)) = 'customer support'").all()).toEqual([{ name: 'Customer Support' }])
 })

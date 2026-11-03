@@ -120,6 +120,7 @@ it.each([
   expect(row('SELECT xp FROM learner_topic').xp).toBe(0)
   expect(raw.prepare('SELECT purpose, ok FROM model_calls').all()).toEqual(Array.from({ length: calls }, () => ({ purpose: 'grade', ok: 0 })))
   expect((await nextItem({ data: { sessionId: 's1', why: 'my reflection' } })).item?.id).toBe('i2')
+  expect(await endSession({ data: { sessionId: 's1' } })).toMatchObject({ correct: 0, total: 0, ungraded: 1 })
 })
 
 it.each([

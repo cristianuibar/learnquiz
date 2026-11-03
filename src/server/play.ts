@@ -1,12 +1,14 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, count, eq, getTableColumns, gte, inArray, isNull, lte, ne, sql, type SQL } from 'drizzle-orm'
+import { and, asc, count, eq, exists, getTableColumns, gte, inArray, isNull, lte, ne, or, sql, type SQL } from 'drizzle-orm'
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core'
 import { z } from 'zod'
 import { getDb, type Db } from '@/db'
-import { attempts, concepts, items, learnerConcept, learnerItem, learnerTopic, learnerUnit, placements, pushLog, sessions, topics, units } from '@/db/schema'
+import { member } from '@/db/auth-schema'
+import { attempts, concepts, items, jobRoles, learnerConcept, learnerItem, learnerTopic, learnerUnit, memberRoleAssignments, placements, pushLog, sessions, topics, units } from '@/db/schema'
 import { BKT, guessFor, MASTERY, placementPrior, update } from '@/lib/learning/bkt'
 import { ratingFor, retrievability, review } from '@/lib/learning/fsrs'
 import { gradeAnswer, revealState, toItemView } from '@/lib/learning/grade'
+import { benchmarkMet } from '@/lib/learning/profile'
 import { levelResult, nextLevel, pickNext, PLACEMENT, shouldStop } from '@/lib/learning/placement'
 import { composeSession, reinsert, SESSION_BONUS, streakAfter, xpFor } from '@/lib/learning/session'
 import type { Confidence, ItemView, Reveal, SessionPlanning, SessionView, SummaryView } from '@/lib/learning/types'
@@ -30,7 +32,7 @@ type Stmt = Parameters<Db['batch']>[0][number]
 
 // planJson. position indexes itemIdsJson; answered gates answerItem (once per slot) and nextItem (only after an answer).
 // answerClaim marks a slot being graded (see answerItem).
-type Plan = { position: number; answered: boolean; lastAttemptId?: string; answerClaim?: { token: string; at: number } }
+type Plan = { position: number; answered: boolean; lastAttemptId?: string; answerClaim?: { token: string; at: number }; ungraded?: number }
 type PlacementPlan = Plan & {
   workingLevel: number
   log: { itemId: string; correct: boolean; confidence: Confidence; level: number }[]
@@ -59,13 +61,29 @@ function insertIf<T extends SQLiteTable>(db: Db, table: T, when: SQL, row: T['$i
   return db.insert(table).select(sql`select ${sql.join(values, sql`, `)} where ${when}`)
 }
 
+// The learner's own topic, or the topic of an active role they are assigned to in a company they belong to.
+const playable = (db: Db, learnerId: string) =>
+  or(
+    eq(topics.learnerId, learnerId),
+    exists(
+      db
+        .select({ one: sql`1` })
+        .from(memberRoleAssignments)
+        .innerJoin(member, and(eq(member.userId, memberRoleAssignments.userId), eq(member.organizationId, memberRoleAssignments.orgId)))
+        .innerJoin(jobRoles, and(eq(jobRoles.id, memberRoleAssignments.jobRoleId), eq(jobRoles.orgId, memberRoleAssignments.orgId), eq(jobRoles.status, 'active')))
+        .where(and(eq(memberRoleAssignments.userId, learnerId), eq(memberRoleAssignments.jobRoleId, topics.jobRoleId))),
+    ),
+  )
+
 async function ownedTopic(db: Db, learnerId: string, topicId: string) {
   const [topic] = await db
     .select()
     .from(topics)
-    .where(and(eq(topics.id, topicId), eq(topics.learnerId, learnerId)))
+    .where(and(eq(topics.id, topicId), playable(db, learnerId)))
   if (!topic) throw httpError('Topic not found', 404)
   if (topic.status !== 'ready') throw httpError('This topic is not ready yet', 409)
+  // A role topic has no learner_topic row until the member first plays it (defaults as in curriculum.ts).
+  if (topic.learnerId !== learnerId) await db.insert(learnerTopic).values({ learnerId, topicId: topic.id, level: 3, rating: 1500 }).onConflictDoNothing()
   return topic
 }
 
@@ -74,7 +92,7 @@ async function loadSession(db: Db, learnerId: string, sessionId: string) {
     .select({ session: sessions, topic: topics })
     .from(sessions)
     .innerJoin(topics, eq(topics.id, sessions.topicId))
-    .where(and(eq(sessions.id, sessionId), eq(sessions.learnerId, learnerId), eq(topics.learnerId, learnerId)))
+    .where(and(eq(sessions.id, sessionId), eq(sessions.learnerId, learnerId), playable(db, learnerId)))
   if (!row) throw httpError('Session not found', 404)
   return row
 }
@@ -401,6 +419,28 @@ export const transcribeAnswer = createServerFn({ method: 'POST' })
     return transcribeAudio({ audio: data.audio, learnerId, sessionId: session.id, topicId: session.topicId })
   })
 
+// Sticky: a role topic's assignment gets proficient_at once the benchmark is met, and it is never cleared.
+async function stampProficiency(db: Db, learnerId: string, topicId: string, now: number) {
+  const [role] = await db
+    .select({ orgId: memberRoleAssignments.orgId, benchmark: jobRoles.benchmark })
+    .from(memberRoleAssignments)
+    .innerJoin(member, and(eq(member.userId, memberRoleAssignments.userId), eq(member.organizationId, memberRoleAssignments.orgId)))
+    .innerJoin(jobRoles, and(eq(jobRoles.id, memberRoleAssignments.jobRoleId), eq(jobRoles.orgId, memberRoleAssignments.orgId), eq(jobRoles.status, 'active')))
+    .innerJoin(topics, and(eq(topics.jobRoleId, jobRoles.id), eq(topics.id, topicId)))
+    .where(and(eq(memberRoleAssignments.userId, learnerId), isNull(memberRoleAssignments.proficientAt)))
+  if (!role) return
+  const rows = await db
+    .select({ id: concepts.id, critical: concepts.critical, pKnown: learnerConcept.pKnown })
+    .from(concepts)
+    .leftJoin(learnerConcept, and(eq(learnerConcept.conceptId, concepts.id), eq(learnerConcept.learnerId, learnerId)))
+    .where(eq(concepts.topicId, topicId))
+  if (!benchmarkMet(rows.map((r) => ({ id: r.id, critical: r.critical, pKnown: r.pKnown ?? 0 })), role.benchmark)) return
+  await db
+    .update(memberRoleAssignments)
+    .set({ proficientAt: now })
+    .where(and(eq(memberRoleAssignments.userId, learnerId), eq(memberRoleAssignments.orgId, role.orgId), isNull(memberRoleAssignments.proficientAt)))
+}
+
 export const answerItem = createServerFn({ method: 'POST' })
   .validator(
     z.object({
@@ -481,7 +521,7 @@ export const answerItem = createServerFn({ method: 'POST' })
         // Advance without recording a wrong answer or changing mastery, scheduling or XP.
         const [kept] = await db
           .update(sessions)
-          .set({ planJson: JSON.stringify({ ...plan, answered: true, lastAttemptId: undefined }) })
+          .set({ planJson: JSON.stringify({ ...plan, answered: true, lastAttemptId: undefined, ungraded: (plan.ungraded ?? 0) + 1 }) })
           .where(claimHeld)
           .returning({ id: sessions.id })
         if (!kept) throw await dropped()
@@ -570,6 +610,7 @@ export const answerItem = createServerFn({ method: 'POST' })
     }
     const [kept] = (await batch(db, stmts)) as unknown as [unknown[]]
     if (!kept.length) throw await dropped()
+    await stampProficiency(db, learnerId, session.topicId, now)
 
     // State D only, read from the concept; no model call. chosenFeedback is shown on its own, so it is not repeated here.
     const mixUps = state === 'D' ? (JSON.parse(concept.misconceptionsJson) as string[]) : []
@@ -834,6 +875,7 @@ async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: 
     durationMs: (session.endedAt ?? Date.now()) - session.startedAt,
     correct: session.correctCount,
     total,
+    ungraded: plan.ungraded ?? 0,
     xp: session.xp,
     streak: lt.streakCount,
     level: lt.level,

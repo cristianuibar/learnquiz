@@ -11,7 +11,7 @@ const tab = (active: boolean) =>
 // Link directly to the learner screen to avoid redirecting through the landing page.
 export function BottomNav({ topicId }: { topicId: string | null }) {
   const { pathname } = useLocation()
-  const today = pathname === '/' || pathname === '/start' || pathname.startsWith('/play')
+  const today = pathname === '/' || pathname === '/start' || pathname === '/today' || pathname.startsWith('/play')
   const path = pathname.startsWith('/t/')
   const me = pathname.startsWith('/me')
   return (
@@ -22,7 +22,7 @@ export function BottomNav({ topicId }: { topicId: string | null }) {
         className="fixed inset-x-0 bottom-0 z-40 border-t bg-background pb-[env(safe-area-inset-bottom)]"
       >
         <div className="mx-auto flex max-w-xl">
-          <Link to="/start" className={tab(today)} aria-current={today ? 'page' : undefined}>
+          <Link to={topicId ? '/today' : '/start'} className={tab(today)} aria-current={today ? 'page' : undefined}>
             <CalendarCheck className="size-6" aria-hidden />
             Today
           </Link>

@@ -91,6 +91,10 @@ it('lists company questions and learner flags, approves, edits and retires witho
     format: 'mcq', difficulty_prior: 2, reviewed_by: null, reviewed_at: null, check_json: null,
     payload_json: JSON.stringify({ ...edited, source_quote: payload.source_quote }),
   })
+  await reviewQuestion({ data: { slug: 'alpha', itemId: 'a-flag', action: 'edit', payload: edited } })
+  expect(row('SELECT status FROM items WHERE id = ?', 'a-flag')).toEqual({ status: 'reported' })
+  await reviewQuestion({ data: { slug: 'alpha', itemId: 'a-flag', action: 'approve' } })
+  expect(row('SELECT status, reviewed_by FROM items WHERE id = ?', 'a-flag')).toEqual({ status: 'active', reviewed_by: 'admin-a' })
   await reviewQuestion({ data: { slug: 'alpha', itemId: 'a-live', action: 'retire' } })
   await expect(reviewQuestion({ data: { slug: 'alpha', itemId: 'a-live', action: 'approve' } })).rejects.toMatchObject({ status: 409 })
   expect(row('SELECT status FROM items WHERE id = ?', 'a-live')).toEqual({ status: 'retired' })

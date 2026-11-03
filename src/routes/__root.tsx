@@ -73,7 +73,7 @@ function Root() {
 
   return (
     <>
-      {!focus && <TopBar branding={branding} home={user ? '/start' : '/'} signIn={(!user || user.isAnonymous) && pathname !== '/sign-in'} />}
+      {!focus && <TopBar branding={branding} home={user ? '/today' : '/'} signIn={(!user || user.isAnonymous) && pathname !== '/sign-in'} />}
       <Outlet />
       {nav && <BottomNav topicId={latestTopicId} />}
     </>

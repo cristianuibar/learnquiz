@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { RouteError, errorMessage, fieldErrors } from '@/components/inline-error'
+import { RoleDocumentForm } from '@/components/role-document-form'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -58,6 +59,9 @@ function Roles() {
             <li key={role.id} className="rounded-lg border p-4">
               <p className="font-medium">{role.name}</p>
               <p className="text-sm text-muted-foreground">Benchmark: {Math.round(role.benchmark * 100)}% · Onboarding: {role.onboardingDays} days · {role.topicStatus}</p>
+              {(role.topicStatus === 'draft' || role.topicStatus === 'failed') && (
+                <RoleDocumentForm slug={org.slug} roleId={role.id} roleName={role.name} onUploaded={() => router.invalidate()} />
+              )}
             </li>
           ))}
         </ul>

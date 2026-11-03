@@ -8,6 +8,7 @@ import { Route as rolesRoute } from '@/routes/org.$slug.roles'
 import { createCompany, createRole } from '@/server/org'
 
 vi.mock('@/server/org', () => ({ createCompany: vi.fn(), createRole: vi.fn() }))
+vi.mock('@/server/role-documents', () => ({ uploadRoleDocument: vi.fn() }))
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
 
 const roots: { unmount: () => void; container: HTMLElement }[] = []
