@@ -1,5 +1,5 @@
-import { useState, type ComponentType, type ReactNode } from 'react'
-import { Pressable, type PressableProps } from 'react-native'
+import { useState, type ComponentType, type ReactNode, type Ref } from 'react'
+import { Pressable, type PressableProps, type View } from 'react-native'
 import type { LucideProps } from 'lucide-react-native'
 import { useTheme } from '../../theme/ThemeProvider'
 import { Text } from './Text'
@@ -8,6 +8,7 @@ export type LinkButtonProps = Omit<PressableProps, 'children'> & {
   children: ReactNode
   tone?: 'brand' | 'muted'
   icon?: ComponentType<LucideProps>
+  ref?: Ref<View>
 }
 
 export function LinkButton({ children, tone = 'brand', icon: Icon, style, onFocus, onBlur, ...props }: LinkButtonProps) {

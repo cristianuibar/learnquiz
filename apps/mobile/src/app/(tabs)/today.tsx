@@ -1,9 +1,10 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { AccessibilityInfo, findNodeHandle, ScrollView, View, type Text as NativeText } from 'react-native'
 import { useFocusEffect, useRouter, useScrollToTop } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { EmptyState } from '@/components/today/EmptyState'
 import { Hero } from '@/components/today/Hero'
+import { OfflineLead, TodayNotice } from '@/components/today/Notice'
 import { QuestCard } from '@/components/today/QuestCard'
 import { RoleCard } from '@/components/today/RoleCard'
 import { TodayTopBar } from '@/components/today/TodayTopBar'
@@ -12,12 +13,15 @@ import { PLAY_LOADING, playParams, useStreakPop, useToday } from '@/lib/today'
 import { useTheme } from '@/theme/ThemeProvider'
 
 export default function TodayScreen() {
-  const { today, view, refresh } = useToday()
+  const { today, view, status, refreshing, refresh } = useToday()
   const { colors, space } = useTheme()
   const insets = useSafeAreaInsets()
   const router = useRouter()
   const heading = useRef<NativeText>(null)
   const scroll = useRef<ScrollView>(null)
+  const retryHadFocus = useRef(false)
+  const retryStartedWithFocus = useRef(false)
+  const prevStatus = useRef(status)
   useScrollToTop(scroll)
 
   // Focus the hidden "Today" header on arrival and on every return to the tab,
@@ -30,14 +34,37 @@ export default function TodayScreen() {
     return () => cancelAnimationFrame(frame)
   }, []))
 
-  const reward = view?.hero.kind === 'done'
+  // After a retry-driven recovery, the notice unmounts and focus would be
+  // lost: move it to the hidden heading. Passive recovery (foreground or poll
+  // refetch with retry never focused) leaves focus alone.
+  useEffect(() => {
+    const was = prevStatus.current
+    prevStatus.current = status
+    if (was !== 'ready' && status === 'ready' && (retryHadFocus.current || retryStartedWithFocus.current)) {
+      retryHadFocus.current = false
+      retryStartedWithFocus.current = false
+      const tag = heading.current && findNodeHandle(heading.current)
+      if (tag != null) AccessibilityInfo.setAccessibilityFocus(tag)
+    }
+    if (!refreshing) retryStartedWithFocus.current = false
+  }, [status, refreshing])
+
+  // A cached done plan stays quiet until the network confirms the reward.
+  const reward = view?.hero.kind === 'done' && status === 'ready'
   const popIn = useStreakPop(reward)
 
   const play = useCallback(() => {
-    const params = playParams(today)
+    const params = playParams(today, status)
     if (params) router.push({ pathname: PLAY_LOADING, params })
-  }, [today, router])
+  }, [today, status, router])
   const openProfile = useCallback(() => router.navigate('/(tabs)/profile'), [router])
+  const retry = useCallback(() => {
+    // Activating either retry owns focus; busy may blur it before success.
+    retryStartedWithFocus.current = true
+    void refresh()
+  }, [refresh])
+
+  const notice = status === 'offline' || status === 'error'
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surfacePage, paddingLeft: insets.left, paddingRight: insets.right }}>
@@ -53,10 +80,25 @@ export default function TodayScreen() {
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingTop: space[2], paddingHorizontal: space[4], paddingBottom: space[6], gap: space[6] }}
       >
+        {notice && (
+          <TodayNotice
+            status={status}
+            refreshing={refreshing}
+            onRetry={retry}
+            onRetryFocus={() => { retryHadFocus.current = true }}
+            onRetryBlur={() => { retryHadFocus.current = false }}
+          />
+        )}
         {!view ? (
           <Skeleton />
         ) : view.hero.kind === 'empty' ? (
-          <EmptyState onRetry={() => { void refresh() }} onSignOut={() => { void signOut() }} />
+          <EmptyState onRetry={retry} onSignOut={() => { void signOut() }} />
+        ) : status === 'offline' ? (
+          <>
+            <OfflineLead hero={view.hero} onPlay={play} />
+            <QuestCard quests={view.quests} />
+            {view.role && <RoleCard role={view.role} onPress={openProfile} />}
+          </>
         ) : (
           <>
             <Hero hero={view.hero} onPlay={play} />
