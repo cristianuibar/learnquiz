@@ -15,4 +15,5 @@ export const META_MODELS = new Set([
   'muse-voice-transcribe-1.0',
   'muse-spark-open',
   'muse-glimmer',
+  'llama-v3p3-70b-instruct',
 ])

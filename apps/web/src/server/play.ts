@@ -12,7 +12,7 @@ import { benchmarkMet } from '@/lib/learning/profile'
 import { levelResult, nextLevel, pickNext, PLACEMENT, shouldStop } from '@/lib/learning/placement'
 import { composeSession, reinsert, SESSION_BONUS, streakAfter, xpFor } from '@/lib/learning/session'
 import type { Confidence, ItemView, Reveal, SessionPlanning, SessionView, SummaryView } from '@/lib/learning/types'
-import { chatJson, DailyCapError, isVoiceEnabled, jobModel, transcribeAudio } from '@/lib/llm/client'
+import { chatJson, chatJsonWithModel, DailyCapError, isVoiceEnabled, jobModel, transcribeAudio } from '@/lib/llm/client'
 import { gradePrompt } from '@/lib/llm/prompts'
 import { Grade, type ItemPayload } from '@/lib/llm/schemas'
 import { validateVoiceWav } from '@/lib/voice'
@@ -737,7 +737,7 @@ async function placementLine(db: Db, learnerId: string, session: SessionRow, top
       .innerJoin(concepts, eq(concepts.id, items.conceptId))
       .where(inArray(items.id, log.map((l) => l.itemId)))
     const concept = new Map(names.map((n) => [n.id, n.concept]))
-    const { line } = await chatJson({
+    const { data: { line }, model } = await chatJsonWithModel({
       purpose: 'placement_line',
       schema: PlacementLine,
       schemaName: 'placement_line',
@@ -753,7 +753,7 @@ ${log.map((l) => `- ${concept.get(l.itemId) ?? 'unknown'}: ${l.correct ? 'right'
       sessionId: session.id,
       topicId: topic.id,
     })
-    return { levelLine: line, levelLineModel: jobModel('placement_line').model }
+    return { levelLine: line, levelLineModel: model }
   } catch (e) {
     console.error('placement line failed, using template', e instanceof Error ? e.message : e)
     return { levelLine: fallback, levelLineModel: null }

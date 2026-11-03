@@ -30,6 +30,7 @@ vi.mock('@/lib/llm/client', async (importOriginal) => {
     ...client,
     chatJson: vi.fn(async (opts) => opts.purpose === 'plan'
       ? client.chatJson(opts) : { line: 'You know the basics and will grow from here.' }),
+    chatJsonWithModel: vi.fn(async () => ({ data: { line: 'You know the basics and will grow from here.' }, model: 'muse-spark-1.3' })),
   }
 })
 
@@ -682,6 +683,7 @@ it('writes exactly one placement when two finishing nextItem calls race (placeme
   expect(scalar(raw, 'SELECT ended_at AS endedAt FROM sessions WHERE id = ?', 's1').endedAt).not.toBeNull()
   const summary = await endSession({ data: { sessionId: 's1' } })
   expect(summary.level).toBe(4)
+  expect(summary.levelLineModel).toBe('muse-spark-1.3')
   expect(summary.levelLine).toBe('You know the basics and will grow from here.')
 })
 

@@ -10,6 +10,7 @@ import { COMPANY_CAP_MESSAGE, companyCallsToday, dailyCapError, reserveModelCall
 // USD per million tokens; reasoning tokens bill as output. Unlisted prices are unknown.
 export const PRICES: Record<string, { in: number; out: number }> = {
   'muse-spark-1.3': { in: 1.25, out: 4.25 },
+  'llama-v3p3-70b-instruct': { in: 0.9, out: 0.9 }, // Fireworks serverless
 }
 
 export class LlmError extends Error {
@@ -31,13 +32,16 @@ export class DailyCapError extends LlmError {
 type Usage = { prompt_tokens?: number; completion_tokens?: number; completion_tokens_details?: { reasoning_tokens?: number } }
 type Message = { role: 'system' | 'user' | 'assistant'; content: string }
 
-export function jobModel(job: ModelJob) {
+// `fallback` resolves the Meta model that backs up a failed Fireworks call.
+export function jobModel(job: ModelJob, fallback = false) {
   const env = getEnv()
   try {
     // Wrangler JSON bindings are objects; .dev.vars can supply JSON strings.
     const mapping: unknown = typeof env.JOB_MODELS === 'string' ? JSON.parse(env.JOB_MODELS) : env.JOB_MODELS === undefined ? {} : env.JOB_MODELS
     const jobs = z.record(z.string(), z.unknown()).parse(mapping)
-    const selected = jobs[job] === undefined
+    const selected = fallback
+      ? { provider: 'meta' as const, model: 'muse-spark-1.3' }
+      : jobs[job] === undefined
       ? { provider: env.LLM_PROFILE, model: job === 'voice' ? 'muse-voice-transcribe-1.0' : job === 'image' ? env.IMAGE_MODEL : env.LLM_MODEL }
       : z.object({ provider: z.enum(['meta', 'baseten', 'fireworks']), model: z.string().min(1) }).parse(jobs[job])
     const modelId = selected.provider === 'fireworks' ? selected.model.replace(/^accounts\/fireworks\/models\//, '') : selected.model
@@ -78,8 +82,7 @@ export function isImageEnabled(): boolean {
   }
 }
 
-// Calls the model for JSON matching `schema`; defaults to one retry for bad output, then throws LlmError.
-export async function chatJson<T>(opts: {
+type ChatJsonOpts<T> = {
   purpose: ModelJob
   schema: z.ZodType<T>
   schemaName: string
@@ -93,8 +96,27 @@ export async function chatJson<T>(opts: {
   orgId?: string | null // Company calls also count against the company's daily cap.
   sessionId?: string | null
   topicId?: string | null
-}): Promise<T> {
+}
+
+// Calls the model for JSON matching `schema`; defaults to one retry for bad output, then throws LlmError.
+export async function chatJson<T>(opts: ChatJsonOpts<T>): Promise<T> {
+  return (await chatJsonWithModel(opts)).data
+}
+
+// Like chatJson, also returning the model that produced the reply. A failed Fireworks call is repeated once on Meta.
+export async function chatJsonWithModel<T>(opts: ChatJsonOpts<T>): Promise<{ data: T; model: string }> {
   const selected = jobModel(opts.purpose)
+  try {
+    return { data: await callJson(opts, selected), model: selected.model }
+  } catch (e) {
+    if (selected.provider !== 'fireworks' || !(e instanceof LlmError) || e instanceof DailyCapError || e.message === COMPANY_CAP_MESSAGE) throw e
+    console.error('fireworks call failed, falling back to Meta', e.status)
+    const meta = jobModel(opts.purpose, true)
+    return { data: await callJson(opts, meta), model: meta.model }
+  }
+}
+
+async function callJson<T>(opts: ChatJsonOpts<T>, selected: ReturnType<typeof jobModel>): Promise<T> {
   const log = { ...opts, model: selected.model }
   const strict = selected.jsonMode === 'json_schema'
   // Strict json_schema is a Meta feature; other profiles get json_object plus the schema in the prompt.
