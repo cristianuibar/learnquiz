@@ -10,7 +10,6 @@ import { COMPANY_CAP_MESSAGE, companyCallsToday, dailyCapError, reserveModelCall
 // USD per million tokens; reasoning tokens bill as output. Unlisted prices are unknown.
 export const PRICES: Record<string, { in: number; out: number }> = {
   'muse-spark-1.3': { in: 1.25, out: 4.25 },
-  'llama-v3p3-70b-instruct': { in: 0.9, out: 0.9 }, // Fireworks serverless
 }
 
 export class LlmError extends Error {
