@@ -8,7 +8,7 @@ import { chatJson, jobModel, LlmError } from '@/lib/llm/client'
 import { curriculumPrompt } from '@/lib/llm/prompts'
 import { CurriculumSkeleton } from '@/lib/llm/schemas'
 import { MAX_SOURCE_TEXT_CHARS } from '@/lib/limits'
-import { asItem, ensureConceptItems, httpError, loadPKnown, mean, targetFor, type StoredItem } from '@/server/helpers'
+import { asItem, httpError, loadPKnown, mean, type StoredItem } from '@/server/helpers'
 import { assertWithinDailyCap } from '@/server/model-cap'
 import { requireOrgAdmin } from '@/server/authz'
 import { requireLearnerId } from '@/server/session'
@@ -178,22 +178,4 @@ export const getConceptItems = createServerFn({ method: 'GET' })
       .where(and(eq(items.conceptId, data.conceptId), eq(items.status, 'active'), eq(topics.learnerId, learnerId)))
       .orderBy(desc(items.createdAt))
     return { items: rows.map((r) => asItem(r.item)) }
-  })
-
-export const generateConceptItems = createServerFn({ method: 'POST' })
-  .validator(z.object({ conceptId: z.string().min(1) }))
-  .handler(async ({ data }): Promise<{ items: StoredItem[] }> => {
-    const learnerId = await requireLearnerId()
-    const db = getDb()
-    const [row] = await db
-      .select({ concept: concepts, topic: topics })
-      .from(concepts)
-      .innerJoin(topics, eq(topics.id, concepts.topicId))
-      .where(and(eq(concepts.id, data.conceptId), eq(topics.learnerId, learnerId)))
-    if (!row) throw httpError('Concept not found', 404)
-    const [lt] = await db
-      .select({ level: learnerTopic.level })
-      .from(learnerTopic)
-      .where(and(eq(learnerTopic.learnerId, learnerId), eq(learnerTopic.topicId, row.topic.id)))
-    return { items: await ensureConceptItems(db, learnerId, row.concept, row.topic, { targetDifficulty: targetFor(lt?.level ?? 3) }) }
   })
