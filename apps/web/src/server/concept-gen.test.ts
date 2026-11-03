@@ -115,6 +115,16 @@ it('drains a pending company topic until every concept holds exactly six shared,
   expect(one('SELECT COUNT(*) AS n FROM model_calls')).toEqual({ n: CONCEPTS * 2 })
 })
 
+it('stores questions as retired when their document is replaced while they generate', async () => {
+  raw.exec("DELETE FROM concepts WHERE id <> 'c00'")
+  fetchModel.mockImplementation(async (url, init) => {
+    raw.exec("UPDATE sources SET retired_at = 1 WHERE id = 'co-topic-src'")
+    return answerModel(url, init)
+  })
+  await drainConceptQueue()
+  expect(raw.prepare("SELECT status, COUNT(*) AS n FROM items WHERE source_id = 'co-topic-src' GROUP BY status").all()).toEqual([{ status: 'retired', n: 6 }])
+})
+
 it('fails a concept the model cannot answer, resets it on admin retry and refuses other callers', async () => {
   fetchModel.mockImplementation(async () => new Response('Unavailable', { status: 502 }))
   raw.exec("DELETE FROM concepts WHERE id <> 'c00'")

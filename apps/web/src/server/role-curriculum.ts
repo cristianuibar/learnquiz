@@ -52,7 +52,7 @@ export async function buildRoleCurriculum({ orgId, ownerId, roleId }: { orgId: s
   if (!row) throw httpError('Role topic not found', 404)
   const topicId = row.topic.id
   const documents = await db.select().from(sources)
-    .where(and(eq(sources.topicId, topicId), isNull(sources.deletedAt)))
+    .where(and(eq(sources.topicId, topicId), isNull(sources.deletedAt), isNull(sources.retiredAt)))
     .orderBy(asc(sources.createdAt), asc(sources.id))
   if (!documents.length || documents.some((d) => !d.bodyText.trim())) {
     throw httpError('Add documents with extracted text before building the curriculum.', 422)

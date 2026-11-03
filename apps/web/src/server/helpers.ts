@@ -135,7 +135,8 @@ export async function generateConceptItems(
   }
   if (!kept.length) throw httpError('Could not generate items for this concept', 502)
 
-  const [source] = concept.sourceId ? await db.select({ version: sources.version }).from(sources).where(eq(sources.id, concept.sourceId)) : []
+  // A document replaced or retired mid-generation must not gain live items citing it.
+  const [source] = concept.sourceId ? await db.select({ version: sources.version, retiredAt: sources.retiredAt }).from(sources).where(eq(sources.id, concept.sourceId)) : []
   const now = Date.now()
   const rows = kept.map(({ payload, check }) => ({
     id: crypto.randomUUID(),
@@ -148,10 +149,11 @@ export async function generateConceptItems(
     checkJson: check === null ? null : JSON.stringify(check),
     sourceId: concept.sourceId ?? null,
     sourceVersion: source?.version ?? null,
+    status: source?.retiredAt ? 'retired' as const : 'active' as const,
     createdAt: now,
   }))
   // Each item binds 12 parameters including defaults; eight rows stay below D1's 100-parameter limit.
   const [first, ...rest] = chunks(rows, 8).map((r) => db.insert(items).values(r))
   await db.batch([first, ...rest])
-  return rows.map((r, i) => ({ id: r.id, format: r.format, difficultyPrior: r.difficultyPrior, payload: kept[i].payload, generatedBy: r.generatedBy }))
+  return rows.flatMap((r, i) => r.status === 'active' ? [{ id: r.id, format: r.format, difficultyPrior: r.difficultyPrior, payload: kept[i].payload, generatedBy: r.generatedBy }] : [])
 }

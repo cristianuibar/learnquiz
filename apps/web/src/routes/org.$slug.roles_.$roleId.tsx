@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { TRAINING_STATUS } from '@/lib/training-status'
 import { plural } from '@/lib/utils'
 import { generateRoleCurriculum, retryConceptGeneration } from '@/server/curriculum'
+import { retireRoleDocument } from '@/server/role-documents'
 import { getRoleDetail, updateRoleConcept } from '@/server/role-detail'
 
 export const Route = createFileRoute('/org/$slug/roles_/$roleId')({
@@ -96,10 +97,7 @@ function RoleDetail() {
           {documents.length > 0 ? (
             <ul className="mt-4 flex flex-col gap-3">
               {documents.map((d) => (
-                <li key={d.id} className="rounded-lg border p-3">
-                  <p className="font-medium break-words">{d.title}</p>
-                  <p className="text-sm text-muted-foreground">Version {d.version} · Uploaded {date(d.createdAt)}</p>
-                </li>
+                <DocumentItem key={d.id} doc={d} slug={slug} roleId={role.id} roleName={role.name} canChange={!readOnly && role.topicStatus !== 'generating'} />
               ))}
             </ul>
           ) : (
@@ -230,6 +228,43 @@ function ConceptItem({ concept: c, slug, readOnly }: { concept: Concept; slug: s
         </form>
       )}
       {error && <p role="alert" className="mt-2 text-sm font-medium text-wrong">{error}</p>}
+    </li>
+  )
+}
+
+function DocumentItem({ doc: d, slug, roleId, roleName, canChange }: { doc: Detail['documents'][number]; slug: string; roleId: string; roleName: string; canChange: boolean }) {
+  const router = useRouter()
+  const retire = useServerFn(retireRoleDocument)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  async function run() {
+    if (!window.confirm('Retire this document? Its questions stop appearing in practice.')) return
+    setError('')
+    setBusy(true)
+    try {
+      await retire({ data: { slug, roleId, sourceId: d.id } })
+      await router.invalidate()
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <li className="rounded-lg border p-3">
+      <p className="font-medium break-words">{d.title}</p>
+      <p className="text-sm text-muted-foreground">Version {d.version} · Uploaded {date(d.createdAt)}</p>
+      {canChange && (
+        <>
+          <RoleDocumentForm slug={slug} roleId={roleId} roleName={roleName} replaces={d} onUploaded={() => router.invalidate()} />
+          <Button type="button" variant="outline" className="mt-2 min-h-11" disabled={busy} onClick={run}>
+            Retire<span className="sr-only"> {d.title}</span>
+          </Button>
+          {error && <p role="alert" className="mt-2 text-sm font-medium text-wrong">{error}</p>}
+        </>
+      )}
     </li>
   )
 }

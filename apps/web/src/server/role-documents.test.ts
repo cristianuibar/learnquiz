@@ -5,7 +5,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vite
 import * as schema from '@/db/schema'
 import * as authSchema from '@/db/auth-schema'
 
-const state = vi.hoisted(() => ({ db: null as unknown, user: 'owner-a' as string | null, active: null as string | null, anonymous: false, bucket: { put: vi.fn(), delete: vi.fn() } }))
+const state = vi.hoisted(() => ({ db: null as unknown, user: 'owner-a' as string | null, active: null as string | null, anonymous: false, bucket: { put: vi.fn(), delete: vi.fn() }, background: [] as Promise<unknown>[] }))
+const drain = vi.hoisted(() => vi.fn())
 
 // Fake only the server transport, session and Cloudflare bindings. Validators,
 // admin checks, SQL, PDF extraction and the upload handler execute for real.
@@ -20,12 +21,13 @@ vi.mock('@tanstack/react-start', () => ({
 }))
 vi.mock('@tanstack/react-start/server', () => ({ getRequestHeaders: () => new Headers() }))
 vi.mock('@/db', () => ({ getDb: () => state.db }))
-vi.mock('@/server/env', () => ({ getEnv: () => ({ MEDIA: state.bucket }) }))
+vi.mock('@/server/env', () => ({ getEnv: () => ({ MEDIA: state.bucket }), runInBackground: (task: Promise<unknown>) => { state.background.push(task) } }))
+vi.mock('@/server/concept-gen', () => ({ drainConceptQueue: drain }))
 vi.mock('@/server/session', () => ({ getSessionUser: async () => state.user ? { id: state.user, isAnonymous: state.anonymous } : null }))
 vi.mock('@/server/auth', () => ({ getAuth: () => ({ api: { getSession: async () => state.user ? { user: { id: state.user, isAnonymous: state.anonymous }, session: { activeOrganizationId: state.active } } : null } }) }))
 
 import { MAX_ROLE_DOCUMENT_CHARS } from '@/lib/limits'
-import { uploadRoleDocument } from './role-documents'
+import { retireRoleDocument, uploadRoleDocument } from './role-documents'
 
 let sqlite: DatabaseSync
 beforeAll(() => {
@@ -70,6 +72,8 @@ beforeEach(() => {
   vi.resetAllMocks()
   state.bucket.put.mockResolvedValue({})
   state.bucket.delete.mockResolvedValue(undefined)
+  drain.mockResolvedValue(undefined)
+  state.background = []
 })
 afterEach(() => sqlite.exec('ROLLBACK'))
 afterAll(() => sqlite.close())
@@ -109,7 +113,7 @@ const sourceRows = () => sqlite.prepare('SELECT * FROM sources').all()
 it('stores an uploaded PDF in R2 and records its extracted text against the role topic', async () => {
   const result = await uploadRoleDocument({ data: form({ file: textPdf() }) })
   const key = `orgs/org-a/roles/role-a/sources/${result.sourceId}.pdf`
-  expect(result).toEqual({ sourceId: result.sourceId, topicId: 'topic-role-a', r2Key: key, chars: SENTENCE.length })
+  expect(result).toEqual({ sourceId: result.sourceId, topicId: 'topic-role-a', r2Key: key, chars: SENTENCE.length, version: 1 })
   expect(state.bucket.put).toHaveBeenCalledTimes(1)
   expect(state.bucket.put.mock.calls[0][0]).toBe(key)
   expect(state.bucket.put.mock.calls[0][1].byteLength).toBe((await textPdf().arrayBuffer()).byteLength)
@@ -139,9 +143,66 @@ it('rejects pasted text over the cap and saves pasted text within it as a text s
   await expect(uploadRoleDocument({ data: form({ title: 'Too long', text: 'a'.repeat(MAX_ROLE_DOCUMENT_CHARS + 1) }) })).rejects.toMatchObject({ status: 413 })
   expect(sourceRows()).toEqual([])
   const result = await uploadRoleDocument({ data: form({ title: 'Dock rules', text: 'Wear a vest on the dock.' }) })
-  expect(result).toEqual({ sourceId: result.sourceId, topicId: 'topic-role-a', r2Key: null, chars: 24 })
+  expect(result).toEqual({ sourceId: result.sourceId, topicId: 'topic-role-a', r2Key: null, chars: 24, version: 1 })
   expect(sqlite.prepare('SELECT * FROM sources').all()).toEqual([expect.objectContaining({
     id: result.sourceId, kind: 'text', title: 'Dock rules', body_text: 'Wear a vest on the dock.', r2_key: null, version: 1, uploaded_by: 'owner-a',
   })])
   expect(state.bucket.put).not.toHaveBeenCalled()
+})
+
+// Topic "topic-role-a" holds a v1 source, a concept citing it, two active v1 items and one unrelated item.
+function seedV1(topicStatus = 'ready') {
+  sqlite.prepare('UPDATE topics SET status = ? WHERE id = ?').run(topicStatus, 'topic-role-a')
+  sqlite.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, version, status, created_at) VALUES ('src-1', 'topic-role-a', 'text', 'Dock rules', 'Wear a vest on the dock.', 1, 'ready', 1)").run()
+  sqlite.prepare("INSERT INTO units (id, topic_id, `order`, name) VALUES ('unit-1', 'topic-role-a', 0, 'Unit')").run()
+  sqlite.prepare("INSERT INTO concepts (id, topic_id, unit_id, `order`, name, summary, source_id, source_quote, gen_status) VALUES ('con-1', 'topic-role-a', 'unit-1', 0, 'Vests', 'Vests', 'src-1', 'wear a vest', 'ready')").run()
+  const item = sqlite.prepare("INSERT INTO items (id, concept_id, topic_id, format, payload_json, source_id, source_version, status, created_at) VALUES (?, 'con-1', 'topic-role-a', 'mcq', '{}', ?, ?, 'active', 1)")
+  item.run('item-1', 'src-1', 1)
+  item.run('item-2', 'src-1', 1)
+  item.run('item-other', null, null)
+}
+const itemStatus = () => Object.fromEntries((sqlite.prepare('SELECT id, status FROM items ORDER BY id').all() as { id: string; status: string }[]).map((r) => [r.id, r.status]))
+
+it('replaces a document with version 2, retires its items and requeues the concepts that cited it', async () => {
+  seedV1()
+  const result = await uploadRoleDocument({ data: form({ replacesId: 'src-1', text: 'Always wear a vest on the dock.' }) })
+  expect(result).toEqual({ sourceId: result.sourceId, topicId: 'topic-role-a', r2Key: null, chars: 31, version: 2 })
+  expect(sqlite.prepare('SELECT title, version, body_text FROM sources WHERE id = ?').get(result.sourceId)).toEqual({ title: 'Dock rules', version: 2, body_text: 'Always wear a vest on the dock.' })
+  expect(sqlite.prepare("SELECT retired_at IS NOT NULL AS retired FROM sources WHERE id = 'src-1'").get()).toEqual({ retired: 1 })
+  expect(sqlite.prepare("SELECT count(*) AS n FROM items WHERE source_id = 'src-1' AND status != 'retired'").get()).toEqual({ n: 0 })
+  expect(itemStatus()).toEqual({ 'item-1': 'retired', 'item-2': 'retired', 'item-other': 'active' })
+  expect(sqlite.prepare("SELECT source_id, source_quote, gen_status, gen_started_at, gen_error FROM concepts WHERE id = 'con-1'").get())
+    .toEqual({ source_id: result.sourceId, source_quote: 'wear a vest', gen_status: 'pending', gen_started_at: null, gen_error: null })
+  expect(drain).toHaveBeenCalledTimes(1)
+  expect(state.background).toHaveLength(1)
+})
+
+it('refuses a replacement while the curriculum is generating', async () => {
+  seedV1('generating')
+  await expect(uploadRoleDocument({ data: form({ replacesId: 'src-1', text: 'New text.' }) })).rejects.toMatchObject({ status: 409 })
+  expect(sqlite.prepare('SELECT count(*) AS n FROM sources').get()).toEqual({ n: 1 })
+  expect(itemStatus()['item-1']).toBe('active')
+  expect(drain).not.toHaveBeenCalled()
+})
+
+it('refuses to replace a document that is already retired', async () => {
+  seedV1()
+  sqlite.prepare("UPDATE sources SET retired_at = 5 WHERE id = 'src-1'").run()
+  await expect(uploadRoleDocument({ data: form({ replacesId: 'src-1', text: 'New text.' }) })).rejects.toMatchObject({ status: 404, message: 'Document not found' })
+  expect(sqlite.prepare('SELECT count(*) AS n FROM sources').get()).toEqual({ n: 1 })
+})
+
+it('retires a document and its items without touching other items', async () => {
+  seedV1()
+  await expect(retireRoleDocument({ data: { slug: 'acme', roleId: 'role-a', sourceId: 'src-1' } })).resolves.toEqual({ ok: true })
+  expect(sqlite.prepare("SELECT retired_at IS NOT NULL AS retired FROM sources WHERE id = 'src-1'").get()).toEqual({ retired: 1 })
+  expect(itemStatus()).toEqual({ 'item-1': 'retired', 'item-2': 'retired', 'item-other': 'active' })
+  await expect(retireRoleDocument({ data: { slug: 'acme', roleId: 'role-a', sourceId: 'src-1' } })).rejects.toMatchObject({ status: 404 })
+})
+
+it('refuses retiring a document for a plain member', async () => {
+  seedV1()
+  state.user = 'member-a'
+  await expect(retireRoleDocument({ data: { slug: 'acme', roleId: 'role-a', sourceId: 'src-1' } })).rejects.toMatchObject({ status: 403 })
+  expect(itemStatus()['item-1']).toBe('active')
 })
