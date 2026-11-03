@@ -264,11 +264,13 @@ export const startSession = createServerFn({ method: 'POST' })
     // Generation runs only when nothing is due, so a daily-cap refusal has no stored reviews to fall back on.
     const generated = role || due.length + storedFresh > 0 ? stored
       : await Promise.all(top.map((f) => ensureConceptItems(db, learnerId, f.concept, topic, { targetDifficulty, unseen: seen, sessionId })))
+    // A role topic cannot generate more, so with nothing due or fresh it replays its stored questions ahead of schedule.
+    const replay = role && due.length + storedFresh === 0
     const frontierInput = top.map((f, i) => ({
       conceptId: f.concept.id,
       unitOrder: f.unitOrder,
       pKnown: f.pKnown,
-      items: generated[i].filter((it) => !seen.has(it.id)).map((it) => ({ id: it.id, difficulty: it.difficultyPrior })),
+      items: generated[i].filter((it) => replay || !seen.has(it.id)).map((it) => ({ id: it.id, difficulty: it.difficultyPrior })),
     }))
 
     // shortcut: a closer may be an item seen recently (unseen ones go first); upgrade once items are generated ahead of play.
