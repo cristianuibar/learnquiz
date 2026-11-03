@@ -1078,6 +1078,25 @@ it('refuses prepareNextSession for another learner\'s session', async () => {
   await expect(prepareNextSession({ data: { sessionId: 's1' } })).rejects.toMatchObject({ status: 404 })
 })
 
+it('refuses prepareNextSession for another employee on the same role topic', async () => {
+  seedTopicAndLearner(raw, 0)
+  raw.prepare('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, ?)').run('org-a', 'Alpha', 'alpha', 1)
+  raw.prepare('INSERT INTO job_roles (id, org_id, name, benchmark, created_at) VALUES (?, ?, ?, ?, ?)').run('role', 'org-a', 'Analyst', 0.5, 1)
+  raw.prepare('UPDATE topics SET learner_id = NULL, job_role_id = ? WHERE id = ?').run('role', 't1')
+  for (const learnerId of ['u1', 'u2']) {
+    raw.prepare('INSERT INTO user (id, name, email) VALUES (?, ?, ?)').run(learnerId, 'Learner', `${learnerId}@example.test`)
+    raw.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, ?)').run(`m-${learnerId}`, 'org-a', learnerId, 'member', 1)
+    raw.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES (?, ?, ?, ?)').run(learnerId, 'org-a', 'role', 1)
+    raw.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, started_at) VALUES (?, ?, ?, ?, ?)').run(`s-${learnerId}`, learnerId, 't1', 'session', 1)
+  }
+
+  await expect(prepareNextSession({ data: { sessionId: 's-u1' } })).resolves.toEqual({ ok: true })
+  vi.mocked(requireLearnerId).mockResolvedValueOnce('u2')
+  await expect(prepareNextSession({ data: { sessionId: 's-u2' } })).resolves.toEqual({ ok: true })
+  vi.mocked(requireLearnerId).mockResolvedValueOnce('u2')
+  await expect(prepareNextSession({ data: { sessionId: 's-u1' } })).rejects.toMatchObject({ status: 404 })
+})
+
 it.each([
   [8, true],
   [12, false],

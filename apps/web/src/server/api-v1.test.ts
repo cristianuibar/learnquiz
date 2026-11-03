@@ -6,6 +6,7 @@ const fns = vi.hoisted(() => ({
   getToday: vi.fn(),
   getInvite: vi.fn(),
   answerItem: vi.fn(),
+  prepareNextSession: vi.fn(),
   getTopicPath: vi.fn(),
   getProfile: vi.fn(),
   reportItem: vi.fn(),
@@ -24,6 +25,7 @@ vi.mock('@/server/play', () => ({
   endSession: vi.fn(),
   getSession: vi.fn(),
   nextItem: vi.fn(),
+  prepareNextSession: fns.prepareNextSession,
   reportItem: fns.reportItem,
   startMiniSession: vi.fn(),
   startPlacement: vi.fn(),
@@ -74,6 +76,32 @@ it('passes query string params together with path params on GET', async () => {
   fns.getTopicPath.mockResolvedValue({})
   await call('/topics/t-1/path?x=1', { headers: auth })
   expect(fns.getTopicPath).toHaveBeenCalledWith({ data: { topicId: 't-1', x: '1' } })
+})
+
+it('requires a bearer token before preparing the next session', async () => {
+  const res = await call('/sessions/s-1/prepare-next', { method: 'POST' })
+  expect(res.status).toBe(401)
+  expect(await res.json()).toEqual({ error: 'Unauthorized' })
+  expect(fns.prepareNextSession).not.toHaveBeenCalled()
+})
+
+it('prepares the owner session with the path ID and returns JSON', async () => {
+  fns.prepareNextSession.mockResolvedValue({ ok: true })
+  const res = await call('/sessions/s-1/prepare-next', {
+    method: 'POST', headers: auth, body: JSON.stringify({ sessionId: 'other' }),
+  })
+  expect(res.status).toBe(200)
+  expect(await res.json()).toEqual({ ok: true })
+  expect(fns.prepareNextSession).toHaveBeenCalledTimes(1)
+  expect(fns.prepareNextSession).toHaveBeenCalledWith({ data: { sessionId: 's-1' } })
+})
+
+it('preserves the ownership rejection from prepareNextSession', async () => {
+  fns.prepareNextSession.mockRejectedValue(Object.assign(new Error('Session not found'), { status: 404 }))
+  const res = await call('/sessions/another-learner-session/prepare-next', { method: 'POST', headers: auth })
+  expect(res.status).toBe(404)
+  expect(await res.json()).toEqual({ error: 'Session not found' })
+  expect(fns.prepareNextSession).toHaveBeenCalledWith({ data: { sessionId: 'another-learner-session' } })
 })
 
 it('maps a thrown error with a status to that status', async () => {
