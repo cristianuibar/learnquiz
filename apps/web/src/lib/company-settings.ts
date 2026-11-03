@@ -1,14 +1,8 @@
+import { brandProblem } from '@learnquiz/tokens'
 import { z } from 'zod'
 
-// Primary buttons, links and focus rings sit on the existing white background.
 export function accessibleAccent(colour: string) {
-  if (!/^#[\da-f]{6}$/i.test(colour)) return false
-  const channels = [1, 3, 5].map((offset) => {
-    const c = parseInt(colour.slice(offset, offset + 2), 16) / 255
-    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
-  })
-  const luminance = channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722
-  return 1.05 / (luminance + 0.05) >= 4.5
+  return brandProblem(colour) === null
 }
 
 // ISO weekdays: Monday is 1, Sunday is 7; times are local to the company timezone.
@@ -27,5 +21,8 @@ export const CompanySettings = z.object({
     try { new Intl.DateTimeFormat('en', { timeZone: zone }); return true } catch { return false }
   }, 'Choose a valid timezone, such as Europe/London'),
   workingHours: WorkingHours,
-  accent: z.string().nullable().refine((value) => value === null || accessibleAccent(value), 'Choose a darker accent with at least 4.5:1 contrast against white'),
+  accent: z.string().nullable().superRefine((value, ctx) => {
+    const problem = value === null ? null : brandProblem(value)
+    if (problem) ctx.addIssue({ code: 'custom', message: problem })
+  }),
 })
