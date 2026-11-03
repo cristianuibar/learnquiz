@@ -16,6 +16,15 @@ import { useTheme } from '@/theme/ThemeProvider'
 
 const preparingStatus = 'Getting your questions ready.'
 
+// Heading focus runs on the first frame. Speak on the following frame so
+// TalkBack does not interrupt the status with the heading's focus event.
+function announceAfterFocus(message: string): () => void {
+  let frame = requestAnimationFrame(() => {
+    frame = requestAnimationFrame(() => AccessibilityInfo.announceForAccessibility(message))
+  })
+  return () => cancelAnimationFrame(frame)
+}
+
 export default function LoadingScreen() {
   const params = useLocalSearchParams<{
     topicId?: string | string[]
@@ -31,7 +40,6 @@ export default function LoadingScreen() {
   const insets = useSafeAreaInsets()
   const heading = useRef<NativeText>(null)
   const request = useRef<ReturnType<typeof beginStartPlay> | null>(null)
-  const announced = useRef(false)
   const [attempt, setAttempt] = useState(0)
   const [slow, setSlow] = useState(false)
   const [failure, setFailure] = useState<StartFailure | null>(null)
@@ -45,19 +53,20 @@ export default function LoadingScreen() {
       setFailure({ message: 'Open a session from Today to try again.', retry: false })
       return
     }
-    if (!announced.current) {
-      announced.current = true
-      AccessibilityInfo.announceForAccessibility(preparingStatus)
-    }
+    const cancelPreparing = announceAfterFocus(preparingStatus)
     const current = beginStartPlay({ topicId, start, unitId }, {
       onSlow: () => setSlow(true),
-      onFailure: setFailure,
-      onReady: () => AccessibilityInfo.announceForAccessibility('Your session is ready.'),
-      replace: (path) => router.replace(path),
+      onFailure: (error) => {
+        cancelPreparing()
+        setFailure(error)
+      },
+      onReady: cancelPreparing,
+      replace: (path) => router.replace(path === '/(tabs)/today' ? path : `${path}?announceReady=1`),
       dismissAll: () => router.dismissAll(),
     })
     request.current = current
     return () => {
+      cancelPreparing()
       current.dispose()
       if (request.current === current) request.current = null
     }
