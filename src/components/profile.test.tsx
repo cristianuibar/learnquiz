@@ -13,6 +13,7 @@ import { getProfile } from '@/server/profile'
 import { getSessionFn } from '@/server/session-fn'
 import { getPushSettings } from '@/server/push'
 import { getToday } from '@/server/today'
+import { authClient } from '@/lib/auth-client'
 
 vi.mock('@/server/profile', () => ({ getProfile: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
@@ -91,7 +92,8 @@ it('shows a company admin the member’s Training progress read-only and refuses
   const person = createRoute({ getParentRoute: () => org, path: '/people/$id', loader: personRoute.options.loader as (ctx: { params: { slug: string; id: string } }) => unknown, errorComponent: personRoute.options.errorComponent, component: personRoute.options.component })
   const people = createRoute({ getParentRoute: () => org, path: '/people', component: () => <h1>People</h1> })
   const today = createRoute({ getParentRoute: () => rootRoute, path: '/today', component: () => <h1>Today</h1> })
-  const router = createRouter({ routeTree: rootRoute.addChildren([org.addChildren([person, people]), today]), history: createMemoryHistory({ initialEntries: ['/org/acme/people/learner'] }) })
+  const signIn = createRoute({ getParentRoute: () => rootRoute, path: '/sign-in', component: () => <h1>Sign in</h1> })
+  const router = createRouter({ routeTree: rootRoute.addChildren([org.addChildren([person, people]), today, signIn]), history: createMemoryHistory({ initialEntries: ['/org/acme/people/learner'] }) })
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -109,6 +111,21 @@ it('shows a company admin the member’s Training progress read-only and refuses
     expect(container.querySelector('[role="alert"]')?.textContent).toContain('Only company admins can do this')
     expect(container.textContent).not.toContain('Dana Learner')
     expect([...container.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Sign in as someone else'])
+
+    // Offline, signOut rejects; the button must come back so switching works after reconnecting.
+    const signOut = vi.fn().mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValueOnce({ data: { success: true }, error: null })
+    Object.assign(authClient, { signOut })
+    const switchButton = () => container.querySelector('button')!
+    await act(async () => { switchButton().click() })
+    expect(container.textContent).toContain('Failed to fetch')
+    expect(switchButton().disabled).toBe(false)
+    expect(router.state.location.pathname).toBe('/org/acme/people/learner')
+    await act(async () => { switchButton().click() })
+    expect(signOut).toHaveBeenCalledTimes(2)
+    expect(router.state.location.pathname).toBe('/sign-in')
+    await act(async () => { router.history.back() })
+    await act(async () => { await router.invalidate() })
+
     await act(async () => { [...container.querySelectorAll('a')].find((a) => a.textContent === 'Go to Today')?.click() })
     expect(router.state.location.pathname).toBe('/today')
     expect(container.querySelector('h1')?.textContent).toBe('Today')
