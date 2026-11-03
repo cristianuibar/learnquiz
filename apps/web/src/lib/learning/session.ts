@@ -1,6 +1,8 @@
 import type { SessionView } from '@learnquiz/api'
 
 export const SESSION_BONUS = 20
+// Due reviews per session; a finished queue this long earns the day even under 10 answers.
+export const DUE_CAP = 8
 const DAY = 86_400_000
 
 type Due = { id: string; conceptId: string; confidentError: boolean; retrievability: number }
@@ -21,7 +23,7 @@ export function composeSession(input: {
   const conceptOf = new Map<string, string>()
   const due = [...input.due]
     .sort((a, b) => Number(b.confidentError) - Number(a.confidentError) || a.retrievability - b.retrievability)
-    .slice(0, 8)
+    .slice(0, DUE_CAP)
   const concepts = [...input.frontier].sort((a, b) => a.unitOrder - b.unitOrder || a.pKnown - b.pKnown)
   for (const c of concepts) for (const i of c.items) conceptOf.set(i.id, c.conceptId)
   for (const d of [...due, ...closers]) conceptOf.set(d.id, d.conceptId)
@@ -67,8 +69,9 @@ export function streakAfter(
   prev: { streakCount: number; lastSessionAt: number | null },
   now: Date,
   itemsAnswered: number,
+  finishedQueue = false,
 ): { streakCount: number; lastSessionAt: number | null } {
-  if (itemsAnswered < 10) return { streakCount: prev.streakCount, lastSessionAt: prev.lastSessionAt }
+  if (itemsAnswered < 10 && !(finishedQueue && itemsAnswered >= DUE_CAP)) return { streakCount: prev.streakCount, lastSessionAt: prev.lastSessionAt }
   const gap = prev.lastSessionAt === null ? Infinity : Math.floor(now.getTime() / DAY) - Math.floor(prev.lastSessionAt / DAY)
   const streakCount = gap === 0 ? Math.max(1, prev.streakCount) : gap === 1 ? prev.streakCount + 1 : 1
   return { streakCount, lastSessionAt: now.getTime() }

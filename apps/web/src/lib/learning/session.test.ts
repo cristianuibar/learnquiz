@@ -35,4 +35,7 @@ it('counts a day only at 10 items and resets after a gap', () => {
   expect(streakAfter(prev, day(28), 10).streakCount).toBe(4)
   expect(streakAfter(prev, day(27), 10).streakCount).toBe(3)
   expect(streakAfter(prev, day(30), 10).streakCount).toBe(1)
+  expect(streakAfter(prev, day(28), 8, true).streakCount).toBe(4) // a finished queue of 8 stored reviews
+  expect(streakAfter(prev, day(28), 7, true).streakCount).toBe(3)
+  expect(streakAfter(prev, day(28), 8).streakCount).toBe(3) // left early
 })
