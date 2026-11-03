@@ -32,8 +32,10 @@ export function BottomNav({ topicId }: { topicId: string | null }) {
               Path
             </Link>
           ) : (
-            <span aria-disabled="true" className={cn(tab(false), 'opacity-50')}>
-              <Route className="size-6" aria-hidden />
+            <span aria-disabled="true" className={cn(tab(false), 'cursor-not-allowed text-ink-muted')}>
+              <span className="flex h-[30px] w-14 items-center justify-center rounded-full border-2 border-dashed border-border-strong bg-surface-sunken">
+                <Route className="size-6" aria-hidden />
+              </span>
               Path
             </span>
           )}

@@ -49,8 +49,8 @@ function InviteRow({ invite, link, isNew, onRevoke }: { invite: Invite; link: st
           <>
             <Button
               ref={copyRef}
-              variant="outline"
-              className="h-11 px-4"
+              variant="secondary"
+              className="px-4"
               onClick={async () => {
                 await navigator.clipboard.writeText(link)
                 setCopied(true)
@@ -58,14 +58,14 @@ function InviteRow({ invite, link, isNew, onRevoke }: { invite: Invite; link: st
             >
               {copied ? 'Copied' : 'Copy link'}
             </Button>
-            <Button variant="outline" className="h-11 px-4" aria-expanded={qr} onClick={() => setQr(!qr)}>
+            <Button variant="secondary" className="px-4" aria-expanded={qr} onClick={() => setQr(!qr)}>
               QR code
             </Button>
           </>
         )}
         <Dialog>
           <DialogTrigger asChild>
-            <Button variant="ghost" className="h-11 px-4">
+            <Button variant="ghost" className="px-4">
               Revoke invite
             </Button>
           </DialogTrigger>
@@ -76,12 +76,12 @@ function InviteRow({ invite, link, isNew, onRevoke }: { invite: Invite; link: st
             </DialogHeader>
             <DialogFooter>
               <DialogClose asChild>
-                <Button variant="outline" className="h-11 px-4">
+                <Button variant="secondary" className="px-4">
                   Keep invite
                 </Button>
               </DialogClose>
               <DialogClose asChild>
-                <Button variant="destructive" className="h-11 px-4" onClick={onRevoke}>
+                <Button variant="secondary" className="px-4" onClick={onRevoke}>
                   Revoke invite
                 </Button>
               </DialogClose>
@@ -147,12 +147,12 @@ function People() {
       {!org.readOnly && <form className="mt-8 flex flex-col gap-6" ref={formRef} onSubmit={invite}>
         <div className="flex flex-col gap-2">
           <Label htmlFor="name">Name</Label>
-          <Input id="name" name="name" className="h-11" maxLength={80} required aria-invalid={!!fields.name || undefined} aria-describedby={fields.name ? 'name-error' : undefined} />
+          <Input id="name" name="name" maxLength={80} required aria-invalid={!!fields.name || undefined} aria-describedby={fields.name ? 'name-error' : undefined} />
           {fields.name && <p id="name-error" role="alert" className="text-sm font-medium text-wrong">{fields.name}</p>}
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="email">Email</Label>
-          <Input id="email" name="email" type="email" className="h-11" required aria-invalid={!!fields.email || undefined} aria-describedby={fields.email ? 'email-error' : undefined} />
+          <Input id="email" name="email" type="email" required aria-invalid={!!fields.email || undefined} aria-describedby={fields.email ? 'email-error' : undefined} />
           {fields.email && <p id="email-error" role="alert" className="text-sm font-medium text-wrong">{fields.email}</p>}
         </div>
         <div className="flex flex-col gap-2">
@@ -160,7 +160,7 @@ function People() {
           <select
             id="role"
             name="role"
-            className="h-11 w-full rounded-md border border-input bg-transparent px-3 text-base shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm"
+            className="min-h-12 w-full rounded-md border-2 border-border-strong bg-surface-card px-4 text-body-lg"
             required
           >
             {org.roles.map((r) => (
@@ -175,7 +175,7 @@ function People() {
             {error}
           </p>
         )}
-        <Button type="submit" className="h-11 self-end px-6" disabled={busy}>
+        <Button type="submit" className="self-end px-6" disabled={busy}>
           Create invite link
         </Button>
       </form>}

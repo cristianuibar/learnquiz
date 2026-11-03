@@ -44,7 +44,7 @@ function SignIn() {
         }}
       />
       {facebookEnabled && (
-        <Button variant="outline" className="h-12 px-6" onClick={() => authClient.signIn.social({ provider: 'facebook', callbackURL: next })}>
+        <Button variant="secondary" className="px-6" onClick={() => authClient.signIn.social({ provider: 'facebook', callbackURL: next })}>
           Continue with Facebook
         </Button>
       )}

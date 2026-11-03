@@ -46,9 +46,9 @@ function Users() {
         const form = new FormData(event.currentTarget)
         void navigate({ search: { search: String(form.get('search')).trim(), field: form.get('field') === 'name' ? 'name' : 'email', offset: 0 } })
       }}>
-        <div className="flex min-w-0 flex-1 basis-64 flex-col gap-2"><Label htmlFor="user-search">Search users</Label><Input id="user-search" name="search" defaultValue={search.search} maxLength={200} className="h-11" /></div>
-        <div className="flex flex-col gap-2"><Label htmlFor="search-field">Search by</Label><select id="search-field" name="field" defaultValue={search.field} className="h-11 rounded-md border border-input bg-background px-3 focus-visible:ring-[3px] focus-visible:ring-ring/50"><option value="email">Email</option><option value="name">Name</option></select></div>
-        <Button type="submit" className="h-11">Search</Button>
+        <div className="flex min-w-0 flex-1 basis-64 flex-col gap-2"><Label htmlFor="user-search">Search users</Label><Input id="user-search" name="search" defaultValue={search.search} maxLength={200} /></div>
+        <div className="flex flex-col gap-2"><Label htmlFor="search-field">Search by</Label><select id="search-field" name="field" defaultValue={search.field} className="min-h-12 rounded-md border-2 border-border-strong bg-surface-card px-4 text-body-lg"><option value="email">Email</option><option value="name">Name</option></select></div>
+        <Button type="submit">Search</Button>
       </form>
       {error && <p role="alert" className="mt-4 font-medium text-wrong">{error}</p>}
       <p role="status" className="mt-6">{plural(total, 'user', 'users')} found</p>
@@ -60,20 +60,20 @@ function Users() {
             <p className="mt-1 text-sm">{user.role || 'user'} · {user.banned ? 'Banned' : 'Active'}</p>
             {user.banned && user.banReason && <p className="mt-2 text-sm">{user.banReason}</p>}
             {user.id !== staff.id && (user.banned
-              ? <Button className="mt-4 h-11" variant="outline" disabled={busy} onClick={() => void changeBan(user.id, false)} aria-label={`Unban ${user.email}`}>Unban</Button>
+              ? <Button className="mt-4" variant="secondary" disabled={busy} onClick={() => void changeBan(user.id, false)} aria-label={`Unban ${user.email}`}>Unban</Button>
               : <form className="mt-4 flex flex-wrap items-end gap-3" onSubmit={(event) => {
                   event.preventDefault()
                   void changeBan(user.id, true, String(new FormData(event.currentTarget).get('reason')))
                 }}>
-                  <div className="flex flex-col gap-2"><Label htmlFor={`reason-${user.id}`}>Ban reason (optional)</Label><Input id={`reason-${user.id}`} name="reason" maxLength={500} className="h-11" /></div>
-                  <Button type="submit" variant="outline" className="h-11" disabled={busy} aria-label={`Ban ${user.email}`}>Ban</Button>
+                  <div className="flex flex-col gap-2"><Label htmlFor={`reason-${user.id}`}>Ban reason (optional)</Label><Input id={`reason-${user.id}`} name="reason" maxLength={500} /></div>
+                  <Button type="submit" variant="secondary" disabled={busy} aria-label={`Ban ${user.email}`}>Ban</Button>
                 </form>)}
           </li>
         ))}
       </ul>
       <nav aria-label="User pages" className="mt-6 flex items-center gap-4">
-        <Button variant="outline" className="h-11" disabled={busy || search.offset === 0} onClick={() => void navigate({ search: { ...search, offset: Math.max(0, search.offset - 25) } })}>Previous</Button>
-        <Button variant="outline" className="h-11" disabled={busy || search.offset + 25 >= total} onClick={() => void navigate({ search: { ...search, offset: search.offset + 25 } })}>Next</Button>
+        <Button variant="secondary" disabled={busy || search.offset === 0} onClick={() => void navigate({ search: { ...search, offset: Math.max(0, search.offset - 25) } })}>Previous</Button>
+        <Button variant="secondary" disabled={busy || search.offset + 25 >= total} onClick={() => void navigate({ search: { ...search, offset: search.offset + 25 } })}>Next</Button>
       </nav>
     </main>
   )
