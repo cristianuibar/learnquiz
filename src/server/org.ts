@@ -178,5 +178,7 @@ export const getInvite = createServerFn({ method: 'GET' })
       .get()
     if (!row) return null
     const status = row.status === 'pending' && row.expiresAt.getTime() < Date.now() ? 'expired' : row.status
-    return { company: row.company, email: row.email, name: row.name, status }
+    const viewer = await getSessionUser()
+    const otherAccount = !!viewer && !viewer.isAnonymous && viewer.email.toLowerCase() !== row.email.toLowerCase()
+    return { company: row.company, email: row.email, name: row.name, status, otherAccount }
   })
