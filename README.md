@@ -41,7 +41,7 @@ Built solo by Cristian Uibar for the Meta Global AI Developer Hackathon
 | --- | --- | --- |
 | Muse Spark 1.3 (`muse-spark-1.3`) | Curriculum skeleton, question generation and item self-check | Shipped; default Meta Model API model with JSON-schema output |
 | Muse Spark 1.3 | Short-answer grading | Shipped |
-| Llama 3.3 70B Instruct on Fireworks (`accounts/fireworks/models/llama-v3p3-70b-instruct`) | Placement result text (`placement_line`) | Shipped; falls back to Muse Spark 1.3 when Fireworks fails or times out, then to a template |
+| Muse Spark Open on Fireworks (`accounts/fireworks/models/muse-spark-open`) | Placement result text (`placement_line`) | Shipped; falls back to Muse Spark 1.3 when Fireworks fails or times out, then to a template |
 | Muse Voice Transcribe 1.0 (`muse-voice-transcribe-1.0`) | Transcribe spoken text answers for editing before submission | Implemented, opt-in; disabled in the checked-in configuration |
 | Muse Wonder 1.0 | Session planning with tools (coach) | Planned; current sessions use the code-based planner |
 | Muse Image 1.0 | Procedure diagrams | Shipped; generated once per visual concept and shown on answer reveals and Path |

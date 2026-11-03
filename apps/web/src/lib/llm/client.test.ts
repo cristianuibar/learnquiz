@@ -21,7 +21,7 @@ vi.mock('cloudflare:workers', () => ({
   env: { LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://llm.example', LLM_MODEL: 'muse-spark-1.3' },
 }))
 
-import { getSession, startSession } from '@/server/play'
+import { endSession, getSession, startSession } from '@/server/play'
 
 let raw: DatabaseSync
 let db: ReturnType<typeof drizzle>
@@ -153,26 +153,34 @@ it.each([
   ])
 })
 
-const llama = 'accounts/fireworks/models/llama-v3p3-70b-instruct'
+const sparkOpen = 'accounts/fireworks/models/muse-spark-open'
 
-it('runs placement_line on Llama 3.3 70B via Fireworks and prices the call at 0.9/0.9', async () => {
-  Object.assign(getEnv(), { JOB_MODELS: { placement_line: { provider: 'fireworks', model: llama } }, FIREWORKS_API_KEY: 'fw-key' })
+it('runs placement_line on Muse Spark Open via Fireworks with reasoning budget and unknown cost', async () => {
+  Object.assign(getEnv(), { JOB_MODELS: { placement_line: { provider: 'fireworks', model: sparkOpen } }, FIREWORKS_API_KEY: 'fw-key' })
+  raw.exec(`
+    INSERT INTO topics (id, learner_id, title, status, created_at) VALUES ('t1', 'u1', 'Algebra', 'ready', 1);
+    INSERT INTO learner_topic (learner_id, topic_id) VALUES ('u1', 't1');
+  `)
+  const plan = JSON.stringify({ position: 0, answered: true, workingLevel: 3, pool: [], log: [{ itemId: 'i1', correct: true, confidence: 'sure', level: 3 }] })
+  raw.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, plan_json, started_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .run('s1', 'u1', 't1', 'placement', plan, Date.now())
   const fetchModel = vi.fn(async () => Response.json({
-    choices: [{ message: { content: '{"answer":"ok"}' } }],
+    choices: [{ message: { content: '{"line":"You know variables. You will practise equations next."}' } }],
     usage: { prompt_tokens: 1000, completion_tokens: 1000 },
   }))
   vi.stubGlobal('fetch', fetchModel)
-  await expect(chatJsonWithModel({ ...answerRequest, purpose: 'placement_line' })).resolves.toEqual({ data: { answer: 'ok' }, model: llama })
+  await expect(endSession({ data: { sessionId: 's1' } })).resolves.toMatchObject({ levelLine: 'You know variables. You will practise equations next.', levelLineModel: sparkOpen })
   const [[endpoint, init]] = fetchModel.mock.calls as unknown as [[string, { headers: Record<string, string>; body: string }]]
   const body = JSON.parse(init.body)
   expect(endpoint).toBe('https://api.fireworks.ai/inference/v1/chat/completions')
   expect(init.headers.authorization).toBe('Bearer fw-key')
-  expect(body.model).toBe(llama)
+  expect(body.model).toBe(sparkOpen)
+  expect(body.max_tokens).toBeGreaterThanOrEqual(256)
   expect(body.response_format).toEqual({ type: 'json_object' })
   expect(body.n).toBeUndefined()
   expect(body.reasoning_effort).toBeUndefined()
   expect(raw.prepare('SELECT purpose, model, ok, cost_usd FROM model_calls').all()).toEqual([
-    { purpose: 'placement_line', model: llama, ok: 1, cost_usd: 0.0018 },
+    { purpose: 'placement_line', model: sparkOpen, ok: 1, cost_usd: null },
   ])
 })
 
@@ -180,18 +188,18 @@ it.each([
   { failure: 'HTTP 503', first: async () => new Response('down', { status: 503 }) },
   { failure: 'timeout', first: async () => { throw new DOMException('timed out', 'TimeoutError') } },
 ])('falls back to muse-spark-1.3 when Fireworks fails ($failure)', async ({ first }) => {
-  Object.assign(getEnv(), { JOB_MODELS: { placement_line: { provider: 'fireworks', model: llama } }, FIREWORKS_API_KEY: 'fw-key' })
+  Object.assign(getEnv(), { JOB_MODELS: { placement_line: { provider: 'fireworks', model: sparkOpen } }, FIREWORKS_API_KEY: 'fw-key' })
   const fetchModel = vi.fn()
     .mockImplementationOnce(first)
     .mockResolvedValueOnce(Response.json({ choices: [{ message: { content: '{"answer":"meta"}' } }] }))
   vi.stubGlobal('fetch', fetchModel)
   await expect(chatJsonWithModel({ ...answerRequest, purpose: 'placement_line' })).resolves.toEqual({ data: { answer: 'meta' }, model: 'muse-spark-1.3' })
   expect(fetchModel.mock.calls.map(([endpoint, init]) => [endpoint, JSON.parse(init.body).model])).toEqual([
-    ['https://api.fireworks.ai/inference/v1/chat/completions', llama],
+    ['https://api.fireworks.ai/inference/v1/chat/completions', sparkOpen],
     ['https://llm.example/chat/completions', 'muse-spark-1.3'],
   ])
   expect(raw.prepare('SELECT model, ok FROM model_calls ORDER BY rowid').all()).toEqual([
-    { model: llama, ok: 0 },
+    { model: sparkOpen, ok: 0 },
     { model: 'muse-spark-1.3', ok: 1 },
   ])
 })
@@ -199,6 +207,7 @@ it.each([
 it.each([
   { self_check: { provider: 'meta', model: 'gpt-4.1' } },
   { self_check: { provider: 'fireworks', model: 'accounts/fireworks/models/gpt-4.1' } },
+  { self_check: { provider: 'fireworks', model: 'accounts/fireworks/models/llama-v3p3-70b-instruct' } },
   { self_check: { provider: 'unknown', model: 'muse-wonder-1.0' } },
   '{invalid json',
   null,

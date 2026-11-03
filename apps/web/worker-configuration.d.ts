@@ -4,7 +4,7 @@
 interface __BaseEnv_Env {
 	MEDIA: R2Bucket;
 	DB: D1Database;
-	JOB_MODELS: {"curriculum":{"provider":"meta","model":"muse-spark-1.3"},"items":{"provider":"meta","model":"muse-spark-1.3"},"self_check":{"provider":"meta","model":"muse-spark-1.3"},"plan":{"provider":"meta","model":"muse-wonder-1.0"},"grade":{"provider":"meta","model":"muse-spark-1.3"},"image":{"provider":"meta","model":"muse-image-1.0"},"voice":{"provider":"meta","model":"muse-voice-transcribe-1.0"},"placement_line":{"provider":"fireworks","model":"accounts/fireworks/models/llama-v3p3-70b-instruct"}};
+	JOB_MODELS: {"curriculum":{"provider":"meta","model":"muse-spark-1.3"},"items":{"provider":"meta","model":"muse-spark-1.3"},"self_check":{"provider":"meta","model":"muse-spark-1.3"},"plan":{"provider":"meta","model":"muse-wonder-1.0"},"grade":{"provider":"meta","model":"muse-spark-1.3"},"image":{"provider":"meta","model":"muse-image-1.0"},"voice":{"provider":"meta","model":"muse-voice-transcribe-1.0"},"placement_line":{"provider":"fireworks","model":"accounts/fireworks/models/muse-spark-open"}};
 	LLM_API_KEY: string;
 	BETTER_AUTH_SECRET: string;
 	BETTER_AUTH_URL: string;
