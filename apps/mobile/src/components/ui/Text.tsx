@@ -3,7 +3,7 @@ import { useTheme } from '../../theme/ThemeProvider'
 
 export type TextProps = NativeTextProps & {
   ref?: React.Ref<NativeText>
-  variant?: 'display' | 'title1' | 'title2' | 'title3' | 'bodyLg' | 'body' | 'label' | 'labelLg' | 'caption' | 'overline'
+  variant?: 'display' | 'title1' | 'title2' | 'title3' | 'bodyLg' | 'body' | 'label' | 'labelLg' | 'caption' | 'overline' | 'chip'
   num?: boolean
   muted?: boolean
   header?: boolean
