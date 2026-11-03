@@ -82,9 +82,9 @@ function Settings() {
           {settings.hasLogo && <label className="flex min-h-11 items-center gap-2"><input id="removeLogo" name="removeLogo" type="checkbox" className="size-4" />Remove current logo</label>}
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="accent">Accent colour</Label>
-          <Input id="accent" name="accent" className="h-11" defaultValue={settings.accent ?? ''} placeholder="#00785f" pattern="#[0-9a-fA-F]{6}" maxLength={7} aria-describedby="accent-help" />
-          <p id="accent-help" className="text-sm text-muted-foreground">Use a hex colour with at least 4.5:1 contrast against white. Leave empty for the default brand.</p>
+          <Label htmlFor="accent">Accent color</Label>
+          <Input id="accent" name="accent" className="h-11" defaultValue={settings.accent ?? ''} placeholder="#0E5A73" pattern="#[0-9a-fA-F]{6}" maxLength={7} aria-describedby="accent-help" />
+          <p id="accent-help" className="text-sm text-muted-foreground">Use a hex color such as #0E5A73. Green and red are reserved for answer feedback, and the color needs 4.5:1 contrast. Leave empty for the default brand.</p>
         </div>
         {error && <p role="alert" className="text-sm font-medium text-wrong">{error}</p>}
         {saved && <p role="status" className="text-sm">Settings saved.</p>}

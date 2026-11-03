@@ -1,5 +1,5 @@
 import { ChoiceGroup } from '@/components/choice-group'
-import type { Confidence } from '@/lib/learning/types'
+import type { Confidence } from '@learnquiz/api'
 
 const OPTIONS = [
   { id: 'sure', text: 'Sure' },

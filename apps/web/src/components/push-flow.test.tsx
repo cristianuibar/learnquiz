@@ -11,7 +11,7 @@ import { Route as meRoute } from '@/routes/me.index'
 import { endSession, startMiniSession } from '@/server/play'
 import { getPushSettings, savePushPreferences } from '@/server/push'
 import { getSessionFn } from '@/server/session-fn'
-import type { SummaryView } from '@/lib/learning/types'
+import type { SummaryView } from '@learnquiz/api'
 
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn(async () => ({ user: { id: 'u1', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })) }))

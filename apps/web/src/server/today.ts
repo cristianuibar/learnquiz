@@ -1,14 +1,10 @@
+import type { Today } from '@learnquiz/api'
 import { createServerFn } from '@tanstack/react-start'
 import { and, count, desc, eq, lte } from 'drizzle-orm'
 import { getDb } from '@/db'
 import { items, learnerItem, learnerTopic, placements, topics } from '@/db/schema'
 import { getLearnerId } from '@/server/session'
 import { assignedRoleTopic, rolePlayable } from '@/server/topic-access'
-
-export type Today = {
-  topic: { id: string; title: string; placed: boolean; placeable: boolean; due: number; xp: number; streak: number } | null
-  role: { name: string; company: string; topicTitle: string; preparing: boolean } | null
-}
 
 // The home screen. An employee's Today is their role topic (or "preparing" until the curriculum is ready);
 // the personal edition shows the newest ready personal topic.

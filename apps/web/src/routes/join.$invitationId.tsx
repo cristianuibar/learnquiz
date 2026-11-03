@@ -82,7 +82,7 @@ function Join() {
                 onClick={async () => {
                   setBusy(true)
                   setError('')
-                  const { error } = await authClient.signOut()
+                  const { error } = await authClient.signOut().catch(() => ({ error: { message: 'Could not sign out' } }))
                   if (error) {
                     setError(error.message ?? 'Could not sign out')
                     setBusy(false)

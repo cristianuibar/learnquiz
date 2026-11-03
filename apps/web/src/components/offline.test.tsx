@@ -39,7 +39,7 @@ beforeEach(() => {
   vi.mocked(getSession).mockResolvedValue({
     id: 'session', kind: 'session', topicId: 'topic', topicTitle: 'Arithmetic', ended: false,
     progress: { position: 1, total: 1 },
-    item: { id: 'item', conceptId: 'concept', conceptName: 'Addition', format: 'mcq', stem: '2 + 2?', options: [{ id: 'four', text: '4' }], difficulty: 1 },
+    item: { id: 'item', conceptId: 'concept', conceptName: 'Addition', format: 'mcq', stem: '2 + 2?', options: [{ id: 'four', text: '4' }], blank: null, image: null, difficulty: 1 },
   })
 })
 
@@ -178,7 +178,7 @@ it('keeps the answer after an offline Check and submits it with Try again online
     expect(container.querySelector('[role="alert"]')?.textContent).toContain("You're offline")
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
     vi.mocked(answerItem).mockResolvedValueOnce({
-      attemptId: 'attempt', diagramConceptId: null, state: 'A', correct: true, score: 1, feedback: null, missingPoints: [], correctAnswer: '4', chosenFeedback: null, explanation: 'Two plus two is four.', sourceQuote: null, sourceTitle: null, mixUps: [], returnsThisSession: false, pKnownBefore: 0.1, pKnownAfter: 0.5,
+      attemptId: 'attempt', diagramConceptId: null, state: 'A', correct: true, score: 1, feedback: null, missingPoints: [], correctAnswer: '4', chosenFeedback: null, explanation: 'Two plus two is four.', sourceQuote: null, sourceTitle: null, mixUps: [], returnsThisSession: false, pKnownBefore: 0.1, pKnownAfter: 0.5, xp: 10, critical: false, correctOptionIds: ['four'], sourceVersion: null, detail: null,
     })
     await act(async () => { container.querySelector<HTMLButtonElement>('[role="alert"] button')!.click() })
     expect(answerItem).toHaveBeenLastCalledWith({ data: expect.objectContaining({ itemId: 'item', answer: { optionId: 'four' }, confidence: 'sure' }) })
@@ -201,7 +201,7 @@ it.each([false, true])('resyncs after a question is retired during an answer (se
     vi.mocked(getSession).mockResolvedValue({
       id: 'session', kind: 'session', topicId: 'topic', topicTitle: 'Arithmetic', ended,
       progress: { position: 2, total: 2 },
-      item: ended ? null : { id: 'next', conceptId: 'concept', conceptName: 'Addition', format: 'mcq', stem: '3 + 3?', options: [{ id: 'six', text: '6' }], difficulty: 1 },
+      item: ended ? null : { id: 'next', conceptId: 'concept', conceptName: 'Addition', format: 'mcq', stem: '3 + 3?', options: [{ id: 'six', text: '6' }], blank: null, image: null, difficulty: 1 },
     })
     await act(async () => { container.querySelector<HTMLButtonElement>('button[form="play"]')!.click() })
     expect(container.textContent).toContain(ended ? 'Session complete' : '3 + 3?')

@@ -1,4 +1,4 @@
-import type { Confidence } from './types'
+import type { Confidence } from '@learnquiz/api'
 
 export const PLACEMENT = { start: 3, min: 8, max: 12 }
 

@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Working } from '@/components/working'
 import { VoiceAnswer } from '@/components/voice-answer'
-import type { Confidence, Reveal, SessionView } from '@/lib/learning/types'
+import type { Confidence, Reveal, SessionView } from '@learnquiz/api'
 import { answerItem, endSession, getSession, nextItem, reportItem } from '@/server/play'
 
 export const Route = createFileRoute('/play/$sessionId')({

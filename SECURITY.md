@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Only the current production deployment at [learnquiz.com](https://learnquiz.com) is supported with security updates. Older commits, forks and local deployments are not covered. Please verify that a vulnerability still affects the live site or the latest `main` branch before reporting it.
+Only the current production web app and API at [app.learnquiz.com](https://app.learnquiz.com) are supported with security updates. [learnquiz.com](https://learnquiz.com) is the marketing site. Older commits, forks and local deployments are not covered. Please verify that a vulnerability still affects the live site or the latest `main` branch before reporting it.
 
 ## Reporting a vulnerability
 

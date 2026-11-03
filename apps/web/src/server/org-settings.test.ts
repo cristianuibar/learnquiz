@@ -128,6 +128,18 @@ it('rejects unsafe uploads, inaccessible accents and invalid schedules before st
   expect(sqlite.prepare('SELECT count(*) AS n FROM org_settings').get()).toEqual({ n: 0 })
 })
 
+it('rejects a reserved green accent with the reason and ignores a stored one', async () => {
+  const input = form()
+  input.set('accent', '#1E7F4F')
+  await expect(saveCompanySettings({ data: input })).rejects.toMatchObject({ status: 400, message: expect.stringContaining('Green and red are reserved for answer feedback.') })
+  expect(sqlite.prepare('SELECT count(*) AS n FROM org_settings').get()).toEqual({ n: 0 })
+  const seed = (accent: string) => sqlite.prepare('INSERT OR REPLACE INTO org_settings (org_id, company_name, timezone, working_hours_json, accent) VALUES (?, ?, ?, ?, ?)').run('org-a', 'Alpha Training', 'UTC', JSON.stringify({ days: [1], start: '09:00', end: '17:00' }), accent)
+  seed('#1E7F4F')
+  expect(await getCompanyBranding()).toMatchObject({ accent: null })
+  seed('#543189')
+  expect(await getCompanyBranding()).toMatchObject({ accent: '#543189' })
+})
+
 it('serves the saved logo only to company members and supports removal', async () => {
   const input = form()
   input.set('logo', logo())

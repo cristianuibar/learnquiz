@@ -1,4 +1,4 @@
-import type { Confidence } from './types'
+import type { Confidence } from '@learnquiz/api'
 
 export const WEEK = 7 * 86_400_000
 
