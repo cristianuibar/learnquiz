@@ -16,7 +16,7 @@ document libraries and automatic role-to-curriculum assignment are not yet
 shipped.
 
 Built solo by Cristian Uibar for the Meta Global AI Developer Hackathon
-(Oct 27 to Nov 4, 2026), Indie Developer track. Live at https://learnquiz.com.
+(Oct 27 to Nov 4, 2026), Indie Developer track. The web app and API are live at https://app.learnquiz.com; the marketing site is at https://learnquiz.com.
 
 ## What works today
 
@@ -208,7 +208,7 @@ the link; opening it records `push_log.opened_at` and resumes a single-question
 ## Deploy
 
 The checked-in Worker, database ID, bucket and custom domain target the live
-`learnquiz.com` service; its owner handles production deployments. For your own
+`app.learnquiz.com` service; its owner handles production deployments. For your own
 deployment, use your Cloudflare account, create a D1 database and R2 bucket, and
 update `apps/web/wrangler.jsonc` with your Worker name, database ID, bucket name and domain.
 Set `BETTER_AUTH_URL` to that domain's HTTPS origin and check the model configuration.
