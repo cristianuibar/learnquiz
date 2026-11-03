@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { Check, X } from 'lucide-react'
@@ -123,12 +123,15 @@ function Concept({
   const [items, setItems] = useState<Item[] | null>(null)
   const [working, setWorking] = useState(false)
   const [error, setError] = useState('')
+  const [open, setOpen] = useState(false)
+  const listId = useId()
 
   async function show() {
     setWorking(true)
     setError('')
     try {
       setItems((await load({ data: { conceptId: concept.id } })).items)
+      setOpen(true)
     } catch (err) {
       setError(errorMessage(err))
     }
@@ -150,10 +153,15 @@ function Concept({
         </div>
       ) : (
         concept.itemCount > 0 &&
-        items === null &&
         !error && (
-          <Button variant="outline" className="mt-4 h-12 px-6" onClick={show}>
-            Show answered questions
+          <Button
+            variant="outline"
+            className="mt-4 h-12 px-6"
+            aria-expanded={open}
+            aria-controls={listId}
+            onClick={() => (items === null ? void show() : setOpen(!open))}
+          >
+            {open ? 'Hide answered questions' : 'Show answered questions'}
           </Button>
         )
       )}
@@ -162,18 +170,20 @@ function Concept({
           <InlineError message={error} onRetry={() => void show()} />
         </div>
       )}
-      {items?.length === 0 && (
-        <p role="status" className="mt-3 text-sm text-muted-foreground">
-          No answered questions to review yet.
-        </p>
-      )}
-      {items && items.length > 0 && (
-        <ol className="mt-4 flex flex-col gap-4 border-t pt-4">
-          {items.map((item) => (
-            <ItemView key={item.id} item={item} />
-          ))}
-        </ol>
-      )}
+      <div id={listId} hidden={!open}>
+        {items?.length === 0 && (
+          <p role="status" className="mt-3 text-sm text-muted-foreground">
+            No answered questions to review yet.
+          </p>
+        )}
+        {items && items.length > 0 && (
+          <ol className="mt-4 flex flex-col gap-4 border-t pt-4">
+            {items.map((item) => (
+              <ItemView key={item.id} item={item} />
+            ))}
+          </ol>
+        )}
+      </div>
     </li>
   )
 }
