@@ -8,6 +8,7 @@ import { Route as meRoute } from '@/routes/me.index'
 import { Route as profileRoute } from '@/routes/me.profile'
 import { getProfile } from '@/server/profile'
 import { getSessionFn } from '@/server/session-fn'
+import { getPushSettings } from '@/server/push'
 
 vi.mock('@/server/profile', () => ({ getProfile: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
@@ -15,11 +16,13 @@ vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => null }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
 vi.mock('@/server/push', () => ({
-  getPushSettings: async () => ({ publicKey: null, isStaff: false, endpoints: [], canPrompt: false, prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' } }),
+  getPushSettings: vi.fn(),
   subscribe: vi.fn(), unsubscribe: vi.fn(), sendTestPush: vi.fn(), savePushPreferences: vi.fn(),
 }))
 
 it.each(['user', 'admin'])('opens training progress for %s, preserves staff access, and redirects signed-out visitors', async (role) => {
+  vi.mocked(getPushSettings).mockResolvedValue({ publicKey: null, isStaff: role === 'admin', endpoints: [], canPrompt: false,
+    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' } })
   const day = 86_400_000
   const start = Date.UTC(2026, 10, 2)
   vi.mocked(getProfile).mockResolvedValue({

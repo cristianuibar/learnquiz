@@ -25,6 +25,8 @@ vi.mock('@/db', () => ({ getDb: () => holder.db }))
 vi.mock('@/server/session', () => ({ requireLearnerId: vi.fn(async () => 'u1'), getSessionUser: async () => ({ id: 'u1', isAnonymous: false }) }))
 
 vi.mock('@/lib/llm/client', () => ({
+  isVoiceEnabled: () => false,
+  jobModel: () => ({ model: 'muse-spark-1.3' }),
   chatJson: vi.fn(async () => ({ line: 'You know the basics and will grow from here.' })),
   LlmError: class LlmError extends Error {
     constructor(message: string, public status: number) {

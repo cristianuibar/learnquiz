@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "903a1fc3-5c9f-4dcc-999f-128ad5802474",
-  "prevId": "c51ee29c-75c8-4482-8334-6c5c1609412c",
+  "id": "d7f2df0c-2bac-4546-a0ff-6ad28657bc18",
+  "prevId": "7e0f54f2-5000-45cb-b220-6717abaf8084",
   "tables": {
     "attempts": {
       "name": "attempts",
@@ -960,9 +960,8 @@
           "name": "cost_usd",
           "type": "real",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
+          "notNull": false,
+          "autoincrement": false
         },
         "ok": {
           "name": "ok",
@@ -1149,27 +1148,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "item_id": {
-          "name": "item_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "session_id": {
-          "name": "session_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "opened_at": {
-          "name": "opened_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -1223,38 +1201,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": false
-        },
-        "paused": {
-          "name": "paused",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "start_minute": {
-          "name": "start_minute",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 540
-        },
-        "end_minute": {
-          "name": "end_minute",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 1020
-        },
-        "timezone": {
-          "name": "timezone",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'UTC'"
         },
         "updated_at": {
           "name": "updated_at",

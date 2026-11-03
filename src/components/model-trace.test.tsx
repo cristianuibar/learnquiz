@@ -32,7 +32,10 @@ it.each(['topic', 'session'] as const)('opens the %s trace from its page and ret
     level: 3, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], nextLine: 'Practise equations.',
   })
   vi.mocked(getModelTrace).mockReset().mockRejectedValueOnce(new Error('Trace unavailable')).mockResolvedValue({
-    calls: [{ id: 'call', purpose: 'items', model: 'muse-spark-1.3', latencyMs: 123, promptTokens: 100, completionTokens: 20, reasoningTokens: 5, costUsd: 0.00021, ok: true, createdAt: 1 }], totalCostUsd: 0.00021,
+    calls: [
+      { id: 'call', purpose: 'items', model: 'muse-spark-1.3', latencyMs: 123, promptTokens: 100, completionTokens: 20, reasoningTokens: 5, costUsd: 0.00021, ok: true, createdAt: 1 },
+      { id: 'unpriced', purpose: 'self_check', model: 'muse-wonder-1.0', latencyMs: 123, promptTokens: 100, completionTokens: 20, reasoningTokens: 5, costUsd: null, ok: true, createdAt: 2 },
+    ], totalCostUsd: 0.00021,
   })
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
   const path = createRoute({ getParentRoute: () => rootRoute, path: '/t/$topicId/path', loader: pathRoute.options.loader, component: pathRoute.options.component })
@@ -52,6 +55,7 @@ it.each(['topic', 'session'] as const)('opens the %s trace from its page and ret
     await act(async () => dialog.querySelector<HTMLButtonElement>('[role="alert"] button')!.click())
     expect(getModelTrace).toHaveBeenLastCalledWith({ data: scope === 'topic' ? { scope, topicId: 't1' } : { scope, sessionId: 's1' } })
     expect(dialog.textContent).toContain('muse-spark-1.3')
+    expect(dialog.textContent).toContain('Unknown')
     expect(dialog.textContent).toContain(`${scope === 'topic' ? 'Generation' : 'Session'} total: $0.00021`)
     await act(async () => dialog.querySelector<HTMLButtonElement>('[data-slot="dialog-close"]')!.click())
     expect(document.querySelector('[role="dialog"]')).toBeNull()

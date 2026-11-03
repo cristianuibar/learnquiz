@@ -6,6 +6,7 @@ import { createTopic, getTopicPath } from '@/server/curriculum'
 import { answerItem } from '@/server/play'
 import { getModelTrace } from '@/server/model-trace'
 import { generateConceptDiagram, serveConceptDiagram } from './diagrams'
+import type { JobModels } from '@/lib/llm/models'
 
 const boundary = vi.hoisted(() => ({
   db: null as unknown,
@@ -13,6 +14,7 @@ const boundary = vi.hoisted(() => ({
   objects: new Map<string, Uint8Array>(),
   env: {
     LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://model.test/v1', LLM_MODEL: 'muse-spark-1.3', IMAGE_MODEL: 'muse-image-1.0',
+    JOB_MODELS: undefined as JobModels | undefined,
     MEDIA: { head: vi.fn(), get: vi.fn(), put: vi.fn() },
   },
 }))
@@ -54,6 +56,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))
   boundary.learnerId = 'learner'
   boundary.env.LLM_PROFILE = 'meta'
+  boundary.env.JOB_MODELS = undefined
   boundary.objects.clear()
   boundary.env.MEDIA.head.mockImplementation(async (key: string) => boundary.objects.has(key) ? {} : null)
   boundary.env.MEDIA.get.mockImplementation(async (key: string) => boundary.objects.has(key) ? { body: boundary.objects.get(key) } : null)
@@ -73,6 +76,18 @@ afterEach(() => {
 })
 const row = (sql: string) => raw.prepare(sql).get() as Record<string, unknown>
 
+it('routes the image job independently of text and records an unknown cost in its topic trace', async () => {
+  boundary.env.LLM_PROFILE = 'baseten'
+  boundary.env.JOB_MODELS = { image: { provider: 'meta', model: 'muse-image-1.0' } }
+  expect(await generateConceptDiagram({ data: { conceptId: 'procedure' } })).toMatchObject({ status: 'ready' })
+  expect(fetchModel).toHaveBeenCalledTimes(1)
+  expect(fetchModel.mock.calls[0][0]).toBe('https://api.meta.ai/v1/images/generations')
+  expect(JSON.parse(fetchModel.mock.calls[0][1].body).model).toBe('muse-image-1.0')
+  expect(await getModelTrace({ data: { scope: 'topic', topicId: 'topic' } })).toMatchObject({
+    calls: [{ purpose: 'diagram', model: 'muse-image-1.0', costUsd: null }], totalCostUsd: 0,
+  })
+})
+
 it('generates one diagram across overlapping views, serves its bytes, and reuses it on Path and reveal', async () => {
   let finish!: (res: Response) => void
   let started!: () => void
@@ -90,10 +105,10 @@ it('generates one diagram across overlapping views, serves its bytes, and reuses
   expect(url).toBe('https://model.test/v1/images/generations')
   expect(JSON.parse(request.body)).toMatchObject({ model: 'muse-image-1.0', n: 1, response_format: 'b64_json', prompt: expect.stringContaining('Check stock before packing.') })
   expect(boundary.env.MEDIA.put).toHaveBeenCalledTimes(1)
-  expect(row('SELECT model, purpose, cost_usd, ok FROM model_calls')).toEqual({ model: 'muse-image-1.0', purpose: 'diagram', cost_usd: 0.01, ok: 1 })
+  expect(row('SELECT model, purpose, cost_usd, ok FROM model_calls')).toEqual({ model: 'muse-image-1.0', purpose: 'diagram', cost_usd: null, ok: 1 })
   expect(row('SELECT COUNT(*) AS n FROM model_calls').n).toBe(1)
   expect(await getModelTrace({ data: { scope: 'topic', topicId: 'topic' } })).toMatchObject({
-    calls: [{ purpose: 'diagram', model: 'muse-image-1.0', costUsd: 0.01 }], totalCostUsd: 0.01,
+    calls: [{ purpose: 'diagram', model: 'muse-image-1.0', costUsd: null }], totalCostUsd: 0,
   })
   const response = await serveConceptDiagram('procedure')
   expect(response.status).toBe(200)
@@ -152,7 +167,7 @@ it.each(['http', 'invalid-image', 'storage'])('allows retry after a %s failure w
   expect(await generateConceptDiagram({ data: { conceptId: 'procedure' } })).toMatchObject({ status: 'ready' })
   expect(fetchModel).toHaveBeenCalledTimes(2)
   expect(row('SELECT COUNT(*) AS n FROM model_calls').n).toBe(2)
-  expect(row('SELECT ok, cost_usd FROM model_calls ORDER BY rowid LIMIT 1')).toEqual({ ok: failure === 'storage' ? 1 : 0, cost_usd: failure === 'http' ? 0 : 0.01 })
+  expect(row('SELECT ok, cost_usd FROM model_calls ORDER BY rowid LIMIT 1')).toEqual({ ok: failure === 'storage' ? 1 : 0, cost_usd: null })
 })
 
 it('recovers an abandoned claim and an uploaded image without generating again', async () => {

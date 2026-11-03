@@ -44,6 +44,7 @@ beforeEach(() => {
   raw.exec('BEGIN')
   holder.learnerId = 'u1'
   getEnv().LLM_MODEL = 'muse-spark-1.3'
+  getEnv().JOB_MODELS = undefined
 })
 afterEach(() => { raw.exec('ROLLBACK'); vi.unstubAllGlobals() })
 afterAll(() => raw.close())
@@ -68,7 +69,7 @@ it('returns every owned session call and exact costs, with generation scoped to 
     ['items', 'u1', 's1', 't1', 'items', 0.03, 1, 3],
     ['check', 'u1', 's1', 't1', 'self_check', 0.04, 1, 4],
     ['line', 'u1', 's1', 't1', 'placement_line', 0.05, 1, 5],
-    ['voice', 'u1', 's1', 't1', 'voice', 0, 1, 6],
+    ['voice', 'u1', 's1', 't1', 'voice', null, 1, 6],
     ['later', 'u1', 's2', 't1', 'items', 0.06, 1, 7],
     ['other-topic', 'u1', null, 't2', 'curriculum', 1, 1, 8],
     ['other-learner', 'u2', 's1', 't1', 'items', 9, 1, 9],
@@ -80,7 +81,7 @@ it('returns every owned session call and exact costs, with generation scoped to 
   const trace = await getModelTrace({ data: { scope: 'session', sessionId: 's1' } })
   expect(trace.calls.map((c) => c.id)).toEqual(['retry', 'items', 'check', 'line', 'voice'])
   expect(trace.calls[0]).toEqual({ id: 'retry', purpose: 'items', model: 'muse-spark-1.3', latencyMs: 123, promptTokens: 100, completionTokens: 200, reasoningTokens: 20, costUsd: 0.02, ok: false, createdAt: 2 })
-  expect(trace.totalCostUsd).toBe(trace.calls.reduce((sum, c) => sum + c.costUsd, 0))
+  expect(trace.totalCostUsd).toBe(trace.calls.reduce((sum, c) => sum + (c.costUsd ?? 0), 0))
   expect(trace.totalCostUsd).toBeCloseTo(0.14, 12)
   const generation = await getModelTrace({ data: { scope: 'topic', topicId: 't1' } })
   expect(generation.calls.map((c) => c.id)).toEqual(['curriculum', 'retry', 'items', 'check', 'later'])
@@ -95,6 +96,11 @@ it('returns every owned session call and exact costs, with generation scoped to 
 })
 
 it.each(['placement', 'session'] as const)('traces real %s startup generation, retries and persisted model attribution', async (kind) => {
+  getEnv().JOB_MODELS = {
+    curriculum: { provider: 'meta', model: 'muse-wonder-1.0' },
+    items: { provider: 'meta', model: 'muse-wonder-1.0' },
+    placement_line: { provider: 'meta', model: 'muse-wonder-1.0' },
+  }
   const skeleton = { units: Array.from({ length: 4 }, (_, u) => ({
     name: `Unit ${u}`, summary: 'Basics', concepts: Array.from({ length: 4 }, (_, c) => ({
       name: `Concept ${u}-${c}`, summary: 'Variables', visual: false, prerequisites: [], source_quote: null, critical: false, misconceptions: [],
@@ -129,20 +135,21 @@ it.each(['placement', 'session'] as const)('traces real %s startup generation, r
   }
   const summary = await endSession({ data: { sessionId } })
   getEnv().LLM_MODEL = 'a-different-model'
-  expect(path.topic.generatedBy).toBe('muse-spark-1.3')
+  expect(path.topic.generatedBy).toBe('muse-wonder-1.0')
   expect((await getSession({ data: { sessionId } })).ended).toBe(true)
-  expect(view.item?.generatedBy).toBe('muse-spark-1.3')
+  expect(view.item?.generatedBy).toBe('muse-wonder-1.0')
   const stored = raw.prepare('SELECT generated_by FROM items WHERE concept_id = ?').all(view.item!.conceptId) as { generated_by: string }[]
-  expect(stored.map((i) => i.generated_by)).toEqual(Array(6).fill('muse-spark-1.3'))
+  expect(stored.map((i) => i.generated_by)).toEqual(Array(6).fill('muse-wonder-1.0'))
   if (kind === 'placement') {
-    expect(summary.levelLineModel).toBe('muse-spark-1.3')
-    expect((await getTopicPath({ data: { topicId } })).learner.levelLineModel).toBe('muse-spark-1.3')
+    expect(summary.levelLineModel).toBe('muse-wonder-1.0')
+    expect((await getTopicPath({ data: { topicId } })).learner.levelLineModel).toBe('muse-wonder-1.0')
   }
   const trace = await getModelTrace({ data: { scope: 'session', sessionId } })
   expect(trace.calls).toHaveLength(kind === 'placement' ? 8 : 9)
-  expect(trace.calls.every((c) => c.costUsd === 0.000975)).toBe(true)
+  expect(trace.calls.map((c) => [c.model, c.costUsd])).toEqual(trace.calls.map((c) => c.purpose === 'self_check'
+    ? ['muse-spark-1.3', 0.000975] : ['muse-wonder-1.0', null]))
   const total = raw.prepare('SELECT SUM(cost_usd) AS cost FROM model_calls WHERE session_id = ?').get(sessionId) as { cost: number }
-  expect(trace.totalCostUsd).toBe(trace.calls.reduce((sum, c) => sum + c.costUsd, 0))
+  expect(trace.totalCostUsd).toBe(trace.calls.reduce((sum, c) => sum + (c.costUsd ?? 0), 0))
   expect(trace.totalCostUsd).toBeCloseTo(total.cost, 12)
   expect((await getModelTrace({ data: { scope: 'topic', topicId } })).calls).toHaveLength(kind === 'placement' ? 8 : 10)
 })
