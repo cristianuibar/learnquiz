@@ -9,6 +9,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vite
 import { Route as appRootRoute } from '@/routes/__root'
 import { Route as indexRoute } from '@/routes/index'
 import { Route as meRoute } from '@/routes/me.index'
+import { Route as orgLayoutRoute } from '@/routes/org.$slug'
 import { Route as orgRoute } from '@/routes/org.$slug.index'
 import { Route as rolesRoute } from '@/routes/org.$slug.roles'
 import { Route as signInRoute } from '@/routes/sign-in'
@@ -90,13 +91,16 @@ afterAll(() => sqlite.close())
 
 async function renderApp(initialEntry = '/sign-in') {
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, component: appRootRoute.options.component, loader: appRootRoute.options.loader })
+  const orgLayout = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgLayoutRoute.options.beforeLoad, component: orgLayoutRoute.options.component })
   const routes = [
     createRoute({ getParentRoute: () => rootRoute, path: '/', beforeLoad: indexRoute.options.beforeLoad, component: indexRoute.options.component }),
     createRoute({ getParentRoute: () => rootRoute, path: '/sign-in', beforeLoad: signInRoute.options.beforeLoad, validateSearch: signInRoute.options.validateSearch, component: signInRoute.options.component }),
     createRoute({ getParentRoute: () => rootRoute, path: '/start', validateSearch: startRoute.options.validateSearch, component: startRoute.options.component }),
     createRoute({ getParentRoute: () => rootRoute, path: '/me', beforeLoad: meRoute.options.beforeLoad, loader: meRoute.options.loader, component: meRoute.options.component }),
-    createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', loader: orgRoute.options.loader as (ctx: { params: { slug: string } }) => unknown, errorComponent: orgRoute.options.errorComponent, component: orgRoute.options.component }),
-    createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug/roles', loader: rolesRoute.options.loader as (ctx: { params: { slug: string } }) => unknown, errorComponent: rolesRoute.options.errorComponent, component: rolesRoute.options.component }),
+    orgLayout.addChildren([
+      createRoute({ getParentRoute: () => orgLayout, path: '/', loader: orgRoute.options.loader as (ctx: { params: { slug: string } }) => unknown, errorComponent: orgRoute.options.errorComponent, component: orgRoute.options.component }),
+      createRoute({ getParentRoute: () => orgLayout, path: '/roles', loader: rolesRoute.options.loader as (ctx: { params: { slug: string } }) => unknown, errorComponent: rolesRoute.options.errorComponent, component: rolesRoute.options.component }),
+    ]),
     createRoute({ getParentRoute: () => rootRoute, path: '/welcome', beforeLoad: welcomeRoute.options.beforeLoad, validateSearch: welcomeRoute.options.validateSearch, component: welcomeRoute.options.component }),
   ]
   const router = createRouter({ routeTree: rootRoute.addChildren(routes), history: createMemoryHistory({ initialEntries: [initialEntry] }) })
@@ -182,11 +186,11 @@ it('lists job roles without links to pages that do not exist', async () => {
   vi.mocked(getSessionUser).mockResolvedValue({ id: 'owner', name: 'Owner', isAnonymous: false } as never)
   const { container, router, cleanup } = await renderApp('/org/northwind')
   try {
-    await act(async () => { container.querySelector<HTMLAnchorElement>('a[href="/org/northwind/roles"]')!.click(); await router.load() })
+    await act(async () => { container.querySelector<HTMLAnchorElement>('nav[aria-label="Company"] a[href="/org/northwind/roles"]')!.click(); await router.load() })
     expect(container.querySelector('h1')?.textContent).toBe('Job roles')
     expect(container.querySelector('main li')?.textContent).toContain('Barista')
     for (const a of container.querySelectorAll<HTMLAnchorElement>('main a')) {
-      expect(router.matchRoutes(a.getAttribute('href')!).at(-1)?.pathname).toBe(a.getAttribute('href'))
+      expect(router.matchRoutes(a.getAttribute('href')!).at(-1)?.pathname.replace(/(.)\/$/, '$1')).toBe(a.getAttribute('href'))
     }
   } finally { await cleanup() }
 })
