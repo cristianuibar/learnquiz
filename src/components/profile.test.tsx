@@ -6,17 +6,20 @@ import { expect, it, vi } from 'vitest'
 import { Route as appRootRoute } from '@/routes/__root'
 import { Route as meRoute } from '@/routes/me.index'
 import { Route as profileRoute } from '@/routes/me.profile'
+import { Route as signInRoute } from '@/routes/sign-in'
 import { Route as orgRoute } from '@/routes/org.$slug'
 import { Route as personRoute } from '@/routes/org.$slug.people_.$id'
 import { getProfile } from '@/server/profile'
 import { getSessionFn } from '@/server/session-fn'
 import { getPushSettings } from '@/server/push'
+import { getToday } from '@/server/today'
 
 vi.mock('@/server/profile', () => ({ getProfile: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => null }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
+vi.mock('@/server/today', () => ({ getToday: vi.fn() }))
 vi.mock('@/server/push', () => ({
   getPushSettings: vi.fn(),
   subscribe: vi.fn(), unsubscribe: vi.fn(), sendTestPush: vi.fn(), savePushPreferences: vi.fn(),
@@ -104,6 +107,38 @@ it('shows a company admin the member’s Training progress read-only and refuses
     await act(async () => { await router.invalidate() })
     expect(container.querySelector('[role="alert"]')?.textContent).toContain('Only company admins can do this')
     expect(container.textContent).not.toContain('Dana Learner')
+  } finally {
+    await act(async () => root.unmount())
+    container.remove()
+    delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT
+  }
+})
+
+it('shows a guest their topic progress and reaches sign-up in one tap', async () => {
+  vi.mocked(getToday).mockResolvedValue({ topic: { id: 't1', title: 'Spanish verbs', placed: true, due: 0, xp: 120, streak: 3 }, role: null } as Awaited<ReturnType<typeof getToday>>)
+  vi.mocked(getPushSettings).mockClear()
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'guest', name: 'Anonymous', isAnonymous: true, role: 'user' }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })
+  const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
+  const me = createRoute({ getParentRoute: () => rootRoute, path: '/me', beforeLoad: meRoute.options.beforeLoad, loader: meRoute.options.loader, component: meRoute.options.component })
+  const signIn = createRoute({ getParentRoute: () => rootRoute, path: '/sign-in', validateSearch: signInRoute.options.validateSearch, beforeLoad: signInRoute.options.beforeLoad, component: signInRoute.options.component })
+  const router = createRouter({ routeTree: rootRoute.addChildren([me, signIn]), history: createMemoryHistory({ initialEntries: ['/me'] }) })
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  try {
+    await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
+    expect(container.querySelector('h1')?.textContent).toBe('Guest')
+    expect(container.textContent).toContain('Spanish verbs')
+    expect(container.textContent).toContain('Streak 3 · 120 XP')
+    expect(getPushSettings).not.toHaveBeenCalled()
+    expect([...container.querySelectorAll('button')].some((b) => b.textContent === 'Sign out')).toBe(false)
+    await act(async () => {
+      const link = [...container.querySelectorAll('a')].find((a) => a.textContent === 'Save your progress')!
+      link.click()
+      await vi.waitFor(() => expect(container.querySelector('h1')?.textContent).toBe('Create an account'))
+    })
+    expect(container.querySelector('#name')).not.toBeNull()
   } finally {
     await act(async () => root.unmount())
     container.remove()

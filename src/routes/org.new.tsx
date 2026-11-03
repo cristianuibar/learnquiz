@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { errorMessage, fieldErrors } from '@/components/inline-error'
+import { errorMessage, fieldErrors, useFocusInvalid } from '@/components/inline-error'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,6 +19,7 @@ function NewCompany() {
   const create = useServerFn(createCompany)
   const [error, setError] = useState('')
   const [fields, setFields] = useState<Record<string, string>>({})
+  const formRef = useFocusInvalid(fields)
   const [busy, setBusy] = useState(false)
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
@@ -48,7 +49,7 @@ function NewCompany() {
   return (
     <main className="mx-auto w-full max-w-xl px-4 pt-8 pb-16">
       <h1 className="mb-8 text-3xl font-bold tracking-tight">Set up your company</h1>
-      <form className="flex flex-col gap-6" onSubmit={submit}>
+      <form ref={formRef} className="flex flex-col gap-6" onSubmit={submit}>
         <div className="flex flex-col gap-2">
           <Label htmlFor="name">Company name</Label>
           <Input id="name" name="name" className="h-11" minLength={2} maxLength={80} required autoFocus aria-invalid={!!fields.name || undefined} aria-describedby={fields.name ? 'name-error' : undefined} />

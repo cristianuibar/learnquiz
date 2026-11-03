@@ -96,7 +96,7 @@ it('shows the offline message for answered questions on Path and loads them with
   vi.mocked(getTopicPath).mockResolvedValue({
     topic: { id: 'topic', title: 'Arithmetic', goal: null, status: 'ready', generatedBy: null },
     learner: { level: 1, levelLine: null, levelLineModel: null, placed: false, xp: 0, streak: 0 },
-    units: [{ id: 'unit', order: 0, name: 'Basics', summary: '', mastery: 0, unlocked: true, concepts: [{ id: 'concept', order: 0, name: 'Addition', summary: '', visual: false, grounded: false, critical: false, itemCount: 1, pKnown: 0 }] }],
+    units: [{ id: 'unit', order: 0, name: 'Basics', summary: '', mastery: 0, measured: false, unlocked: true, concepts: [{ id: 'concept', order: 0, name: 'Addition', summary: '', visual: false, grounded: false, critical: false, itemCount: 1, pKnown: 0 }] }],
     edges: [],
   })
   const { container, cleanup } = await renderApp('/t/topic/path')
@@ -119,6 +119,43 @@ it('shows the offline message for answered questions on Path and loads them with
   }
 })
 
+it('opens and closes the answered questions on Path from the same button', async () => {
+  vi.mocked(getTopicPath).mockResolvedValue({
+    topic: { id: 'topic', title: 'Arithmetic', goal: null, status: 'ready', generatedBy: null },
+    learner: { level: 1, levelLine: null, levelLineModel: null, placed: false, xp: 0, streak: 0 },
+    units: [{ id: 'unit', order: 0, name: 'Basics', summary: '', mastery: 0, measured: false, unlocked: true, concepts: [{ id: 'concept', order: 0, name: 'Addition', summary: '', visual: false, grounded: false, critical: false, itemCount: 1, pKnown: 0 }] }],
+    edges: [],
+  })
+  vi.mocked(getConceptItems).mockResolvedValue({
+    items: [{
+      id: 'item', format: 'cloze', difficultyPrior: 1, generatedBy: null,
+      payload: { format: 'cloze', stem: '2 + 2 = ____', options: [], accepted_answers: ['4'], model_answer: '4', explanation: 'Two plus two is four.', difficulty: 1, source_quote: null, grounded: false, bloom: 'remember' },
+    }],
+  })
+  const { container, cleanup } = await renderApp('/t/topic/path')
+  try {
+    const button = () => [...container.querySelectorAll('button')].find((b) => b.textContent?.endsWith('answered questions'))!
+    const list = () => document.getElementById(button().getAttribute('aria-controls')!)!
+    expect(button().textContent).toBe('Show answered questions')
+    expect(button().getAttribute('aria-expanded')).toBe('false')
+    await act(async () => { button().click() })
+    expect(button().textContent).toBe('Hide answered questions')
+    expect(button().getAttribute('aria-expanded')).toBe('true')
+    expect(list().hidden).toBe(false)
+    expect(list().textContent).toContain('2 + 2 = ____')
+    await act(async () => { button().click() })
+    expect(button().textContent).toBe('Show answered questions')
+    expect(button().getAttribute('aria-expanded')).toBe('false')
+    expect(list().hidden).toBe(true)
+    await act(async () => { button().click() })
+    expect(button().getAttribute('aria-expanded')).toBe('true')
+    expect(list().hidden).toBe(false)
+    expect(getConceptItems).toHaveBeenCalledTimes(1)
+  } finally {
+    await cleanup()
+  }
+})
+
 it('keeps the answer after an offline Check and submits it with Try again online', async () => {
   const { container, cleanup } = await renderApp('/play/session')
   try {
@@ -132,7 +169,7 @@ it('keeps the answer after an offline Check and submits it with Try again online
     expect(container.querySelector('[role="alert"]')?.textContent).toContain("You're offline")
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
     vi.mocked(answerItem).mockResolvedValueOnce({
-      attemptId: 'attempt', diagramConceptId: null, state: 'A', correct: true, score: 1, feedback: null, missingPoints: [], correctAnswer: '4', chosenFeedback: null, explanation: 'Two plus two is four.', sourceQuote: null, mixUps: [], returnsThisSession: false, pKnownBefore: 0.1, pKnownAfter: 0.5,
+      attemptId: 'attempt', diagramConceptId: null, state: 'A', correct: true, score: 1, feedback: null, missingPoints: [], correctAnswer: '4', chosenFeedback: null, explanation: 'Two plus two is four.', sourceQuote: null, sourceTitle: null, mixUps: [], returnsThisSession: false, pKnownBefore: 0.1, pKnownAfter: 0.5,
     })
     await act(async () => { container.querySelector<HTMLButtonElement>('[role="alert"] button')!.click() })
     expect(answerItem).toHaveBeenLastCalledWith({ data: expect.objectContaining({ itemId: 'item', answer: { optionId: 'four' }, confidence: 'sure' }) })

@@ -154,7 +154,7 @@ function Play({ initial }: { initial: SessionView }) {
                 submitNext()
               }}
             >
-              <RevealCard reveal={reveal} chosen={chosen} why={why} onWhy={setWhy} />
+              <RevealCard reveal={reveal} chosen={chosen} why={why} onWhy={setWhy} model={item.generatedBy} />
             </form>
             {reported ? (
               <p className="text-sm text-muted-foreground">Reported</p>

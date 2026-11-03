@@ -31,6 +31,7 @@ export type Reveal = {
   chosenFeedback: string | null // why the chosen option is wrong (mcq, states C and D)
   explanation: string
   sourceQuote: string | null
+  sourceTitle: string | null // title of the source document the quote is from
   mixUps: string[] // state D only: the concept's common mistakes
   returnsThisSession: boolean // states C and D: the item re-enters later
   pKnownBefore: number

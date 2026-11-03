@@ -62,7 +62,7 @@ async function renderPlay(voiceEnabled: boolean | null = true, permissionPending
   const initial: SessionView = {
     id: 's1', kind: 'session', topicId: 't1', topicTitle: 'Algebra', progress: { position: 1, total: 1 }, ended: false,
     ...(voiceEnabled === null ? {} : { voiceEnabled }),
-    item: { id: 'i1', conceptId: 'c1', conceptName: 'Variables', format, stem: format === 'short' ? 'Explain why subtracting one preserves equality.' : 'x + 1 = 2; x = ____', options: [], difficulty: 1 },
+    item: { id: 'i1', conceptId: 'c1', conceptName: 'Variables', format, stem: format === 'short' ? 'Explain why subtracting one preserves equality.' : 'x + 1 = 2; x = ____', options: [], difficulty: 1, generatedBy: 'gpt-test' },
   }
   vi.mocked(getSession).mockResolvedValue(initial)
   vi.mocked(transcribeAnswer).mockReset().mockResolvedValue('one')
@@ -103,7 +103,7 @@ it.each([
     const reveal = {
       attemptId: 'a1', diagramConceptId: null, correct: false, correctAnswer: '1', state: 'C' as const, mixUps: [], explanation: 'Subtract one.',
       score: 0, feedback: null, missingPoints: [],
-      chosenFeedback: null, sourceQuote: null, returnsThisSession: true, pKnownBefore: 0.1, pKnownAfter: 0.05,
+      chosenFeedback: null, sourceQuote: null, sourceTitle: null, returnsThisSession: true, pKnownBefore: 0.1, pKnownAfter: 0.05,
     }
     vi.mocked(answerItem).mockResolvedValueOnce(reveal)
   }
@@ -116,6 +116,10 @@ it.each([
       container.querySelector<HTMLInputElement>(`input[value="${repeats ? 'unsure' : 'sure'}"]`)!.click()
     })
     await act(async () => { button(container, 'Check').click() })
+    if (repeats) {
+      expect(container.querySelector('[role="status"]')!.textContent).toContain('No source: written by gpt-test from general knowledge')
+      expect(container.querySelector('label[for="why"]')!.textContent).toBe('In one line, why? (optional)')
+    }
     await act(async () => {
       const next = button(container, 'Continue')
       next.focus()
@@ -252,7 +256,7 @@ it.each([false, true])('submits a short answer and shows its reveal (ungraded=%s
       score: ungraded ? null : 0.5, feedback: ungraded ? 'Compare your answer with the model answer.' : 'Explain why both sides stay equal.',
       missingPoints: ungraded ? [] : ['Subtract the same amount from both sides.'],
       correctAnswer: 'Equal changes preserve equality.', explanation: 'Both sides change by the same amount.',
-      chosenFeedback: null, sourceQuote: 'Subtract equal quantities.', mixUps: [], returnsThisSession: false, pKnownBefore: 0.6, pKnownAfter: 0.6,
+      chosenFeedback: null, sourceQuote: 'Subtract equal quantities.', sourceTitle: 'Algebra notes', mixUps: [], returnsThisSession: false, pKnownBefore: 0.6, pKnownAfter: 0.6,
     })
     const input = container.querySelector<HTMLInputElement>('#answer')!
     await act(async () => {
@@ -271,6 +275,8 @@ it.each([false, true])('submits a short answer and shows its reveal (ungraded=%s
       expect(status.querySelector('#why')).toBeNull()
     } else {
       expect(status.textContent).toContain('Score: 50%')
+      expect(status.textContent).toContain('Subtract equal quantities.')
+      expect(status.textContent).toContain('From Algebra notes')
       expect(status.textContent).toContain('Explain why both sides stay equal.')
       expect(status.textContent).toContain('Subtract the same amount from both sides.')
     }

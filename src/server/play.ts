@@ -4,7 +4,7 @@ import type { SQLiteTable } from 'drizzle-orm/sqlite-core'
 import { z } from 'zod'
 import { getDb, type Db } from '@/db'
 import { member } from '@/db/auth-schema'
-import { attempts, concepts, items, jobRoles, learnerConcept, learnerItem, learnerTopic, learnerUnit, memberRoleAssignments, placements, pushLog, sessions, topics, units } from '@/db/schema'
+import { attempts, concepts, items, jobRoles, learnerConcept, learnerItem, learnerTopic, learnerUnit, memberRoleAssignments, placements, pushLog, sessions, sources, topics, units } from '@/db/schema'
 import { BKT, guessFor, MASTERY, placementPrior, update } from '@/lib/learning/bkt'
 import { ratingFor, retrievability, review } from '@/lib/learning/fsrs'
 import { gradeAnswer, revealState, toItemView } from '@/lib/learning/grade'
@@ -498,6 +498,11 @@ export const answerItem = createServerFn({ method: 'POST' })
 
     const { item, concept, payload } = await loadItem(db, session.topicId, data.itemId, true)
     if (item.status === 'retired') throw httpError('This question has been retired', 409)
+    const sourceId = item.sourceId ?? concept.sourceId
+    const sourceTitle = payload.source_quote && sourceId
+      ? (await db.select({ title: sources.title }).from(sources)
+          .where(and(eq(sources.id, sourceId), eq(sources.topicId, session.topicId), isNull(sources.deletedAt))).get())?.title ?? null
+      : null
 
     // Claim the slot before grading, so concurrent submits (double tap, retry, two tabs) score once.
     // A claim older than the grading timeout is abandoned and may be taken over.
@@ -563,7 +568,7 @@ export const answerItem = createServerFn({ method: 'POST' })
           attemptId: null, diagramConceptId: concept.visual ? concept.id : null, state: 'ungraded', correct: false, score: null,
           feedback: `${capped ? 'Daily grading limit reached; back tomorrow. ' : ''}Compare your answer with the model answer. Your learning progress has not changed.`,
           missingPoints: [], correctAnswer: payload.model_answer, chosenFeedback: null,
-          explanation: payload.explanation, sourceQuote: payload.source_quote, mixUps: [], returnsThisSession: false,
+          explanation: payload.explanation, sourceQuote: payload.source_quote, sourceTitle, mixUps: [], returnsThisSession: false,
           pKnownBefore, pKnownAfter: pKnownBefore,
         }
       }
@@ -660,6 +665,7 @@ export const answerItem = createServerFn({ method: 'POST' })
       chosenFeedback: grade.chosenFeedback,
       explanation: payload.explanation,
       sourceQuote: payload.source_quote,
+      sourceTitle,
       mixUps,
       returnsThisSession,
       pKnownBefore,

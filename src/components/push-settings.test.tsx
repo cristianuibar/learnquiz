@@ -13,6 +13,7 @@ vi.mock('@/server/push', () => ({ getPushSettings: vi.fn(), subscribe: vi.fn(), 
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => null }))
+vi.mock('@/server/today', () => ({ getToday: vi.fn() }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
 const prefs = { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' }
 afterEach(() => {
