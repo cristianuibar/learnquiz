@@ -9,6 +9,10 @@ jest.mock('./lib/session-store', () => ({
   SessionProvider: ({ children }: { children: unknown }) => children,
   useSession: jest.fn(),
 }))
+// Screens reach the network and secure storage; keep the router test hermetic.
+jest.mock('./lib/api', () => ({ ApiError: class ApiError extends Error {}, api: jest.fn(() => new Promise(() => {})), mediaSource: jest.fn() }))
+jest.mock('./lib/auth', () => ({ signOut: jest.fn() }))
+jest.mock('expo-image', () => ({ Image: jest.fn(() => null) }))
 jest.mock('react-native-gesture-handler', () => ({ GestureHandlerRootView: 'View' }))
 jest.mock('react-native-keyboard-controller', () => ({ KeyboardProvider: 'View' }))
 jest.mock('expo-router/build/toolbar/native', () => ({ RouterToolbarHost: 'View', RouterToolbarItem: 'View' }))
