@@ -2,6 +2,7 @@
 // sequence. Pure: no React Native imports, the network calls are injected.
 import type { InviteView } from '@learnquiz/api/invite'
 import { networkError } from '@learnquiz/api/system-copy'
+import { canOpenTarget } from './route-gates'
 
 export type AuthMode = 'signUp' | 'signIn'
 
@@ -134,9 +135,6 @@ export type JoinApi = {
   signIn(email: string, password: string): Promise<unknown>
   accept(invitationId: string): Promise<unknown>
   session(): Promise<{ needsDisclosure: boolean }>
-  takeHeldTarget(): string | null
-  // Keeps the root layout from replaying a held link while the flow runs.
-  deferReplay(): () => void
 }
 
 export type JoinInput = {
@@ -149,60 +147,119 @@ export type JoinInput = {
 }
 
 export type JoinOutcome =
-  | { kind: 'done'; target: string }
+  | { kind: 'done'; needsDisclosure: boolean }
   | { kind: 'error'; message: string; mode?: AuthMode }
-
-export function nextTarget(needsDisclosure: boolean, takeHeld: () => string | null): string {
-  if (needsDisclosure) return WELCOME
-  return takeHeld() ?? TODAY
-}
+  // A newer attempt or a sign-out started meanwhile: the result means nothing.
+  | { kind: 'stale' }
 
 // One flow per screen. It remembers the steps already done, so a retry after a
-// failed accept never signs up a second time.
+// failed accept never signs up a second time. Every attempt gets a token; a new
+// attempt or a sign-out makes older tokens stale.
 export function createJoinFlow(api: JoinApi, invitationId: string) {
   let authenticated = false
   let accepted = false
+  let epoch = 0
 
-  async function run(input: JoinInput, signedIn: boolean): Promise<JoinOutcome> {
-    const release = api.deferReplay()
-    try {
-      return await steps(input, signedIn)
-    } finally {
-      release()
-    }
+  function isLive(token: number) {
+    return token === epoch
   }
 
-  async function steps(input: JoinInput, signedIn: boolean): Promise<JoinOutcome> {
+  async function steps(input: JoinInput, signedIn: boolean, token: number): Promise<JoinOutcome> {
     if (!signedIn && !authenticated) {
       try {
         if (input.mode === 'signUp') await api.signUp(input.email, input.password, input.name.trim())
         else await api.signIn(input.email, input.password)
-        authenticated = true
       } catch (error) {
+        if (!isLive(token)) return { kind: 'stale' }
         if (noResponse(error)) return { kind: 'error', message: networkError }
         if (input.mode === 'signUp' && isAccountExists(error)) return { kind: 'error', message: accountExists, mode: 'signIn' }
         return { kind: 'error', message: serverMessage(error) ?? signInFailed }
       }
+      // Signed in for a session that a sign-out already ended: do not cache it.
+      if (!isLive(token)) return { kind: 'stale' }
+      authenticated = true
     }
     if (input.accept !== false && !accepted) {
       try {
         await api.accept(invitationId)
+        // The invite is accepted on the server, whatever happened here meanwhile.
         accepted = true
       } catch (error) {
+        // A sign-out meanwhile (api.ts signs out on a 401 before rejecting) already cleared the sign-in.
+        if (!isLive(token)) return { kind: 'stale' }
+        if (failure(error).status === 401) {
+          // The session behind the cached sign-in is gone; the retry signs in again.
+          authenticated = false
+          return { kind: 'error', message: serverMessage(error) ?? joinFailed, mode: 'signIn' }
+        }
         return { kind: 'error', message: noResponse(error) ? networkError : serverMessage(error) ?? joinFailed }
       }
+      if (!isLive(token)) return { kind: 'stale' }
     }
     try {
       const { needsDisclosure } = await api.session()
-      return { kind: 'done', target: nextTarget(needsDisclosure, api.takeHeldTarget) }
+      return isLive(token) ? { kind: 'done', needsDisclosure } : { kind: 'stale' }
     } catch {
-      return { kind: 'error', message: networkError }
+      return isLive(token) ? { kind: 'error', message: networkError } : { kind: 'stale' }
     }
   }
 
   return {
-    run,
+    // Starts an attempt; any older attempt is stale from now on.
+    begin(): number {
+      return ++epoch
+    },
+    isLive,
+    run(input: JoinInput, signedIn: boolean, token: number): Promise<JoinOutcome> {
+      return steps(input, signedIn, token)
+    },
+    // Sign-out ends the cached sign-in and every attempt in flight. An accepted
+    // invite stays accepted: the next attempt signs in and goes on.
+    signedOut() {
+      authenticated = false
+      epoch++
+    },
     // Signed in by this flow: the screen keeps showing the retry, not the form.
     get authenticated() { return authenticated },
   }
+}
+
+// ---- Navigation guard ---------------------------------------------------------
+
+export type GateState = { status: 'loading' | 'signedOut' | 'ready'; needsDisclosure: boolean }
+
+export type NavigationCheck = {
+  // The attempt's token is still the live one: no newer attempt, no sign-out.
+  live: boolean
+  // The join screen is the focused screen.
+  focused: boolean
+  session: GateState
+  // The held link, looked at but not taken.
+  held: string | null
+}
+
+export type NavigationDecision =
+  | { kind: 'navigate'; target: string; takesHeld: boolean }
+  // Not focused, or the session store has not caught up yet: keep the result.
+  | { kind: 'keep' }
+  // A newer attempt or a sign-out: forget the result.
+  | { kind: 'drop' }
+  // Joined, but the session could not be loaded (the store went signed out without a sign-out).
+  | { kind: 'offline' }
+
+// The only way the join flow navigates. Disclosure first, then the held link, then Today.
+export function decideJoinNavigation(result: { needsDisclosure: boolean }, check: NavigationCheck): NavigationDecision {
+  if (!check.live) return { kind: 'drop' }
+  if (!check.focused) return { kind: 'keep' }
+  let target = TODAY
+  let takesHeld = false
+  if (result.needsDisclosure) target = WELCOME
+  else if (check.held && canOpenTarget(check.held, check.session)) {
+    target = check.held
+    takesHeld = true
+  }
+  // An unopenable held link stays held for the layout to replay later.
+  if (canOpenTarget(target, check.session)) return { kind: 'navigate', target, takesHeld }
+  if (check.session.status === 'signedOut') return { kind: 'offline' }
+  return { kind: 'keep' }
 }

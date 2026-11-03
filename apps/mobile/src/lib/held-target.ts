@@ -56,3 +56,8 @@ export function replayVersion(): number {
 export function takeReplayTarget(): string | null {
   return holds.size > 0 ? null : takeHeldTarget()
 }
+
+// Looks at the held link without taking it.
+export function peekHeldTarget(): string | null {
+  return held
+}

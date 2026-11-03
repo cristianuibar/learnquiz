@@ -17,16 +17,19 @@ export type AccountFormProps = {
   email?: string
   defaultName?: string
   error?: string | null
+  // Owned by the parent when given: the form then sets no state of its own after submit.
+  busy?: boolean
   onSubmit: (values: AccountFormValues) => Promise<void>
 }
 
-export function AccountForm({ mode, onModeChange, email, defaultName, error, onSubmit }: AccountFormProps) {
+export function AccountForm({ mode, onModeChange, email, defaultName, error, busy: parentBusy, onSubmit }: AccountFormProps) {
   const { space } = useTheme()
   const [typedEmail, setTypedEmail] = useState('')
   const [name, setName] = useState(defaultName ?? '')
   const [password, setPassword] = useState('')
   const [shown, setShown] = useState(false)
-  const [busy, setBusy] = useState(false)
+  const [ownBusy, setOwnBusy] = useState(false)
+  const busy = parentBusy ?? ownBusy
   const busyRef = useRef(false)
 
   const signUp = mode === 'signUp'
@@ -36,12 +39,13 @@ export function AccountForm({ mode, onModeChange, email, defaultName, error, onS
   const submit = async () => {
     if (busyRef.current || disabled) return
     busyRef.current = true
-    setBusy(true)
+    const own = parentBusy === undefined
+    if (own) setOwnBusy(true)
     try {
       await onSubmit({ email: emailValue, name, password })
     } finally {
       busyRef.current = false
-      setBusy(false)
+      if (own) setOwnBusy(false)
     }
   }
 
@@ -92,7 +96,7 @@ export function AccountForm({ mode, onModeChange, email, defaultName, error, onS
       />
       <View style={{ gap: space[4], marginTop: space[2] }}>
         {!!error && <AlertRow>{error}</AlertRow>}
-        <Button size="lg" variant="primary" disabled={disabled} busy={busy} onPress={submit}>
+        <Button size="lg" variant="primary" disabled={disabled} busy={busy} onPress={() => { void submit() }}>
           {signUp ? 'Create account' : 'Sign in'}
         </Button>
       </View>
