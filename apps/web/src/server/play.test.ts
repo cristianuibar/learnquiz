@@ -617,9 +617,10 @@ describe('learner practice and unit unlocks', () => {
   })
 
   it.each([new LlmError('Provider rate limit', 429), new Error('Unexpected generation failure')])(
-    'propagates other frontier errors even with a due question: $message',
+    'propagates other frontier errors when nothing is stored to practise: $message',
     async (error) => {
-      seedFrontier(raw, 1, true)
+      // A due item now starts Start without generating, so use a seen, not-due item to force the generation path.
+      seedFrontier(raw, 1, false)
       vi.mocked(chatJson).mockRejectedValueOnce(error)
 
       await expect(startSession({ data: { topicId: 't1' } })).rejects.toThrow(error.message)
@@ -841,6 +842,29 @@ it('startSession uses stored unseen items without generating when the frontier h
   expect(vi.mocked(chatJson).mock.calls.filter(([o]) => o.purpose === 'items')).toHaveLength(0)
   const queue = JSON.parse(scalar(raw, 'SELECT item_ids_json AS ids FROM sessions WHERE id = ?', sessionId).ids as string) as string[]
   expect(queue).toHaveLength(12)
+})
+
+it('startSession starts from a few stored unseen items without generating, even when other frontier concepts have none', async () => {
+  seedTopicAndLearner(raw, 0)
+  raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un1', 't1', 0, 'Basics')
+  raw.prepare('INSERT INTO learner_unit (learner_id, unit_id, unlocked_at) VALUES (?, ?, ?)').run('u1', 'un1', 1)
+  const concept = raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)')
+  const item = raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+  const payload = JSON.stringify({ format: 'cloze', stem: 'Solve x + 1 = 2: x = ____.', options: [], accepted_answers: ['1'], model_answer: '1', explanation: 'Subtract 1.', difficulty: 3, source_quote: null, grounded: false, bloom: 'apply' })
+  for (const [i, n] of [2, 0, 0].entries()) {
+    concept.run(`c${i + 1}`, 't1', 'un1', i, `Concept ${i + 1}`, '')
+    for (let k = 0; k < n; k++) item.run(`c${i + 1}-i${k}`, `c${i + 1}`, 't1', 'cloze', payload, 3, 1)
+  }
+  const base = vi.mocked(chatJson).getMockImplementation()!
+  vi.mocked(chatJson).mockImplementation(async (opts) => opts.purpose === 'items' ? { items: [JSON.parse(payload)] }
+    : opts.purpose === 'self_check' ? { results: [{ index: 0, keep: true, reasons: [] }] } : base(opts))
+  onTestFinished(() => { vi.mocked(chatJson).mockImplementation(base) })
+  vi.mocked(chatJson).mockClear()
+
+  const { sessionId } = await startSession({ data: { topicId: 't1' } })
+  expect(vi.mocked(chatJson).mock.calls.filter(([o]) => o.purpose === 'items')).toHaveLength(0)
+  const queue = JSON.parse(scalar(raw, 'SELECT item_ids_json AS ids FROM sessions WHERE id = ?', sessionId).ids as string) as string[]
+  expect([...queue].sort()).toEqual(['c1-i0', 'c1-i1'])
 })
 
 it('refuses prepareNextSession for another learner\'s session', async () => {

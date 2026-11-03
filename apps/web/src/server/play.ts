@@ -241,24 +241,15 @@ export const startSession = createServerFn({ method: 'POST' })
 
     // Seen items come back through the due list, not as fresh frontier questions.
     const top = frontier.slice(0, 4)
-    // Enough stored unseen items start the session at once; generation tops up later via prepareNextSession.
+    // Anything practisable stored starts the session at once (a shorter one is fine); prepareNextSession tops up during play.
     const storedRows = top.length
       ? await db.select().from(items).where(and(eq(items.topicId, topic.id), inArray(items.conceptId, top.map((f) => f.concept.id)), eq(items.status, 'active')))
       : []
     const stored = top.map((f) => storedRows.filter((r) => r.conceptId === f.concept.id).map(asItem))
     const storedFresh = stored.flat().filter((it) => !seen.has(it.id)).length
-    const generated = due.length + storedFresh >= SESSION_SIZE / 2 ? stored : await Promise.all(top.map(async (f) => {
-      try {
-        return await ensureConceptItems(db, learnerId, f.concept, topic, { targetDifficulty, unseen: seen, sessionId })
-      } catch (error) {
-        // Defer capped generation when stored reviews are due; other failures still surface.
-        if (
-          due.length > 0 && error instanceof Error && 'status' in error && error.status === 429 &&
-          error.message === 'You have reached the daily limit for generating new content. Try again tomorrow.'
-        ) return []
-        throw error
-      }
-    }))
+    // Generation runs only when nothing is due, so a daily-cap refusal has no stored reviews to fall back on.
+    const generated = due.length + storedFresh > 0 ? stored
+      : await Promise.all(top.map((f) => ensureConceptItems(db, learnerId, f.concept, topic, { targetDifficulty, unseen: seen, sessionId })))
     const frontierInput = top.map((f, i) => ({
       conceptId: f.concept.id,
       unitOrder: f.unitOrder,
