@@ -23,6 +23,8 @@ vi.mock('@/server/push', () => ({ getPushSettings: vi.fn(), subscribe: vi.fn(), 
 vi.mock('@/server/model-trace', () => ({ getModelTrace: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
 
+const schedule = { window: { startMinute: 540, endMinute: 1020, days: [1, 2, 3, 4, 5], timezone: 'UTC', source: 'default' as const }, dailyCap: 3, steadyCap: 3, phase: 'steady' as const, preview: null }
+
 afterEach(() => {
   vi.restoreAllMocks(); vi.resetAllMocks(); vi.unstubAllGlobals()
   delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT
@@ -54,7 +56,7 @@ it.each([
   vi.mocked(endSession).mockResolvedValue({ sessionId: 's1', kind: 'session', topicId: 't1', durationMs: 1000, correct: total, total, ungraded: 0, xp: 0,
     streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], benchmark: null, reviewsLeft: 0, nextLine: 'Come back soon.', endedEarly: false } satisfies SummaryView)
   vi.mocked(getPushSettings).mockResolvedValue({ publicKey: 'public-key', isStaff: false, endpoints: [], canPrompt,
-    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' } })
+    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' }, schedule })
   vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('iPhone')
   vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({ matches: standalone && query === '(display-mode: standalone)' }) as MediaQueryList)
   const requestPermission = vi.fn()
@@ -78,7 +80,7 @@ it.each([0, 3])('shows the not-graded count on the summary only when answers wer
   vi.mocked(endSession).mockResolvedValue({ sessionId: 's1', kind: 'session', topicId: 't1', durationMs: 1000, correct: 9, total: 10, ungraded, xp: 0,
     streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], benchmark: null, reviewsLeft: 0, nextLine: 'Come back soon.', endedEarly: false } satisfies SummaryView)
   vi.mocked(getPushSettings).mockResolvedValue({ publicKey: 'public-key', isStaff: false, endpoints: [], canPrompt: false,
-    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' } })
+    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' }, schedule })
   const { container, cleanup } = await renderApp('/play/s1/done')
   try {
     const score = [...container.querySelectorAll('span')].find((span) => span.textContent?.startsWith('9 of 10 correct'))
@@ -90,7 +92,7 @@ it.each([true, false])('explains a placement that ended early only when it did (
   vi.mocked(endSession).mockResolvedValue({ sessionId: 's1', kind: 'placement', topicId: 't1', durationMs: 1000, correct: 6, total: 8, ungraded: 0, xp: 0,
     streak: 0, level: 3, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], benchmark: null, reviewsLeft: 0, nextLine: 'Come back soon.', endedEarly } satisfies SummaryView)
   vi.mocked(getPushSettings).mockResolvedValue({ publicKey: 'public-key', isStaff: false, endpoints: [], canPrompt: false,
-    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' } })
+    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' }, schedule })
   const { container, cleanup } = await renderApp('/play/s1/done')
   try {
     expect(container.querySelector('h1')?.textContent).toContain('level 3')
@@ -124,7 +126,7 @@ it('preserves the notification link through sign-in without opening a session wh
 it('keeps staff navigation and working push controls together on Profile', async () => {
   vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'u1', name: 'Learner', isAnonymous: false, role: 'admin' }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })
   const prefs = { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' }
-  vi.mocked(getPushSettings).mockResolvedValue({ publicKey: null, isStaff: true, endpoints: [], canPrompt: false, prefs })
+  vi.mocked(getPushSettings).mockResolvedValue({ publicKey: null, isStaff: true, endpoints: [], canPrompt: false, prefs, schedule })
   const { container, cleanup } = await renderApp('/me')
   try {
     expect(container.querySelector('h1')?.textContent).toBe('Learner')

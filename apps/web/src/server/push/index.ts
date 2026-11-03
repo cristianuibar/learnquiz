@@ -1,14 +1,17 @@
 import { createServerFn } from '@tanstack/react-start'
 import { and, eq, isNotNull, notExists, exists, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { getDb } from '@/db'
+import type { PushSchedule } from '@learnquiz/api/schedule'
+import { getDb, type Db } from '@/db'
 import { attempts, pushPrefs, pushSubscriptions, sessions } from '@/db/schema'
 import { requireStaff } from '@/server/authz'
 import { getEnv } from '@/server/env'
 import { httpError } from '@/server/helpers'
 import { getSessionUser } from '@/server/session'
 import { decodeKey, importSubscriberKey } from './crypto'
+import { previewItem } from './pick'
 import { EXPO_TOKEN, sendPush } from './sender'
+import { capPolicy, effectiveWindow, pushContext } from './window'
 
 // Subscriber-supplied URLs must never turn this Worker into an arbitrary HTTP client.
 const Endpoint = z.string().max(2048).refine((value) => {
@@ -43,20 +46,31 @@ function vapidConfig() {
   return { publicKey: env.VAPID_PUBLIC_KEY, privateKey: env.VAPID_PRIVATE_KEY, subject: env.VAPID_SUBJECT }
 }
 
+// New prefs start at the company's hours for company members, else 9-5 in the given timezone.
+async function seedWindow(db: Db, userId: string, timezone: string) {
+  const { company } = await pushContext(db, userId)
+  return company ? effectiveWindow(company, null) : { startMinute: 540, endMinute: 1020, timezone }
+}
+
 export const getPushSettings = createServerFn({ method: 'GET' }).handler(async () => {
   const user = checkAccount(await getSessionUser())
   const env = getEnv()
   const db = getDb()
-  const [subscriptions, [prefs], finished] = await Promise.all([
+  const now = Date.now()
+  const [subscriptions, [prefs], finished, context, preview] = await Promise.all([
     db.select({ endpoint: pushSubscriptions.endpoint }).from(pushSubscriptions).where(eq(pushSubscriptions.userId, user.id)),
     db.select().from(pushPrefs).where(eq(pushPrefs.userId, user.id)),
     db.select({ id: sessions.id }).from(sessions).where(and(eq(sessions.learnerId, user.id), isNotNull(sessions.endedAt),
       exists(db.select().from(attempts).where(eq(attempts.sessionId, sessions.id))))).limit(2),
+    pushContext(db, user.id),
+    previewItem(db, user.id, now),
   ])
+  const schedule: PushSchedule = { window: effectiveWindow(context.company, prefs ?? null), ...capPolicy(context.role, now), preview: preview?.stem ?? null }
   return {
     publicKey: env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_SUBJECT ? env.VAPID_PUBLIC_KEY : null,
     isStaff: user.role === 'admin', endpoints: subscriptions.map((s) => s.endpoint), canPrompt: finished.length === 1,
     prefs: { paused: prefs?.paused ?? false, startMinute: prefs?.startMinute ?? 540, endMinute: prefs?.endMinute ?? 1020, timezone: prefs?.timezone ?? 'UTC' },
+    schedule,
   }
 })
 
@@ -81,13 +95,14 @@ export const subscribe = createServerFn({ method: 'POST' }).validator(Subscripti
   }
   const db = getDb()
   const now = Date.now()
+  const seed = await seedWindow(db, user.id, 'UTC')
   // Unique endpoints prevent duplicate delivery. Only the owner can refresh its keys.
   const [saved] = await db.batch([
     db.insert(pushSubscriptions).values({ id: crypto.randomUUID(), userId: user.id, endpoint: data.endpoint, ...data.keys, createdAt: now })
       .onConflictDoUpdate({ target: pushSubscriptions.endpoint, set: { ...data.keys }, setWhere: eq(pushSubscriptions.userId, user.id) }).returning({ id: pushSubscriptions.id }),
     db.insert(pushPrefs).select(db.select({ userId: pushSubscriptions.userId, enabled: sql<boolean>`1`.as('enabled'),
-      paused: sql<boolean>`0`.as('paused'), startMinute: sql<number>`540`.as('start_minute'), endMinute: sql<number>`1020`.as('end_minute'),
-      timezone: sql<string>`'UTC'`.as('timezone'), updatedAt: sql<number>`${now}`.as('updated_at') })
+      paused: sql<boolean>`0`.as('paused'), startMinute: sql<number>`${seed.startMinute}`.as('start_minute'), endMinute: sql<number>`${seed.endMinute}`.as('end_minute'),
+      timezone: sql<string>`${seed.timezone}`.as('timezone'), updatedAt: sql<number>`${now}`.as('updated_at') })
       .from(pushSubscriptions).where(and(eq(pushSubscriptions.userId, user.id), eq(pushSubscriptions.endpoint, data.endpoint))))
       .onConflictDoUpdate({ target: pushPrefs.userId, set: { enabled: true, updatedAt: now } }),
   ])
@@ -99,11 +114,12 @@ export const subscribeExpo = createServerFn({ method: 'POST' }).validator(z.obje
   const user = checkAccount(await getSessionUser())
   const db = getDb()
   const now = Date.now()
+  const seed = await seedWindow(db, user.id, data.timezone ?? 'UTC')
   await db.batch([
     // A shared phone moves to whoever registers last.
     db.insert(pushSubscriptions).values({ id: crypto.randomUUID(), userId: user.id, endpoint: data.token, p256dh: '', auth: '', createdAt: now })
       .onConflictDoUpdate({ target: pushSubscriptions.endpoint, set: { userId: user.id } }),
-    db.insert(pushPrefs).values({ userId: user.id, enabled: true, paused: false, startMinute: 540, endMinute: 1020, timezone: data.timezone ?? 'UTC', updatedAt: now })
+    db.insert(pushPrefs).values({ userId: user.id, enabled: true, paused: false, startMinute: seed.startMinute, endMinute: seed.endMinute, timezone: seed.timezone, updatedAt: now })
       .onConflictDoUpdate({ target: pushPrefs.userId, set: { enabled: true, updatedAt: now } }),
   ])
   return { subscribed: true }
