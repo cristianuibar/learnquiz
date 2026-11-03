@@ -11,7 +11,7 @@ import { gradeAnswer, revealState, toItemView } from '@/lib/learning/grade'
 import { benchmarkMet } from '@/lib/learning/profile'
 import { levelResult, nextLevel, pickNext, PLACEMENT, shouldStop } from '@/lib/learning/placement'
 import { composeSession, reinsert, SESSION_BONUS, streakAfter, xpFor } from '@/lib/learning/session'
-import type { Confidence, ItemView, Reveal, SessionPlanning, SessionView, SummaryView } from '@/lib/learning/types'
+import type { Confidence, ItemView, Reveal, SessionPlanning, SessionView, SummaryView } from '@learnquiz/api'
 import { chatJson, chatJsonWithModel, DailyCapError, isVoiceEnabled, jobModel, transcribeAudio } from '@/lib/llm/client'
 import { gradePrompt } from '@/lib/llm/prompts'
 import { Grade, type ItemPayload } from '@/lib/llm/schemas'
@@ -22,7 +22,7 @@ import { requireLearnerId } from '@/server/session'
 import { assertWithinDailyCap } from '@/server/model-cap'
 
 // shortcut: 12 instead of the spec's 20 while generation is slow, raise it once items are generated ahead of play.
-const SESSION_SIZE = 12
+export const SESSION_SIZE = 12
 const CLOSER_MIN = 0.7
 const DAY = 86_400_000
 
@@ -119,7 +119,7 @@ async function loadItem(db: Db, topicId: string, itemId: string, includeRetired 
 
 // Unlocked-unit concepts the learner has not mastered, in play order. A concept never met counts as BKT.L0.
 // shortcut: prerequisite edges are ignored, only unit unlocks gate the frontier; add the 0.6 prerequisite rule when units unlock during play.
-async function loadFrontier(db: Db, learnerId: string, topicId: string) {
+export async function loadFrontier(db: Db, learnerId: string, topicId: string) {
   const rows = await db
     .select({ concept: concepts, unitOrder: units.order, pKnown: learnerConcept.pKnown })
     .from(concepts)

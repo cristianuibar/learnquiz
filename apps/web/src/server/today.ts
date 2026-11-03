@@ -1,14 +1,10 @@
+import type { Today } from '@learnquiz/api'
 import { createServerFn } from '@tanstack/react-start'
 import { and, count, desc, eq, lte } from 'drizzle-orm'
 import { getDb } from '@/db'
 import { member } from '@/db/auth-schema'
 import { items, jobRoles, learnerItem, learnerTopic, memberRoleAssignments, placements, topics } from '@/db/schema'
 import { getLearnerId } from '@/server/session'
-
-export type Today = {
-  topic: { id: string; title: string; placed: boolean; due: number; xp: number; streak: number } | null
-  role: { name: string; topicTitle: string } | null
-}
 
 // The home screen: the newest ready personal topic with what is due, plus a ready role topic (display only).
 export const getToday = createServerFn({ method: 'GET' }).handler(async (): Promise<Today> => {

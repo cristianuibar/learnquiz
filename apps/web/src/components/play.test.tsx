@@ -8,7 +8,7 @@ import { Route as appRootRoute } from '@/routes/__root'
 import { answerItem, getSession, nextItem, transcribeAnswer } from '@/server/play'
 import { getModelTrace } from '@/server/model-trace'
 import { generateConceptDiagram } from '@/server/diagrams'
-import type { Reveal, SessionView } from '@/lib/learning/types'
+import type { Reveal, SessionView } from '@learnquiz/api'
 
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
 vi.mock('@/server/play', () => ({ answerItem: vi.fn(), getSession: vi.fn(), transcribeAnswer: vi.fn(), nextItem: vi.fn(), endSession: vi.fn(), reportItem: vi.fn() }))

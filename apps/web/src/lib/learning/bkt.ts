@@ -1,4 +1,4 @@
-import type { Confidence, ItemView } from './types'
+import type { Confidence, ItemView } from '@learnquiz/api'
 
 // Week-one hand-set values, not fitted.
 export const BKT = { L0: 0.2, T: 0.15, S: 0.1 }

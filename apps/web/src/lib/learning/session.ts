@@ -1,4 +1,4 @@
-import type { SessionView } from './types'
+import type { SessionView } from '@learnquiz/api'
 
 export const SESSION_BONUS = 20
 const DAY = 86_400_000

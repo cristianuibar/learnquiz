@@ -4,7 +4,7 @@ import { ConceptDiagram } from '@/components/concept-diagram'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
-import type { Reveal } from '@/lib/learning/types'
+import type { Reveal } from '@learnquiz/api'
 
 const HEADING = {
   A: 'Correct, you were sure',
