@@ -7,21 +7,23 @@ import { chatJson, jobModel, LlmError } from '@/lib/llm/client'
 import { curriculumPrompt } from '@/lib/llm/prompts'
 import { CurriculumSkeleton } from '@/lib/llm/schemas'
 import { MAX_SOURCE_TEXT_CHARS } from '@/lib/limits'
+import { drainConceptQueue } from '@/server/concept-gen'
+import { runInBackground } from '@/server/env'
 import { chunks, httpError } from '@/server/helpers'
 import { assertWithinDailyCap } from '@/server/model-cap'
 
-export function curriculumWrites(db: Db, topicId: string, valid: ValidatedSkeleton, generatedBy: string | null) {
+export function curriculumWrites(db: Db, topicId: string, valid: ValidatedSkeleton, generatedBy: string | null, conceptGenStatus: 'pending' | 'ready' = 'ready') {
   const unitRows = valid.units.map((u, order) => ({ id: u.id, topicId, order, name: u.name, summary: u.summary }))
   const conceptRows = valid.units.flatMap((u) =>
     u.concepts.map((c, order) => ({
       id: c.id, topicId, unitId: u.id, order, name: c.name, summary: c.summary, level: 3,
       sourceId: c.sourceId, sourceQuote: c.sourceQuote, grounded: c.grounded, critical: c.critical, visual: c.visual,
-      misconceptionsJson: JSON.stringify(c.misconceptions),
+      misconceptionsJson: JSON.stringify(c.misconceptions), genStatus: conceptGenStatus,
     })),
   )
   return [
     ...chunks(unitRows, 10).map((rows) => db.insert(units).values(rows)),
-    // Each concept binds 13 parameters including defaults; seven rows stay below D1's 100-parameter limit.
+    // Each concept binds 14 parameters including defaults; seven rows stay below D1's 100-parameter limit.
     ...chunks(conceptRows, 7).map((rows) => db.insert(concepts).values(rows)),
     ...chunks(valid.edges.map((e) => ({ topicId, ...e })), 20).map((rows) => db.insert(conceptEdges).values(rows)),
     db.update(topics).set({ status: 'ready', generatedBy }).where(eq(topics.id, topicId)),
@@ -68,8 +70,10 @@ export async function buildRoleCurriculum({ orgId, ownerId, roleId }: { orgId: s
       throw httpError('The curriculum contains concepts without a matching document quote. Try again.', 422)
     }
     // Publish the complete path and its ready status together; never publish a generic fallback for an SOP.
-    const [first, ...rest] = curriculumWrites(db, topicId, valid, jobModel('curriculum').model)
+    const [first, ...rest] = curriculumWrites(db, topicId, valid, jobModel('curriculum').model, 'pending')
     await db.batch([first, ...rest])
+    // Questions are generated per concept for the whole company, not per learner.
+    runInBackground(drainConceptQueue())
     return { topicId }
   } catch (e) {
     await db.update(topics).set({ status: 'failed' }).where(eq(topics.id, topicId)).catch(() => {})

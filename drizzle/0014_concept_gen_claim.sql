@@ -1,0 +1,1 @@
+ALTER TABLE `concepts` ADD `gen_started_at` integer;

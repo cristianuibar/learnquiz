@@ -1,6 +1,6 @@
 import { and, desc, eq } from 'drizzle-orm'
 import type { Db } from '@/db'
-import { concepts, items, learnerConcept, topics } from '@/db/schema'
+import { concepts, items, learnerConcept, sources, topics } from '@/db/schema'
 import { chatJson, jobModel, LlmError } from '@/lib/llm/client'
 import { itemsPrompt, selfCheckPrompt } from '@/lib/llm/prompts'
 import { ItemBatch, ItemPayload, SelfCheck } from '@/lib/llm/schemas'
@@ -60,10 +60,22 @@ export async function ensureConceptItems(
   // shortcut: no lock, two concurrent calls for one concept may both generate; add a claim row if the UI double-fires.
 
   const avoidStems = existing.slice(0, 3).map((r) => (JSON.parse(r.payloadJson) as ItemPayload).stem)
+  const generated = await generateConceptItems(db, concept, topic, { targetDifficulty: opts.targetDifficulty, spread: opts.spread, avoidStems, want: 3, maxRounds: 2, learnerId, sessionId: opts.sessionId })
+  return [...existing.map(asItem), ...generated]
+}
+
+// Generates and stores a batch of items for one concept; returns only the new ones. Callers own the cap pre-check.
+export async function generateConceptItems(
+  db: Db,
+  concept: typeof concepts.$inferSelect,
+  topic: typeof topics.$inferSelect,
+  opts: { targetDifficulty: number; spread?: boolean; avoidStems: string[]; want: number; maxRounds: number; learnerId: string | null; orgId?: string | null; sessionId?: string },
+): Promise<StoredItem[]> {
+  const { learnerId, orgId, avoidStems } = opts
   const misconceptions = JSON.parse(concept.misconceptionsJson) as string[]
 
   const kept: { payload: ItemPayload; check: unknown }[] = []
-  for (let round = 0; round < 2 && kept.length < 3; round++) {
+  for (let round = 0; round < opts.maxRounds && kept.length < opts.want; round++) {
     try {
       const batch = await chatJson({
         purpose: 'items',
@@ -82,6 +94,7 @@ export async function ensureConceptItems(
         }),
         maxTokens: 16000,
         learnerId,
+        orgId,
         topicId: topic.id,
         sessionId: opts.sessionId,
       })
@@ -100,6 +113,7 @@ export async function ensureConceptItems(
             ...selfCheckPrompt({ items: drafted }),
             reasoningEffort: 'minimal',
             learnerId,
+            orgId,
             topicId: topic.id,
             sessionId: opts.sessionId,
           })
@@ -121,6 +135,7 @@ export async function ensureConceptItems(
   }
   if (!kept.length) throw httpError('Could not generate items for this concept', 502)
 
+  const [source] = concept.sourceId ? await db.select({ version: sources.version }).from(sources).where(eq(sources.id, concept.sourceId)) : []
   const now = Date.now()
   const rows = kept.map(({ payload, check }) => ({
     id: crypto.randomUUID(),
@@ -131,9 +146,11 @@ export async function ensureConceptItems(
     generatedBy: jobModel('items').model,
     difficultyPrior: payload.difficulty,
     checkJson: check === null ? null : JSON.stringify(check),
+    sourceId: concept.sourceId ?? null,
+    sourceVersion: source?.version ?? null,
     createdAt: now,
   }))
   const [first, ...rest] = chunks(rows, 10).map((r) => db.insert(items).values(r))
   await db.batch([first, ...rest])
-  return [...existing.map(asItem), ...rows.map((r, i) => ({ id: r.id, format: r.format, difficultyPrior: r.difficultyPrior, payload: kept[i].payload, generatedBy: r.generatedBy }))]
+  return rows.map((r, i) => ({ id: r.id, format: r.format, difficultyPrior: r.difficultyPrior, payload: kept[i].payload, generatedBy: r.generatedBy }))
 }

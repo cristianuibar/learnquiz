@@ -10,6 +10,9 @@ export const MAX_SOURCE_TEXT_CHARS = 20_000
 export const GUEST_DAILY_MODEL_CALL_CAP = 20
 export const ACCOUNT_DAILY_MODEL_CALL_CAP = 150
 
+// Model calls per company per UTC day, counted through its topics: background role item generation.
+export const COMPANY_DAILY_MODEL_CALL_CAP = 400
+
 export const utcDayStart = (nowMs: number): number => {
   const d = new Date(nowMs)
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())

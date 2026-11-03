@@ -1,9 +1,10 @@
 import { z } from 'zod'
 import { getDb } from '@/db'
 import { modelCalls } from '@/db/schema'
+import { COMPANY_DAILY_MODEL_CALL_CAP, isOverDailyCap } from '@/lib/limits'
 import { META_MODELS, PROVIDERS, type ModelJob } from '@/lib/llm/models'
 import { getEnv } from '@/server/env'
-import { assertWithinDailyCap, isOverLearnerDailyCap } from '@/server/model-cap'
+import { assertWithinDailyCap, COMPANY_CAP_MESSAGE, companyCallsToday, isOverLearnerDailyCap } from '@/server/model-cap'
 
 // USD per million tokens; reasoning tokens bill as output. Unlisted prices are unknown.
 export const PRICES: Record<string, { in: number; out: number }> = {
@@ -86,6 +87,7 @@ export async function chatJson<T>(opts: {
   reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high'
   maxTokens?: number
   learnerId?: string | null
+  orgId?: string | null // Company calls also count against the company's daily cap.
   sessionId?: string | null
   topicId?: string | null
 }): Promise<T> {
@@ -114,6 +116,14 @@ export async function chatJson<T>(opts: {
       } catch (e) {
         if (e instanceof LlmError) throw e
         console.error('daily cap check failed, allowing call', e instanceof Error ? e.message : e)
+      }
+    }
+    if (opts.orgId) {
+      try {
+        if (isOverDailyCap(await companyCallsToday(getDb(), opts.orgId), COMPANY_DAILY_MODEL_CALL_CAP)) throw new LlmError(COMPANY_CAP_MESSAGE, 429)
+      } catch (e) {
+        if (e instanceof LlmError) throw e
+        console.error('company cap check failed, allowing call', e instanceof Error ? e.message : e)
       }
     }
 

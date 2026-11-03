@@ -3,7 +3,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { z } from 'zod'
-import { modelCalls } from '@/db/schema'
+import { modelCalls, topics } from '@/db/schema'
 import { getEnv } from '@/server/env'
 import { ACCOUNT_DAILY_MODEL_CALL_CAP } from '@/lib/limits'
 import { chatJson, DailyCapError, LlmError } from './client'
@@ -229,4 +229,20 @@ it.each([
     expect(fetchModel).toHaveBeenCalledTimes(1)
     expect(await db.select().from(modelCalls)).toHaveLength(calls + 1)
   }
+})
+
+it('refuses a company call after its 400th daily model call but not another company', async () => {
+  const topic = (id: string, orgId: string) => ({ id, orgId, title: id, status: 'ready' as const, createdAt: Date.now() })
+  await db.insert(topics).values([topic('t-x', 'org-x'), topic('t-y', 'org-y')])
+  await db.insert(modelCalls).values(Array.from({ length: 400 }, (_, i) => ({
+    id: `co-${i}`, topicId: 't-x', purpose: 'items', model: 'muse-spark-1.3', latencyMs: 0, ok: true, createdAt: Date.now(),
+  })))
+  const fetchModel = vi.fn(async () => Response.json({ choices: [{ message: { content: '{"answer":"ok"}' }, finish_reason: 'stop' }] }))
+  vi.stubGlobal('fetch', fetchModel)
+  const call = (orgId: string, topicId: string) => chatJson({ ...answerRequest, purpose: 'items', orgId, topicId })
+
+  await expect(call('org-x', 't-x')).rejects.toMatchObject({ status: 429, message: expect.stringContaining('This company has reached') })
+  expect(fetchModel).not.toHaveBeenCalled()
+  await expect(call('org-y', 't-y')).resolves.toEqual({ answer: 'ok' })
+  expect(fetchModel).toHaveBeenCalledTimes(1)
 })
