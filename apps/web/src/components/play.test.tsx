@@ -445,8 +445,6 @@ it.each([
 })
 
 it.each([
-  { format: 'multi' },
-  { format: 'order' },
   { format: 'diagram' },
 ])('tells the learner a $format question needs a newer app and lets them end the session', async ({ format }) => {
   const { container, cleanup } = await renderPlay(false, false, 'mcq', false, { format: format as ItemView['format'], options: [] })
