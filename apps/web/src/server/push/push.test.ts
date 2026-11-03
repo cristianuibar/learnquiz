@@ -329,3 +329,38 @@ it('sends a staff test push to an Expo token without VAPID configuration', async
   await expect(sendTestPush({ data: { endpoint: token } })).resolves.toEqual({ sent: true })
   expect(http.mock.calls[0][0]).toBe(expoUrl)
 })
+
+it('reports the personal default schedule, then the company schedule, seeding and clamping prefs for company members', async () => {
+  vi.mocked(getSessionUser).mockResolvedValue(learner as never)
+  expect((await getPushSettings()).schedule).toEqual({
+    window: { startMinute: 540, endMinute: 1020, days: [1, 2, 3, 4, 5], timezone: 'UTC', source: 'default' },
+    dailyCap: 3, steadyCap: 3, phase: 'steady', preview: null,
+  })
+
+  const now = Date.now()
+  raw.prepare('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, ?)').run('o1', 'Acme', 'acme', now)
+  for (const id of ['learner', 'staff']) raw.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, ?)').run(`m-${id}`, 'o1', id, 'member', now)
+  raw.prepare('INSERT INTO org_settings (org_id, company_name, timezone, working_hours_json) VALUES (?, ?, ?, ?)')
+    .run('o1', 'Acme', 'Europe/Bucharest', JSON.stringify({ days: [1, 2, 3, 4, 5], start: '06:00', end: '18:00' }))
+  raw.prepare('INSERT INTO job_roles (id, org_id, name, onboarding_days, status, created_at) VALUES (?, ?, ?, ?, ?, ?)').run('r1', 'o1', 'Barista', 30, 'active', now)
+  raw.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES (?, ?, ?, ?)').run('learner', 'o1', 'r1', now - 86_400_000)
+  raw.prepare('INSERT INTO topics (id, job_role_id, org_id, title, status, created_at) VALUES (?, ?, ?, ?, ?, ?)').run('t1', 'r1', 'o1', 'Barista basics', 'ready', now)
+  raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run('i-role', 'c1', 't1', 'mcq', JSON.stringify({ format: 'mcq', stem: 'Steam milk to what temperature?' }), 'active', now)
+  raw.prepare('INSERT INTO learner_item (learner_id, item_id, due, stability, difficulty, state) VALUES (?, ?, ?, ?, ?, ?)').run('learner', 'i-role', now + 3_600_000, 1, 5, 2)
+
+  const company = { startMinute: 360, endMinute: 1080, days: [1, 2, 3, 4, 5], timezone: 'Europe/Bucharest', source: 'company' }
+  expect((await getPushSettings()).schedule).toEqual({ window: company, dailyCap: 6, steadyCap: 3, phase: 'onboarding', preview: 'Steam milk to what temperature?' })
+
+  await subscribeExpo({ data: { token } })
+  expect(rows("SELECT start_minute, end_minute, timezone FROM push_prefs WHERE user_id = 'learner'")).toEqual([{ start_minute: 360, end_minute: 1080, timezone: 'Europe/Bucharest' }])
+  vi.mocked(getSessionUser).mockResolvedValue(staff as never)
+  await subscribe({ data: { endpoint, keys } })
+  expect(rows("SELECT start_minute, end_minute, timezone FROM push_prefs WHERE user_id = 'staff'")).toEqual([{ start_minute: 360, end_minute: 1080, timezone: 'Europe/Bucharest' }])
+
+  vi.mocked(getSessionUser).mockResolvedValue(learner as never)
+  await savePushPreferences({ data: { paused: false, startMinute: 0, endMinute: 1440, timezone: 'UTC' } })
+  expect((await getPushSettings()).schedule.window).toEqual(company)
+  await savePushPreferences({ data: { paused: false, startMinute: 540, endMinute: 600, timezone: 'UTC' } })
+  expect((await getPushSettings()).schedule.window).toEqual({ ...company, startMinute: 540, endMinute: 600, source: 'learner' })
+})

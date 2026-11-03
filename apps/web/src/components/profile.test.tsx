@@ -41,7 +41,8 @@ function mockProfile() {
 
 it.each(['user', 'admin'])('opens training progress for %s, preserves staff access, and redirects signed-out visitors', async (role) => {
   vi.mocked(getPushSettings).mockResolvedValue({ publicKey: null, isStaff: role === 'admin', endpoints: [], canPrompt: false,
-    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' } })
+    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' },
+    schedule: { window: { startMinute: 540, endMinute: 1020, days: [1, 2, 3, 4, 5], timezone: 'UTC', source: 'default' }, dailyCap: 3, steadyCap: 3, phase: 'steady', preview: null } })
   mockProfile()
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   let user: { id: string; name: string; isAnonymous: boolean; role: string } | null = { id: 'learner', name: 'Learner', isAnonymous: false, role }
