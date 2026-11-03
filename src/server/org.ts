@@ -79,7 +79,8 @@ async function trainingOf(orgId: string) {
     const reachedAt = progressRow.proficientAt
     training.set(userId, {
       stage: proficient ? 'proficient' : 'onboarding',
-      progress: progressRow.list.length ? (progressRow.benchmark > 0 ? Math.min(1, mean(progressRow.list.map((c) => c.pKnown)) / progressRow.benchmark) : 1) : 0,
+      // Critical concepts must each reach the benchmark too, so the weakest one caps progress below 100% until proficiency is met.
+      progress: progressRow.list.length ? (progressRow.benchmark > 0 ? Math.min(1, ...[mean(progressRow.list.map((c) => c.pKnown)), ...progressRow.list.filter((c) => c.critical).map((c) => c.pKnown)].map((p) => p / progressRow.benchmark)) : 1) : 0,
       daysToProficiency: proficient && reachedAt !== null && reachedAt >= progressRow.assignedAt && reachedAt <= now ? Math.ceil((reachedAt - progressRow.assignedAt) / 86_400_000) : null,
       criticalConfidentErrors: 0,
     })

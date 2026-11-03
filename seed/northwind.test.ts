@@ -196,7 +196,8 @@ it('seeds the three employee stages through the real SOP pipeline and preserves 
 
   await signIn(NORTHWIND.emails.owner, secret.ownerPassword)
   const people = await getPeople({ data: { slug: result.slug } })
-  const { known } = raw.prepare(`SELECT AVG(COALESCE(lc.p_known, 0)) AS known FROM concepts c
+  // Progress is the lower of mean mastery and the weakest critical concept, each against the benchmark.
+  const { known } = raw.prepare(`SELECT MIN(AVG(COALESCE(lc.p_known, 0)), MIN(CASE WHEN c.critical THEN COALESCE(lc.p_known, 0) ELSE 1 END)) AS known FROM concepts c
     LEFT JOIN learner_concept lc ON lc.concept_id = c.id AND lc.learner_id = (SELECT id FROM user WHERE email = ?) WHERE c.topic_id = ?`).get(NORTHWIND.emails.onboarding, result.topicId) as { known: number }
   expect(people.members.map(({ email, training, lastActiveAt }) => ({ email, training, lastActiveAt }))).toEqual(expect.arrayContaining([
     { email: NORTHWIND.emails.owner, training: null, lastActiveAt: null },
