@@ -118,6 +118,7 @@ model configuration is in `wrangler.jsonc`. Local D1 data is separate from produ
 | `LLM_API_KEY`, `BASETEN_API_KEY`, `FIREWORKS_API_KEY` | Provider credentials; store as secrets |
 | `VOICE_ENABLED` | Enable the voice job with Meta's transcription model; default `false` |
 | `IMAGE_MODEL` | Legacy model for an unmapped image job |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web Push key pair and contact; required to enable notifications |
 | `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET` | App origin and authentication secret |
 | `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET` | Optional Facebook login; both are required |
 
@@ -179,14 +180,21 @@ const { d: privateKey } = await crypto.subtle.exportKey('jwk', pair.privateKey)
 console.log({ publicKey, privateKey })
 ```
 
-After applying local migrations, signed-in account users can enable or disable
-notifications in **Profile**. Staff (`role=admin`) also see **Send test push**, which
+After the first finished session, account users can opt into notifications from
+the summary. On iOS, add Learn Quiz to the home screen first. **Profile** also
+offers browser subscription controls, an account-wide pause, and working hours
+with a timezone. The sender checks these preferences before delivery.
+Staff (`role=admin`) also see **Send test push**, which
 sends only to their current browser. On Android Chrome, allow notifications, send
 a test, then check the device notification and tap it to return to the profile.
 A successful send means the push service accepted it; device delivery still depends on browser
 and OS notification settings. Delivery attempts are recorded in `push_log`; HTTP
 404/410 removes the expired subscription, while transient failures leave it intact.
 Supported services are Chrome/FCM, Mozilla Push, and Apple Web Push.
+
+Question reminders link to `/play/quick/$itemId`. The sender adds a `pushId` to
+the link; opening it records `push_log.opened_at` and resumes a single-question
+`mini` session. A missed answer gets feedback and finishes without a re-ask.
 
 ## Deploy
 

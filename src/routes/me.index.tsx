@@ -27,7 +27,6 @@ function Me() {
   return (
     <main className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pt-8 pb-8">
       <h1 className="text-3xl font-bold tracking-tight">{user.isAnonymous ? 'Guest' : user.name}</h1>
-      {push && <PushSettings {...push} />}
       <Link to="/me/profile" className="flex min-h-12 items-center rounded-lg border p-4 font-medium text-primary focus-visible:outline-2">
         Training progress
       </Link>
@@ -43,6 +42,7 @@ function Me() {
         </ul>
       )}
       {user.role === 'admin' && <Link to="/admin" className="inline-flex min-h-11 items-center rounded-md underline focus-visible:ring-[3px] focus-visible:ring-ring/50">Staff area</Link>}
+      {push && <PushSettings {...push} />}
       {!user.isAnonymous && (
         <Button variant="outline" className="h-12 w-full px-6 sm:w-auto sm:self-start" onClick={signOut}>
           Sign out

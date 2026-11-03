@@ -16,12 +16,15 @@ vi.mock('@tanstack/react-start', () => ({
     validator: (schema: z.ZodType) => ({ handler: (fn: (input: { data: unknown }) => unknown) => async (input: { data: unknown }) => fn({ data: schema.parse(input.data) }) }),
   }),
 }))
-vi.mock('@tanstack/react-start/server', () => ({ setResponseStatus: vi.fn() }))
 vi.mock('@/db', () => ({ getDb: () => holder.db }))
 vi.mock('@/server/env', () => ({ getEnv: () => holder.env }))
 vi.mock('@/server/session', () => ({ getSessionUser: vi.fn() }))
+vi.mock('@tanstack/react-start/server', () => ({ setResponseStatus: vi.fn() }))
 
-import { getPushSettings, sendTestPush, subscribe, unsubscribe } from './index'
+import { getPushSettings, savePushPreferences, sendTestPush, subscribe, unsubscribe } from './index'
+import { sendPush } from './sender'
+import type { Db } from '@/db'
+import type { pushSubscriptions } from '@/db/schema'
 
 const staff = { id: 'staff', role: 'admin', isAnonymous: false, banned: false }
 const learner = { ...staff, id: 'learner', role: 'user' }
@@ -30,6 +33,7 @@ receiver.generateKeys()
 const auth = randomBytes(16)
 const keys = { p256dh: receiver.getPublicKey().toString('base64url'), auth: auth.toString('base64url') }
 const endpoint = 'https://fcm.googleapis.com/fcm/send/test-device'
+const preferences = { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' }
 const vapidPair = generateKeyPairSync('ec', { namedCurve: 'prime256v1' })
 const vapidJwk = vapidPair.privateKey.export({ format: 'jwk' })
 const vapidEnv = {
@@ -111,6 +115,7 @@ it('refuses unauthenticated, guest and banned accounts and restricts test delive
     await expect(subscribe({ data: { endpoint, keys } })).rejects.toMatchObject({ status })
     await expect(unsubscribe({ data: { endpoint } })).rejects.toMatchObject({ status })
     await expect(getPushSettings()).rejects.toMatchObject({ status })
+    await expect(savePushPreferences({ data: preferences })).rejects.toMatchObject({ status })
   }
   vi.mocked(getSessionUser).mockResolvedValue(learner as never)
   await subscribe({ data: { endpoint, keys } })
@@ -130,16 +135,22 @@ it('validates push destinations and key material before storing or sending anyth
   await expect(subscribe({ data: { endpoint, keys: { ...keys, p256dh: 'not a key' } } })).rejects.toThrow('Invalid public key')
   await expect(subscribe({ data: { endpoint, keys: { ...keys, auth: 'too-short' } } })).rejects.toThrow()
   holder.env = {}
-  expect(await getPushSettings()).toEqual({ publicKey: null, isStaff: true, endpoints: [] })
+  expect(await getPushSettings()).toMatchObject({ publicKey: null, isStaff: true, endpoints: [], canPrompt: false })
   await expect(subscribe({ data: { endpoint, keys } })).rejects.toMatchObject({ status: 503 })
   expect(rows('SELECT * FROM push_subscriptions')).toEqual([])
   expect(http).not.toHaveBeenCalled()
 })
 
-it('sends a verifiable VAPID JWT and a payload independently decryptable by the subscribed browser', async () => {
+it.each(['/me', '/play/quick/i1'])('sends verifiable VAPID and independently decryptable payloads for %s', async (url) => {
   await subscribe({ data: { endpoint, keys } })
-  expect(await getPushSettings()).toEqual({ publicKey: vapidEnv.VAPID_PUBLIC_KEY, isStaff: true, endpoints: [endpoint] })
-  await expect(sendTestPush({ data: { endpoint } })).resolves.toEqual({ sent: true })
+  expect(await getPushSettings()).toMatchObject({ publicKey: vapidEnv.VAPID_PUBLIC_KEY, isStaff: true, endpoints: [endpoint] })
+  if (url === '/me') {
+    await expect(sendTestPush({ data: { endpoint } })).resolves.toEqual({ sent: true })
+  } else {
+    const subscription = rows('SELECT id, user_id AS userId, endpoint, p256dh, auth, created_at AS createdAt FROM push_subscriptions')[0] as typeof pushSubscriptions.$inferSelect
+    await expect(sendPush(holder.db as Db, subscription, { publicKey: vapidEnv.VAPID_PUBLIC_KEY, privateKey: vapidEnv.VAPID_PRIVATE_KEY, subject: vapidEnv.VAPID_SUBJECT },
+      { title: 'Learn Quiz', body: 'Your test notification arrived. You’re ready to learn.', url })).resolves.toEqual({ outcome: 'accepted', status: 201 })
+  }
   expect(http).toHaveBeenCalledTimes(1)
   const [destination, init] = http.mock.calls[0]
   expect(destination).toBe(endpoint)
@@ -166,7 +177,10 @@ it('sends a verifiable VAPID JWT and a payload independently decryptable by the 
   decipher.setAuthTag(encrypted.subarray(-16))
   const plaintext = Buffer.concat([decipher.update(encrypted.subarray(86, -16)), decipher.final()])
   expect(plaintext[plaintext.length - 1]).toBe(2)
-  expect(JSON.parse(plaintext.subarray(0, -1).toString())).toEqual({ title: 'Learn Quiz', body: 'Your test notification arrived. You’re ready to learn.', url: '/me' })
+  const log = rows('SELECT id, item_id FROM push_log')[0]
+  expect(JSON.parse(plaintext.subarray(0, -1).toString())).toEqual({ title: 'Learn Quiz', body: 'Your test notification arrived. You’re ready to learn.',
+    url: url === '/me' ? url : `${url}?pushId=${log.id}` })
+  expect(log.item_id).toBe(url === '/me' ? null : 'i1')
   expect(rows('SELECT outcome, http_status FROM push_log')).toEqual([{ outcome: 'accepted', http_status: 201 }])
 })
 
@@ -197,4 +211,38 @@ it('keeps refreshed subscription keys when an in-flight push returns 410', async
   })
   await expect(sendTestPush({ data: { endpoint } })).rejects.toMatchObject({ status: 410 })
   expect(rows('SELECT auth FROM push_subscriptions')).toEqual([{ auth: refreshed.auth }])
+})
+
+it('stops already-selected pushes when paused, preserves the pause on subscribe, and respects local working hours', async () => {
+  await subscribe({ data: { endpoint, keys } })
+  const subscription = rows('SELECT id, user_id AS userId, endpoint, p256dh, auth, created_at AS createdAt FROM push_subscriptions')[0] as typeof pushSubscriptions.$inferSelect
+  const config = { publicKey: vapidEnv.VAPID_PUBLIC_KEY, privateKey: vapidEnv.VAPID_PRIVATE_KEY, subject: vapidEnv.VAPID_SUBJECT }
+  const deliver = () => sendPush(holder.db as Db, subscription, config, { title: 'Learn Quiz', body: 'One question', url: '/play/quick/i1' })
+  await savePushPreferences({ data: { ...preferences, paused: true } })
+  await subscribe({ data: { endpoint, keys } })
+  expect(await deliver()).toEqual({ outcome: 'skipped', status: null })
+  expect(http).not.toHaveBeenCalled()
+  expect(rows('SELECT * FROM push_log')).toEqual([])
+
+  vi.mocked(getSessionUser).mockResolvedValue(learner as never)
+  await savePushPreferences({ data: preferences })
+  vi.mocked(getSessionUser).mockResolvedValue(staff as never)
+  expect((await getPushSettings()).prefs.paused).toBe(true)
+  await savePushPreferences({ data: { ...preferences, timezone: 'America/New_York' } })
+  // Noon UTC is 07:00 in New York on this frozen date.
+  expect(await deliver()).toEqual({ outcome: 'skipped', status: null })
+  vi.setSystemTime(new Date('2026-11-02T14:00:00Z'))
+  expect(await deliver()).toEqual({ outcome: 'accepted', status: 201 })
+  expect(rows('SELECT item_id, opened_at FROM push_log')).toEqual([{ item_id: 'i1', opened_at: null }])
+  vi.setSystemTime(new Date('2026-11-02T22:00:00Z'))
+  expect(await deliver()).toEqual({ outcome: 'skipped', status: null })
+  expect(http).toHaveBeenCalledTimes(1)
+})
+
+it('rejects invalid working hours and timezones without changing saved preferences', async () => {
+  await savePushPreferences({ data: preferences })
+  for (const invalid of [{ startMinute: 800, endMinute: 700 }, { startMinute: -1 }, { endMinute: 1500 }, { timezone: 'not-a-timezone' }]) {
+    await expect(savePushPreferences({ data: { ...preferences, ...invalid } })).rejects.toThrow()
+  }
+  expect((await getPushSettings()).prefs).toEqual(preferences)
 })

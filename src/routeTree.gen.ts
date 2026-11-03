@@ -31,6 +31,7 @@ import { Route as OrgSlugQuestionsRouteImport } from './routes/org.$slug.questio
 import { Route as OrgSlugRolesRouteImport } from './routes/org.$slug.roles'
 import { Route as OrgSlugSettingsRouteImport } from './routes/org.$slug.settings'
 import { Route as PlaySessionIdDoneRouteImport } from './routes/play.$sessionId_.done'
+import { Route as PlayQuickItemIdRouteImport } from './routes/play.quick.$itemId'
 import { Route as TTopicIdPathRouteImport } from './routes/t.$topicId.path'
 import { Route as ApiOrgOrgIdLogoRouteImport } from './routes/api/org.$orgId.logo'
 
@@ -144,6 +145,11 @@ const PlaySessionIdDoneRoute = PlaySessionIdDoneRouteImport.update({
   path: '/play/$sessionId/done',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlayQuickItemIdRoute = PlayQuickItemIdRouteImport.update({
+  id: '/play/quick/$itemId',
+  path: '/play/quick/$itemId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TTopicIdPathRoute = TTopicIdPathRouteImport.update({
   id: '/t/$topicId/path',
   path: '/t/$topicId/path',
@@ -177,6 +183,7 @@ export interface FileRoutesByFullPath {
   '/org/$slug/roles': typeof OrgSlugRolesRoute
   '/org/$slug/settings': typeof OrgSlugSettingsRoute
   '/play/$sessionId/done': typeof PlaySessionIdDoneRoute
+  '/play/quick/$itemId': typeof PlayQuickItemIdRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
   '/org/$slug/': typeof OrgSlugIndexRoute
   '/api/org/$orgId/logo': typeof ApiOrgOrgIdLogoRoute
@@ -202,6 +209,7 @@ export interface FileRoutesByTo {
   '/org/$slug/roles': typeof OrgSlugRolesRoute
   '/org/$slug/settings': typeof OrgSlugSettingsRoute
   '/play/$sessionId/done': typeof PlaySessionIdDoneRoute
+  '/play/quick/$itemId': typeof PlayQuickItemIdRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
   '/org/$slug': typeof OrgSlugIndexRoute
   '/api/org/$orgId/logo': typeof ApiOrgOrgIdLogoRoute
@@ -229,6 +237,7 @@ export interface FileRoutesById {
   '/org/$slug/roles': typeof OrgSlugRolesRoute
   '/org/$slug/settings': typeof OrgSlugSettingsRoute
   '/play/$sessionId_/done': typeof PlaySessionIdDoneRoute
+  '/play/quick/$itemId': typeof PlayQuickItemIdRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
   '/org/$slug/': typeof OrgSlugIndexRoute
   '/api/org/$orgId/logo': typeof ApiOrgOrgIdLogoRoute
@@ -257,6 +266,7 @@ export interface FileRouteTypes {
     | '/org/$slug/roles'
     | '/org/$slug/settings'
     | '/play/$sessionId/done'
+    | '/play/quick/$itemId'
     | '/t/$topicId/path'
     | '/org/$slug/'
     | '/api/org/$orgId/logo'
@@ -282,6 +292,7 @@ export interface FileRouteTypes {
     | '/org/$slug/roles'
     | '/org/$slug/settings'
     | '/play/$sessionId/done'
+    | '/play/quick/$itemId'
     | '/t/$topicId/path'
     | '/org/$slug'
     | '/api/org/$orgId/logo'
@@ -308,6 +319,7 @@ export interface FileRouteTypes {
     | '/org/$slug/roles'
     | '/org/$slug/settings'
     | '/play/$sessionId_/done'
+    | '/play/quick/$itemId'
     | '/t/$topicId/path'
     | '/org/$slug/'
     | '/api/org/$orgId/logo'
@@ -331,6 +343,7 @@ export interface RootRouteChildren {
   OrgSlugRolesRoute: typeof OrgSlugRolesRoute
   OrgSlugSettingsRoute: typeof OrgSlugSettingsRoute
   PlaySessionIdDoneRoute: typeof PlaySessionIdDoneRoute
+  PlayQuickItemIdRoute: typeof PlayQuickItemIdRoute
   TTopicIdPathRoute: typeof TTopicIdPathRoute
   OrgSlugIndexRoute: typeof OrgSlugIndexRoute
   ApiOrgOrgIdLogoRoute: typeof ApiOrgOrgIdLogoRoute
@@ -492,6 +505,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlaySessionIdDoneRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/play/quick/$itemId': {
+      id: '/play/quick/$itemId'
+      path: '/play/quick/$itemId'
+      fullPath: '/play/quick/$itemId'
+      preLoaderRoute: typeof PlayQuickItemIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/t/$topicId/path': {
       id: '/t/$topicId/path'
       path: '/t/$topicId/path'
@@ -543,6 +563,7 @@ const rootRouteChildren: RootRouteChildren = {
   OrgSlugRolesRoute: OrgSlugRolesRoute,
   OrgSlugSettingsRoute: OrgSlugSettingsRoute,
   PlaySessionIdDoneRoute: PlaySessionIdDoneRoute,
+  PlayQuickItemIdRoute: PlayQuickItemIdRoute,
   TTopicIdPathRoute: TTopicIdPathRoute,
   OrgSlugIndexRoute: OrgSlugIndexRoute,
   ApiOrgOrgIdLogoRoute: ApiOrgOrgIdLogoRoute,

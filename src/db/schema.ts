@@ -240,15 +240,6 @@ export const consents = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.kind] })],
 )
 
-export const orgSettings = sqliteTable('org_settings', {
-  orgId: text('org_id').primaryKey().references(() => organization.id, { onDelete: 'cascade' }),
-  companyName: text('company_name').notNull(),
-  timezone: text('timezone').notNull().default('UTC'),
-  workingHours: text('working_hours_json', { mode: 'json' }).$type<WorkingHours>().notNull(),
-  logoKey: text('logo_key'),
-  accent: text('accent'),
-})
-
 export const pushSubscriptions = sqliteTable('push_subscriptions', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
@@ -261,6 +252,10 @@ export const pushSubscriptions = sqliteTable('push_subscriptions', {
 export const pushPrefs = sqliteTable('push_prefs', {
   userId: text('user_id').primaryKey().references(() => user.id, { onDelete: 'cascade' }),
   enabled: integer('enabled', { mode: 'boolean' }).notNull().default(false),
+  paused: integer('paused', { mode: 'boolean' }).notNull().default(false),
+  startMinute: integer('start_minute').notNull().default(540),
+  endMinute: integer('end_minute').notNull().default(1020),
+  timezone: text('timezone').notNull().default('UTC'),
   updatedAt: integer('updated_at').notNull(),
 })
 
@@ -270,5 +265,17 @@ export const pushLog = sqliteTable('push_log', {
   subscriptionId: text('subscription_id').notNull(), // Retained when a subscription expires.
   outcome: text('outcome', { enum: ['accepted', 'gone', 'failed'] }).notNull(),
   httpStatus: integer('http_status'),
+  itemId: text('item_id'),
+  sessionId: text('session_id'),
+  openedAt: integer('opened_at'),
   createdAt: integer('created_at').notNull(),
 }, (t) => [index('push_log_user_idx').on(t.userId)])
+
+export const orgSettings = sqliteTable('org_settings', {
+  orgId: text('org_id').primaryKey().references(() => organization.id, { onDelete: 'cascade' }),
+  companyName: text('company_name').notNull(),
+  timezone: text('timezone').notNull().default('UTC'),
+  workingHours: text('working_hours_json', { mode: 'json' }).$type<WorkingHours>().notNull(),
+  logoKey: text('logo_key'),
+  accent: text('accent'),
+})

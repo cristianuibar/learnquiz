@@ -37,8 +37,8 @@ it('focuses an existing app window or opens the target, refusing off-origin noti
   expect(close).toHaveBeenCalledOnce()
   expect(focus).toHaveBeenCalledOnce()
   expect(self.clients.openWindow).not.toHaveBeenCalled()
-  for (const url of ['/start', 'https://attacker.test', '//attacker.test', 'javascript:alert(1)']) {
+  for (const url of ['/start', '/play/quick/i1?pushId=p1', 'https://attacker.test', '//attacker.test', 'javascript:alert(1)']) {
     await dispatch('notificationclick', { notification: { close, data: { url } } })
-    expect(self.clients.openWindow).toHaveBeenLastCalledWith(`https://learnquiz.test${url === '/start' ? '/start' : '/me'}`)
+    expect(self.clients.openWindow).toHaveBeenLastCalledWith(`https://learnquiz.test${url.startsWith('/start') || url.startsWith('/play/') ? url : '/me'}`)
   }
 })

@@ -150,8 +150,9 @@ it('lets an owner leave the portal to train, return through Profile and sign out
     expect(container.querySelector('h1')?.textContent).toBe('Contoso')
     await act(async () => { container.querySelector<HTMLAnchorElement>('header a')!.click(); await router.load() })
     await act(async () => { container.querySelector<HTMLAnchorElement>('a[href="/me"]')!.click(); await router.load() })
+    const signOut = [...container.querySelectorAll<HTMLButtonElement>('main button')].find((button) => button.textContent === 'Sign out')!
     await act(async () => {
-      container.querySelector<HTMLButtonElement>('main button')!.click()
+      signOut.click()
       await vi.waitFor(() => expect(router.state.location.pathname).toBe('/'))
     })
     expect(container.querySelector('h1')?.textContent).toBe('Quiz it, until you learn it')

@@ -15,10 +15,14 @@ vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => null }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
-vi.mock('@/server/push', () => ({ getPushSettings: vi.fn(), subscribe: vi.fn(), unsubscribe: vi.fn(), sendTestPush: vi.fn() }))
+vi.mock('@/server/push', () => ({
+  getPushSettings: vi.fn(),
+  subscribe: vi.fn(), unsubscribe: vi.fn(), sendTestPush: vi.fn(), savePushPreferences: vi.fn(),
+}))
 
 it.each(['user', 'admin'])('opens training progress for %s, preserves staff access, and redirects signed-out visitors', async (role) => {
-  vi.mocked(getPushSettings).mockResolvedValue({ publicKey: null, isStaff: role === 'admin', endpoints: [] })
+  vi.mocked(getPushSettings).mockResolvedValue({ publicKey: null, isStaff: role === 'admin', endpoints: [], canPrompt: false,
+    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' } })
   const day = 86_400_000
   const start = Date.UTC(2026, 10, 2)
   vi.mocked(getProfile).mockResolvedValue({
@@ -42,6 +46,7 @@ it.each(['user', 'admin'])('opens training progress for %s, preserves staff acce
   const root = createRoot(container)
   try {
     await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
+    expect(container.querySelector('#push-heading')?.textContent).toBe('Notifications')
     const staffLink = [...container.querySelectorAll('a')].find((a) => a.textContent === 'Staff area')
     expect(staffLink?.getAttribute('href')).toBe(role === 'admin' ? '/admin' : undefined)
     const portalLink = [...container.querySelectorAll('a')].find((a) => a.textContent === 'Acme portal')
