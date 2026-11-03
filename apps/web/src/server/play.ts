@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, count, eq, exists, getTableColumns, gte, inArray, isNull, lte, ne, or, sql, type SQL } from 'drizzle-orm'
+import { and, asc, count, eq, exists, getTableColumns, gte, inArray, isNull, lt, lte, ne, or, sql, type SQL } from 'drizzle-orm'
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core'
 import { z } from 'zod'
 import { getDb, type Db } from '@/db'
@@ -17,7 +17,7 @@ import { gradePrompt } from '@/lib/llm/prompts'
 import { Grade, type ItemPayload } from '@/lib/llm/schemas'
 import { validateVoiceWav } from '@/lib/voice'
 import { plural } from '@/lib/utils'
-import { chunks, ensureConceptItems, httpError, loadPKnown, mean, targetFor } from '@/server/helpers'
+import { asItem, chunks, ensureConceptItems, httpError, loadPKnown, mean, targetFor } from '@/server/helpers'
 import { requireLearnerId } from '@/server/session'
 import { assertWithinDailyCap } from '@/server/model-cap'
 
@@ -241,18 +241,15 @@ export const startSession = createServerFn({ method: 'POST' })
 
     // Seen items come back through the due list, not as fresh frontier questions.
     const top = frontier.slice(0, 4)
-    const generated = await Promise.all(top.map(async (f) => {
-      try {
-        return await ensureConceptItems(db, learnerId, f.concept, topic, { targetDifficulty, unseen: seen, sessionId })
-      } catch (error) {
-        // Defer capped generation when stored reviews are due; other failures still surface.
-        if (
-          due.length > 0 && error instanceof Error && 'status' in error && error.status === 429 &&
-          error.message === 'You have reached the daily limit for generating new content. Try again tomorrow.'
-        ) return []
-        throw error
-      }
-    }))
+    // Anything practisable stored starts the session at once (a shorter one is fine); prepareNextSession tops up during play.
+    const storedRows = top.length
+      ? await db.select().from(items).where(and(eq(items.topicId, topic.id), inArray(items.conceptId, top.map((f) => f.concept.id)), eq(items.status, 'active')))
+      : []
+    const stored = top.map((f) => storedRows.filter((r) => r.conceptId === f.concept.id).map(asItem))
+    const storedFresh = stored.flat().filter((it) => !seen.has(it.id)).length
+    // Generation runs only when nothing is due, so a daily-cap refusal has no stored reviews to fall back on.
+    const generated = due.length + storedFresh > 0 ? stored
+      : await Promise.all(top.map((f) => ensureConceptItems(db, learnerId, f.concept, topic, { targetDifficulty, unseen: seen, sessionId })))
     const frontierInput = top.map((f, i) => ({
       conceptId: f.concept.id,
       unitOrder: f.unitOrder,
@@ -346,6 +343,39 @@ export const startSession = createServerFn({ method: 'POST' })
       startedAt: now.getTime(),
     })
     return { sessionId }
+  })
+
+// Generates the frontier's items ahead so the next session starts without waiting on the model.
+async function topUpFrontier(db: Db, learnerId: string, topic: TopicRow, reserved: string[], placing: boolean) {
+  const [{ level }, seenRows, frontier] = await Promise.all([
+    loadLearnerTopic(db, learnerId, topic.id),
+    db
+      .select({ itemId: learnerItem.itemId })
+      .from(learnerItem)
+      .innerJoin(items, eq(items.id, learnerItem.itemId))
+      .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topic.id), eq(items.status, 'active'))),
+    // The frontier is known only after placement ends, and units 0-1 are always unlocked then.
+    placing
+      ? db.select({ concept: concepts }).from(concepts).innerJoin(units, eq(units.id, concepts.unitId))
+        .where(and(eq(concepts.topicId, topic.id), lt(units.order, 2))).orderBy(asc(units.order), asc(concepts.order)).limit(5)
+      // A session practises at most the first 4 frontier concepts, so the next 4 cover a session that masters them all.
+      : loadFrontier(db, learnerId, topic.id).then((f) => f.slice(0, 8)),
+  ])
+  const seen = new Set([...seenRows.map((r) => r.itemId), ...reserved])
+  const targetDifficulty = targetFor(level)
+  await Promise.all(frontier.map((f) => ensureConceptItems(db, learnerId, f.concept, topic, { targetDifficulty, unseen: seen })))
+}
+
+// The play pages call this while the learner plays and keep the request open, so generation is not cut short like waitUntil.
+export const prepareNextSession = createServerFn({ method: 'POST' })
+  .validator(z.object({ sessionId: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    const learnerId = await requireLearnerId()
+    const db = getDb()
+    const { session, topic } = await loadSession(db, learnerId, data.sessionId)
+    const reserved = session.kind === 'session' ? (JSON.parse(session.itemIdsJson) as string[]) : []
+    await topUpFrontier(db, learnerId, topic, reserved, session.kind === 'placement' && session.endedAt === null)
+    return { ok: true as const }
   })
 
 export const startMiniSession = createServerFn({ method: 'POST' })

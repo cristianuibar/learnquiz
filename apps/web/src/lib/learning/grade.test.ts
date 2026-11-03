@@ -62,3 +62,82 @@ it.each<[ItemPayload['format'], string[], { numeric: boolean } | null]>([
   expect(view.blank).toEqual(blank)
   expect(view.image).toBeNull()
 })
+
+const choices = (n: number, right: string[]) => 'abcde'.slice(0, n).split('').map((id) => ({ id, text: `T${id}`, is_correct: right.includes(id), feedback: `F${id}` }))
+const multi: ItemPayload = { ...base, format: 'multi', options: choices(4, ['a', 'c']) }
+
+it.each<[string, string[], boolean, number, number, number]>([
+  ['exact', ['a', 'c'], true, 1, 2, 0],
+  ['exact with duplicates and unknown ids', ['c', 'c', 'a', 'z'], true, 1, 2, 0],
+  ['partial', ['a'], false, 0.5, 1, 0],
+  ['extra', ['a', 'b', 'c'], false, 0.5, 2, 1],
+  ['only wrong', ['b', 'd'], false, 0, 0, 2],
+  ['none', [], false, 0, 0, 0],
+])('grades multi: %s', (_, optionIds, correct, score, found, extra) => {
+  const graded = gradeAnswer(multi, { optionIds })
+  expect(graded).toMatchObject({ correct, score, correctAnswer: 'Ta / Tc', chosenFeedback: null })
+  expect(graded).toMatchObject({ detail: { kind: 'multi', found, total: 2, extra } })
+})
+
+it('reveals every multi option with its note', () => {
+  expect(gradeAnswer(multi, { optionIds: ['a', 'b'] })).toEqual({
+    correct: false,
+    correctAnswer: 'Ta / Tc',
+    chosenFeedback: null,
+    score: 0,
+    detail: {
+      kind: 'multi',
+      found: 1,
+      total: 2,
+      extra: 1,
+      options: [
+        { id: 'a', text: 'Ta', correct: true, chosen: true, note: 'Fa' },
+        { id: 'b', text: 'Tb', correct: false, chosen: true, note: 'Fb' },
+        { id: 'c', text: 'Tc', correct: true, chosen: false, note: 'Fc' },
+        { id: 'd', text: 'Td', correct: false, chosen: false, note: 'Fd' },
+      ],
+    },
+  })
+})
+
+const order: ItemPayload = { ...base, format: 'order', options: choices(4, ['a', 'b', 'c', 'd']) }
+
+it.each<[string, string[], boolean, number, number[]]>([
+  ['exact', ['a', 'b', 'c', 'd'], true, 4, [1, 2, 3, 4]],
+  ['adjacent swap', ['a', 'c', 'b', 'd'], false, 2, [1, 3, 2, 4]],
+  ['reversed', ['d', 'c', 'b', 'a'], false, 0, [4, 3, 2, 1]],
+])('grades order: %s', (_, answerOrder, correct, rightPositions, positions) => {
+  const graded = gradeAnswer(order, { order: answerOrder })
+  expect(graded).toMatchObject({ correct, score: rightPositions / 4, correctAnswer: 'Ta → Tb → Tc → Td', chosenFeedback: null })
+  expect(graded).toMatchObject({ detail: { kind: 'order', rightPositions } })
+  expect(graded).toMatchObject({
+    detail: { steps: ['a', 'b', 'c', 'd'].map((id, i) => ({ id, text: `T${id}`, note: `F${id}`, yourPosition: positions[i] })) },
+  })
+})
+
+it.each<[string, string, boolean]>([
+  ['007', '7', true],
+  ['7', '007', true],
+  ['7 kg', '7', false],
+  ['123457', '123456', false],
+])('cloze compares digit-only answers as numbers: %j vs accepted %j', (text, accepted, correct) => {
+  expect(gradeAnswer({ ...base, format: 'cloze', accepted_answers: [accepted] }, { text }).correct).toBe(correct)
+})
+
+it('never serves an order item in the stored order, deterministically per seed', () => {
+  const item = { id: 'i', conceptId: 'c', conceptName: 'C', format: 'order' as const, difficultyPrior: 3, payload: order }
+  for (let n = 0; n < 200; n++) {
+    const ids = toItemView(item, `seed${n}`).options.map((o) => o.id)
+    expect(ids).not.toEqual(['a', 'b', 'c', 'd'])
+    expect(ids).toEqual(toItemView(item, `seed${n}`).options.map((o) => o.id))
+  }
+})
+
+it.each([
+  [{ key: 'secret/key.png', alt: 'A graph', width: 640, height: 480 }, { src: '/media/items/i', alt: 'A graph', width: 640, height: 480 }],
+  [undefined, null],
+])('serves the image %j as %j without its key', (image, expected) => {
+  const view = toItemView({ id: 'i', conceptId: 'c', conceptName: 'C', format: 'mcq', difficultyPrior: 3, payload: { ...mcq, image } }, 'seed')
+  expect(view.image).toEqual(expected)
+  expect(JSON.stringify(view)).not.toContain('secret/key')
+})

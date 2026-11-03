@@ -37,7 +37,7 @@ vi.mock('@/lib/llm/client', async (importOriginal) => {
 
 vi.mock('cloudflare:workers', () => ({ env: { LLM_PROFILE: 'ollama', LLM_MODEL: 'muse-spark-1.3', LLM_BASE_URL: 'https://llm.example/v1' } }))
 
-import { answerItem, endSession, getSession, nextItem, startMiniSession, startPlacement, startSession } from './play'
+import { answerItem, endSession, getSession, nextItem, prepareNextSession, startMiniSession, startPlacement, startSession } from './play'
 import { getEnv } from '@/server/env'
 import { getConceptItems, getTopicPath } from './curriculum'
 import { getModelTrace } from './model-trace'
@@ -617,9 +617,10 @@ describe('learner practice and unit unlocks', () => {
   })
 
   it.each([new LlmError('Provider rate limit', 429), new Error('Unexpected generation failure')])(
-    'propagates other frontier errors even with a due question: $message',
+    'propagates other frontier errors when nothing is stored to practise: $message',
     async (error) => {
-      seedFrontier(raw, 1, true)
+      // A due item now starts Start without generating, so use a seen, not-due item to force the generation path.
+      seedFrontier(raw, 1, false)
       vi.mocked(chatJson).mockRejectedValueOnce(error)
 
       await expect(startSession({ data: { topicId: 't1' } })).rejects.toThrow(error.message)
@@ -714,6 +715,197 @@ it('writes exactly one placement when two finishing nextItem calls race (placeme
   expect(summary.level).toBe(4)
   expect(summary.levelLineModel).toBe('muse-spark-1.3')
   expect(summary.levelLine).toBe('You know the basics and will grow from here.')
+})
+
+it('prepareNextSession generates the next concepts\' items after placement so the first session makes no item calls', async () => {
+  seedTopicAndLearner(raw, 0)
+  raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un1', 't1', 0, 'Basics')
+  const concept = raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)')
+  concept.run('c1', 't1', 'un1', 0, 'Variables', '')
+  concept.run('c2', 't1', 'un1', 1, 'Equations', '')
+  const payload = { format: 'cloze', stem: 'Solve x + 1 = 2: x = ____.', options: [], accepted_answers: ['1'], model_answer: '1', explanation: 'Subtract 1.', difficulty: 3, source_quote: null, grounded: false, bloom: 'apply' }
+  raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run('i1', 'c1', 't1', 'cloze', JSON.stringify(payload), 3, 1)
+  const log = Array.from({ length: 8 }, () => ({ itemId: 'i1', correct: false, confidence: 'sure' as const, level: 1 }))
+  raw.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, item_ids_json, plan_json, started_at, correct_count, xp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run('p1', 'u1', 't1', 'placement', JSON.stringify(['i1']), JSON.stringify({ position: 7, answered: true, workingLevel: 1, log, pool: [{ id: 'i1', conceptId: 'c1', difficulty: 3 }], lastAttemptId: 'a1' }), 1, 0, 0)
+  const base = vi.mocked(chatJson).getMockImplementation()!
+  const batch = Array.from({ length: 6 }, (_, i) => ({ ...payload, stem: `Solve x + ${i} = ${i + 1}: x = ____.` }))
+  vi.mocked(chatJson).mockImplementation(async (opts) => opts.purpose === 'items' ? { items: batch }
+    : opts.purpose === 'self_check' ? { results: batch.map((_, index) => ({ index, keep: true, reasons: [] })) } : base(opts))
+  onTestFinished(() => { vi.mocked(chatJson).mockImplementation(base) })
+  const itemCalls = () => vi.mocked(chatJson).mock.calls.filter(([o]) => o.purpose === 'items').length
+
+  expect((await nextItem({ data: { sessionId: 'p1' } })).ended).toBe(true)
+  await expect(prepareNextSession({ data: { sessionId: 'p1' } })).resolves.toEqual({ ok: true })
+  expect(scalar(raw, "SELECT COUNT(*) AS n FROM items WHERE concept_id = 'c2'").n).toBe(6)
+  const before = itemCalls()
+
+  const { sessionId } = await startSession({ data: { topicId: 't1' } })
+  expect(itemCalls() - before).toBe(0)
+  const queue = JSON.parse(scalar(raw, 'SELECT item_ids_json AS ids FROM sessions WHERE id = ?', sessionId).ids as string) as string[]
+  expect(queue).toHaveLength(12)
+  expect(new Set(queue).size).toBe(12)
+})
+
+it('startSession joins an in-flight prepareNextSession generation so one concept is generated once', async () => {
+  seedTopicAndLearner(raw, 0)
+  raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un1', 't1', 0, 'Basics')
+  raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)').run('c1', 't1', 'un1', 0, 'Variables', '')
+  const payload = { format: 'cloze', stem: 'Solve x + 1 = 2: x = ____.', options: [], accepted_answers: ['1'], model_answer: '1', explanation: 'Subtract 1.', difficulty: 3, source_quote: null, grounded: false, bloom: 'apply' }
+  const log = Array.from({ length: 8 }, () => ({ itemId: 'i1', correct: false, confidence: 'sure' as const, level: 1 }))
+  raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .run('i1', 'c1', 't1', 'cloze', JSON.stringify(payload), 3, 1, 'retired')
+  raw.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, item_ids_json, plan_json, started_at, correct_count, xp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run('p1', 'u1', 't1', 'placement', JSON.stringify(['i1']), JSON.stringify({ position: 7, answered: true, workingLevel: 1, log, pool: [{ id: 'i1', conceptId: 'c1', difficulty: 3 }], lastAttemptId: 'a1' }), 1, 0, 0)
+  const base = vi.mocked(chatJson).getMockImplementation()!
+  const batch = Array.from({ length: 6 }, (_, i) => ({ ...payload, stem: `Solve x + ${i} = ${i + 1}: x = ____.` }))
+  let release!: () => void
+  const gate = new Promise<void>((r) => { release = r })
+  vi.mocked(chatJson).mockImplementation(async (opts) => {
+    if (opts.purpose === 'items') { await gate; return { items: batch } }
+    return opts.purpose === 'self_check' ? { results: batch.map((_, index) => ({ index, keep: true, reasons: [] })) } : base(opts)
+  })
+  onTestFinished(() => { vi.mocked(chatJson).mockImplementation(base) })
+  const itemCalls = () => vi.mocked(chatJson).mock.calls.filter(([o]) => o.purpose === 'items').length
+  expect((await nextItem({ data: { sessionId: 'p1' } })).ended).toBe(true)
+  const before = itemCalls()
+
+  const prep = prepareNextSession({ data: { sessionId: 'p1' } })
+  await vi.waitFor(() => expect(itemCalls() - before).toBe(1))
+  const start = startSession({ data: { topicId: 't1' } })
+  await new Promise((r) => setTimeout(r, 50))
+  release()
+  await prep
+  const { sessionId } = await start
+
+  expect(itemCalls() - before).toBe(1)
+  expect(scalar(raw, "SELECT COUNT(*) AS n FROM items WHERE concept_id = 'c1' AND status = 'active'").n).toBe(6)
+  const queue = JSON.parse(scalar(raw, 'SELECT item_ids_json AS ids FROM sessions WHERE id = ?', sessionId).ids as string) as string[]
+  expect(queue).toHaveLength(6)
+  expect(scalar(raw, "SELECT gen_status AS s FROM concepts WHERE id = 'c1'").s).toBe('ready')
+})
+
+it('prepareNextSession mid-placement generates units 0-1 items so the first session makes no item calls', async () => {
+  seedTopicAndLearner(raw, 0)
+  const unit = raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)')
+  unit.run('un1', 't1', 0, 'Basics')
+  unit.run('un2', 't1', 1, 'Next')
+  const concept = raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)')
+  concept.run('c1', 't1', 'un1', 0, 'Variables', '')
+  concept.run('c2', 't1', 'un1', 1, 'Equations', '')
+  concept.run('c3', 't1', 'un2', 0, 'Functions', '')
+  const payload = { format: 'cloze', stem: 'Solve x + 1 = 2: x = ____.', options: [], accepted_answers: ['1'], model_answer: '1', explanation: 'Subtract 1.', difficulty: 3, source_quote: null, grounded: false, bloom: 'apply' }
+  raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run('i1', 'c1', 't1', 'cloze', JSON.stringify(payload), 3, 1)
+  const log = Array.from({ length: 7 }, () => ({ itemId: 'i1', correct: false, confidence: 'sure' as const, level: 1 }))
+  raw.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, item_ids_json, plan_json, started_at, correct_count, xp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run('p1', 'u1', 't1', 'placement', JSON.stringify(['i1']), JSON.stringify({ position: 7, answered: false, workingLevel: 1, log, pool: [{ id: 'i1', conceptId: 'c1', difficulty: 3 }] }), 1, 0, 0)
+  const base = vi.mocked(chatJson).getMockImplementation()!
+  const batch = Array.from({ length: 6 }, (_, i) => ({ ...payload, stem: `Solve x + ${i} = ${i + 1}: x = ____.` }))
+  vi.mocked(chatJson).mockImplementation(async (opts) => opts.purpose === 'items' ? { items: batch }
+    : opts.purpose === 'self_check' ? { results: batch.map((_, index) => ({ index, keep: true, reasons: [] })) } : base(opts))
+  onTestFinished(() => { vi.mocked(chatJson).mockImplementation(base) })
+  const itemCalls = () => vi.mocked(chatJson).mock.calls.filter(([o]) => o.purpose === 'items').length
+
+  await expect(prepareNextSession({ data: { sessionId: 'p1' } })).resolves.toEqual({ ok: true })
+  expect(scalar(raw, "SELECT COUNT(*) AS n FROM items WHERE concept_id = 'c2'").n).toBe(6)
+  expect(scalar(raw, "SELECT COUNT(*) AS n FROM items WHERE concept_id = 'c3'").n).toBe(6)
+
+  // Finish the placement, then the first session must not wait on generation.
+  raw.prepare('UPDATE sessions SET plan_json = ? WHERE id = ?')
+    .run(JSON.stringify({ position: 7, answered: true, workingLevel: 1, log: [...log, log[0]], pool: [{ id: 'i1', conceptId: 'c1', difficulty: 3 }], lastAttemptId: 'a1' }), 'p1')
+  expect((await nextItem({ data: { sessionId: 'p1' } })).ended).toBe(true)
+  const before = itemCalls()
+  await startSession({ data: { topicId: 't1' } })
+  expect(itemCalls() - before).toBe(0)
+})
+
+it('startSession uses stored unseen items without generating when the frontier has enough, even if a concept has fewer than 6', async () => {
+  seedTopicAndLearner(raw, 0)
+  raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un1', 't1', 0, 'Basics')
+  raw.prepare('INSERT INTO learner_unit (learner_id, unit_id, unlocked_at) VALUES (?, ?, ?)').run('u1', 'un1', 1)
+  const concept = raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)')
+  const item = raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+  const payload = JSON.stringify({ format: 'cloze', stem: 'Solve x + 1 = 2: x = ____.', options: [], accepted_answers: ['1'], model_answer: '1', explanation: 'Subtract 1.', difficulty: 3, source_quote: null, grounded: false, bloom: 'apply' })
+  for (const [i, n] of [2, 6, 6].entries()) {
+    concept.run(`c${i + 1}`, 't1', 'un1', i, `Concept ${i + 1}`, '')
+    for (let k = 0; k < n; k++) item.run(`c${i + 1}-i${k}`, `c${i + 1}`, 't1', 'cloze', payload, 3, 1)
+  }
+  const base = vi.mocked(chatJson).getMockImplementation()!
+  vi.mocked(chatJson).mockImplementation(async (opts) => opts.purpose === 'items' ? { items: [JSON.parse(payload)] }
+    : opts.purpose === 'self_check' ? { results: [{ index: 0, keep: true, reasons: [] }] } : base(opts))
+  onTestFinished(() => { vi.mocked(chatJson).mockImplementation(base) })
+  vi.mocked(chatJson).mockClear()
+
+  const { sessionId } = await startSession({ data: { topicId: 't1' } })
+  expect(vi.mocked(chatJson).mock.calls.filter(([o]) => o.purpose === 'items')).toHaveLength(0)
+  const queue = JSON.parse(scalar(raw, 'SELECT item_ids_json AS ids FROM sessions WHERE id = ?', sessionId).ids as string) as string[]
+  expect(queue).toHaveLength(12)
+})
+
+it('startSession starts from a few stored unseen items without generating, even when other frontier concepts have none', async () => {
+  seedTopicAndLearner(raw, 0)
+  raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un1', 't1', 0, 'Basics')
+  raw.prepare('INSERT INTO learner_unit (learner_id, unit_id, unlocked_at) VALUES (?, ?, ?)').run('u1', 'un1', 1)
+  const concept = raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)')
+  const item = raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+  const payload = JSON.stringify({ format: 'cloze', stem: 'Solve x + 1 = 2: x = ____.', options: [], accepted_answers: ['1'], model_answer: '1', explanation: 'Subtract 1.', difficulty: 3, source_quote: null, grounded: false, bloom: 'apply' })
+  for (const [i, n] of [2, 0, 0].entries()) {
+    concept.run(`c${i + 1}`, 't1', 'un1', i, `Concept ${i + 1}`, '')
+    for (let k = 0; k < n; k++) item.run(`c${i + 1}-i${k}`, `c${i + 1}`, 't1', 'cloze', payload, 3, 1)
+  }
+  const base = vi.mocked(chatJson).getMockImplementation()!
+  vi.mocked(chatJson).mockImplementation(async (opts) => opts.purpose === 'items' ? { items: [JSON.parse(payload)] }
+    : opts.purpose === 'self_check' ? { results: [{ index: 0, keep: true, reasons: [] }] } : base(opts))
+  onTestFinished(() => { vi.mocked(chatJson).mockImplementation(base) })
+  vi.mocked(chatJson).mockClear()
+
+  const { sessionId } = await startSession({ data: { topicId: 't1' } })
+  expect(vi.mocked(chatJson).mock.calls.filter(([o]) => o.purpose === 'items')).toHaveLength(0)
+  const queue = JSON.parse(scalar(raw, 'SELECT item_ids_json AS ids FROM sessions WHERE id = ?', sessionId).ids as string) as string[]
+  expect([...queue].sort()).toEqual(['c1-i0', 'c1-i1'])
+})
+
+it('prepareNextSession also prepares the concepts after the current session\'s four, so mastering them still starts without generating', async () => {
+  seedTopicAndLearner(raw, 0)
+  raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un1', 't1', 0, 'Basics')
+  raw.prepare('INSERT INTO learner_unit (learner_id, unit_id, unlocked_at) VALUES (?, ?, ?)').run('u1', 'un1', 1)
+  const concept = raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)')
+  const item = raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+  const payload = { format: 'cloze', stem: 'Solve x + 1 = 2: x = ____.', options: [], accepted_answers: ['1'], model_answer: '1', explanation: 'Subtract 1.', difficulty: 3, source_quote: null, grounded: false, bloom: 'apply' }
+  const stored = ['c1', 'c2', 'c3', 'c4'].flatMap((c) => Array.from({ length: 6 }, (_, k) => `${c}-i${k}`))
+  for (let i = 1; i <= 5; i++) concept.run(`c${i}`, 't1', 'un1', i, `Concept ${i}`, '')
+  for (const id of stored) item.run(id, id.split('-')[0], 't1', 'cloze', JSON.stringify(payload), 3, 1)
+  const base = vi.mocked(chatJson).getMockImplementation()!
+  const batch = Array.from({ length: 6 }, (_, i) => ({ ...payload, stem: `Solve x + ${i} = ${i + 1}: x = ____.` }))
+  vi.mocked(chatJson).mockImplementation(async (opts) => opts.purpose === 'items' ? { items: batch }
+    : opts.purpose === 'self_check' ? { results: batch.map((_, index) => ({ index, keep: true, reasons: [] })) } : base(opts))
+  onTestFinished(() => { vi.mocked(chatJson).mockImplementation(base) })
+  const itemCalls = () => vi.mocked(chatJson).mock.calls.filter(([o]) => o.purpose === 'items').length
+
+  await startSession({ data: { topicId: 't1' } })
+  const current = scalar(raw, "SELECT id FROM sessions WHERE kind = 'session'").id as string
+  await prepareNextSession({ data: { sessionId: current } })
+  expect(scalar(raw, "SELECT COUNT(*) AS n FROM items WHERE concept_id = 'c5'").n).toBe(6)
+
+  for (let i = 1; i <= 4; i++) raw.prepare('INSERT INTO learner_concept (learner_id, concept_id, p_known, n_attempts, mastered_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)').run('u1', `c${i}`, 0.99, 5, 1, 1)
+  for (const id of stored) raw.prepare('INSERT INTO learner_item (learner_id, item_id, due, stability, difficulty, state, reps) VALUES (?, ?, ?, ?, ?, ?, ?)').run('u1', id, Date.now() + 7 * 864e5, 5, 5, 2, 1)
+  const before = itemCalls()
+
+  const { sessionId } = await startSession({ data: { topicId: 't1' } })
+  expect(itemCalls() - before).toBe(0)
+  const queue = JSON.parse(scalar(raw, 'SELECT item_ids_json AS ids FROM sessions WHERE id = ?', sessionId).ids as string) as string[]
+  const c5 = (raw.prepare("SELECT id FROM items WHERE concept_id = 'c5'").all() as { id: string }[]).map((r) => r.id)
+  expect(c5).toHaveLength(6)
+  expect([...queue].sort()).toEqual([...c5].sort())
+})
+
+it('refuses prepareNextSession for another learner\'s session', async () => {
+  seedTopicAndLearner(raw, 0)
+  raw.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, started_at) VALUES (?, ?, ?, ?, ?)').run('s1', 'u1', 't1', 'session', 1)
+  vi.mocked(requireLearnerId).mockResolvedValueOnce('u2')
+  await expect(prepareNextSession({ data: { sessionId: 's1' } })).rejects.toMatchObject({ status: 404 })
 })
 
 it.each([

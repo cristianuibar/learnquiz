@@ -3,6 +3,9 @@ import type { ItemPayload } from '@/lib/llm/schemas'
 
 type Prompt = { system: string; user: string }
 
+// multi and order stay off until both clients render them.
+export const ENABLED_FORMATS: ItemPayload['format'][] = ['mcq', 'cloze', 'short']
+
 const LEVELS = ['novice', 'beginner', 'intermediate', 'advanced', 'fluent']
 const levelLabel = (level: number) => `${level} of 5 (${LEVELS[Math.min(5, Math.max(1, Math.round(level))) - 1]})`
 
@@ -47,17 +50,25 @@ export function itemsPrompt(a: {
   misconceptions: string[]
   targetDifficulty: number
   spread?: boolean // placement: difficulties across 1 to 5 instead of around the target
-  formats: ('mcq' | 'cloze' | 'short')[]
   sourceQuote?: string | null
   sourceText?: string | null // the whole source document, for a concept whose quote no longer exists or whose document was replaced
   avoidStems: string[]
 }): Prompt {
-  const formats = a.formats.join(', ')
+  const formats = ENABLED_FORMATS.join(', ')
+  const has = (f: ItemPayload['format']) => ENABLED_FORMATS.includes(f)
+  const extra = [
+    has('multi')
+      ? '- multi: 4 or 5 options with ids "a" to "e"; at least 2 have is_correct true and at least 1 has is_correct false. The stem says "Choose all that apply". Every option has feedback. accepted_answers is []. model_answer lists the correct options.'
+      : '',
+    has('order')
+      ? '- order: 3 to 5 steps as options with ids "a" to "e", listed in the correct order; all is_correct true. The stem asks to put the steps in order. Each feedback says why the step sits at that position. accepted_answers is []. model_answer lists the steps in order.'
+      : '',
+  ].filter(Boolean).map((l) => `${l}\n`).join('')
   return {
     system: `You write quiz items for a learning app. Output JSON only.
 Write exactly 6 items for the given concept.
 - Allowed formats: ${formats}. ${
-      a.formats.includes('short') ? 'Mix them, including at least one short "explain why" question.' : 'Never use any other format.'
+      has('short') ? 'Mix them, including at least one short "explain why" question.' : 'Never use any other format.'
     } When mcq and cloze are both allowed, write at least 2 of each.
 - difficulty is an integer 1 to 5. ${
       a.spread
@@ -65,9 +76,9 @@ Write exactly 6 items for the given concept.
         : 'Stay within 1 of the target difficulty, and hit the target itself at least 3 times.'
     }
 - mcq: 3 or 4 options with ids "a", "b", "c", "d"; exactly one has is_correct true. Every option has feedback: why it is right, or why it is wrong. Wrong options come from the listed misconceptions or other common errors. accepted_answers is [].
-- cloze: the stem contains ____ exactly once. options is []. accepted_answers lists every acceptable spelling of the blank (1 to 4 entries).
+- cloze: the stem contains ____ exactly once. options is []. accepted_answers lists every acceptable spelling of the blank (1 to 4 entries). Prefer a numeric blank when the source states a quantity: the blank is a whole number 0 to 999 written in digits, with the unit after the blank in the stem.
 - short: options is [] and accepted_answers is []. model_answer is a one or two sentence answer.
-- model_answer: the correct option text for mcq, the blank for cloze, or the full explanation for short.
+${extra}- model_answer: the correct option text for mcq, the blank for cloze, or the full explanation for short.
 - explanation: at most 2 sentences on why the key is right.
 - ${
       a.sourceQuote && a.sourceText
@@ -99,12 +110,12 @@ export function selfCheckPrompt(a: { items: ItemPayload[] }): Prompt {
     system: `You review drafted quiz items against the Haladyna item-writing rules. Output JSON only.
 Return exactly one result per item, with the item's index (0-based, as given). keep is false when any rule fails; reasons names each failed rule in a few words, and is [] when keep is true.
 Rules:
-1. Exactly one defensible key: the marked correct answer is right, and no other option is also right.
+1. Exactly one defensible key for mcq: the marked correct answer is right, and no other option is also right. For multi, every option marked correct is right and every other option is wrong.
 2. No "all of the above" or "none of the above".
 3. Distractors are plausible and homogeneous; none is absurd or gives the answer away through length or wording.
 4. The stem is answerable without seeing the options.
 5. Grounded in the quote: when source_quote is given, the key follows from it; when it is not given, grounded must be false.
-6. Cloze items have one blank and accepted_answers that are all correct; short items have a correct model_answer.
+6. Cloze items have one blank and accepted_answers that are all correct; short items have a correct model_answer; order steps are in the correct order.
 Check facts yourself. Reject an item when the key is wrong.`,
     user: `Items:\n${JSON.stringify(a.items.map((item, index) => ({ index, ...item })))}`,
   }
