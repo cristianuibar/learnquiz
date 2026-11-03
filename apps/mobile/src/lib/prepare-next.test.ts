@@ -33,9 +33,10 @@ jest.mock('react-native-keyboard-controller', () => ({
 }))
 
 const mockRouter = { replace: jest.fn(), dismissAll: jest.fn(), dismissTo: jest.fn() }
+let mockCurrentRouter = mockRouter
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ sessionId: 's1' }),
-  useRouter: () => mockRouter,
+  useRouter: () => mockCurrentRouter,
   useFocusEffect: (effect: () => void) => require('react').useEffect(effect, [effect]),
   Stack: { Screen: () => null },
 }))
@@ -52,7 +53,7 @@ beforeEach(() => {
 test('posts preparation through the shared API client with an encoded session ID', async () => {
   await expect(prepareNext('s/1 ?')).resolves.toBeUndefined()
   expect(request).toHaveBeenCalledTimes(1)
-  expect(request).toHaveBeenCalledWith('/sessions/s%2F1%20%3F/prepare-next', { method: 'POST' })
+  expect(request).toHaveBeenCalledWith('/sessions/s%2F1%20%3F/prepare-next', { method: 'POST', timeoutMs: 300_000 })
 })
 
 test('preparation errors are swallowed without retrying', async () => {
@@ -71,7 +72,7 @@ test('active practice fires once across question changes and foreground refetche
     }
   }
   expect(request).toHaveBeenCalledTimes(1)
-  expect(request).toHaveBeenCalledWith('/sessions/s1/prepare-next', { method: 'POST' })
+  expect(request).toHaveBeenCalledWith('/sessions/s1/prepare-next', { method: 'POST', timeoutMs: 300_000 })
 })
 
 test('another session can prepare even when the prior session already did', () => {
@@ -105,7 +106,7 @@ test('an ended placement prepares once when its summary is ready', async () => {
   await prepareNext(id)
   expect(placementToPrepare({ ...placement }, id)).toBeNull()
   expect(request).toHaveBeenCalledTimes(1)
-  expect(request).toHaveBeenCalledWith('/sessions/p1/prepare-next', { method: 'POST' })
+  expect(request).toHaveBeenCalledWith('/sessions/p1/prepare-next', { method: 'POST', timeoutMs: 300_000 })
 })
 
 test.each<SummaryView['kind']>(['session', 'mock', 'mini'])('does not prepare on a %s summary', (kind) => {
@@ -130,6 +131,7 @@ describe('screen triggers', () => {
   const mount = (component: typeof SessionScreen) => render(createElement(ThemeProvider, { children: createElement(component) }))
 
   beforeEach(() => {
+    mockCurrentRouter = mockRouter
     jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, listener) => {
       onAppState = listener
       return { remove: jest.fn() }
@@ -140,7 +142,7 @@ describe('screen triggers', () => {
   afterEach(() => jest.restoreAllMocks())
 
   test('practice starts one request without waiting for preparation, including after a foreground refetch', async () => {
-    request.mockImplementation(async (path) => path.endsWith('/prepare-next') ? new Promise(() => {}) : view)
+    request.mockImplementation(async (path) => path.endsWith('/prepare-next') ? new Promise(() => {}) : { ...view })
     await mount(SessionScreen)
     expect(screen.getByText('Question?')).toBeOnTheScreen()
     expect(preparations()).toHaveLength(1)
@@ -181,11 +183,15 @@ describe('screen triggers', () => {
     expect(preparations()).toHaveLength(0)
   })
 
-  test('the placement summary starts one request without waiting for preparation', async () => {
-    request.mockImplementation(async (path) => path.endsWith('/prepare-next') ? new Promise(() => {}) : summary)
+  test('the placement summary starts one request even when its summary reloads', async () => {
+    request.mockImplementation(async (path) => path.endsWith('/prepare-next') ? new Promise(() => {}) : { ...summary })
     const rendered = await mount(SessionDone)
     expect(screen.getByText('You’re at level 1 of 5')).toBeOnTheScreen()
+    expect(preparations()).toHaveLength(1)
+    // A changed router callback reloads the same summary in the mounted screen.
+    mockCurrentRouter = { ...mockRouter }
     await rendered.rerender(createElement(ThemeProvider, { children: createElement(SessionDone) }))
+    expect(request.mock.calls.filter(([path]) => path === '/sessions/s1/end')).toHaveLength(2)
     expect(preparations()).toHaveLength(1)
   })
 

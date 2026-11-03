@@ -3,7 +3,8 @@ import { api } from './api'
 
 export async function prepareNext(sessionId: string): Promise<void> {
   try {
-    await api(`/sessions/${encodeURIComponent(sessionId)}/prepare-next`, { method: 'POST' })
+    // Keep the request open through both possible 120-second generation rounds.
+    await api(`/sessions/${encodeURIComponent(sessionId)}/prepare-next`, { method: 'POST', timeoutMs: 300_000 })
   } catch {
     // Preparation is optional; a failure must not interrupt the current session.
   }
