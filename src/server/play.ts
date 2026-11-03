@@ -16,8 +16,7 @@ import { chatJson, DailyCapError, isVoiceEnabled, jobModel, transcribeAudio } fr
 import { gradePrompt } from '@/lib/llm/prompts'
 import { Grade, type ItemPayload } from '@/lib/llm/schemas'
 import { validateVoiceWav } from '@/lib/voice'
-import { chunks, ensureConceptItems, httpError, loadPKnown, mean, targetFor } from '@/server/helpers'
-import { runInBackground } from '@/server/env'
+import { asItem, chunks, ensureConceptItems, httpError, loadPKnown, mean, targetFor } from '@/server/helpers'
 import { requireLearnerId } from '@/server/session'
 import { assertWithinDailyCap } from '@/server/model-cap'
 
@@ -242,7 +241,13 @@ export const startSession = createServerFn({ method: 'POST' })
 
     // Seen items come back through the due list, not as fresh frontier questions.
     const top = frontier.slice(0, 4)
-    const generated = await Promise.all(top.map(async (f) => {
+    // Enough stored unseen items start the session at once; generation tops up later via prepareNextSession.
+    const storedRows = top.length
+      ? await db.select().from(items).where(and(eq(items.topicId, topic.id), inArray(items.conceptId, top.map((f) => f.concept.id)), eq(items.status, 'active')))
+      : []
+    const stored = top.map((f) => storedRows.filter((r) => r.conceptId === f.concept.id).map(asItem))
+    const storedFresh = stored.flat().filter((it) => !seen.has(it.id)).length
+    const generated = due.length + storedFresh >= SESSION_SIZE / 2 ? stored : await Promise.all(top.map(async (f) => {
       try {
         return await ensureConceptItems(db, learnerId, f.concept, topic, { targetDifficulty, unseen: seen, sessionId })
       } catch (error) {
@@ -346,13 +351,11 @@ export const startSession = createServerFn({ method: 'POST' })
       planJson: JSON.stringify(plan),
       startedAt: now.getTime(),
     })
-    // This session's items count as used, so concepts it exhausts are topped up while the learner plays.
-    runInBackground(prepareNextSession(db, learnerId, topic, queue))
     return { sessionId }
   })
 
 // Generates the frontier's items ahead so the next session starts without waiting on the model.
-async function prepareNextSession(db: Db, learnerId: string, topic: TopicRow, reserved: string[]) {
+async function topUpFrontier(db: Db, learnerId: string, topic: TopicRow, reserved: string[]) {
   const [lt, seenRows, frontier] = await Promise.all([
     loadLearnerTopic(db, learnerId, topic.id),
     db
@@ -366,6 +369,18 @@ async function prepareNextSession(db: Db, learnerId: string, topic: TopicRow, re
   const targetDifficulty = targetFor(lt.level)
   await Promise.all(frontier.slice(0, 4).map((f) => ensureConceptItems(db, learnerId, f.concept, topic, { targetDifficulty, unseen: seen })))
 }
+
+// The play pages call this while the learner plays and keep the request open, so generation is not cut short like waitUntil.
+export const prepareNextSession = createServerFn({ method: 'POST' })
+  .validator(z.object({ sessionId: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    const learnerId = await requireLearnerId()
+    const db = getDb()
+    const { session, topic } = await loadSession(db, learnerId, data.sessionId)
+    const reserved = session.kind === 'session' ? (JSON.parse(session.itemIdsJson) as string[]) : []
+    await topUpFrontier(db, learnerId, topic, reserved)
+    return { ok: true as const }
+  })
 
 export const startMiniSession = createServerFn({ method: 'POST' })
   .validator(z.object({ itemId: z.string().min(1), pushId: z.string().min(1).optional() }))
@@ -846,8 +861,6 @@ async function finalise(db: Db, learnerId: string, session: SessionRow, topic: T
       .where(and(eq(sessions.id, session.id), isNull(sessions.endedAt))),
   )
   await batch(db, stmts)
-  // Placement seeds the frontier; a finished session retries a top-up that waitUntil's ~30 s window cut short.
-  if (!('log' in plan) || plan.log.length) runInBackground(prepareNextSession(db, learnerId, topic, []))
 }
 
 async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: TopicRow): Promise<SummaryView> {

@@ -9,7 +9,7 @@ import { requireLearnerId } from '@/server/session'
 // Only external boundaries are faked: the server-fn transport, auth, model HTTP
 // (the client for older placement/generation tests) and Cloudflare bindings. Handlers run for real
 // against an in-memory SQLite database speaking the drizzle proxy protocol.
-const holder = vi.hoisted(() => ({ db: null as unknown, pending: [] as Promise<unknown>[] }))
+const holder = vi.hoisted(() => ({ db: null as unknown }))
 
 vi.mock('@tanstack/react-start', () => ({
   createServerFn: () => ({
@@ -34,9 +34,9 @@ vi.mock('@/lib/llm/client', async (importOriginal) => {
 })
 
 
-vi.mock('cloudflare:workers', () => ({ waitUntil: (p: Promise<unknown>) => { holder.pending.push(p) }, env: { LLM_PROFILE: 'ollama', LLM_MODEL: 'muse-spark-1.3', LLM_BASE_URL: 'https://llm.example/v1' } }))
+vi.mock('cloudflare:workers', () => ({ env: { LLM_PROFILE: 'ollama', LLM_MODEL: 'muse-spark-1.3', LLM_BASE_URL: 'https://llm.example/v1' } }))
 
-import { answerItem, endSession, getSession, nextItem, startMiniSession, startPlacement, startSession } from './play'
+import { answerItem, endSession, getSession, nextItem, prepareNextSession, startMiniSession, startPlacement, startSession } from './play'
 import { getEnv } from '@/server/env'
 import { getConceptItems, getTopicPath } from './curriculum'
 import { getModelTrace } from './model-trace'
@@ -609,7 +609,7 @@ it('writes exactly one placement when two finishing nextItem calls race (placeme
   expect(summary.levelLine).toBe('You know the basics and will grow from here.')
 })
 
-it('generates the next concepts\' items in the background after placement so the first session makes no item calls', async () => {
+it('prepareNextSession generates the next concepts\' items after placement so the first session makes no item calls', async () => {
   seedTopicAndLearner(raw, 0)
   raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un1', 't1', 0, 'Basics')
   const concept = raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)')
@@ -629,7 +629,7 @@ it('generates the next concepts\' items in the background after placement so the
   const itemCalls = () => vi.mocked(chatJson).mock.calls.filter(([o]) => o.purpose === 'items').length
 
   expect((await nextItem({ data: { sessionId: 'p1' } })).ended).toBe(true)
-  await Promise.all(holder.pending.splice(0))
+  await expect(prepareNextSession({ data: { sessionId: 'p1' } })).resolves.toEqual({ ok: true })
   expect(scalar(raw, "SELECT COUNT(*) AS n FROM items WHERE concept_id = 'c2'").n).toBe(6)
   const before = itemCalls()
 
@@ -638,5 +638,34 @@ it('generates the next concepts\' items in the background after placement so the
   const queue = JSON.parse(scalar(raw, 'SELECT item_ids_json AS ids FROM sessions WHERE id = ?', sessionId).ids as string) as string[]
   expect(queue).toHaveLength(12)
   expect(new Set(queue).size).toBe(12)
-  await Promise.all(holder.pending.splice(0))
+})
+
+it('startSession uses stored unseen items without generating when the frontier has enough, even if a concept has fewer than 6', async () => {
+  seedTopicAndLearner(raw, 0)
+  raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un1', 't1', 0, 'Basics')
+  raw.prepare('INSERT INTO learner_unit (learner_id, unit_id, unlocked_at) VALUES (?, ?, ?)').run('u1', 'un1', 1)
+  const concept = raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)')
+  const item = raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+  const payload = JSON.stringify({ format: 'cloze', stem: 'Solve x + 1 = 2: x = ____.', options: [], accepted_answers: ['1'], model_answer: '1', explanation: 'Subtract 1.', difficulty: 3, source_quote: null, grounded: false, bloom: 'apply' })
+  for (const [i, n] of [2, 6, 6].entries()) {
+    concept.run(`c${i + 1}`, 't1', 'un1', i, `Concept ${i + 1}`, '')
+    for (let k = 0; k < n; k++) item.run(`c${i + 1}-i${k}`, `c${i + 1}`, 't1', 'cloze', payload, 3, 1)
+  }
+  const base = vi.mocked(chatJson).getMockImplementation()!
+  vi.mocked(chatJson).mockImplementation(async (opts) => opts.purpose === 'items' ? { items: [JSON.parse(payload)] }
+    : opts.purpose === 'self_check' ? { results: [{ index: 0, keep: true, reasons: [] }] } : base(opts))
+  onTestFinished(() => { vi.mocked(chatJson).mockImplementation(base) })
+  vi.mocked(chatJson).mockClear()
+
+  const { sessionId } = await startSession({ data: { topicId: 't1' } })
+  expect(vi.mocked(chatJson).mock.calls.filter(([o]) => o.purpose === 'items')).toHaveLength(0)
+  const queue = JSON.parse(scalar(raw, 'SELECT item_ids_json AS ids FROM sessions WHERE id = ?', sessionId).ids as string) as string[]
+  expect(queue).toHaveLength(12)
+})
+
+it('refuses prepareNextSession for another learner\'s session', async () => {
+  seedTopicAndLearner(raw, 0)
+  raw.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, started_at) VALUES (?, ?, ?, ?, ?)').run('s1', 'u1', 't1', 'session', 1)
+  vi.mocked(requireLearnerId).mockResolvedValueOnce('u2')
+  await expect(prepareNextSession({ data: { sessionId: 's1' } })).rejects.toMatchObject({ status: 404 })
 })

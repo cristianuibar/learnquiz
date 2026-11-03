@@ -18,7 +18,6 @@ vi.mock('@tanstack/react-start', () => ({ createServerFn: () => ({
   }),
 }) }))
 vi.mock('cloudflare:workers', () => ({
-  waitUntil: () => {},
   env: { LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://llm.example', LLM_MODEL: 'muse-spark-1.3' },
 }))
 
