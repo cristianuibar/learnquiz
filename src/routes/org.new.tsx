@@ -52,12 +52,12 @@ function NewCompany() {
       <form ref={formRef} className="flex flex-col gap-6" onSubmit={submit}>
         <div className="flex flex-col gap-2">
           <Label htmlFor="name">Company name</Label>
-          <Input id="name" name="name" className="h-11" minLength={2} maxLength={80} required autoFocus aria-invalid={!!fields.name || undefined} aria-describedby={fields.name ? 'name-error' : undefined} />
+          <Input id="name" name="name" className="h-11" maxLength={80} required autoFocus aria-invalid={!!fields.name || undefined} aria-describedby={fields.name ? 'name-error' : undefined} />
           {fields.name && <p id="name-error" role="alert" className="text-sm font-medium text-wrong">{fields.name}</p>}
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="role">First job role</Label>
-          <Input id="role" name="role" className="h-11" minLength={2} maxLength={80} required aria-invalid={!!fields.roleName || undefined} aria-describedby={fields.roleName ? 'role-error' : undefined} />
+          <Input id="role" name="role" className="h-11" maxLength={80} required aria-invalid={!!fields.roleName || undefined} aria-describedby={fields.roleName ? 'role-error' : undefined} />
           {fields.roleName && <p id="role-error" role="alert" className="text-sm font-medium text-wrong">{fields.roleName}</p>}
         </div>
         {error && (

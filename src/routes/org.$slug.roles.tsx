@@ -77,7 +77,7 @@ function Roles() {
         <form ref={formRef} className="mt-6 flex flex-col gap-6" onSubmit={submit}>
           <div className="flex flex-col gap-2">
             <Label htmlFor="name">Role name</Label>
-            <Input id="name" name="name" className="h-11" minLength={2} maxLength={80} required aria-invalid={!!fields.name || undefined} aria-describedby={fields.name ? 'name-error' : undefined} />
+            <Input id="name" name="name" className="h-11" maxLength={80} required aria-invalid={!!fields.name || undefined} aria-describedby={fields.name ? 'name-error' : undefined} />
             {fields.name && <p id="name-error" role="alert" className="text-sm font-medium text-wrong">{fields.name}</p>}
           </div>
           <div className="flex flex-col gap-2">
