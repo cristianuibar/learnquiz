@@ -18,7 +18,7 @@ vi.mock('@/server/org', () => ({
 }))
 
 it('keeps the signed-in join controls and error when accepting fails after sign-up', async () => {
-  const session = { user: null, facebookEnabled: false, needsDisclosure: false }
+  const session = { user: null, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] }
   vi.mocked(getSessionFn).mockResolvedValue(session)
   signUp.mockImplementation(async () => {
     vi.mocked(getSessionFn).mockResolvedValue({ ...session, user: { id: 'learner', name: 'Learner', isAnonymous: false } })

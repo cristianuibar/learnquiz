@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "6ee382ea-3e3e-434c-b7c9-8036e7ec694f",
+  "id": "bcf88376-92c3-4bde-9aa9-4bd4fd565111",
   "prevId": "7cb4a71c-d9b1-4eec-935a-66a8bc690432",
   "tables": {
     "attempts": {
@@ -296,6 +296,14 @@
         },
         "grounded": {
           "name": "grounded",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "critical": {
+          "name": "critical",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -963,73 +971,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "org_settings": {
-      "name": "org_settings",
-      "columns": {
-        "org_id": {
-          "name": "org_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "company_name": {
-          "name": "company_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "timezone": {
-          "name": "timezone",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'UTC'"
-        },
-        "working_hours_json": {
-          "name": "working_hours_json",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "logo_key": {
-          "name": "logo_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "accent": {
-          "name": "accent",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "org_settings_org_id_organization_id_fk": {
-          "name": "org_settings_org_id_organization_id_fk",
-          "tableFrom": "org_settings",
-          "tableTo": "organization",
-          "columnsFrom": [
-            "org_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "placements": {
       "name": "placements",
       "columns": {
@@ -1201,6 +1142,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "created_at": {

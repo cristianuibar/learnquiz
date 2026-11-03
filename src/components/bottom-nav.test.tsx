@@ -24,7 +24,7 @@ vi.mock('@/server/session-fn', () => ({
 beforeEach(() => {
   vi.mocked(getLatestTopicIdFn).mockResolvedValue(null)
   vi.mocked(getCompanyBranding).mockResolvedValue(null)
-  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'learner', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false })
+  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'learner', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })
 })
 
 async function renderStart(initialEntry = '/start') {
@@ -131,7 +131,7 @@ it('shows the employee company logo and returns to the default brand after sign-
     expect(container.querySelector('header img')?.getAttribute('alt')).toBe('Alpha Training')
     expect(container.querySelector('header img')?.getAttribute('src')).toBe('/api/org/org-a/logo?v=logo')
     await act(async () => {
-      vi.mocked(getSessionFn).mockResolvedValue({ user: null, facebookEnabled: false, needsDisclosure: false })
+      vi.mocked(getSessionFn).mockResolvedValue({ user: null, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })
       await router.invalidate()
     })
     expect(container.querySelector('header img')).toBeNull()
