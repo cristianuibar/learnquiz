@@ -929,8 +929,10 @@ async function finalise(db: Db, learnerId: string, session: SessionRow, topic: T
     ])
     const ids = JSON.parse(session.itemIdsJson) as string[]
     // The bonus is for finishing the queue with at least one scored answer, not for leaving early or for ungraded items; a quick question shows no bonus.
-    bonus = session.kind !== 'mini' && answered > 0 && (finished || (plan.answered && plan.position >= ids.length - 1)) ? SESSION_BONUS : 0
-    const { streakCount, lastSessionAt } = streakAfter(lt, new Date(now), answered)
+    const completed = session.kind !== 'mini' && answered > 0 && (finished || (plan.answered && plan.position >= ids.length - 1))
+    bonus = completed ? SESSION_BONUS : 0
+    // A finished queue of only stored reviews holds 8 items at most, so finishing it earns the day too.
+    const { streakCount, lastSessionAt } = streakAfter(lt, new Date(now), answered, completed)
     stmts.push(
       db
         .update(learnerTopic)

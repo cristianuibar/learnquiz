@@ -768,6 +768,24 @@ describe('learner practice and unit unlocks', () => {
   })
 })
 
+it('credits the streak day for a finished session of eight due reviews and nothing fresh', async () => {
+  vi.mocked(chatJson).mockClear()
+  vi.spyOn(Date, 'now').mockReturnValue(1793620800000)
+  seedTopicAndLearner(raw, 0)
+  seedFrontier(raw, 8, true)
+  raw.prepare('UPDATE learner_item SET due = ?').run(Date.now() - 1)
+  const { sessionId } = await startSession({ data: { topicId: 't1' } })
+  expect(vi.mocked(chatJson)).not.toHaveBeenCalled()
+  let view = await getSession({ data: { sessionId } })
+  expect(view.progress.total).toBe(8)
+  while (!view.ended) {
+    await answerItem({ data: { sessionId, itemId: view.item!.id, answer: { text: '1' }, confidence: 'sure', responseMs: 1000 } })
+    view = await nextItem({ data: { sessionId } })
+  }
+  expect(scalar(raw, 'SELECT COUNT(*) AS n, SUM(correct) AS ok FROM attempts WHERE session_id = ?', sessionId)).toEqual({ n: 8, ok: 8 })
+  expect(scalar(raw, 'SELECT streak_count, last_session_at FROM learner_topic WHERE topic_id = ?', 't1')).toEqual({ streak_count: 1, last_session_at: 1793620800000 })
+})
+
 it('credits the session bonus once when two finishing nextItem calls race (practice)', async () => {
   seedTopicAndLearner(raw, 100)
   const plan = JSON.stringify({
