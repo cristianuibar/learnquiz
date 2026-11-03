@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, lt, or } from 'drizzle-orm'
 import type { Db } from '@/db'
 import { concepts, items, learnerConcept, sources, topics } from '@/db/schema'
 import { chatJson, jobModel, LlmError } from '@/lib/llm/client'
@@ -39,6 +39,11 @@ export const asItem = (r: typeof items.$inferSelect): StoredItem => ({
   generatedBy: r.generatedBy,
 })
 
+// Same 10 minutes as concept-gen's STALE_CLAIM_MS; importing it would cycle (concept-gen imports helpers).
+const STALE_CLAIM_MS = 10 * 60 * 1000
+const JOIN_POLL_MS = 1000
+const JOIN_MAX_WAIT_MS = 120_000
+
 // Returns the concept's active items, generating a batch first when fewer than 6 exist. The caller has checked that the learner owns the topic.
 export async function ensureConceptItems(
   db: Db,
@@ -57,11 +62,42 @@ export async function ensureConceptItems(
   if (existing.length >= 6 && fresh > 0) return existing.map(asItem)
   // Only a real generation spends the cap; stored items stay readable at the cap.
   await assertWithinDailyCap(db, learnerId)
-  // shortcut: no lock, two concurrent calls for one concept may both generate; add a claim row if the UI double-fires.
+  // One generation per concept: an atomic claim on the row; a concurrent caller joins the in-flight one.
+  const now = Date.now()
+  const claimed = await db
+    .update(concepts)
+    .set({ genStatus: 'generating', genStartedAt: now })
+    .where(and(eq(concepts.id, concept.id), or(eq(concepts.genStatus, 'ready'), and(eq(concepts.genStatus, 'generating'), lt(concepts.genStartedAt, now - STALE_CLAIM_MS)))))
+    .returning({ id: concepts.id })
+  if (!claimed.length) {
+    const status = async () => (await db.select({ s: concepts.genStatus }).from(concepts).where(eq(concepts.id, concept.id)))[0]?.s
+    if ((await status()) === 'generating') {
+      // Wait for the in-flight writer, then read what it stored without spending the cap again.
+      const deadline = Date.now() + JOIN_MAX_WAIT_MS
+      while ((await status()) === 'generating' && Date.now() < deadline) await new Promise((r) => setTimeout(r, JOIN_POLL_MS))
+      const stored = await db
+        .select()
+        .from(items)
+        .where(and(eq(items.conceptId, concept.id), eq(items.topicId, topic.id), eq(items.status, 'active')))
+        .orderBy(desc(items.createdAt))
+      return stored.map(asItem)
+    }
+  }
 
-  const avoidStems = existing.slice(0, 3).map((r) => (JSON.parse(r.payloadJson) as ItemPayload).stem)
-  const generated = await generateConceptItems(db, concept, topic, { targetDifficulty: opts.targetDifficulty, spread: opts.spread, avoidStems, want: 3, maxRounds: 2, learnerId, sessionId: opts.sessionId })
-  return [...existing.map(asItem), ...generated]
+  try {
+    const avoidStems = existing.slice(0, 3).map((r) => (JSON.parse(r.payloadJson) as ItemPayload).stem)
+    const generated = await generateConceptItems(db, concept, topic, { targetDifficulty: opts.targetDifficulty, spread: opts.spread, avoidStems, want: 3, maxRounds: 2, learnerId, sessionId: opts.sessionId })
+    return [...existing.map(asItem), ...generated]
+  } finally {
+    // Release only our own claim; a failed release must not mask the generation's error.
+    if (claimed.length) {
+      await db
+        .update(concepts)
+        .set({ genStatus: 'ready', genStartedAt: null })
+        .where(and(eq(concepts.id, concept.id), eq(concepts.genStatus, 'generating'), eq(concepts.genStartedAt, now)))
+        .catch((e) => console.error('concept claim release failed', e))
+    }
+  }
 }
 
 // Generates and stores a batch of items for one concept; returns only the new ones. Callers own the cap pre-check.
