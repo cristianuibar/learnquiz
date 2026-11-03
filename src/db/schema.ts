@@ -201,7 +201,7 @@ export const modelCalls = sqliteTable('model_calls', {
   promptTokens: integer('prompt_tokens').notNull().default(0),
   completionTokens: integer('completion_tokens').notNull().default(0),
   reasoningTokens: integer('reasoning_tokens').notNull().default(0),
-  costUsd: real('cost_usd').notNull().default(0),
+  costUsd: real('cost_usd'),
   ok: integer('ok', { mode: 'boolean' }).notNull(),
   error: text('error'),
   createdAt: integer('created_at').notNull(),

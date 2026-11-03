@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { getDb, type Db } from '@/db'
 import { conceptEdges, concepts, items, jobRoles, learnerItem, learnerTopic, learnerUnit, placements, sources, topics, units } from '@/db/schema'
 import { validateSkeleton, fallbackSkeleton, type ValidatedSkeleton } from '@/lib/curriculum/validate'
-import { chatJson, LlmError } from '@/lib/llm/client'
+import { chatJson, jobModel, LlmError } from '@/lib/llm/client'
 import { curriculumPrompt } from '@/lib/llm/prompts'
 import { CurriculumSkeleton } from '@/lib/llm/schemas'
 import { MAX_SOURCE_TEXT_CHARS } from '@/lib/limits'
@@ -12,7 +12,6 @@ import { asItem, chunks, ensureConceptItems, httpError, loadPKnown, mean, target
 import { assertWithinDailyCap } from '@/server/model-cap'
 import { requireOrgAdmin } from '@/server/authz'
 import { requireLearnerId } from '@/server/session'
-import { getEnv } from '@/server/env'
 
 function curriculumWrites(db: Db, topicId: string, valid: ValidatedSkeleton, generatedBy: string | null) {
   const unitRows = valid.units.map((u, order) => ({ id: u.id, topicId, order, name: u.name, summary: u.summary }))
@@ -65,7 +64,7 @@ export const createTopic = createServerFn({ method: 'POST' })
           learnerId,
           topicId,
         })
-        generatedBy = getEnv().LLM_MODEL
+        generatedBy = jobModel('curriculum').model
       } catch (e) {
         if (e instanceof LlmError && e.status === 429) {
           // A request that raced the cap check stored its rows before the backstop
@@ -142,7 +141,7 @@ export const generateRoleCurriculum = createServerFn({ method: 'POST' })
         throw httpError('The curriculum contains concepts without a matching document quote. Try again.', 422)
       }
       // Publish the complete path and its ready status together; never publish a generic fallback for an SOP.
-      const [first, ...rest] = curriculumWrites(db, topicId, valid, getEnv().LLM_MODEL)
+      const [first, ...rest] = curriculumWrites(db, topicId, valid, jobModel('curriculum').model)
       await db.batch([first, ...rest])
       return { topicId }
     } catch (e) {

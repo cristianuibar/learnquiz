@@ -3,7 +3,7 @@ import { and, eq, isNull, lt, or } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb, type Db } from '@/db'
 import { concepts, topics } from '@/db/schema'
-import { generateImage } from '@/lib/llm/client'
+import { generateImage, isImageEnabled } from '@/lib/llm/client'
 import { getEnv } from '@/server/env'
 import { httpError } from '@/server/helpers'
 import { getLearnerId, requireLearnerId } from '@/server/session'
@@ -30,7 +30,7 @@ export const generateConceptDiagram = createServerFn({ method: 'POST' })
     const ready = (alt: string): DiagramResult => ({ status: 'ready', image: { src: `/media/concepts/${encodeURIComponent(concept.id)}`, alt } })
     if (concept.imageKey) return ready(concept.imageAlt ?? `${concept.name}: ${concept.summary}`)
     const env = getEnv()
-    if (!concept.visual || env.LLM_PROFILE !== 'meta' || !env.IMAGE_MODEL) return { status: 'disabled' }
+    if (!concept.visual || !isImageEnabled()) return { status: 'disabled' }
 
     const started = Date.now()
     // Atomic D1 claim works across worker instances. A crashed request can be

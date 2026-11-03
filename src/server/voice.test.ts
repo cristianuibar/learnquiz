@@ -32,7 +32,7 @@ const row = (sql: string) => raw.prepare(sql).get() as Record<string, unknown>
 
 beforeAll(() => {
   raw = new DatabaseSync(':memory:')
-  for (const file of readdirSync('drizzle').filter((f) => f.endsWith('.sql')).sort()) {
+  for (const file of readdirSync('drizzle').filter((file) => file.endsWith('.sql')).sort()) {
     raw.exec(readFileSync(`drizzle/${file}`, 'utf8').replaceAll('--> statement-breakpoint', ''))
   }
   const run = (sql: string, params: unknown[], method: string) => {
@@ -59,7 +59,7 @@ beforeAll(() => {
 beforeEach(() => {
   raw.exec('SAVEPOINT voice_test')
   holder.learnerId = 'u1'
-  Object.assign(getEnv(), { VOICE_ENABLED: 'true', LLM_PROFILE: 'meta' })
+  Object.assign(getEnv(), { VOICE_ENABLED: 'true', LLM_PROFILE: 'meta', JOB_MODELS: undefined })
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))
   fetchModel.mockReset().mockResolvedValue(Response.json({ transcript: 'one' }))
@@ -85,13 +85,17 @@ function upload(audio = recording(), itemId = 'i1') {
   return { data }
 }
 
-it('transcribes an owned current answer, logs voice, and grades the learner’s edited transcript', async () => {
+it.each([
+  { profile: 'meta' as const, mapping: undefined, url: 'https://llm.example/v1/asr/transcribe' },
+  { profile: 'baseten' as const, mapping: { voice: { provider: 'meta' as const, model: 'muse-voice-transcribe-1.0' } }, url: 'https://api.meta.ai/v1/asr/transcribe' },
+])('transcribes an owned current answer with global profile $profile, logs voice, and grades the edited transcript', async ({ profile, mapping, url }) => {
+  Object.assign(getEnv(), { LLM_PROFILE: profile, JOB_MODELS: mapping })
   expect((await getSession({ data: { sessionId: 's1' } })).voiceEnabled).toBe(true)
   const transcript = await transcribeAnswer(upload())
   expect(transcript).toBe('one')
   expect(fetchModel).toHaveBeenCalledTimes(1)
-  const [url, request] = fetchModel.mock.calls[0] as [string, RequestInit]
-  expect(url).toBe('https://llm.example/v1/asr/transcribe')
+  const [endpoint, request] = fetchModel.mock.calls[0] as [string, RequestInit]
+  expect(endpoint).toBe(url)
   expect(request.method).toBe('POST')
   expect(request.headers).toEqual({ authorization: 'Bearer test-key' })
   const body = request.body as FormData
@@ -111,6 +115,8 @@ it.each([
   { name: 'another learner’s session', status: 404, setup: () => { holder.learnerId = 'u2' } },
   { name: 'disabled flag', status: 404, setup: () => { getEnv().VOICE_ENABLED = 'false' } },
   { name: 'local profile', status: 404, setup: () => { getEnv().LLM_PROFILE = 'ollama' } },
+  { name: 'unsupported voice provider', status: 404, setup: () => { getEnv().JOB_MODELS = { voice: { provider: 'baseten', model: 'muse-voice-transcribe-1.0' } } } },
+  { name: 'text model mapped to voice', status: 404, setup: () => { getEnv().JOB_MODELS = { voice: { provider: 'meta', model: 'muse-spark-1.3' } } } },
   { name: 'ended session', status: 409, setup: () => { raw.exec('UPDATE sessions SET ended_at = 2') } },
   { name: 'answered question', status: 409, setup: () => { raw.exec(`UPDATE sessions SET plan_json = json_set(plan_json, '$.answered', json('true'))`) } },
   { name: 'stale question', status: 409, setup: () => { raw.exec(`UPDATE sessions SET item_ids_json = '["i2"]'`) } },

@@ -15,6 +15,16 @@
     "LLM_BASE_URL": "https://api.meta.ai/v1",
     "LLM_MODEL": "muse-spark-1.3",
     "IMAGE_MODEL": "muse-image-1.0",
+    "JOB_MODELS": {
+      "curriculum": { "provider": "meta", "model": "muse-spark-1.3" },
+      "items": { "provider": "meta", "model": "muse-spark-1.3" },
+      "self_check": { "provider": "meta", "model": "muse-spark-1.3" },
+      "plan": { "provider": "meta", "model": "muse-wonder-1.0" },
+      "grade": { "provider": "meta", "model": "muse-spark-1.3" },
+      "image": { "provider": "meta", "model": "muse-image-1.0" },
+      "voice": { "provider": "meta", "model": "muse-voice-transcribe-1.0" },
+      "placement_line": { "provider": "meta", "model": "muse-spark-1.3" }
+    },
     "VOICE_ENABLED": "false",
     "BETTER_AUTH_URL": "https://learnquiz.com"
   },

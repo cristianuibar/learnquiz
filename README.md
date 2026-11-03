@@ -48,11 +48,14 @@ tokens and estimated USD cost, plus the total. Generated paths, questions and pl
 feedback name the model that wrote them. Traces are private to the learner.
 Topic links and model labels are recorded for newly generated content.
 
-Cost estimates use the configured token price table for Spark 1.3 and a fixed
-$0.01 per successful image generation. Models without a price entry, including
-voice, log a zero cost rather than a provider billing total.
+Cost estimates use the configured token price table for Spark 1.3. Models without
+a known price, including Wonder, Image and voice, record `cost_usd = null` and show
+**Unknown** in the trace. Totals include priced calls only; unpriced calls add no
+monetary charge and still count toward the daily model-call cap. Billing rates and
+units for these models will be added separately.
 
-With `VOICE_ENABLED=true` and `LLM_PROFILE=meta`, text-answer questions offer a
+With `VOICE_ENABLED=true` and the voice job mapped to Meta's Muse Voice Transcribe
+1.0, text-answer questions offer a
 hold-to-talk button. Allow microphone access, hold to speak (up to one minute), then
 release. Edit the transcript before choosing confidence and pressing Check.
 Recordings are converted locally to mono 16-bit 24 kHz WAV and sent to
@@ -110,17 +113,40 @@ model configuration is in `wrangler.jsonc`. Local D1 data is separate from produ
 
 | Setting | Purpose |
 | --- | --- |
-| `LLM_PROFILE`, `LLM_BASE_URL`, `LLM_MODEL` | Provider profile (`meta`, `baseten`, `ollama`), API URL and model identifier |
-| `LLM_API_KEY` | Model API credential; store as a secret |
-| `VOICE_ENABLED` | Enable voice only with the `meta` profile; default `false` |
-| `IMAGE_MODEL` | Model for procedure diagrams; requires the `meta` profile |
+| `JOB_MODELS` | Provider and model for each model job |
+| `LLM_PROFILE`, `LLM_BASE_URL`, `LLM_MODEL` | Legacy defaults for unmapped jobs (`meta`, `baseten`, `fireworks`, `ollama`) |
+| `LLM_API_KEY`, `BASETEN_API_KEY`, `FIREWORKS_API_KEY` | Provider credentials; store as secrets |
+| `VOICE_ENABLED` | Enable the voice job with Meta's transcription model; default `false` |
+| `IMAGE_MODEL` | Legacy model for an unmapped image job |
 | `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET` | App origin and authentication secret |
 | `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET` | Optional Facebook login; both are required |
 
-For an alternative endpoint, set the profile, base URL and model together. The
-`baseten` and `ollama` profiles use OpenAI-compatible `/chat/completions` with JSON
-object output and the schema in the prompt. They require a separately hosted model;
-none is bundled. Voice requires the Meta profile.
+`JOB_MODELS` in `wrangler.jsonc` maps `curriculum`, `items`, `self_check`, `plan`,
+`grade`, `image`, `voice`, and the placement result's `placement_line` to a provider
+and model. For example, set `self_check` to
+`{ "provider": "baseten", "model": "muse-spark-open" }` and supply `BASETEN_API_KEY`
+to use a second model for checking questions. Session planning remains a reserved
+job for the planned coach feature. Only the Meta models listed in
+`src/lib/llm/models.ts` are accepted. Fireworks may prefix a model ID with
+`accounts/fireworks/models/`.
+
+| Provider | Base URL | Secret binding | JSON mode |
+| --- | --- | --- | --- |
+| `meta` | `https://api.meta.ai/v1` | `LLM_API_KEY` | Strict JSON Schema |
+| `baseten` | `https://inference.baseten.co/v1` | `BASETEN_API_KEY` | JSON object with schema in the prompt |
+| `fireworks` | `https://api.fireworks.ai/inference/v1` | `FIREWORKS_API_KEY` | JSON object with schema in the prompt |
+
+All JSON output is validated locally; invalid output gets one retry. Provider and
+network errors fail immediately. Requests, call logs and generated-content labels
+use the job's selected model, including failures and retries.
+
+`.dev.vars` can override `JOB_MODELS` with a JSON string. Unmapped jobs retain
+`LLM_PROFILE` and `LLM_MODEL` (or `IMAGE_MODEL` for images, Muse Voice Transcribe 1.0
+for voice). `LLM_BASE_URL` overrides the URL for `LLM_PROFILE`; that profile may
+also fall back to `LLM_API_KEY` for its secret. For the local edition, set
+`JOB_MODELS={}`, `LLM_PROFILE=ollama`, `LLM_MODEL=muse-glimmer` and point
+`LLM_BASE_URL` at an Ollama or llama.cpp server running Muse Glimmer. Voice and
+image generation switch off; no model server is bundled.
 
 For local staff access, sign up first, then grant that local account the staff role:
 
