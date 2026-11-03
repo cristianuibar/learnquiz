@@ -73,9 +73,10 @@ async function ownedTopic(db: Db, learnerId: string, topicId: string) {
   return topic
 }
 
+// Role topics play stored items graded without a model, so short answers stay out.
 async function storedItems(db: Db, topicId: string, conceptId: string) {
   const rows = await db.select().from(items)
-    .where(and(eq(items.conceptId, conceptId), eq(items.topicId, topicId), eq(items.status, 'active')))
+    .where(and(eq(items.conceptId, conceptId), eq(items.topicId, topicId), eq(items.status, 'active'), ne(items.format, 'short')))
     .orderBy(asc(items.createdAt), asc(items.id))
   return rows.map(asItem)
 }
@@ -264,7 +265,8 @@ export const startSession = createServerFn({ method: 'POST' })
       .select({ id: items.id, conceptId: items.conceptId })
       .from(items)
       .innerJoin(learnerConcept, and(eq(learnerConcept.conceptId, items.conceptId), eq(learnerConcept.learnerId, learnerId)))
-      .where(and(eq(items.topicId, topic.id), eq(items.status, 'active'), gte(learnerConcept.pKnown, CLOSER_MIN), lte(items.difficultyPrior, lt.level)))
+      .where(and(eq(items.topicId, topic.id), eq(items.status, 'active'), gte(learnerConcept.pKnown, CLOSER_MIN), lte(items.difficultyPrior, lt.level),
+        topic.jobRoleId !== null ? ne(items.format, 'short') : undefined))
     const closers = closerRows
       .filter((c) => !taken.has(c.id))
       .sort((a, b) => Number(seen.has(a.id)) - Number(seen.has(b.id)))

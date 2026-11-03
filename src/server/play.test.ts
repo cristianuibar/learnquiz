@@ -659,7 +659,11 @@ describe('employees training on their role topic', () => {
     source_quote: null, grounded: false, bloom: 'apply',
     options: ['a', 'b', 'c'].map((id) => ({ id, text: id, is_correct: id === 'a', feedback: '' })),
   })
-  // Company o1 has a role topic with two units of six stored items; company o2 has an employee with its own role.
+  const short = (n: number) => JSON.stringify({
+    format: 'short', stem: `Explain ${n}.`, accepted_answers: ['because'], model_answer: 'Because.', explanation: 'Because.', difficulty: 1 + (n % 5),
+    source_quote: null, grounded: false, bloom: 'apply', options: [],
+  })
+  // Company o1 has a role topic with two units of six stored mcq and six short items; company o2 has an employee with its own role.
   const seedRoleTopic = (itemsPerConcept: number) => {
     const org = raw.prepare('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, ?)')
     const member = raw.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, ?)')
@@ -678,7 +682,10 @@ describe('employees training on their role topic', () => {
     for (const u of [0, 1]) {
       raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run(`ru${u}`, 'rt', u, `Unit ${u}`)
       raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)').run(`rc${u}`, 'rt', `ru${u}`, 0, `Concept ${u}`, '')
-      for (let i = 0; i < itemsPerConcept; i++) item.run(`ri${u}-${i}`, `rc${u}`, 'rt', 'mcq', mcq(i), 1 + (i % 5), i)
+      for (let i = 0; i < itemsPerConcept; i++) {
+        item.run(`ri${u}-${i}`, `rc${u}`, 'rt', 'mcq', mcq(i), 1 + (i % 5), i)
+        item.run(`rs${u}-${i}`, `rc${u}`, 'rt', 'short', short(i), 1 + (i % 5), i)
+      }
     }
   }
   const count = (table: string) => scalar(raw, `SELECT COUNT(*) AS n FROM ${table}`).n
