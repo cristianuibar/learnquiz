@@ -16,6 +16,7 @@ import { ThemeProvider } from '@/theme/ThemeProvider'
 import { SessionProvider, useSession } from '@/lib/session-store'
 import { holdTarget, takeHeldTarget } from '@/lib/held-target'
 import { canOpenTarget, targetFromURL } from '@/lib/route-gates'
+import { useNotificationObserver } from '@/lib/notification-observer'
 
 SplashScreen.preventAutoHideAsync()
 
@@ -51,6 +52,7 @@ function SessionRoutes({ fontsLoaded }: { fontsLoaded: boolean }) {
   const lastURL = useRef<string | null>(null)
   const mounted = useRef(false)
   const resolved = fontsLoaded && session.status !== 'loading'
+  useNotificationObserver(resolved && session.status === 'ready' && !session.needsDisclosure)
 
   useEffect(() => {
     if (url && url !== lastURL.current) {
