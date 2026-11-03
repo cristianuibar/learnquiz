@@ -90,7 +90,10 @@ async function renderPlay(voiceEnabled: boolean | null = true, permissionPending
   } }
 }
 // happy-dom's :disabled ignores a disabled ancestor fieldset, which browsers honour.
-const locked = (el: HTMLElement) => (el as HTMLInputElement).disabled || Boolean(el.closest('fieldset')?.disabled)
+const locked = (el: HTMLElement): boolean => {
+  const fieldset = el.parentElement?.closest('fieldset')
+  return (el as HTMLInputElement).disabled || Boolean(fieldset && (fieldset.disabled || locked(fieldset)))
+}
 const button = (container: HTMLElement, label: string) => [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === label)!
 async function key(container: HTMLElement, type: 'keydown' | 'keyup') {
   await act(async () => button(container, type === 'keydown' ? 'Hold to answer by voice' : 'Release to transcribe')
@@ -455,5 +458,24 @@ it.each([
     vi.mocked(endSession).mockReset().mockResolvedValue({} as never)
     await act(async () => { button(container, 'End session').click() })
     expect(endSession).toHaveBeenCalledWith({ data: { sessionId: 's1' } })
+  } finally { await cleanup() }
+})
+
+it('locks the answer and confidence while a check is in flight, so Try again sends what is shown', async () => {
+  const { container, cleanup } = await renderPlay(false, false, 'mcq')
+  try {
+    let fail!: (err: unknown) => void
+    vi.mocked(answerItem).mockReturnValueOnce(new Promise((_, reject) => { fail = reject }))
+    await pick(container, 'answer', 'b')
+    await pick(container, 'confidence', 'sure')
+    await act(async () => { button(container, 'Check').click() })
+    const optionA = container.querySelector<HTMLInputElement>('input[name="answer"][value="a"]')!
+    const unsure = container.querySelector<HTMLInputElement>('input[name="confidence"][value="unsure"]')!
+    expect(locked(optionA)).toBe(true)
+    expect(locked(unsure)).toBe(true)
+    await act(async () => { fail(new TypeError('Failed to fetch')) })
+    expect(locked(optionA)).toBe(false)
+    await act(async () => { button(container, 'Try again').click() })
+    expect(answerItem).toHaveBeenLastCalledWith({ data: expect.objectContaining({ answer: { optionId: 'b' }, confidence: 'sure' }) })
   } finally { await cleanup() }
 })

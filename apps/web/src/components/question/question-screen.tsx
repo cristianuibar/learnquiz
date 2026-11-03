@@ -64,6 +64,8 @@ export function QuestionScreen({
 }) {
   const Body = FORMATS[props.item.format] ?? UnsupportedQuestion
   const answerable = Body !== UnsupportedQuestion
+  // Locked while a check is in flight, so Try again resubmits exactly the answer on screen.
+  const locked = loading || props.busy
   return (
     <>
       <form
@@ -77,7 +79,7 @@ export function QuestionScreen({
         <h1 ref={headingRef} tabIndex={-1} className="text-title-2 text-ink">
           {props.item.stem}
         </h1>
-        <fieldset disabled={loading} aria-busy={loading} className="flex min-w-0 flex-col gap-6">
+        <fieldset disabled={locked} aria-busy={locked} className="flex min-w-0 flex-col gap-6">
           <Body {...props} />
         </fieldset>
       </form>
@@ -87,7 +89,7 @@ export function QuestionScreen({
         </div>
       )}
       {answerable && (
-        <QuestionDock confidence={confidence} onConfidence={onConfidence} locked={loading} canCheck={canCheck} failed={Boolean(error)} onRetry={error?.retry ?? onCheck} />
+        <QuestionDock confidence={confidence} onConfidence={onConfidence} locked={locked} canCheck={canCheck} failed={Boolean(error)} onRetry={error?.retry ?? onCheck} />
       )}
     </>
   )
