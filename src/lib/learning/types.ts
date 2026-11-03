@@ -62,6 +62,7 @@ export type SummaryView = {
   durationMs: number
   correct: number
   total: number
+  ungraded: number // answers shown the model answer because grading failed
   xp: number
   streak: number
   level: number | null // placement result, or the current level

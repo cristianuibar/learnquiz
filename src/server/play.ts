@@ -32,7 +32,7 @@ type Stmt = Parameters<Db['batch']>[0][number]
 
 // planJson. position indexes itemIdsJson; answered gates answerItem (once per slot) and nextItem (only after an answer).
 // answerClaim marks a slot being graded (see answerItem).
-type Plan = { position: number; answered: boolean; lastAttemptId?: string; answerClaim?: { token: string; at: number } }
+type Plan = { position: number; answered: boolean; lastAttemptId?: string; answerClaim?: { token: string; at: number }; ungraded?: number }
 type PlacementPlan = Plan & {
   workingLevel: number
   log: { itemId: string; correct: boolean; confidence: Confidence; level: number }[]
@@ -521,7 +521,7 @@ export const answerItem = createServerFn({ method: 'POST' })
         // Advance without recording a wrong answer or changing mastery, scheduling or XP.
         const [kept] = await db
           .update(sessions)
-          .set({ planJson: JSON.stringify({ ...plan, answered: true, lastAttemptId: undefined }) })
+          .set({ planJson: JSON.stringify({ ...plan, answered: true, lastAttemptId: undefined, ungraded: (plan.ungraded ?? 0) + 1 }) })
           .where(claimHeld)
           .returning({ id: sessions.id })
         if (!kept) throw await dropped()
@@ -875,6 +875,7 @@ async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: 
     durationMs: (session.endedAt ?? Date.now()) - session.startedAt,
     correct: session.correctCount,
     total,
+    ungraded: plan.ungraded ?? 0,
     xp: session.xp,
     streak: lt.streakCount,
     level: lt.level,
