@@ -1,9 +1,11 @@
-import { act, renderRouter, screen } from 'expo-router/testing-library'
+import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 import { router } from 'expo-router'
 import * as SecureStore from 'expo-secure-store'
 import { todayFixtures } from '@learnquiz/api/today'
-import { acceptInvitation, getToken, signIn } from './lib/auth'
+import { acceptInvitation, getToken, signIn, signOut } from './lib/auth'
+import { holdTarget, peekHeldTarget } from './lib/held-target'
 import { setJSON } from './lib/kv'
+import { tokenFingerprint } from './lib/token-fingerprint'
 
 // The real root layout, session store, auth, kv, Today hook and Today cache.
 // Every useSession() call is recorded with the bearer that was live at that moment.
@@ -43,6 +45,7 @@ jest.mock('expo-sqlite/kv-store', () => {
     getAllKeysAsync: async () => [...values.keys()],
   } }
 })
+jest.mock('expo-image', () => ({ Image: () => null }))
 jest.mock('@expo-google-fonts/inter', () => ({ useFonts: () => [true, null] }))
 jest.mock('expo-splash-screen', () => ({ preventAutoHideAsync: jest.fn(), hideAsync: jest.fn() }))
 jest.mock('expo-notifications', () => ({
@@ -165,4 +168,50 @@ test("a late /session answer for A's old token after B's sign-in is ignored", as
   expect(underBo().length).toBeGreaterThan(0)
   expect(leaked()).toEqual([])
   expect(SecureStore.deleteItemAsync).not.toHaveBeenCalledWith('lq.token')
+})
+
+test('sign-in with a held unit while B\'s /session stalls: loading shows nothing signed in, then one replace opens the unit', async () => {
+  const forBo = deferred()
+  routes = {
+    '/api/v1/session': (bearer) => (bearer === 'token-b' ? forBo.promise : new Promise(() => {})),
+    '/api/v1/branding': async () => response({ data: null }),
+    '/api/auth/sign-in/email': async () => response({ data: {}, token: 'token-b' }),
+  }
+  // Signed out, with Ana's saved session and Today cache left on the phone (a cleanup that failed).
+  await signOut()
+  const day = new Date().toISOString().slice(0, 10)
+  await setJSON('lq:session', { owner: tokenFingerprint('token-a'), user: ana, needsDisclosure: false, branding: null })
+  await setJSON('lq:today:user-a', { userId: 'user-a', day, branding: null,
+    today: { ...todayFixtures.normal, topic: { ...todayFixtures.normal.topic!, title: "Ana's private topic" } } })
+
+  const navigation = renderRouter('src/app', { initialUrl: '/sign-in' })
+  await navigation
+  expect(await screen.findByRole('header', { name: 'Sign in' })).toBeOnTheScreen()
+  await fireEvent.changeText(screen.getByLabelText('Email'), 'bo@example.com')
+  await fireEvent.changeText(screen.getByLabelText('Password'), 'password')
+  holdTarget('/unit/u1')
+  const replace = jest.spyOn(router, 'replace')
+  await fireEvent.press(screen.getByRole('button', { name: 'Sign in' }))
+  await flush()
+
+  // Loading for Bo's bearer: no signed-in screen, nothing of Ana's, no navigation yet.
+  expect(getToken()).toBe('token-b')
+  expect(mockSeen.at(-1)).toMatchObject({ status: 'loading', userId: null, token: 'token-b' })
+  expect(underBo().length).toBeGreaterThan(0)
+  expect(leaked()).toEqual([])
+  expect(navigation.getPathname()).toBe('/')
+  for (const text of ['Unit', 'Training progress', 'Ana', "today:Ana's private topic"]) expect(screen.queryByText(text)).toBeNull()
+  expect(screen.queryByRole('header', { name: 'Sign in' })).toBeNull()
+  expect(replace).not.toHaveBeenCalled()
+  expect(peekHeldTarget()).toBe('/unit/u1')
+
+  await act(async () => { forBo.resolve({ data: { user: bo, needsDisclosure: false } }) })
+  await flush()
+  expect(navigation.getPathname()).toBe('/unit/u1')
+  expect(screen.getByText('Unit')).toBeOnTheScreen()
+  expect(replace.mock.calls.map(([target]) => target)).toEqual(['/unit/u1'])
+  expect(peekHeldTarget()).toBeNull()
+  expect(mockSeen.at(-1)).toMatchObject({ status: 'ready', userId: 'user-b', token: 'token-b' })
+  expect(leaked()).toEqual([])
+  replace.mockRestore()
 })
