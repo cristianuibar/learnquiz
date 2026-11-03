@@ -74,6 +74,8 @@ export function toItemView(
     format: item.format,
     stem: item.payload.stem,
     options,
+    blank: item.format === 'cloze' ? { numeric: item.payload.accepted_answers.every((answer) => /^\d{1,3}$/.test(answer)) } : null,
+    image: null,
     difficulty: item.difficultyPrior,
   }
 }
