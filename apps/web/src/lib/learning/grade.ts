@@ -1,5 +1,5 @@
 import type { ItemPayload } from '@/lib/llm/schemas'
-import type { Answer, Confidence, ItemView, RevealState } from './types'
+import type { Answer, Confidence, ItemView, RevealState } from '@learnquiz/api'
 
 export function normalize(text: string): string {
   return text
