@@ -41,7 +41,7 @@ async function insertRole(orgId: string, data: z.input<typeof Role>) {
   // A role and its single draft topic must be stored together.
   await db.batch([
     db.insert(jobRoles).values({ id, orgId, ...data, createdAt }),
-    db.insert(topics).values({ id: crypto.randomUUID(), jobRoleId: id, title: data.name, status: 'draft', createdAt }),
+    db.insert(topics).values({ id: crypto.randomUUID(), orgId, jobRoleId: id, title: data.name, status: 'draft', createdAt }),
   ])
   return { id }
 }

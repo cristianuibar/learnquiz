@@ -88,7 +88,7 @@ it('creates the first company role with exactly one draft topic', async () => {
   const role = sqlite.prepare('SELECT * FROM job_roles WHERE org_id = ?').get('new-org')!
   expect(role).toMatchObject({ name: 'Support specialist', benchmark: 0.85, onboarding_days: 30 })
   expect(sqlite.prepare('SELECT * FROM topics WHERE title = ?').all('Support specialist')).toEqual([
-    expect.objectContaining({ job_role_id: role.id, learner_id: null, title: 'Support specialist', status: 'draft' }),
+    expect.objectContaining({ org_id: 'new-org', job_role_id: role.id, learner_id: null, title: 'Support specialist', status: 'draft' }),
   ])
 })
 
@@ -97,11 +97,11 @@ it('backfills one draft topic per existing role and preserves personal topics', 
   expect(org.roles).toEqual([
     expect.objectContaining({ id: 'legacy-role', name: 'Original role', benchmark: 0.85, onboardingDays: 30, topicStatus: 'draft' }),
   ])
-  expect(sqlite.prepare('SELECT job_role_id, learner_id, title, status FROM topics WHERE job_role_id IS NOT NULL ORDER BY job_role_id').all()).toEqual([
-    { job_role_id: 'legacy-role', learner_id: null, title: 'Original role', status: 'draft' },
-    { job_role_id: 'other-role', learner_id: null, title: 'Private role', status: 'draft' },
+  expect(sqlite.prepare('SELECT org_id, job_role_id, learner_id, title, status FROM topics WHERE job_role_id IS NOT NULL ORDER BY job_role_id').all()).toEqual([
+    { org_id: 'org-a', job_role_id: 'legacy-role', learner_id: null, title: 'Original role', status: 'draft' },
+    { org_id: 'org-b', job_role_id: 'other-role', learner_id: null, title: 'Private role', status: 'draft' },
   ])
-  expect(sqlite.prepare('SELECT * FROM topics WHERE id = ?').get('personal')).toMatchObject({ learner_id: 'owner', job_role_id: null, title: 'Algebra', status: 'ready', generated_by: 'muse-spark-1.3', created_at: 1 })
+  expect(sqlite.prepare('SELECT * FROM topics WHERE id = ?').get('personal')).toMatchObject({ learner_id: 'owner', org_id: null, job_role_id: null, title: 'Algebra', status: 'ready', generated_by: 'muse-spark-1.3', created_at: 1 })
 })
 
 it.each(['owner', 'admin'])('%s creates and lists roles with defaults or custom targets in their own company', async (id) => {
