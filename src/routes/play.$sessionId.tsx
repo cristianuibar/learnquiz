@@ -101,9 +101,9 @@ function Play({ initial }: { initial: SessionView }) {
   const ready = choice.trim() !== '' && confidence !== null
 
   useEffect(() => {
-    // Writes the next session's questions while this one is played; the open request outlives waitUntil's window.
-    if (initial.kind === 'session') prepare({ data: { sessionId: initial.id } }).catch(() => {})
-  }, [initial.id, initial.kind])
+    // Writes the next session's questions while this one (placement included) is played; the open request outlives waitUntil's window.
+    prepare({ data: { sessionId: initial.id } }).catch(() => {})
+  }, [initial.id])
 
   useEffect(() => {
     questionHeading.current?.focus()

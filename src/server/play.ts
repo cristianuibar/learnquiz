@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, count, eq, exists, getTableColumns, gte, inArray, isNull, lte, ne, or, sql, type SQL } from 'drizzle-orm'
+import { and, asc, count, eq, exists, getTableColumns, gte, inArray, isNull, lt, lte, ne, or, sql, type SQL } from 'drizzle-orm'
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core'
 import { z } from 'zod'
 import { getDb, type Db } from '@/db'
@@ -355,19 +355,23 @@ export const startSession = createServerFn({ method: 'POST' })
   })
 
 // Generates the frontier's items ahead so the next session starts without waiting on the model.
-async function topUpFrontier(db: Db, learnerId: string, topic: TopicRow, reserved: string[]) {
-  const [lt, seenRows, frontier] = await Promise.all([
+async function topUpFrontier(db: Db, learnerId: string, topic: TopicRow, reserved: string[], placing: boolean) {
+  const [{ level }, seenRows, frontier] = await Promise.all([
     loadLearnerTopic(db, learnerId, topic.id),
     db
       .select({ itemId: learnerItem.itemId })
       .from(learnerItem)
       .innerJoin(items, eq(items.id, learnerItem.itemId))
       .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topic.id), eq(items.status, 'active'))),
-    loadFrontier(db, learnerId, topic.id),
+    // The frontier is known only after placement ends, and units 0-1 are always unlocked then.
+    placing
+      ? db.select({ concept: concepts }).from(concepts).innerJoin(units, eq(units.id, concepts.unitId))
+        .where(and(eq(concepts.topicId, topic.id), lt(units.order, 2))).orderBy(asc(units.order), asc(concepts.order)).limit(5)
+      : loadFrontier(db, learnerId, topic.id).then((f) => f.slice(0, 4)),
   ])
   const seen = new Set([...seenRows.map((r) => r.itemId), ...reserved])
-  const targetDifficulty = targetFor(lt.level)
-  await Promise.all(frontier.slice(0, 4).map((f) => ensureConceptItems(db, learnerId, f.concept, topic, { targetDifficulty, unseen: seen })))
+  const targetDifficulty = targetFor(level)
+  await Promise.all(frontier.map((f) => ensureConceptItems(db, learnerId, f.concept, topic, { targetDifficulty, unseen: seen })))
 }
 
 // The play pages call this while the learner plays and keep the request open, so generation is not cut short like waitUntil.
@@ -378,7 +382,7 @@ export const prepareNextSession = createServerFn({ method: 'POST' })
     const db = getDb()
     const { session, topic } = await loadSession(db, learnerId, data.sessionId)
     const reserved = session.kind === 'session' ? (JSON.parse(session.itemIdsJson) as string[]) : []
-    await topUpFrontier(db, learnerId, topic, reserved)
+    await topUpFrontier(db, learnerId, topic, reserved, session.kind === 'placement' && session.endedAt === null)
     return { ok: true as const }
   })
 
