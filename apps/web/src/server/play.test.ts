@@ -900,6 +900,21 @@ it('prepareNextSession also prepares the concepts after the current session\'s f
   expect([...queue].sort()).toEqual([...c5].sort())
 })
 
+it('replays stored role questions early when every one is scheduled ahead and none is due', async () => {
+  seedTopicAndLearner(raw, 0)
+  raw.prepare('INSERT INTO user (id, name, email) VALUES (?, ?, ?)').run('u1', 'Learner', 'learner@example.test')
+  raw.prepare('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, ?)').run('org-a', 'Alpha', 'alpha', 1)
+  raw.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, ?)').run('m1', 'org-a', 'u1', 'member', 1)
+  raw.prepare('INSERT INTO job_roles (id, org_id, name, benchmark, created_at) VALUES (?, ?, ?, ?, ?)').run('role', 'org-a', 'Analyst', 0.5, 1)
+  raw.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES (?, ?, ?, ?)').run('u1', 'org-a', 'role', 1)
+  raw.prepare('UPDATE topics SET learner_id = NULL, job_role_id = ? WHERE id = ?').run('role', 't1')
+  seedFrontier(raw, 1, false)
+  raw.prepare('INSERT INTO learner_concept (learner_id, concept_id, p_known, n_attempts, updated_at) VALUES (?, ?, ?, ?, ?)').run('u1', 'c1', 0.4, 1, 1)
+
+  const { sessionId } = await startSession({ data: { topicId: 't1' } })
+  expect(JSON.parse(scalar(raw, 'SELECT item_ids_json AS ids FROM sessions WHERE id = ?', sessionId).ids as string)).toEqual(['i1'])
+})
+
 it('refuses prepareNextSession for another learner\'s session', async () => {
   seedTopicAndLearner(raw, 0)
   raw.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, started_at) VALUES (?, ?, ?, ?, ?)').run('s1', 'u1', 't1', 'session', 1)
