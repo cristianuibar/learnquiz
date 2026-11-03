@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { renderSVG } from 'uqr'
 import { RouteError } from '@/components/inline-error'
 import { Button } from '@/components/ui/button'
@@ -140,7 +140,12 @@ function People() {
           {org.members.map((m) => (
             <li key={m.id} className="rounded-lg border p-4">
               <p className="font-medium">
-                {m.name} <span className="font-normal text-muted-foreground">{m.email}</span>
+                {org.readOnly ? m.name : (
+                  <Link to="/org/$slug/people/$id" params={{ slug: org.slug, id: m.userId }} className="inline-flex min-h-11 items-center text-primary underline focus-visible:outline-2">
+                    {m.name}
+                  </Link>
+                )}{' '}
+                <span className="font-normal text-muted-foreground">{m.email}</span>
               </p>
               <p className="text-sm">{[m.role, m.jobRole].filter(Boolean).join(' · ')}</p>
               {m.training && (
