@@ -336,7 +336,11 @@ test('pushStatus contains storage and permission errors', async () => {
 })
 
 const originalFetch = globalThis.fetch
-afterEach(() => { globalThis.fetch = originalFetch })
+afterEach(() => {
+  globalThis.fetch = originalFetch
+  jest.useRealTimers()
+  jest.restoreAllMocks()
+})
 
 function authHarness(marker: unknown = true) {
   jest.resetModules()
@@ -364,7 +368,7 @@ function authHarness(marker: unknown = true) {
     setNotificationChannelAsync: jest.fn(async () => null),
     requestPermissionsAsync: jest.fn(async () => ({ status: 'granted' })),
     getPermissionsAsync: jest.fn(async () => ({ status: 'granted' })),
-    getExpoPushTokenAsync: jest.fn(async () => ({ data: 'ExponentPushToken[abc]' })),
+    getExpoPushTokenAsync: jest.fn(async (): Promise<{ data: unknown }> => ({ data: 'ExponentPushToken[abc]' })),
   }
   jest.doMock('expo-secure-store', () => secure)
   jest.doMock('./kv', () => ({ ...store, clearPrefix }))
@@ -394,12 +398,16 @@ async function flush() { for (let i = 0; i < 60; i++) await Promise.resolve() }
 
 test('real signOut unregisters a restored token with its bearer before clearing it', async () => {
   const s = authHarness()
+  const api = jest.spyOn(s.client, 'api')
   await s.auth.loadToken()
   await s.auth.signOut()
   const [url, init] = s.fetch.mock.calls[0]
   expect(url).toMatch(/\/api\/v1\/push\/expo$/)
   expect(init).toMatchObject({ method: 'DELETE', headers: { Authorization: 'Bearer bearer' } })
   expect(JSON.parse(init.body as string)).toEqual({ endpoint: 'ExponentPushToken[abc]' })
+  expect(api).toHaveBeenCalledWith('/push/expo', {
+    method: 'DELETE', body: { endpoint: 'ExponentPushToken[abc]' }, timeoutMs: 5_000,
+  })
   expect(s.events.indexOf('DELETE')).toBeLessThan(s.events.indexOf('clear:lq.push-token'))
   expect(s.events.indexOf('clear:lq.push-token')).toBeLessThan(s.events.indexOf('POST'))
   expect(s.auth.getToken()).toBeNull()
@@ -431,6 +439,7 @@ test('a registration 401 cannot deadlock cleanup or restore its pending marker',
 
 test('auth startup wires foreground retry after restart without requesting permission', async () => {
   const s = authHarness({ pending: true })
+  const api = jest.spyOn(s.client, 'api')
   await s.auth.loadToken()
   expect(s.source.addEventListener).toHaveBeenCalledWith('change', expect.any(Function))
   expect(s.notifications.requestPermissionsAsync).not.toHaveBeenCalled()
@@ -442,8 +451,25 @@ test('auth startup wires foreground retry after restart without requesting permi
   await flush()
   expect(s.fetch).toHaveBeenCalledTimes(1)
   expect(s.fetch.mock.calls[0][1]).toMatchObject({ method: 'PUT', headers: { Authorization: 'Bearer bearer' } })
+  expect(s.fetch.mock.calls[0][0]).toMatch(/\/api\/v1\/push\/expo$/)
+  const body = { token: 'ExponentPushToken[abc]', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC' }
+  expect(JSON.parse(s.fetch.mock.calls[0][1].body as string)).toEqual(body)
+  expect(api).toHaveBeenCalledWith('/push/expo', { method: 'PUT', body, timeoutMs: 5_000 })
   expect(s.store.data.get(PUSH_TOKEN_KEY)).toBe(true)
   expect(s.notifications.requestPermissionsAsync).not.toHaveBeenCalled()
+})
+
+test('enable sends the real PUT payload with a five-second API timeout', async () => {
+  const s = authHarness(null)
+  s.secure.data.delete('lq.push-token')
+  const api = jest.spyOn(s.client, 'api')
+  await s.auth.loadToken()
+  await expect(s.push.enablePush()).resolves.toBe('granted')
+  const body = { token: 'ExponentPushToken[abc]', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC' }
+  expect(api).toHaveBeenCalledWith('/push/expo', { method: 'PUT', body, timeoutMs: 5_000 })
+  expect(s.fetch.mock.calls[0][0]).toMatch(/\/api\/v1\/push\/expo$/)
+  expect(s.fetch.mock.calls[0][1]).toMatchObject({ method: 'PUT', headers: { Authorization: 'Bearer bearer' } })
+  expect(JSON.parse(s.fetch.mock.calls[0][1].body as string)).toEqual(body)
 })
 
 test('late failed registration cannot restore a marker after logout', async () => {
@@ -504,4 +530,85 @@ test('signOut still clears local credentials if DELETE returns 401', async () =>
   expect(s.auth.getToken()).toBeNull()
   expect(s.secure.data.size).toBe(0)
   expect(s.store.data.has(PUSH_TOKEN_KEY)).toBe(false)
+})
+
+test.each(['rejects', 'returns no token'])('foreground recovers after granted token lookup %s', async (failure) => {
+  const s = authHarness(null)
+  s.secure.data.delete('lq.push-token')
+  await s.auth.loadToken()
+  if (failure === 'rejects') s.notifications.getExpoPushTokenAsync.mockRejectedValueOnce(new Error('FCM unavailable'))
+  else s.notifications.getExpoPushTokenAsync.mockResolvedValueOnce({ data: null })
+  await expect(s.push.enablePush()).resolves.toBe('unavailable')
+  expect(await readPromptCounts(s.store)).toMatchObject({ registered: true })
+  s.foreground('active')
+  await flush()
+  expect(s.notifications.getExpoPushTokenAsync).toHaveBeenCalledTimes(2)
+  expect(s.notifications.requestPermissionsAsync).toHaveBeenCalledTimes(1)
+  expect(s.fetch).toHaveBeenCalledTimes(1)
+  expect(s.fetch.mock.calls[0][1].method).toBe('PUT')
+  expect(s.store.data.get(PUSH_TOKEN_KEY)).toBe(true)
+  expect(s.secure.data.get('lq.push-token')).toBe('ExponentPushToken[abc]')
+})
+
+test('foreground token recovery stops after three failed attempts, including after restart', async () => {
+  const s = setup()
+  s.notifications.getExpoPushTokenAsync.mockRejectedValue(new Error('FCM unavailable'))
+  await s.push.enablePush(s.deps)
+  let active!: (state: string) => void
+  const source = { addEventListener: (_event: string, listener: (state: string) => void) => {
+    active = listener
+    return { remove: jest.fn() }
+  } }
+  s.push.observePushForeground(source, s.deps)
+  for (let i = 0; i < 5; i++) { active('active'); await flush() }
+  expect(s.notifications.getExpoPushTokenAsync).toHaveBeenCalledTimes(4)
+  expect(s.putExpoToken).not.toHaveBeenCalled()
+  expect(await readPromptCounts(s.store)).toMatchObject({ registered: true })
+  const restarted = setup({ storeInitial: Object.fromEntries(s.store.data) })
+  await expect(restarted.push.retryPendingPush(restarted.deps)).resolves.toBe('idle')
+  expect(restarted.notifications.getExpoPushTokenAsync).not.toHaveBeenCalled()
+})
+
+test('a foreground event with a confirmed marker never PUTs again', async () => {
+  const s = authHarness(true)
+  await s.auth.loadToken()
+  s.foreground('active')
+  await flush()
+  expect(s.fetch).not.toHaveBeenCalled()
+  expect(s.notifications.getExpoPushTokenAsync).not.toHaveBeenCalled()
+  expect(s.store.data.get(PUSH_TOKEN_KEY)).toBe(true)
+})
+
+test('enable deadline stops native work but keeps a late permission grant for recovery', async () => {
+  jest.useFakeTimers()
+  const s = setup()
+  let finishPermission!: (value: { status: string }) => void
+  s.notifications.requestPermissionsAsync.mockImplementationOnce(() => new Promise((resolve) => { finishPermission = resolve }))
+  const enabling = s.push.enablePush(s.deps)
+  await flush()
+  await jest.advanceTimersByTimeAsync(15_000)
+  await expect(enabling).resolves.toBe('unavailable')
+  finishPermission({ status: 'granted' })
+  await flush()
+  expect(s.notifications.getExpoPushTokenAsync).not.toHaveBeenCalled()
+  expect(s.putExpoToken).not.toHaveBeenCalled()
+  expect(s.store.data.get(PUSH_TOKEN_KEY)).toEqual({ pending: true })
+})
+
+test('signOut can unregister after 401 cleanup and reauthentication', async () => {
+  const s = authHarness()
+  await s.auth.loadToken()
+  s.fetch.mockImplementation(async () => jsonResponse(401, { error: 'Expired' }))
+  await expect(s.client.api('/today')).rejects.toMatchObject({ status: 401 })
+  expect(s.secure.data.size).toBe(0)
+  expect(s.store.data.has(PUSH_TOKEN_KEY)).toBe(false)
+  s.fetch.mockImplementation(async () => jsonResponse(200, { token: 'renewed-bearer' }))
+  await s.auth.signIn('learner@example.com', 'password')
+  await s.auth.signOut()
+  const deletion = s.fetch.mock.calls.find(([, init]) => init.method === 'DELETE')
+  expect(deletion).toBeDefined()
+  expect(deletion![0]).toMatch(/\/api\/v1\/push\/expo$/)
+  expect(deletion![1].headers).toMatchObject({ Authorization: 'Bearer renewed-bearer' })
+  expect(JSON.parse(deletion![1].body as string)).toEqual({ endpoint: 'ExponentPushToken[abc]' })
+  expect(s.secure.data.size).toBe(0)
 })
