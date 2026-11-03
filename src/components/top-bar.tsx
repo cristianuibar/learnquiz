@@ -2,7 +2,7 @@ import { Link } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 
 // Signed-in accounts sign out from /me; guests and visitors get a way to sign in.
-export function TopBar({ signIn, branding, home = '/' }: { signIn: boolean; branding?: { name: string; logoUrl: string | null } | null; home?: '/' | '/start' }) {
+export function TopBar({ signIn, branding, home = '/' }: { signIn: boolean; branding?: { name: string; logoUrl: string | null } | null; home?: '/' | '/today' }) {
   return (
     <header className="mx-auto flex h-16 w-full max-w-3xl items-center justify-between px-4">
       <Link
