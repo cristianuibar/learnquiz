@@ -11,6 +11,10 @@ export async function sendPush(db: Db, subscription: typeof pushSubscriptions.$i
   // Check at delivery time as well as selection time so a queued push respects a pause.
   const [prefs] = await db.select().from(pushPrefs).where(eq(pushPrefs.userId, subscription.userId))
   if (!prefs?.enabled || prefs.paused) return { outcome: 'skipped', status: null }
+  // A device can move to another account after selection; never send this account's question to it.
+  const [current] = await db.select({ id: pushSubscriptions.id }).from(pushSubscriptions).where(and(eq(pushSubscriptions.id, subscription.id),
+    eq(pushSubscriptions.userId, subscription.userId), eq(pushSubscriptions.endpoint, subscription.endpoint)))
+  if (!current) return { outcome: 'skipped', status: null }
   // The same window the scheduler selects with, so the two cannot disagree.
   if (!inWindow(effectiveWindow((await pushContext(db, subscription.userId)).company, prefs), Date.now())) return { outcome: 'skipped', status: null }
   const id = crypto.randomUUID()

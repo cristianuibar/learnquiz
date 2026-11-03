@@ -522,3 +522,16 @@ it('delivers in the company window when the learner kept personal UTC hours from
   expect(pushLogRows()).toEqual([{ item_id: 'i-old', outcome: 'accepted' }, { item_id: 'i-old', outcome: 'accepted' }])
   expect(http).toHaveBeenCalledTimes(2)
 })
+
+it('does not send the question to a device that moved to another account during the run', async () => {
+  await seedLearner()
+  // The shared phone is registered by another account while the web push is in flight.
+  http.mockImplementation(async (input) => {
+    if (String(input) === expoUrl) return Response.json({ data: { status: 'ok' } })
+    raw.prepare('UPDATE push_subscriptions SET user_id = ? WHERE endpoint = ?').run('staff', token)
+    return new Response(null, { status: 201 })
+  })
+  expect(await sendDuePushes(Date.now(), holder.db as Db)).toBe(1)
+  expect(http.mock.calls.map(([destination]) => String(destination))).toEqual([endpoint])
+  expect(rows("SELECT user_id, item_id FROM push_log WHERE item_id = 'i-old'")).toEqual([{ user_id: 'learner', item_id: 'i-old' }])
+})
