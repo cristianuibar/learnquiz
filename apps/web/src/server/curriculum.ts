@@ -15,7 +15,7 @@ import { requireOrgAdmin } from '@/server/authz'
 import { requireLearnerId } from '@/server/session'
 import { drainConceptQueue } from '@/server/concept-gen'
 import { runInBackground } from '@/server/env'
-import { learnerCanAccess, rolePlayable, roleCompany, seedLearnerTopic } from '@/server/topic-access'
+import { learnerCanAccess, notFlaggedBy, rolePlayable, roleCompany, seedLearnerTopic } from '@/server/topic-access'
 import { buildRoleCurriculum, curriculumWrites } from '@/server/role-curriculum'
 
 export const createTopic = createServerFn({ method: 'POST' })
@@ -143,7 +143,7 @@ export const getTopicPath = createServerFn({ method: 'GET' })
       db
         .select({ conceptId: items.conceptId, n: count() })
         .from(items)
-        .where(and(eq(items.topicId, topic.id), eq(items.status, 'active')))
+        .where(and(eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId)))
         .groupBy(items.conceptId),
       db
         .select({ conceptId: learnerConcept.conceptId, pKnown: learnerConcept.pKnown, nAttempts: learnerConcept.nAttempts })
@@ -218,7 +218,7 @@ export const getConceptItems = createServerFn({ method: 'GET' })
       .from(items)
       .innerJoin(topics, eq(topics.id, items.topicId))
       .innerJoin(learnerItem, and(eq(learnerItem.itemId, items.id), eq(learnerItem.learnerId, learnerId)))
-      .where(and(eq(items.conceptId, data.conceptId), eq(items.status, 'active'), learnerCanAccess(db, learnerId)))
+      .where(and(eq(items.conceptId, data.conceptId), eq(items.status, 'active'), notFlaggedBy(db, learnerId), learnerCanAccess(db, learnerId)))
       .orderBy(desc(items.createdAt))
     return { items: rows.map((r) => asItem(r.item)) }
   })

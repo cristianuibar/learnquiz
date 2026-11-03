@@ -1,14 +1,19 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, desc, eq, inArray, ne } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, ne } from 'drizzle-orm'
+import { reportReasons } from '@learnquiz/api/reveal'
 import { z } from 'zod'
 import { getDb, type Db } from '@/db'
-import { concepts, items, jobRoles, sources, topics } from '@/db/schema'
+import { concepts, itemFlags, items, jobRoles, sources, topics } from '@/db/schema'
 import { findSourceQuote } from '@/lib/curriculum/validate'
 import { ENABLED_FORMATS } from '@/lib/llm/prompts'
 import { ItemPayload } from '@/lib/llm/schemas'
 import { requireOrgAdmin } from '@/server/authz'
 import { httpError } from '@/server/helpers'
 
+const reasonLabels: Record<string, string> = {
+  ...Object.fromEntries(reportReasons.map((r) => [r.code, r.label])),
+  'unfair-result': 'The result seems unfair',
+}
 const Slug = z.string().min(1).max(100)
 const companyRoleIds = (db: Db, orgId: string) =>
   db.select({ id: jobRoles.id }).from(jobRoles).where(eq(jobRoles.orgId, orgId))
@@ -29,10 +34,15 @@ export const getQuestionReview = createServerFn({ method: 'GET' })
         .where(inArray(concepts.topicId, scope)).orderBy(asc(concepts.unitId), asc(concepts.order)),
       db.select().from(items).where(inArray(items.topicId, scope)).orderBy(desc(items.createdAt)),
     ])
+    const itemScope = db.select({ id: items.id }).from(items).where(inArray(items.topicId, scope))
+    const flagRows = await db.select().from(itemFlags)
+      .where(and(inArray(itemFlags.itemId, itemScope), isNull(itemFlags.resolvedAt))).orderBy(desc(itemFlags.createdAt))
     return {
       name: org.name, topics: topicRows, topic,
       concepts: conceptRows.map((c) => ({ ...c, questions: itemRows.filter((i) => i.conceptId === c.id)
-        .map((i) => ({ id: i.id, status: i.status, reviewedBy: i.reviewedBy, reviewedAt: i.reviewedAt, payload: JSON.parse(i.payloadJson) as ItemPayload })) })),
+        .map((i) => ({ id: i.id, status: i.status, reviewedBy: i.reviewedBy, reviewedAt: i.reviewedAt,
+          flags: flagRows.filter((f) => f.itemId === i.id).map((f) => ({ reason: f.reason, label: reasonLabels[f.reason] ?? f.reason, note: f.note, createdAt: f.createdAt })),
+          payload: JSON.parse(i.payloadJson) as ItemPayload })) })),
     }
   })
 
@@ -70,8 +80,14 @@ export const reviewQuestion = createServerFn({ method: 'POST' })
     } else {
       changes = { status: 'retired' }
     }
-    const done = await db.update(items).set(changes)
+    const update = db.update(items).set(changes)
       .where(and(scope, data.action === 'approve' ? ne(items.status, 'retired') : undefined)).returning({ id: items.id })
+    // D1 has no transactions: approving and resolving the item's open flags go in one batch.
+    const [done] = data.action === 'approve'
+      ? await db.batch([update, db.update(itemFlags).set({ resolvedAt: Date.now() })
+        .where(and(eq(itemFlags.itemId, data.itemId), isNull(itemFlags.resolvedAt),
+          inArray(itemFlags.itemId, db.select({ id: items.id }).from(items).where(and(eq(items.id, data.itemId), ne(items.status, 'retired'))))))])
+      : [await update]
     if (!done.length) throw httpError('Question is no longer available', 409)
     return { ok: true }
   })

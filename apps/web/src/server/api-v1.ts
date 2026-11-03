@@ -1,5 +1,6 @@
 import { getConceptItems, getTopicPath } from '@/server/curriculum'
 import { generateConceptDiagram } from '@/server/diagrams'
+import { flagResult } from '@/server/flags'
 import { getInvite } from '@/server/org'
 import { getCompanyBranding } from '@/server/org-settings'
 import { answerItem, endSession, getSession, nextItem, reportItem, startMiniSession, startPlacement, startSession } from '@/server/play'
@@ -33,6 +34,7 @@ export const v1Routes: V1Route[] = [
   { method: 'POST', pattern: '/concepts/:conceptId/diagram', fn: generateConceptDiagram },
   { method: 'GET', pattern: '/topics/:topicId/path', fn: getTopicPath },
   { method: 'GET', pattern: '/concepts/:conceptId/items', fn: getConceptItems },
+  { method: 'POST', pattern: '/me/result-flags', fn: flagResult },
   // Always the caller's own profile: a learner can never read another learner's profile through this API.
   { method: 'GET', pattern: '/me/profile', fn: () => getProfile({ data: {} }) },
   { method: 'GET', pattern: '/push/settings', fn: getPushSettings },
