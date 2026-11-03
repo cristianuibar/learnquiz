@@ -447,6 +447,7 @@ it.each([
   { name: 'there is no subscription', prepare: () => raw.exec('DELETE FROM push_subscriptions') },
   { name: 'pushes are paused', prepare: () => raw.exec('UPDATE push_prefs SET paused = 1') },
   { name: 'pushes are disabled', prepare: () => raw.exec('UPDATE push_prefs SET enabled = 0') },
+  { name: 'the account is banned', prepare: () => raw.exec("UPDATE user SET banned = 1 WHERE id = 'learner'") },
   { name: 'it is after the window', prepare: () => vi.setSystemTime(new Date('2026-11-02T18:00:00Z')) },
   { name: 'it is before the window', prepare: () => vi.setSystemTime(new Date('2026-11-02T08:00:00Z')) },
   { name: 'it is a non-working day', prepare: () => vi.setSystemTime(new Date('2026-11-07T12:00:00Z')) },

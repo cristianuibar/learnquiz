@@ -1,5 +1,6 @@
-import { and, eq, exists, sql } from 'drizzle-orm'
+import { and, eq, exists, notExists, sql } from 'drizzle-orm'
 import { getDb, type Db } from '@/db'
+import { user } from '@/db/auth-schema'
 import { pushLog, pushPrefs, pushSubscriptions } from '@/db/schema'
 import { getEnv } from '@/server/env'
 import { capPolicy, effectiveWindow, inWindow, pushContext } from './window'
@@ -22,7 +23,10 @@ export async function sendDuePushes(now: number, db: Db = getDb()) {
   const config = env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_SUBJECT
     ? { publicKey: env.VAPID_PUBLIC_KEY, privateKey: env.VAPID_PRIVATE_KEY, subject: env.VAPID_SUBJECT } : null
   const learners = await db.select().from(pushPrefs)
-    .where(and(eq(pushPrefs.enabled, true), eq(pushPrefs.paused, false), exists(db.select({ id: pushSubscriptions.id }).from(pushSubscriptions).where(eq(pushSubscriptions.userId, pushPrefs.userId)))))
+    .where(and(eq(pushPrefs.enabled, true), eq(pushPrefs.paused, false),
+      exists(db.select({ id: pushSubscriptions.id }).from(pushSubscriptions).where(eq(pushSubscriptions.userId, pushPrefs.userId))),
+      // Banned accounts keep their subscriptions but must not receive question text.
+      notExists(db.select({ id: user.id }).from(user).where(and(eq(user.id, pushPrefs.userId), eq(user.banned, true))))))
   let sent = 0
   for (const prefs of learners) {
     try {
