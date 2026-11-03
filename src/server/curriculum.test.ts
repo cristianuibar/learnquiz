@@ -3,6 +3,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { concepts } from '@/db/schema'
+import { ACCOUNT_DAILY_MODEL_CALL_CAP } from '@/lib/limits'
 import * as curriculum from './curriculum'
 
 // Keep the handlers, validation, authorization, model client and database real.
@@ -223,7 +224,7 @@ it.each([
 
 it('refuses generation at the daily cap before changing the role topic', async () => {
   const log = raw.prepare("INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, created_at) VALUES (?, 'owner', 'curriculum', 'muse-spark-1.3', 0, 1, ?)")
-  for (let i = 0; i < 20; i++) log.run(`call-${i}`, Date.now())
+  for (let i = 0; i < ACCOUNT_DAILY_MODEL_CALL_CAP; i++) log.run(`call-${i}`, Date.now())
   await expect(generate()).rejects.toMatchObject({ status: 429 })
   expect(topicState()).toEqual({ status: 'draft' })
   expect(fetchModel).not.toHaveBeenCalled()

@@ -96,8 +96,11 @@ it.each([0.5, 0.8, 1])('returns and stores a short-answer score of %s with feedb
   expect(JSON.parse(row('SELECT plan_json FROM sessions').plan_json as string).answered).toBe(true)
 })
 
+const PLAIN_FEEDBACK = 'Compare your answer with the model answer. Your learning progress has not changed.'
+
 it.each([
   { name: 'provider failure', response: () => new Response('Unavailable', { status: 503 }), calls: 1 },
+  { name: 'provider rate limit (HTTP 429)', response: () => new Response('Too many', { status: 429 }), calls: 1 },
   { name: 'invalid score after retry', response: () => completion({ score: 2, feedback: 'Incorrect scale', missing_points: [] }), calls: 2 },
   { name: 'network failure', response: () => { throw new TypeError('Failed to fetch') }, calls: 1 },
 ])('reveals neutrally after $name without changing learning progress and allows Continue', async ({ response, calls }) => {
@@ -109,6 +112,7 @@ it.each([
 
   const reveal = await answerItem(request)
 
+  expect(reveal.feedback).toBe(PLAIN_FEEDBACK)
   expect(reveal).toMatchObject({ state: 'ungraded', score: null, attemptId: null, correctAnswer: payload.model_answer, missingPoints: [], mixUps: [], returnsThisSession: false, pKnownBefore: 0.6, pKnownAfter: 0.6 })
   expect(row('SELECT * FROM learner_concept')).toEqual(before)
   expect(row('SELECT * FROM learner_item')).toEqual(scheduleBefore)
@@ -118,14 +122,29 @@ it.each([
   expect((await nextItem({ data: { sessionId: 's1', why: 'my reflection' } })).item?.id).toBe('i2')
 })
 
-it('uses the neutral reveal at the daily cap without calling or logging another model request', async () => {
+it.each([
+  { who: 'guest', anonymous: true, calls: 20, graded: false },
+  { who: 'signed-in learner', anonymous: false, calls: 20, graded: true },
+  { who: 'signed-in learner', anonymous: false, calls: 150, graded: false },
+])('grades a $who with $calls calls today only below their daily cap', async ({ anonymous, calls, graded }) => {
+  raw.prepare('INSERT INTO user (id, name, email, is_anonymous) VALUES (?, ?, ?, ?)').run('u1', 'Learner', 'u1@learnquiz.test', anonymous ? 1 : 0)
   const insert = raw.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-  for (let i = 0; i < 20; i++) insert.run(`call-${i}`, 'u1', 'items', 'muse-spark-1.3', 0, 1, Date.now())
+  for (let i = 0; i < calls; i++) insert.run(`call-${i}`, 'u1', 'items', 'muse-spark-1.3', 0, 1, Date.now())
+  fetchModel.mockResolvedValueOnce(completion({ score: 1, feedback: 'Equality is preserved.', missing_points: [] }))
 
-  expect(await answerItem(request)).toMatchObject({ state: 'ungraded', score: null, returnsThisSession: false })
-  expect(fetchModel).not.toHaveBeenCalled()
-  expect(row('SELECT COUNT(*) AS n FROM model_calls').n).toBe(20)
-  expect(row('SELECT COUNT(*) AS n FROM attempts').n).toBe(0)
+  const reveal = await answerItem(request)
+
+  if (graded) {
+    expect(reveal).toMatchObject({ state: 'A', score: 1, feedback: 'Equality is preserved.' })
+    expect(row('SELECT COUNT(*) AS n FROM model_calls').n).toBe(calls + 1)
+    expect(row('SELECT COUNT(*) AS n FROM attempts').n).toBe(1)
+  } else {
+    expect(reveal).toMatchObject({ state: 'ungraded', score: null, returnsThisSession: false })
+    expect(reveal.feedback).toBe(`Daily grading limit reached; back tomorrow. ${PLAIN_FEEDBACK}`)
+    expect(fetchModel).not.toHaveBeenCalled()
+    expect(row('SELECT COUNT(*) AS n FROM model_calls').n).toBe(calls)
+    expect(row('SELECT COUNT(*) AS n FROM attempts').n).toBe(0)
+  }
 })
 
 it.each([

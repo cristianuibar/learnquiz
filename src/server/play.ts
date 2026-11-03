@@ -10,7 +10,7 @@ import { gradeAnswer, revealState, toItemView } from '@/lib/learning/grade'
 import { levelResult, nextLevel, pickNext, PLACEMENT, shouldStop } from '@/lib/learning/placement'
 import { composeSession, reinsert, SESSION_BONUS, streakAfter, xpFor } from '@/lib/learning/session'
 import type { Confidence, ItemView, Reveal, SessionPlanning, SessionView, SummaryView } from '@/lib/learning/types'
-import { chatJson, isVoiceEnabled, jobModel, transcribeAudio } from '@/lib/llm/client'
+import { chatJson, DailyCapError, isVoiceEnabled, jobModel, transcribeAudio } from '@/lib/llm/client'
 import { gradePrompt } from '@/lib/llm/prompts'
 import { Grade, type ItemPayload } from '@/lib/llm/schemas'
 import { validateVoiceWav } from '@/lib/voice'
@@ -476,7 +476,8 @@ export const answerItem = createServerFn({ method: 'POST' })
         })
         grade.correct = shortGrade.score >= 0.8
       } catch (e) {
-        console.error('short answer grading failed, revealing model answer', e instanceof Error ? e.message : e)
+        const capped = e instanceof DailyCapError
+        if (!capped) console.error('short answer grading failed, revealing model answer', e instanceof Error ? e.message : e)
         // Advance without recording a wrong answer or changing mastery, scheduling or XP.
         const [kept] = await db
           .update(sessions)
@@ -486,7 +487,7 @@ export const answerItem = createServerFn({ method: 'POST' })
         if (!kept) throw await dropped()
         return {
           attemptId: null, diagramConceptId: concept.visual ? concept.id : null, state: 'ungraded', correct: false, score: null,
-          feedback: 'Compare your answer with the model answer. Your learning progress has not changed.',
+          feedback: `${capped ? 'Daily grading limit reached; back tomorrow. ' : ''}Compare your answer with the model answer. Your learning progress has not changed.`,
           missingPoints: [], correctAnswer: payload.model_answer, chosenFeedback: null,
           explanation: payload.explanation, sourceQuote: payload.source_quote, mixUps: [], returnsThisSession: false,
           pKnownBefore, pKnownAfter: pKnownBefore,

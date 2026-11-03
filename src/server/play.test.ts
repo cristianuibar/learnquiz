@@ -223,14 +223,22 @@ describe('Wonder session planning', () => {
     expect((await getSession({ data: { sessionId } })).item?.id).toBe('i1')
   })
 
-  it.each(['daily cap', 'local profile'])('uses rules without a request for %s', async (skip) => {
-    if (skip === 'daily cap') {
-      const log = raw.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      for (let i = 0; i < 20; i++) log.run(`cap-${i}`, 'u1', 'items', 'muse-spark-1.3', 0, 1, Date.now())
-    } else { getEnv().LLM_PROFILE = 'ollama'; getEnv().JOB_MODELS = undefined }
+  it.each([
+    { name: 'guest at 20 calls', account: false, calls: 20, local: false, requests: 0 },
+    { name: 'account at 20 calls', account: true, calls: 20, local: false, requests: 1 },
+    { name: 'account at 150 calls', account: true, calls: 150, local: false, requests: 0 },
+    { name: 'local profile', account: false, calls: 0, local: true, requests: 0 },
+  ])('respects the daily cap and model routing for $name', async ({ account, calls, local, requests }) => {
+    if (account) raw.prepare('INSERT INTO user (id, name, email, is_anonymous) VALUES (?, ?, ?, ?)').run('u1', 'Learner', 'u1@example.test', 0)
+    const log = raw.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    for (let i = 0; i < calls; i++) log.run(`cap-${i}`, 'u1', 'items', 'muse-spark-1.3', 0, 1, Date.now())
+    if (local) { getEnv().LLM_PROFILE = 'ollama'; getEnv().JOB_MODELS = undefined }
     const { sessionId } = await startSession({ data: { topicId: 't1' } })
-    expect(await getModelTrace({ data: { scope: 'session', sessionId } })).toMatchObject({ planning: { planner: 'planned by rules' }, calls: [] })
-    expect(fetchModel).not.toHaveBeenCalled()
+    const trace = await getModelTrace({ data: { scope: 'session', sessionId } })
+    expect(trace.planning?.planner).toBe(requests ? 'muse-wonder-1.0' : 'planned by rules')
+    expect(trace.calls).toEqual(requests ? [expect.objectContaining({ purpose: 'plan', model: 'muse-wonder-1.0', ok: true })] : [])
+    expect(fetchModel).toHaveBeenCalledTimes(requests)
+    expect(scalar(raw, 'SELECT COUNT(*) AS n FROM model_calls').n).toBe(calls + requests)
   })
 })
 
