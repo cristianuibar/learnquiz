@@ -16,7 +16,7 @@ const Slug = z.object({ slug: z.string().min(1).max(100) })
 const Role = z.object({
   name: z.string().trim().min(1, 'Enter a role name').min(2, 'Use at least 2 characters for the role name').max(80, 'Use at most 80 characters for the role name'),
   benchmark: z.number().min(0).max(1).default(0.85),
-  onboardingDays: z.number().int().positive().default(30),
+  onboardingDays: z.number().int('Use whole days for the onboarding period').min(1, 'Use at least 1 day for the onboarding period').max(365, 'Use at most 365 days for the onboarding period').default(30),
 })
 
 const slugify = (name: string) =>
