@@ -1,4 +1,4 @@
-import type { Draft } from '@learnquiz/api'
+import type { Draft, SessionView } from '@learnquiz/api'
 import { getJSON, remove, setJSON } from '../kv'
 
 const pending = new Map<string, Promise<void>>()
@@ -40,4 +40,33 @@ export function writeDraft(sessionId: string, itemId: string, draft: Draft): Pro
 export function deleteDraft(sessionId: string, itemId: string): Promise<void> {
   const key = draftKey(sessionId, itemId)
   return mutate(key, () => remove(key))
+}
+
+export function draftOnViewChange(
+  previous: SessionView | null,
+  next: SessionView,
+  checkedItemId?: string,
+): 'keep' | 'empty' | 'restore' {
+  if (next.item?.id === checkedItemId && checkedItemId !== undefined) return 'empty'
+  if (next.item?.id === previous?.item?.id && next.progress.position === previous?.progress.position) return 'keep'
+  // A new slot for the same item is a re-ask, not an unfinished answer.
+  return next.item && next.item.id !== previous?.item?.id ? 'restore' : 'empty'
+}
+
+// null keeps the current selections, error and retry request for an unchanged slot.
+export async function draftForView(
+  sessionId: string,
+  previous: SessionView | null,
+  next: SessionView,
+  checkedItemId?: string,
+): Promise<Draft | null> {
+  const action = draftOnViewChange(previous, next, checkedItemId)
+  if (action === 'keep') return null
+  if (previous?.item) await deleteDraft(sessionId, previous.item.id).catch(() => {})
+  if (checkedItemId && checkedItemId !== previous?.item?.id) await deleteDraft(sessionId, checkedItemId).catch(() => {})
+  if (action === 'restore' && next.item) {
+    const restored = await readDraft(sessionId, next.item.id).catch(() => null)
+    if (restored) return restored
+  }
+  return { answer: {}, confidence: null }
 }
