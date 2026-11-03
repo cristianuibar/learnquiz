@@ -102,9 +102,15 @@ it('focuses the invalid field on the invite form and ties its message to it', as
   const message = (id: string) => document.getElementById(field(id).getAttribute('aria-describedby')!)?.textContent
   try {
     await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
-    await type('name', '   ')
+    invite.mockResolvedValueOnce({ error: { message: 'Could not create the invite' } } as never)
+    await type('name', 'Sam')
     await type('email', 'a@b.co')
     await submit()
+    expect(container.textContent).toContain('Could not create the invite')
+    invite.mockClear()
+    await type('name', '   ')
+    await submit()
+    expect(container.textContent).not.toContain('Could not create the invite')
     expect(field('name').getAttribute('aria-invalid')).toBe('true')
     expect(message('name')).toBe('Enter a name')
     expect(document.activeElement).toBe(field('name'))

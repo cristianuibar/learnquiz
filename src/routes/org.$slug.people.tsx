@@ -69,13 +69,13 @@ function People() {
     const f = new FormData(form)
     const name = String(f.get('name')).trim()
     const email = String(f.get('email')).trim()
+    setError('')
     const missing: Record<string, string> = {}
     if (!name) missing.name = 'Enter a name'
     if (!email) missing.email = 'Enter an email'
     setFields(missing)
     if (Object.keys(missing).length) return
     setBusy(true)
-    setError('')
     // shortcut: no email service, so invites are links the partner copies or shows as a QR code; add magic links and invite emails when an email provider is chosen.
     const { error } = await authClient.organization.inviteMember({
       organizationId: org.id,
