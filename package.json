@@ -4,8 +4,10 @@
 	"scripts": {
 		"dev": "pnpm --filter @learnquiz/web dev",
 		"build": "pnpm --filter @learnquiz/web build",
+		"deploy:web": "pnpm --filter @learnquiz/web run deploy",
 		"typecheck": "pnpm -r typecheck",
 		"test": "pnpm -r --if-present test",
-		"db:migrate:local": "pnpm --filter @learnquiz/web db:migrate:local"
+		"db:migrate:local": "pnpm --filter @learnquiz/web db:migrate:local",
+		"seed:northwind": "pnpm --filter @learnquiz/web run seed:northwind"
 	}
 }

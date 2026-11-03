@@ -19,6 +19,8 @@
 	},
 	"dependencies": {
 		"@better-auth/drizzle-adapter": "1.7.14",
+		"@learnquiz/api": "workspace:*",
+		"@learnquiz/tokens": "workspace:*",
 		"@tailwindcss/vite": "^4.1.18",
 		"@tanstack/react-devtools": "0.10.13",
 		"@tanstack/react-router": "1.170.46",
