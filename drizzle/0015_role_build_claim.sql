@@ -1,0 +1,1 @@
+ALTER TABLE `topics` ADD `gen_started_at` integer;

@@ -213,6 +213,22 @@ it('publishes the path atomically and allows retry after a failed write', async 
   expect(storedPath()).toEqual({ units: { n: 4 }, concepts: { n: 16 }, edges: { n: 12 } })
 })
 
+it('rebuilds a role whose build request died mid call once the claim is stale', async () => {
+  // A killed request never reaches its failure handler and leaves the claim behind.
+  raw.prepare("UPDATE topics SET status = 'generating', gen_started_at = ? WHERE id = 'picker-topic'").run(Date.now())
+  await expect(generate()).rejects.toMatchObject({ status: 409 })
+  expect(fetchModel).not.toHaveBeenCalled()
+  vi.setSystemTime(Date.now() + 11 * 60 * 1000)
+  await expect(generate()).resolves.toEqual({ topicId: 'picker-topic' })
+  expect(topicState()).toEqual({ status: 'ready' })
+  expect(storedPath()).toEqual({ units: { n: 4 }, concepts: { n: 16 }, edges: { n: 12 } })
+  // A claim left before claims were timed is stale too.
+  raw.exec("UPDATE topics SET status = 'generating', gen_started_at = NULL WHERE id = 'other-role-topic'")
+  holder.userId = 'other-owner'
+  await expect(curriculum.generateRoleCurriculum({ data: { slug: 'other-company', roleId: 'other-role' } })).rejects.toMatchObject({ status: 422 })
+  expect(raw.prepare("SELECT status FROM topics WHERE id = 'other-role-topic'").get()).toEqual({ status: 'failed' })
+})
+
 it.each([
   { failure: 'invalid output', reply: () => modelReply({ units: [] }), status: 422, calls: 2 },
   { failure: 'provider unavailable', reply: () => new Response('Unavailable', { status: 502 }), status: 503, calls: 1 },
