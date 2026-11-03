@@ -49,14 +49,14 @@ afterEach(() => {
   delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT
 })
 
-async function renderApp(initialEntry = '/start') {
+async function renderApp(initialEntry = '/today') {
   const rootRoute = createRootRoute({
     beforeLoad: appRootRoute.options.beforeLoad,
     loader: appRootRoute.options.loader,
     component: appRootRoute.options.component,
     errorComponent: appRootRoute.options.errorComponent,
   })
-  const start = createRoute({ getParentRoute: () => rootRoute, path: '/start', component: () => <h1>Today</h1> })
+  const start = createRoute({ getParentRoute: () => rootRoute, path: '/today', component: () => <h1>Today</h1> })
   const path = createRoute({ getParentRoute: () => rootRoute, path: '/t/$topicId/path', loader: pathRoute.options.loader, component: pathRoute.options.component, errorComponent: pathRoute.options.errorComponent })
   const play = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId', loader: playRoute.options.loader, component: playRoute.options.component, errorComponent: playRoute.options.errorComponent })
   const done = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId/done', component: () => <h1>Session complete</h1> })

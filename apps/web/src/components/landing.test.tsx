@@ -185,14 +185,14 @@ it('lets an owner leave the portal to train, return through Profile and sign out
     await act(async () => { container.querySelector<HTMLAnchorElement>('header a')!.click(); await router.load() })
     expect(router.state.location.pathname).toBe('/start')
     expect(container.querySelector('h1')?.textContent).toBe('What do you want to learn?')
-    await act(async () => { container.querySelector<HTMLAnchorElement>('a[href="/me"]')!.click(); await router.load() })
+    await act(async () => { await router.navigate({ to: '/me' }) })
     expect([...container.querySelectorAll('a[href^="/org/"]')].map((a) => a.textContent)).toEqual(['Northwind portal', 'Contoso portal'])
     expect(container.querySelector('a[href="/admin"]')?.textContent).toBe('Staff area')
     await act(async () => { container.querySelector<HTMLAnchorElement>('a[href="/org/contoso"]')!.click(); await router.load() })
     expect(router.state.location.pathname).toBe('/org/contoso')
     expect(container.querySelector('h1')?.textContent).toBe('Contoso')
     await act(async () => { container.querySelector<HTMLAnchorElement>('header a')!.click(); await router.load() })
-    await act(async () => { container.querySelector<HTMLAnchorElement>('a[href="/me"]')!.click(); await router.load() })
+    await act(async () => { await router.navigate({ to: '/me' }) })
     const signOut = [...container.querySelectorAll<HTMLButtonElement>('main button')].find((button) => button.textContent === 'Sign out')!
     await act(async () => {
       signOut.click()

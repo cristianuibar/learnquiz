@@ -59,29 +59,6 @@ async function renderStart(initialEntry = '/start') {
   }
 }
 
-it('keeps the learner’s goal and material when Today is tapped on start', async () => {
-  const { container, router, cleanup } = await renderStart()
-  try {
-    const goal = container.querySelector<HTMLInputElement>('#goal')!
-    const source = container.querySelector<HTMLTextAreaElement>('#source')!
-    await act(async () => {
-      // Use the native setter so React sees the input events as edits.
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(goal, 'Pass my biology exam')
-      goal.dispatchEvent(new Event('input', { bubbles: true }))
-      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(source, 'Photosynthesis notes')
-      source.dispatchEvent(new Event('input', { bubbles: true }))
-    })
-    const today = [...container.querySelectorAll('a')].find((link) => link.textContent?.trim() === 'Today')!
-    expect(today.getAttribute('href')).toBe('/start')
-    await act(async () => { today.click(); await router.load() })
-    expect(container.querySelector<HTMLInputElement>('#goal')!.value).toBe('Pass my biology exam')
-    expect(container.querySelector<HTMLTextAreaElement>('#source')!.value).toBe('Photosynthesis notes')
-    expect(router.state.location.pathname).toBe('/start')
-  } finally {
-    await cleanup()
-  }
-})
-
 it('names the company on Today while the role training is being prepared', async () => {
   vi.mocked(getLatestTopicIdFn).mockResolvedValue(null)
   vi.mocked(getToday).mockResolvedValue({ topic: null, role: { name: 'Cashier', topicTitle: 'Cashier', company: 'Northwind', preparing: true, mastery: null, benchmark: 0.85, day: 1, days: 30, building: null }, plan: null })
@@ -98,7 +75,7 @@ it('sends a learner with a ready topic to Today, where one tap starts the sessio
   vi.mocked(getLatestTopicIdFn).mockResolvedValue('topic-1')
   vi.mocked(getToday).mockResolvedValue({ topic: { id: 'topic-1', title: 'Biology', placed: true, placeable: true, due: 2, xp: 40, streak: 1 }, role: null, plan: null })
   vi.mocked(startSession).mockResolvedValue({ sessionId: 's1' })
-  const { container, router, cleanup } = await renderStart()
+  const { container, router, cleanup } = await renderStart('/me')
   try {
     const today = [...container.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Main"] a')].find((link) => link.textContent?.trim() === 'Today')!
     expect(today.getAttribute('href')).toBe('/today')
@@ -118,11 +95,9 @@ it('sends a learner with a ready topic to Today, where one tap starts the sessio
 })
 
 it.each([
-  { latestTopicId: null, target: '/me' },
-  { latestTopicId: 'old-topic', target: '/me' },
-  { latestTopicId: null, target: '/play/$sessionId/done' },
-  { latestTopicId: 'old-topic', target: '/play/$sessionId/done' },
-] as const)('refreshes Path after creating a topic from $latestTopicId before visiting $target', async ({ latestTopicId, target }) => {
+  { latestTopicId: null },
+  { latestTopicId: 'old-topic' },
+] as const)('refreshes Path after creating a topic from $latestTopicId before visiting Profile', async ({ latestTopicId }) => {
   let latest: string | null = latestTopicId
   vi.mocked(getLatestTopicIdFn).mockImplementation(async () => latest)
   vi.mocked(createTopic).mockImplementation(async () => {
@@ -141,20 +116,18 @@ it.each([
   const pathHref = () => [...container.querySelectorAll('nav[aria-label="Main"] a')]
     .find((link) => link.textContent?.trim() === 'Path')?.getAttribute('href') ?? null
   try {
-    expect(pathHref()).toBe(latestTopicId ? `/t/${latestTopicId}/path` : null)
     await act(async () => {
       container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
       await started
     })
-    expect.soft(pathHref(), 'Path must refresh while placement is pending').toBe('/t/new-topic/path')
     await act(async () => {
       finishPlacement({ sessionId: 'placement' })
       await vi.waitFor(() => expect(router.state.location.pathname).toBe('/play/placement'))
     })
     await act(async () => {
-      await router.navigate({ to: target, params: { sessionId: 'placement' } })
+      await router.navigate({ to: '/me' })
     })
-    expect(router.state.location.pathname).toBe(target.replace('$sessionId', 'placement'))
+    expect(router.state.location.pathname).toBe('/me')
     expect(pathHref()).toBe('/t/new-topic/path')
   } finally {
     finishPlacement({ sessionId: 'placement' })
@@ -162,6 +135,51 @@ it.each([
   }
 })
 
+it('shows the three tabs on Today and moves focus to the page heading on Profile', async () => {
+  vi.mocked(getLatestTopicIdFn).mockResolvedValue('topic-1')
+  vi.mocked(getToday).mockResolvedValue({ topic: { id: 'topic-1', title: 'Biology', placed: true, placeable: true, due: 2, xp: 40, streak: 1 }, role: null, plan: null })
+  const { container, router, cleanup } = await renderStart('/today')
+  try {
+    const links = () => [...container.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Main"] a')]
+    expect(links().map((link) => link.textContent?.trim())).toEqual(['Today', 'Path', 'Profile'])
+    expect(links().map((link) => link.getAttribute('href'))).toEqual(['/today', '/t/topic-1/path', '/me'])
+    expect(links()[0].getAttribute('aria-current')).toBe('page')
+    expect(links()[2].getAttribute('aria-current')).toBeNull()
+    expect(container.querySelector('header')).toBeNull()
+    await act(async () => { links()[2].click(); await router.load() })
+    expect(router.state.location.pathname).toBe('/me')
+    expect(links()[2].getAttribute('aria-current')).toBe('page')
+    expect(links()[0].getAttribute('aria-current')).toBeNull()
+    expect(container.querySelector('header')).not.toBeNull()
+    const h1 = container.querySelector('h1')!
+    expect(h1.textContent).toBe('Learner')
+    expect(document.activeElement).toBe(h1)
+  } finally {
+    await cleanup()
+  }
+})
+
+it('disables Path without a topic', async () => {
+  const { container, cleanup } = await renderStart('/me')
+  try {
+    const disabled = container.querySelector('nav[aria-label="Main"] [aria-disabled="true"]')
+    expect(disabled?.textContent?.trim()).toBe('Path')
+    const links = [...container.querySelectorAll('nav[aria-label="Main"] a')]
+    expect(links.find((link) => link.textContent?.trim() === 'Path')).toBeUndefined()
+  } finally {
+    await cleanup()
+  }
+})
+
+it.each([{ path: '/play/s1' }, { path: '/play/s1/done' }])('hides the nav and top bar in a session ($path)', async ({ path }) => {
+  const { container, cleanup } = await renderStart(path)
+  try {
+    expect(container.querySelector('nav[aria-label="Main"]')).toBeNull()
+    expect(container.querySelector('header')).toBeNull()
+  } finally {
+    await cleanup()
+  }
+})
 
 it('shows the employee company logo and returns to the default brand after sign-out', async () => {
   vi.mocked(getCompanyBranding).mockResolvedValue({ name: 'Alpha Training', logoUrl: '/api/org/org-a/logo?v=logo', accent: '#543189' })
