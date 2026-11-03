@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { renderSVG } from 'uqr'
-import { RouteError } from '@/components/inline-error'
+import { RouteError, useFocusInvalid } from '@/components/inline-error'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -83,22 +83,34 @@ function People() {
   const router = useRouter()
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [fields, setFields] = useState<Record<string, string>>({})
+  const formRef = useFocusInvalid(fields)
 
   async function invite(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const form = e.currentTarget
     const f = new FormData(form)
-    setBusy(true)
+    const name = String(f.get('name')).trim()
+    const email = String(f.get('email')).trim()
     setError('')
+    const missing: Record<string, string> = {}
+    if (!name) missing.name = 'Enter a name'
+    if (!email) missing.email = 'Enter an email'
+    setFields(missing)
+    if (Object.keys(missing).length) return
+    setBusy(true)
     // shortcut: no email service, so invites are links the partner copies or shows as a QR code; add magic links and invite emails when an email provider is chosen.
     const { error } = await authClient.organization.inviteMember({
       organizationId: org.id,
-      email: String(f.get('email')).trim(),
+      email,
       role: 'member',
-      inviteeName: String(f.get('name')).trim(),
+      inviteeName: name,
       jobRoleId: String(f.get('role')),
     })
     setBusy(false)
+    if (error?.code === 'USER_IS_ALREADY_INVITED_TO_THIS_ORGANIZATION' || error?.code === 'USER_IS_ALREADY_A_MEMBER_OF_THIS_ORGANIZATION') {
+      return setFields({ email: error.message ?? 'This email is already invited' })
+    }
     if (error) return setError(error.message ?? 'Could not create the invite')
     form.reset()
     await router.invalidate()
@@ -114,14 +126,16 @@ function People() {
     <main className="mx-auto w-full max-w-3xl px-4 pt-8 pb-16">
       <h1 className="text-3xl font-bold tracking-tight">People at {org.name}</h1>
       {org.readOnly && <p className="mt-4 text-muted-foreground">Staff view · Read only</p>}
-      {!org.readOnly && <form className="mt-8 flex flex-col gap-6" onSubmit={invite}>
+      {!org.readOnly && <form className="mt-8 flex flex-col gap-6" ref={formRef} onSubmit={invite}>
         <div className="flex flex-col gap-2">
           <Label htmlFor="name">Name</Label>
-          <Input id="name" name="name" className="h-11" maxLength={80} required />
+          <Input id="name" name="name" className="h-11" maxLength={80} required aria-invalid={!!fields.name || undefined} aria-describedby={fields.name ? 'name-error' : undefined} />
+          {fields.name && <p id="name-error" role="alert" className="text-sm font-medium text-wrong">{fields.name}</p>}
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="email">Email</Label>
-          <Input id="email" name="email" type="email" className="h-11" required />
+          <Input id="email" name="email" type="email" className="h-11" required aria-invalid={!!fields.email || undefined} aria-describedby={fields.email ? 'email-error' : undefined} />
+          {fields.email && <p id="email-error" role="alert" className="text-sm font-medium text-wrong">{fields.email}</p>}
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="role">Job role</Label>

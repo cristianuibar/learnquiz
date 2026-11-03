@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { CredentialsForm } from '@/components/credentials-form'
 import { Button } from '@/components/ui/button'
@@ -19,12 +20,23 @@ function SignIn() {
   const { facebookEnabled } = Route.useRouteContext()
   const { redirect: next = '/', email } = Route.useSearch()
   const router = useRouter()
+  const [mode, setMode] = useState<'up' | 'in'>('in')
+  const heading = mode === 'up' ? 'Create an account' : 'Sign in'
+
+  useEffect(() => {
+    const previous = document.title
+    document.title = `${heading} · Learn Quiz`
+    return () => {
+      document.title = previous
+    }
+  }, [heading])
 
   return (
     <main className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pt-8 pb-16">
-      <h1 className="text-3xl font-bold tracking-tight">Sign in</h1>
+      <h1 className="text-3xl font-bold tracking-tight">{heading}</h1>
       <CredentialsForm
         initial="in"
+        onModeChange={setMode}
         defaultEmail={email}
         onDone={async () => {
           await router.navigate({ href: next })

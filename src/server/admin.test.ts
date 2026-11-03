@@ -72,6 +72,8 @@ beforeAll(async () => {
     sqlite.prepare('INSERT INTO sources (id, topic_id, kind, title, body_text, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(org, org, 'text', `${org} document`, 'Private source text', NOW)
     sqlite.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, cost_usd, ok, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(org, id, 'items', 'test', 1, org === 'alpha' ? 0.125 : 9, 1, NOW)
   }
+  // Role topics have no learner; only alpha's role has an SOP. Personal documents above are not company documents.
+  sqlite.prepare('INSERT INTO sources (id, topic_id, kind, title, body_text, created_at) VALUES (?, ?, ?, ?, ?, ?)').run('alpha-sop', 'role-alpha', 'text', 'alpha SOP', 'Role source text', NOW)
   const learner = accounts.get('learner')!.id
   for (const [id, startedAt] of [['recent', NOW], ['also-recent', NOW], ['old', NOW - 31 * 86_400_000]] as const) {
     sqlite.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, started_at) VALUES (?, ?, ?, ?, ?)')
@@ -112,15 +114,16 @@ it('returns company members, roles, documents, distinct active learners and scop
   await expect(getStaffSession()).resolves.toMatchObject({ id: accounts.get('staff')!.id })
   await expect(getCompanies()).resolves.toEqual([
     { id: 'alpha', name: 'alpha', slug: 'alpha', members: 1, roles: 1, documents: 1, activeLearners: 1, modelSpend: 0.125 },
-    { id: 'beta', name: 'beta', slug: 'beta', members: 1, roles: 1, documents: 1, activeLearners: 0, modelSpend: 9 },
+    { id: 'beta', name: 'beta', slug: 'beta', members: 1, roles: 1, documents: 0, activeLearners: 0, modelSpend: 9 },
     { id: 'empty', name: 'empty', slug: 'empty', members: 0, roles: 0, documents: 0, activeLearners: 0, modelSpend: 0 },
   ])
   await expect(getCompany({ data: { slug: 'alpha' } })).resolves.toMatchObject({
     members: [{ name: 'learner', role: 'owner', jobRole: 'alpha role' }],
     roles: [{ id: 'alpha', name: 'alpha role', status: 'active' }],
-    documents: [{ id: 'alpha', title: 'alpha document', learner: 'learner' }],
+    documents: [{ id: 'alpha-sop', title: 'alpha SOP', role: 'alpha role' }],
     activeLearners: 1, modelSpend: 0.125,
   })
+  await expect(getCompany({ data: { slug: 'beta' } })).resolves.toMatchObject({ documents: [] })
   await expect(getCompany({ data: { slug: 'missing' } })).rejects.toMatchObject({ status: 404 })
 })
 

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { RouteError, errorMessage, fieldErrors } from '@/components/inline-error'
+import { RouteError, errorMessage, fieldErrors, useFocusInvalid } from '@/components/inline-error'
 import { RoleDocumentForm } from '@/components/role-document-form'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,6 +20,7 @@ function Roles() {
   const create = useServerFn(createRole)
   const [error, setError] = useState('')
   const [fields, setFields] = useState<Record<string, string>>({})
+  const formRef = useFocusInvalid(fields)
   const [busy, setBusy] = useState(false)
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
@@ -70,7 +71,7 @@ function Roles() {
       )}
       <section className="mt-10">
         <h2 className="text-xl font-semibold">Create a job role</h2>
-        <form className="mt-6 flex flex-col gap-6" onSubmit={submit}>
+        <form ref={formRef} className="mt-6 flex flex-col gap-6" onSubmit={submit}>
           <div className="flex flex-col gap-2">
             <Label htmlFor="name">Role name</Label>
             <Input id="name" name="name" className="h-11" minLength={2} maxLength={80} required aria-invalid={!!fields.name || undefined} aria-describedby={fields.name ? 'name-error' : undefined} />
@@ -83,7 +84,7 @@ function Roles() {
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="onboardingDays">Onboarding days</Label>
-            <Input id="onboardingDays" name="onboardingDays" type="number" className="h-11" min={1} step={1} defaultValue={30} required aria-invalid={!!fields.onboardingDays || undefined} aria-describedby={fields.onboardingDays ? 'onboardingDays-error' : undefined} />
+            <Input id="onboardingDays" name="onboardingDays" type="number" className="h-11" min={1} max={365} step={1} defaultValue={30} required aria-invalid={!!fields.onboardingDays || undefined} aria-describedby={fields.onboardingDays ? 'onboardingDays-error' : undefined} />
             {fields.onboardingDays && <p id="onboardingDays-error" role="alert" className="text-sm font-medium text-wrong">{fields.onboardingDays}</p>}
           </div>
           {error && <p role="alert" className="text-sm font-medium text-wrong">{error}</p>}
