@@ -10,12 +10,15 @@ import { ThemeProvider } from '../theme/ThemeProvider'
 
 const mockRouter = { replace: jest.fn(), dismissTo: jest.fn() }
 let mockBack: () => boolean
+let mockFocused = true
 
 jest.mock('expo-router', () => ({
   Stack: { Screen: () => null },
   useRouter: () => mockRouter,
   useLocalSearchParams: () => ({ sessionId: 's1' }),
-  useFocusEffect: (effect: () => () => void) => require('react').useEffect(effect, [effect]),
+  useFocusEffect: (effect: () => () => void) => require('react').useEffect(
+    () => mockFocused ? effect() : undefined, [effect, mockFocused],
+  ),
 }))
 jest.mock('expo-notifications', () => ({ getPermissionsAsync: jest.fn() }))
 jest.mock('./api', () => ({ api: jest.fn(), ApiError: class extends Error {} }))
@@ -47,6 +50,7 @@ function deferred<T>() {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  mockFocused = true
   jest.mocked(api).mockResolvedValue(summary)
   jest.mocked(recordFinished).mockResolvedValue(1)
   jest.mocked(readPromptCounts).mockResolvedValue({ finishedSessions: 1, skips: 0, registered: false })
@@ -56,6 +60,23 @@ beforeEach(() => {
   })
 })
 afterEach(() => jest.restoreAllMocks())
+
+test('blur then refocus during /end retains the summary and counts the completion once', async () => {
+  const ending = deferred<SummaryView>()
+  jest.mocked(api).mockReturnValue(ending.promise)
+  const content = h(ThemeProvider, { children: h(SessionDone) })
+  const view = await render(content)
+  expect(screen.getByText('Wrapping up')).toBeOnTheScreen()
+  mockFocused = false
+  await view.rerender(h(ThemeProvider, { children: h(SessionDone) }))
+  await act(async () => { ending.resolve(summary) })
+  mockFocused = true
+  await view.rerender(h(ThemeProvider, { children: h(SessionDone) }))
+  expect(screen.getByRole('header', { name: 'Session done' })).toBeOnTheScreen()
+  expect(recordFinished).toHaveBeenCalledTimes(1)
+  expect(recordFinished).toHaveBeenCalledWith('s1')
+  expect(api).toHaveBeenCalledTimes(1)
+})
 
 test.each(['unmount', 'Back'])('Continue cannot navigate when permission resolves after %s', async (leave) => {
   const permission = deferred<Notifications.NotificationPermissionsStatus>()

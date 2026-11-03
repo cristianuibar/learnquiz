@@ -81,10 +81,10 @@ test('Try again starts a new request after a non-JSON success', async () => {
   expect(screen.getByRole('alert', { name: startFailed })).toBeOnTheScreen()
   await fireEvent.press(screen.getByRole('button', { name: 'Try again' }))
   expect(mockFetch).toHaveBeenCalledTimes(2)
-  expect(mockRouter.replace).toHaveBeenCalledWith('/play/s2')
+  expect(mockRouter.replace).toHaveBeenCalledWith('/play/s2?announceReady=1')
 })
 
-test('open status follows the heading focus frame and ready follows navigation and destination focus', async () => {
+test('open status follows focus and delegates ready to the destination after navigation', async () => {
   let resolve!: (value: Response) => void
   mockFetch.mockImplementation(() => new Promise<Response>((done) => { resolve = done }))
   const view = await render(h(ThemeProvider, { children: h(LoadingScreen) }))
@@ -94,14 +94,14 @@ test('open status follows the heading focus frame and ready follows navigation a
   await frame()
   expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledWith('Getting your questions ready.')
   await act(async () => { resolve(response({ sessionId: 's1' })) })
-  expect(mockRouter.replace).toHaveBeenCalledWith('/play/s1')
+  expect(mockRouter.replace).toHaveBeenCalledWith('/play/s1?announceReady=1')
   expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledTimes(1)
   await view.unmount()
-  // The destination's useHeadingFocus runs on this first frame.
+  // Loading cannot know when the destination's GET and item focus finish.
   await frame()
   expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledTimes(1)
   await frame()
-  expect(AccessibilityInfo.announceForAccessibility).toHaveBeenLastCalledWith('Your session is ready.')
+  expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledTimes(1)
 })
 
 test('leaving Loading cancels its pending open announcement', async () => {

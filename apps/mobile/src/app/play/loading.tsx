@@ -60,13 +60,8 @@ export default function LoadingScreen() {
         cancelPreparing()
         setFailure(error)
       },
-      // Navigation happens first. This announcement intentionally survives
-      // Loading's unmount and follows the destination heading's focus frame.
-      onReady: () => {
-        cancelPreparing()
-        announceAfterFocus('Your session is ready.')
-      },
-      replace: (path) => router.replace(path),
+      onReady: cancelPreparing,
+      replace: (path) => router.replace(path === '/(tabs)/today' ? path : `${path}?announceReady=1`),
       dismissAll: () => router.dismissAll(),
     })
     request.current = current

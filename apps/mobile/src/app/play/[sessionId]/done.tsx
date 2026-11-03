@@ -32,8 +32,10 @@ export default function SessionDone() {
   const [state, setState] = useState<State>({ status: 'loading' })
   const finished = useRef<Promise<unknown>>(Promise.resolve())
   const active = useRef(true)
+  const leaving = useRef(false)
 
   const toToday = useCallback(() => {
+    leaving.current = true
     active.current = false
     router.dismissTo(TODAY)
   }, [router])
@@ -58,7 +60,7 @@ export default function SessionDone() {
     // Ending is idempotent, so a remount or retry returns the same summary.
     api<SummaryView>(`/sessions/${encodeURIComponent(sessionId)}/end`, { method: 'POST', signal: controller.signal })
       .then((summary) => {
-        if (controller.signal.aborted || !active.current) return
+        if (controller.signal.aborted || leaving.current) return
         if (summary.total === 0) {
           toToday()
           return
