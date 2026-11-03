@@ -56,7 +56,13 @@ export function PushSettings({ publicKey, isStaff, endpoints, prefs, prompt = fa
         if (permission !== 'granted') throw new Error('Allow notifications in your browser settings to enable them.')
         const registration = await navigator.serviceWorker.ready
         const applicationServerKey = Uint8Array.from(atob(publicKey!.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0))
-        const current = await registration.pushManager.getSubscription() ?? await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey })
+        let current = await registration.pushManager.getSubscription()
+        // A subscription this account has not saved may belong to someone who used this browser before; replace it.
+        if (current && !endpoints.includes(current.endpoint)) {
+          await current.unsubscribe()
+          current = null
+        }
+        current ??= await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey })
         setSubscription(current)
         const json = current.toJSON()
         await subscribe({ data: { endpoint: current.endpoint, keys: { p256dh: json.keys!.p256dh, auth: json.keys!.auth } } })
