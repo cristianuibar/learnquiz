@@ -12,6 +12,9 @@ export type AppEnv = Omit<Env, 'LLM_PROFILE' | 'LLM_BASE_URL' | 'LLM_MODEL' | 'I
   BETTER_AUTH_SECRET?: string
   FACEBOOK_APP_ID?: string
   FACEBOOK_APP_SECRET?: string
+  VAPID_PUBLIC_KEY?: string
+  VAPID_PRIVATE_KEY?: string
+  VAPID_SUBJECT?: string
 }
 
 // Call inside request handlers only: touching bindings at import time breaks the build.

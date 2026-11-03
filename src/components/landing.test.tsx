@@ -93,7 +93,7 @@ async function renderApp(initialEntry = '/sign-in') {
     createRoute({ getParentRoute: () => rootRoute, path: '/', beforeLoad: indexRoute.options.beforeLoad, component: indexRoute.options.component }),
     createRoute({ getParentRoute: () => rootRoute, path: '/sign-in', beforeLoad: signInRoute.options.beforeLoad, validateSearch: signInRoute.options.validateSearch, component: signInRoute.options.component }),
     createRoute({ getParentRoute: () => rootRoute, path: '/start', validateSearch: startRoute.options.validateSearch, component: startRoute.options.component }),
-    createRoute({ getParentRoute: () => rootRoute, path: '/me', beforeLoad: meRoute.options.beforeLoad, component: meRoute.options.component }),
+    createRoute({ getParentRoute: () => rootRoute, path: '/me', beforeLoad: meRoute.options.beforeLoad, loader: meRoute.options.loader, component: meRoute.options.component }),
     createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', loader: orgRoute.options.loader, errorComponent: orgRoute.options.errorComponent, component: orgRoute.options.component }),
     createRoute({ getParentRoute: () => rootRoute, path: '/welcome', beforeLoad: welcomeRoute.options.beforeLoad, validateSearch: welcomeRoute.options.validateSearch, component: welcomeRoute.options.component }),
   ]

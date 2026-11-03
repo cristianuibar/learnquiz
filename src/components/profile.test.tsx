@@ -8,14 +8,17 @@ import { Route as meRoute } from '@/routes/me.index'
 import { Route as profileRoute } from '@/routes/me.profile'
 import { getProfile } from '@/server/profile'
 import { getSessionFn } from '@/server/session-fn'
+import { getPushSettings } from '@/server/push'
 
 vi.mock('@/server/profile', () => ({ getProfile: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => null }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
+vi.mock('@/server/push', () => ({ getPushSettings: vi.fn(), subscribe: vi.fn(), unsubscribe: vi.fn(), sendTestPush: vi.fn() }))
 
 it.each(['user', 'admin'])('opens training progress for %s, preserves staff access, and redirects signed-out visitors', async (role) => {
+  vi.mocked(getPushSettings).mockResolvedValue({ publicKey: null, isStaff: role === 'admin', endpoints: [] })
   const day = 86_400_000
   const start = Date.UTC(2026, 10, 2)
   vi.mocked(getProfile).mockResolvedValue({
@@ -30,7 +33,7 @@ it.each(['user', 'admin'])('opens training progress for %s, preserves staff acce
   let user: { id: string; name: string; isAnonymous: boolean; role: string } | null = { id: 'learner', name: 'Learner', isAnonymous: false, role }
   vi.mocked(getSessionFn).mockImplementation(async () => ({ user, facebookEnabled: false, needsDisclosure: false, adminCompanies: [{ name: 'Acme', slug: 'acme' }] }))
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
-  const me = createRoute({ getParentRoute: () => rootRoute, path: '/me', beforeLoad: meRoute.options.beforeLoad, component: meRoute.options.component })
+  const me = createRoute({ getParentRoute: () => rootRoute, path: '/me', beforeLoad: meRoute.options.beforeLoad, loader: meRoute.options.loader, component: meRoute.options.component })
   const profile = createRoute({ getParentRoute: () => rootRoute, path: '/me/profile', beforeLoad: profileRoute.options.beforeLoad, loader: profileRoute.options.loader, component: profileRoute.options.component })
   const index = createRoute({ getParentRoute: () => rootRoute, path: '/', component: () => <h1>Home</h1> })
   const router = createRouter({ routeTree: rootRoute.addChildren([me, profile, index]), history: createMemoryHistory({ initialEntries: ['/me'] }) })
