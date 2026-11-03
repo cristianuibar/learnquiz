@@ -11,12 +11,12 @@ import { learnerCanAccess } from '@/server/topic-access'
 
 export type DiagramResult =
   | { status: 'ready'; image: { src: string; alt: string } }
-  | { status: 'pending' | 'disabled' }
+  | { status: 'pending' | 'disabled' | 'unavailable' }
 
 // One access rule for serving and generating: the learner's own topic, or the shared topic of their assigned role.
 // A role concept's diagram is stored once and shared, so its generation counts against the company cap.
 async function accessibleConcept(db: Db, learnerId: string, conceptId: string) {
-  const [row] = await db.select({ concept: concepts, topic: topics.title, orgId: topics.orgId })
+  const [row] = await db.select({ concept: concepts, topic: topics.title, orgId: topics.orgId, ownerId: topics.learnerId })
     .from(concepts).innerJoin(topics, eq(topics.id, concepts.topicId))
     .where(and(eq(concepts.id, conceptId), learnerCanAccess(db, learnerId)))
   return row
@@ -32,6 +32,8 @@ export const generateConceptDiagram = createServerFn({ method: 'POST' })
     const { concept } = row
     const ready = (alt: string): DiagramResult => ({ status: 'ready', image: { src: `/media/concepts/${encodeURIComponent(concept.id)}`, alt } })
     if (concept.imageKey) return ready(concept.imageAlt ?? `${concept.name}: ${concept.summary}`)
+    // Employees play a shared role topic from stored content only: no paid image call on the employee path (#40).
+    if (row.ownerId !== learnerId) return { status: concept.visual ? 'unavailable' : 'disabled' }
     const env = getEnv()
     if (!concept.visual || !isImageEnabled()) return { status: 'disabled' }
 
