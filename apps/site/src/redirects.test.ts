@@ -1,5 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { signInUrl } from './site-config'
+
+const appOrigin = new URL(signInUrl).origin
 
 const redirects = readFileSync(new URL('../public/_redirects', import.meta.url), 'utf8')
   .trim()
@@ -22,13 +25,13 @@ function redirect(path: string) {
 describe('app redirects', () => {
   it.each(redirects)('preserves the prefix and nested path for $source', ({ source }) => {
     const path = source.replaceAll('*', 'abc/nested')
-    expect(redirect(path)).toEqual({ target: `https://app.learnquiz.com${path}`, status: 308 })
+    expect(redirect(path)).toEqual({ target: `${appOrigin}${path}`, status: 308 })
   })
 
   it.each([
     '/join/abc', '/play/abc', '/t/abc', '/org/abc', '/me/abc', '/admin/abc', '/api/abc', '/media/abc',
     '/me', '/admin', '/sign-in', '/today', '/welcome', '/start', '/opt-in',
   ])('sends %s to the same path in the app', (path) => {
-    expect(redirect(path)).toEqual({ target: `https://app.learnquiz.com${path}`, status: 308 })
+    expect(redirect(path)).toEqual({ target: `${appOrigin}${path}`, status: 308 })
   })
 })
