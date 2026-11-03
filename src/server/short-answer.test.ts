@@ -240,7 +240,12 @@ it.each([1, 12])('moves past an ungraded placement question and respects the que
 it('allows short items in practice generation and serves the checked items without leaking answers', async () => {
   raw.exec('DELETE FROM items')
   const drafts = Array.from({ length: 6 }, (_, i) => ({ ...payload, stem: `${payload.stem} (${i + 1})` }))
-  fetchModel.mockResolvedValueOnce(completion({ items: drafts })).mockResolvedValueOnce(completion({ results: drafts.map((_, index) => ({ index, keep: true, reasons: [] })) }))
+  fetchModel.mockResolvedValueOnce(completion({ items: drafts }))
+    .mockResolvedValueOnce(completion({ results: drafts.map((_, index) => ({ index, keep: true, reasons: [] })) }))
+    .mockImplementationOnce(async (_url: string, request: RequestInit) => completion({
+      steps: JSON.parse(JSON.parse(request.body as string).messages[1].content).candidates
+        .map((c: { itemId: string }) => ({ itemId: c.itemId, reason: 'Practise explaining equality.' })),
+    }))
 
   const { sessionId } = await startSession({ data: { topicId: 't1' } })
   const view = await getSession({ data: { sessionId } })
@@ -250,5 +255,5 @@ it('allows short items in practice generation and serves the checked items witho
   expect(row('SELECT COUNT(*) AS n FROM items WHERE format = \'short\'').n).toBe(6)
   const body = JSON.parse((fetchModel.mock.calls[0] as [string, RequestInit])[1].body as string)
   expect(body.messages[0].content).toContain('Allowed formats: mcq, cloze, short.')
-  expect(raw.prepare('SELECT purpose, ok FROM model_calls').all()).toEqual([{ purpose: 'items', ok: 1 }, { purpose: 'self_check', ok: 1 }])
+  expect(raw.prepare('SELECT purpose, ok FROM model_calls').all()).toEqual([{ purpose: 'items', ok: 1 }, { purpose: 'self_check', ok: 1 }, { purpose: 'plan', ok: 1 }])
 })
