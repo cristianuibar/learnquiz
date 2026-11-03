@@ -661,7 +661,8 @@ async function advance(db: Db, learnerId: string, session: SessionRow, topic: To
   }
 
   if (!nextId) {
-    await finalise(db, learnerId, session, topic)
+    // No active question is left, so the queue is finished even if retired items trail the position.
+    await finalise(db, learnerId, session, topic, true)
     const done = await loadSession(db, learnerId, session.id)
     return viewOf(db, done.session, done.topic, plan)
   }
@@ -760,7 +761,7 @@ ${log.map((l) => `- ${concept.get(l.itemId) ?? 'unknown'}: ${l.correct ? 'right'
 }
 
 // The claim update leads the batch and every side effect is gated on its token, so a concurrent close is a no-op and the batch stays all-or-nothing.
-async function finalise(db: Db, learnerId: string, session: SessionRow, topic: TopicRow) {
+async function finalise(db: Db, learnerId: string, session: SessionRow, topic: TopicRow, finished = false) {
   const now = Date.now()
   const claimToken = crypto.randomUUID()
   const claimed = sql`exists (select 1 from sessions where id = ${session.id} and json_extract(plan_json, '$.finaliseClaim') = ${claimToken})`
@@ -812,7 +813,7 @@ async function finalise(db: Db, learnerId: string, session: SessionRow, topic: T
     ])
     const ids = JSON.parse(session.itemIdsJson) as string[]
     // The bonus is for finishing the queue with at least one scored answer, not for leaving early or for ungraded items.
-    bonus = answered > 0 && plan.answered && plan.position >= ids.length - 1 ? SESSION_BONUS : 0
+    bonus = answered > 0 && (finished || (plan.answered && plan.position >= ids.length - 1)) ? SESSION_BONUS : 0
     const { streakCount, lastSessionAt } = streakAfter(lt, new Date(now), answered)
     stmts.push(
       db
