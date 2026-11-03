@@ -17,8 +17,11 @@ jest.mock('./lib/session-store', () => ({
   useSession: jest.fn(),
 }))
 jest.mock('./lib/api', () => ({ api: jest.fn() }))
-// Profile imports sign-out, which needs the native secure store.
-jest.mock('./lib/auth', () => ({ signOut: jest.fn() }))
+// Authentication and Profile's sign-out need the native secure store.
+jest.mock('./lib/auth', () => ({
+  signIn: jest.fn(), signUp: jest.fn(), signOut: jest.fn(), acceptInvitation: jest.fn(),
+  subscribeAuth: jest.fn(() => () => {}),
+}))
 // The real Today screen loads /today; this file only checks that the route is reachable.
 jest.mock('./app/(tabs)/today', () => ({
   __esModule: true,
@@ -56,8 +59,28 @@ test('the actual router sends a signed-out private link to sign-in', async () =>
   const navigation = renderRouter('src/app', { initialUrl: '/settings' })
   await navigation
   expect(navigation.getPathname()).toBe('/sign-in')
-  expect(screen.getByText('Sign in')).toBeOnTheScreen()
+  expect(screen.getByRole('header', { name: 'Sign in' })).toBeOnTheScreen()
   expect(screen.queryByText('Settings')).toBeNull()
+})
+
+test('sign-in prefills an editable email from the route without offering account creation', async () => {
+  jest.mocked(useSession).mockReturnValue(signedOut)
+  await renderRouter('src/app', { initialUrl: '/sign-in?email=returning%40example.com' })
+  const email = screen.getByLabelText('Email')
+  expect(email).toHaveProp('value', 'returning@example.com')
+  expect(email).toHaveProp('keyboardType', 'email-address')
+  expect(email).toHaveProp('autoComplete', 'email')
+  expect(email).toHaveProp('autoCapitalize', 'none')
+  expect(email).toHaveProp('autoCorrect', false)
+  expect(screen.queryByText('Create an account')).toBeNull()
+  expect(screen.queryByLabelText('Your name')).toBeNull()
+  expect(screen.getByRole('button', { name: 'Sign in' })).toBeDisabled()
+  await fireEvent.changeText(email, 'another@example.com')
+  expect(screen.getByLabelText('Email')).toHaveProp('value', 'another@example.com')
+  await fireEvent.changeText(screen.getByLabelText('Password'), 'password')
+  expect(screen.getByRole('button', { name: 'Sign in' })).toBeEnabled()
+  await fireEvent.changeText(email, '')
+  expect(screen.getByRole('button', { name: 'Sign in' })).toBeDisabled()
 })
 
 test('the actual router sends an undisclosed private link to welcome', async () => {
