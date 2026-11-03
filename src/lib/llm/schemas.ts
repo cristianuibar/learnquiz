@@ -17,6 +17,7 @@ export const CurriculumSkeleton = z.object({
               visual: z.boolean(),
               prerequisites: z.array(z.string().max(80)).max(4),
               source_quote: z.string().max(300).nullable(),
+              critical: z.boolean(),
               misconceptions: z.array(z.string().max(200)).max(3),
             }),
           )

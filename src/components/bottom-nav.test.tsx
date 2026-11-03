@@ -15,7 +15,7 @@ vi.mock('@/server/play', () => ({ startPlacement: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: vi.fn() }))
 vi.mock('@/server/session-fn', () => ({
-  getSessionFn: async () => ({ user: { id: 'learner', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false }),
+  getSessionFn: async () => ({ user: { id: 'learner', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] }),
 }))
 
 beforeEach(() => {

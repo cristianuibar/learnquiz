@@ -110,7 +110,7 @@ it('generates one diagram across overlapping views, serves its bytes, and reuses
 })
 
 it('carries the curriculum visual flag into stored concepts', async () => {
-  const concept = { name: 'Dispatch', summary: 'Pack and dispatch.', visual: true, prerequisites: [], source_quote: null, misconceptions: [] }
+  const concept = { name: 'Dispatch', summary: 'Pack and dispatch.', visual: true, critical: false, prerequisites: [], source_quote: null, misconceptions: [] }
   const skeleton = { units: Array.from({ length: 4 }, (_, u) => ({ name: `Unit ${u}`, summary: '', concepts: Array.from({ length: 4 }, (_, c) => ({ ...concept, name: `Dispatch ${u}-${c}`, visual: c === 0 })) })) }
   fetchModel.mockResolvedValueOnce(Response.json({ choices: [{ message: { content: JSON.stringify(skeleton) }, finish_reason: 'stop' }] }))
   const { topicId } = await createTopic({ data: { topic: 'Warehouse procedures' } })

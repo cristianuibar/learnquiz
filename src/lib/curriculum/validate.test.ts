@@ -49,6 +49,7 @@ it.each([
         visual: false,
         prerequisites: [],
         source_quote: quote,
+        critical: false,
         misconceptions: [],
       }],
     }],
