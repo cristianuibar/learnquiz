@@ -38,16 +38,18 @@ function SignIn() {
         initial={initial}
         onModeChange={setMode}
         defaultEmail={email}
+        social={
+          facebookEnabled ? (
+            <Button type="button" variant="secondary" size="lg" className="w-full" onClick={() => authClient.signIn.social({ provider: 'facebook', callbackURL: next })}>
+              Continue with Facebook
+            </Button>
+          ) : undefined
+        }
         onDone={async () => {
           await router.navigate({ href: next })
           await router.invalidate()
         }}
       />
-      {facebookEnabled && (
-        <Button variant="secondary" className="px-6" onClick={() => authClient.signIn.social({ provider: 'facebook', callbackURL: next })}>
-          Continue with Facebook
-        </Button>
-      )}
     </main>
   )
 }
