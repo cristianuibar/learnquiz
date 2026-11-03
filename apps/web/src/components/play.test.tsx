@@ -95,16 +95,17 @@ const locked = (el: HTMLElement): boolean => {
   return (el as HTMLInputElement).disabled || Boolean(fieldset && (fieldset.disabled || locked(fieldset)))
 }
 const button = (container: HTMLElement, label: string) => [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === label)!
-async function key(container: HTMLElement, type: 'keydown' | 'keyup') {
-  await act(async () => button(container, type === 'keydown' ? 'Hold to answer by voice' : 'Release to transcribe')
-    .dispatchEvent(new KeyboardEvent(type, { key: ' ', bubbles: true, cancelable: true })))
+const byLabel = (container: HTMLElement, label: string) => container.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)
+function type(el: HTMLElement, value: string) {
+  Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value')!.set!.call(el, value)
+  el.dispatchEvent(new Event('input', { bubbles: true }))
 }
+const click = (el: HTMLElement | null | undefined) => act(async () => el!.click())
 
 it('keeps an unsent answer and confidence across a reload and clears them after Check', async () => {
   const typeAndRate = async (container: HTMLElement) => act(async () => {
     const input = container.querySelector<HTMLInputElement>('#answer')!
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'one more')
-    input.dispatchEvent(new Event('input', { bubbles: true }))
+    type(input, 'one more')
     container.querySelector<HTMLInputElement>('input[value="unsure"]')!.click()
   })
   const first = await renderPlay(false, false, 'short')
@@ -150,8 +151,7 @@ it.each([
   try {
     await act(async () => {
       const input = container.querySelector<HTMLInputElement>('#answer')!
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, repeats ? '0' : '1')
-      input.dispatchEvent(new Event('input', { bubbles: true }))
+      type(input, repeats ? '0' : '1')
       container.querySelector<HTMLInputElement>(`input[value="${repeats ? 'unsure' : 'sure'}"]`)!.click()
     })
     await act(async () => { button(container, 'Check').click() })
@@ -165,20 +165,28 @@ it.each([
       next.click()
     })
     expect(nextItem).toHaveBeenCalledWith({ data: { sessionId: 's1', why: undefined } })
-    expect(document.activeElement?.textContent).toBe(nextView.item!.stem)
-    expect(document.activeElement?.tagName).toBe('H1')
+    if (nextView.item!.format === 'cloze') {
+      expect(document.activeElement).toBe(container.querySelector('#answer'))
+    } else {
+      expect(document.activeElement?.textContent).toBe(nextView.item!.stem)
+      expect(document.activeElement?.tagName).toBe('H1')
+    }
     expect(button(container, 'Check').disabled).toBe(true)
   } finally { await cleanup() }
 })
 
-it('records, uploads WAV, lets the learner edit the transcript, and checks the edited answer', async () => {
-  const { container, cleanup } = await renderPlay()
+it('records on tap, uploads WAV on stop, lets the learner edit the transcript, and checks the edited answer', async () => {
+  const { container, cleanup } = await renderPlay(true, false, 'short')
   try {
-    expect(container.textContent).toContain('x + 1 = 2')
     expect(prepareNextSession).toHaveBeenCalledWith({ data: { sessionId: 's1' } })
-    await key(container, 'keydown')
+    expect(container.textContent).toContain('Tap to record')
+    expect(button(container, 'Type instead')).toBeDefined()
+    await click(byLabel(container, 'Record answer'))
+    const stop = byLabel(container, 'Stop recording')!
+    expect(stop.getAttribute('aria-pressed')).toBe('true')
+    expect(container.querySelector('[role="status"]')!.textContent).toContain('Recording')
     expect(button(container, 'Check').disabled).toBe(true)
-    await key(container, 'keyup')
+    await click(stop)
     expect(stopTrack).toHaveBeenCalledTimes(1)
     expect(vi.mocked(transcribeAnswer)).toHaveBeenCalledTimes(1)
     const upload = vi.mocked(transcribeAnswer).mock.calls[0][0]!.data as FormData
@@ -187,17 +195,17 @@ it('records, uploads WAV, lets the learner edit the transcript, and checks the e
     const bytes = await (upload.get('audio') as File).arrayBuffer()
     expect(new DataView(bytes).getUint32(24, true)).toBe(24_000)
     expect(new DataView(bytes).getInt16(44, true)).toBe(8192)
-    const input = container.querySelector<HTMLInputElement>('#answer')!
+    const input = container.querySelector<HTMLTextAreaElement>('textarea#answer')!
     expect(input.value).toBe('one')
     expect(input.disabled).toBe(false)
+    expect(button(container, 'Record again')).toBeDefined()
     expect(answerItem).not.toHaveBeenCalled()
     await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '1')
-      input.dispatchEvent(new Event('input', { bubbles: true }))
+      type(input, 'one more step')
       container.querySelector<HTMLInputElement>('input[value="sure"]')!.click()
     })
-    await act(async () => { button(container, 'Check').click() })
-    expect(answerItem).toHaveBeenCalledWith({ data: expect.objectContaining({ answer: { text: '1' }, confidence: 'sure' }) })
+    await click(button(container, 'Check'))
+    expect(answerItem).toHaveBeenCalledWith({ data: expect.objectContaining({ answer: { text: 'one more step' }, confidence: 'sure' }) })
     expect(container.textContent).toContain('Correct, you were sure')
   } finally { await cleanup() }
 })
@@ -216,8 +224,7 @@ it.each([
     expect(button(container, 'Model trace')).toBeUndefined()
     await act(async () => {
       const input = container.querySelector<HTMLInputElement>('#answer')!
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '1')
-      input.dispatchEvent(new Event('input', { bubbles: true }))
+      type(input, '1')
       container.querySelector<HTMLInputElement>('input[value="sure"]')!.click()
     })
     await act(async () => { button(container, 'Check').click() })
@@ -233,62 +240,99 @@ it.each([
 })
 
 it('keeps typed input after a transcription failure', async () => {
-  const { container, cleanup } = await renderPlay()
+  const { container, cleanup } = await renderPlay(true, false, 'short')
   try {
-    const input = container.querySelector<HTMLInputElement>('#answer')!
-    await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'my draft')
-      input.dispatchEvent(new Event('input', { bubbles: true }))
-    })
+    await click(button(container, 'Type instead'))
+    const input = container.querySelector<HTMLTextAreaElement>('textarea#answer')!
+    expect(document.activeElement).toBe(input)
+    await act(async () => type(input, 'my draft'))
     vi.mocked(transcribeAnswer).mockRejectedValueOnce(new Error('Voice transcription failed. Please try again.'))
-    await key(container, 'keydown'); await key(container, 'keyup')
+    await click(button(container, 'Record again'))
+    await click(byLabel(container, 'Stop recording'))
     expect(container.querySelector('[role="alert"]')?.textContent).toBe('Voice transcription failed. Please try again.')
-    expect(input.value).toBe('my draft')
-    expect(input.disabled).toBe(false)
+    expect(container.querySelector<HTMLTextAreaElement>('textarea#answer')!.value).toBe('my draft')
+    expect(container.querySelector<HTMLTextAreaElement>('textarea#answer')!.disabled).toBe(false)
   } finally { await cleanup() }
 })
 
-it('stops a microphone granted after the learner releases the button', async () => {
-  const { container, mic, cleanup } = await renderPlay(true, true)
+it('stops a microphone granted after the learner stops recording', async () => {
+  const { container, mic, cleanup } = await renderPlay(true, true, 'short')
   try {
-    await key(container, 'keydown')
-    await act(async () => button(container, 'Hold to answer by voice').dispatchEvent(new KeyboardEvent('keyup', { key: ' ', bubbles: true })))
+    await click(byLabel(container, 'Record answer'))
+    await click(byLabel(container, 'Stop recording'))
     await act(async () => finishPermission!(mic))
     expect(stopTrack).toHaveBeenCalledTimes(1)
     expect(transcribeAnswer).not.toHaveBeenCalled()
-    expect(container.querySelector<HTMLInputElement>('#answer')!.disabled).toBe(false)
+    expect(byLabel(container, 'Record answer')).not.toBeNull()
+    expect(byLabel(container, 'Stop recording')).toBeNull()
   } finally { await cleanup() }
 })
 
 it('discards a canceled permission request while a new recording is pending', async () => {
-  const { container, mic, cleanup } = await renderPlay(true, true)
+  const { container, mic, cleanup } = await renderPlay(true, true, 'short')
   try {
-    await key(container, 'keydown')
+    await click(byLabel(container, 'Record answer'))
     const firstPermission = finishPermission!
-    await act(async () => button(container, 'Hold to answer by voice').dispatchEvent(new Event('pointercancel', { bubbles: true })))
-    await key(container, 'keydown')
+    await click(byLabel(container, 'Stop recording'))
+    await click(byLabel(container, 'Record answer'))
     const secondPermission = finishPermission!
     await act(async () => firstPermission(mic))
     expect(stopTrack).toHaveBeenCalledTimes(1)
-    expect(container.querySelector<HTMLInputElement>('#answer')!.disabled).toBe(true)
+    expect(byLabel(container, 'Stop recording')).not.toBeNull()
+    expect(button(container, 'Check').disabled).toBe(true)
     await act(async () => secondPermission(mic))
-    expect(button(container, 'Release to transcribe')).toBeDefined()
+    expect(byLabel(container, 'Stop recording')!.getAttribute('aria-pressed')).toBe('true')
     expect(transcribeAnswer).not.toHaveBeenCalled()
   } finally { await cleanup() }
 })
 
-it.each([false, null])('offers typing when voice availability is %s', async (voiceEnabled) => {
-  const { container, cleanup } = await renderPlay(voiceEnabled)
+it('keeps typing available when microphone permission is denied', async () => {
+  const { container, cleanup } = await renderPlay(true, false, 'short')
   try {
-    const input = container.querySelector<HTMLInputElement>('#answer')!
-    expect(input.disabled).toBe(false)
-    expect(button(container, 'Hold to answer by voice')).toBeUndefined()
+    vi.mocked(navigator.mediaDevices.getUserMedia).mockRejectedValueOnce(new DOMException('denied', 'NotAllowedError'))
+    await click(byLabel(container, 'Record answer'))
+    expect(container.querySelector('[role="alert"]')!.textContent).toBe('Microphone access was denied. Allow it in your browser settings or type your answer.')
+    await click(button(container, 'Type instead'))
     await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '1')
-      input.dispatchEvent(new Event('input', { bubbles: true }))
+      type(container.querySelector('textarea#answer')!, 'typed instead')
       container.querySelector<HTMLInputElement>('input[value="sure"]')!.click()
     })
-    await act(async () => { button(container, 'Check').click() })
+    await click(button(container, 'Check'))
+    expect(answerItem).toHaveBeenCalledWith({ data: expect.objectContaining({ answer: { text: 'typed instead' }, confidence: 'sure' }) })
+    expect(transcribeAnswer).not.toHaveBeenCalled()
+  } finally { await cleanup() }
+})
+
+it('drops non-digits from a numeric blank, ignores a fourth digit, and sends "007" as typed', async () => {
+  const { container, cleanup } = await renderPlay(false)
+  try {
+    const input = container.querySelector<HTMLInputElement>('input#answer')!
+    expect(input.getAttribute('aria-label')).toBe('Missing number')
+    expect(input.inputMode).toBe('numeric')
+    expect(byLabel(container, 'Record answer')).toBeNull()
+    await act(async () => type(input, 'a1b'))
+    expect(input.value).toBe('1')
+    await act(async () => type(input, '0071'))
+    expect(input.value).toBe('007')
+    await act(async () => container.querySelector<HTMLInputElement>('input[value="sure"]')!.click())
+    await click(button(container, 'Check'))
+    expect(answerItem).toHaveBeenCalledWith({ data: expect.objectContaining({ answer: { text: '007' }, confidence: 'sure' }) })
+  } finally { await cleanup() }
+})
+
+it.each([false, null])('offers typing when voice availability is %s', async (voiceEnabled) => {
+  const { container, cleanup } = await renderPlay(voiceEnabled, false, 'short')
+  try {
+    const input = container.querySelector<HTMLTextAreaElement>('textarea#answer')!
+    expect(input.disabled).toBe(false)
+    expect(input.getAttribute('rows')).toBe('4')
+    expect(container.querySelector('label[for="answer"]')!.textContent).toBe('Your answer')
+    expect(byLabel(container, 'Record answer')).toBeNull()
+    await act(async () => {
+      type(input, '1')
+      container.querySelector<HTMLInputElement>('input[value="sure"]')!.click()
+    })
+    await click(button(container, 'Check'))
     expect(answerItem).toHaveBeenCalledWith({ data: expect.objectContaining({ answer: { text: '1' }, confidence: 'sure' }) })
     expect(container.textContent).toContain('Correct, you were sure')
   } finally { await cleanup() }
@@ -307,8 +351,7 @@ it.each([false, true])('submits a short answer and shows its reveal (ungraded=%s
     })
     const input = container.querySelector<HTMLInputElement>('#answer')!
     await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'Both sides get smaller.')
-      input.dispatchEvent(new Event('input', { bubbles: true }))
+      type(input, 'Both sides get smaller.')
       container.querySelector<HTMLInputElement>('input[value="sure"]')!.click()
     })
     await act(async () => { button(container, 'Check').click() })
