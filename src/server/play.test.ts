@@ -203,7 +203,8 @@ it('stamps proficient_at once when a role topic meets its benchmark and never cl
   raw.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, ?)').run('m1', 'org-a', 'u1', 'member', 1)
   raw.prepare('INSERT INTO job_roles (id, org_id, name, benchmark, created_at) VALUES (?, ?, ?, ?, ?)').run('role', 'org-a', 'Analyst', 0.5, 1)
   raw.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES (?, ?, ?, ?)').run('u1', 'org-a', 'role', 1)
-  raw.prepare('UPDATE topics SET job_role_id = ? WHERE id = ?').run('role', 't1')
+  raw.prepare('UPDATE topics SET learner_id = NULL, job_role_id = ? WHERE id = ?').run('role', 't1')
+  raw.prepare('DELETE FROM learner_topic WHERE topic_id = ?').run('t1')
   seedFrontier(raw, 7, true)
   raw.prepare("DELETE FROM learner_item WHERE item_id <> 'i1'").run()
   raw.prepare('UPDATE concepts SET critical = 1 WHERE id = ?').run('c1')
@@ -231,6 +232,23 @@ it('stamps proficient_at once when a role topic meets its benchmark and never cl
   await answer('0')
   expect(scalar(raw, 'SELECT p_known < 0.5 AS low FROM learner_concept WHERE concept_id = ?', 'c1').low).toBe(1)
   expect(proficientAt()).toBe(now + 1000)
+})
+
+it.each([
+  ['no assignment', "DELETE FROM member_role_assignments"],
+  ['an archived role', "UPDATE job_roles SET status = 'archived'"],
+  ['no member row', 'DELETE FROM member'],
+])('refuses a role topic to a learner with %s', async (_name, breakIt) => {
+  seedTopicAndLearner(raw, 0)
+  raw.prepare('INSERT INTO user (id, name, email) VALUES (?, ?, ?)').run('u1', 'Learner', 'learner@example.test')
+  raw.prepare('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, ?)').run('org-a', 'Alpha', 'alpha', 1)
+  raw.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, ?)').run('m1', 'org-a', 'u1', 'member', 1)
+  raw.prepare('INSERT INTO job_roles (id, org_id, name, benchmark, created_at) VALUES (?, ?, ?, ?, ?)').run('role', 'org-a', 'Analyst', 0.5, 1)
+  raw.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES (?, ?, ?, ?)').run('u1', 'org-a', 'role', 1)
+  raw.prepare('UPDATE topics SET learner_id = NULL, job_role_id = ? WHERE id = ?').run('role', 't1')
+  raw.prepare('DELETE FROM learner_topic WHERE topic_id = ?').run('t1')
+  raw.prepare(breakIt).run()
+  await expect(startSession({ data: { topicId: 't1' } })).rejects.toMatchObject({ status: 404, message: 'Topic not found' })
 })
 
 function seedFrontier(raw: DatabaseSync, itemCount: number, hasDue: boolean) {
