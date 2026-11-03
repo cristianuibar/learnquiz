@@ -5,10 +5,10 @@ import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { Route as playRoute } from '@/routes/play.$sessionId'
 import { Route as appRootRoute } from '@/routes/__root'
-import { answerItem, getSession, nextItem, prepareNextSession, transcribeAnswer } from '@/server/play'
+import { answerItem, endSession, getSession, nextItem, prepareNextSession, transcribeAnswer } from '@/server/play'
 import { getModelTrace } from '@/server/model-trace'
 import { generateConceptDiagram } from '@/server/diagrams'
-import type { Reveal, SessionView } from '@learnquiz/api'
+import type { ItemView, Reveal, SessionView } from '@learnquiz/api'
 
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
 vi.mock('@/server/play', () => ({ prepareNextSession: vi.fn(async () => ({ ok: true })), answerItem: vi.fn(), getSession: vi.fn(), transcribeAnswer: vi.fn(), nextItem: vi.fn(), endSession: vi.fn(), reportItem: vi.fn() }))
@@ -30,7 +30,7 @@ beforeEach(() => {
 })
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); finishPermission = undefined; sessionStorage.clear() })
 
-async function renderPlay(voiceEnabled: boolean | null = true, permissionPending = false, format: 'cloze' | 'short' = 'cloze', fromToday = false) {
+async function renderPlay(voiceEnabled: boolean | null = true, permissionPending = false, format: 'cloze' | 'short' | 'mcq' = 'cloze', fromToday = false, overrides: Partial<ItemView> = {}) {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   stopTrack = vi.fn()
   const mic = { getTracks: () => [{ stop: stopTrack }] } as unknown as MediaStream
@@ -62,7 +62,11 @@ async function renderPlay(voiceEnabled: boolean | null = true, permissionPending
   const initial: SessionView = {
     id: 's1', kind: 'session', topicId: 't1', topicTitle: 'Algebra', progress: { position: 1, total: 1 }, ended: false,
     ...(voiceEnabled === null ? {} : { voiceEnabled }),
-    item: { id: 'i1', conceptId: 'c1', conceptName: 'Variables', format, stem: format === 'short' ? 'Explain why subtracting one preserves equality.' : 'x + 1 = 2; x = ____', options: [], blank: format === 'cloze' ? { numeric: true } : null, image: null, difficulty: 1, generatedBy: 'gpt-test' },
+    item: {
+      id: 'i1', conceptId: 'c1', conceptName: 'Variables', format, difficulty: 1, generatedBy: 'gpt-test', image: null,
+      stem: format === 'short' ? 'Explain why subtracting one preserves equality.' : format === 'mcq' ? 'x + 1 = 2; what is x?' : 'x + 1 = 2; x = ____',
+      options: format === 'mcq' ? [{ id: 'a', text: '2' }, { id: 'b', text: '1' }] : [], blank: format === 'cloze' ? { numeric: true } : null, ...overrides,
+    },
   }
   vi.mocked(getSession).mockResolvedValue(initial)
   vi.mocked(transcribeAnswer).mockReset().mockResolvedValue('one')
@@ -86,7 +90,10 @@ async function renderPlay(voiceEnabled: boolean | null = true, permissionPending
   } }
 }
 // happy-dom's :disabled ignores a disabled ancestor fieldset, which browsers honour.
-const locked = (el: HTMLElement) => (el as HTMLInputElement).disabled || Boolean(el.closest('fieldset')?.disabled)
+const locked = (el: HTMLElement): boolean => {
+  const fieldset = el.parentElement?.closest('fieldset')
+  return (el as HTMLInputElement).disabled || Boolean(fieldset && (fieldset.disabled || locked(fieldset)))
+}
 const button = (container: HTMLElement, label: string) => [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === label)!
 async function key(container: HTMLElement, type: 'keydown' | 'keyup') {
   await act(async () => button(container, type === 'keydown' ? 'Hold to answer by voice' : 'Release to transcribe')
@@ -206,7 +213,14 @@ it.each([
   })
   const { container, cleanup } = await renderPlay(false)
   try {
-    expect(container.textContent).toContain('x + 1 = 2')
+    expect(button(container, 'Model trace')).toBeUndefined()
+    await act(async () => {
+      const input = container.querySelector<HTMLInputElement>('#answer')!
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '1')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      container.querySelector<HTMLInputElement>('input[value="sure"]')!.click()
+    })
+    await act(async () => { button(container, 'Check').click() })
     await act(async () => button(container, 'Model trace').click())
     expect(getModelTrace).toHaveBeenCalledWith({ data: { scope: 'session', sessionId: 's1' } })
     const dialog = document.querySelector('[role="dialog"]')!
@@ -354,5 +368,114 @@ it('disables the answer controls while a page restored from the browser cache re
     await act(async () => { loaded({ ...initial, progress: { position: 3, total: 3 }, item: { ...initial.item!, id: 'i3', stem: 'Third question' } }) })
     expect(container.querySelector('h1')!.textContent).toBe('Third question')
     expect(locked(input())).toBe(false)
+  } finally { await cleanup() }
+})
+
+const pick = (container: HTMLElement, name: string, value: string) => act(async () => { container.querySelector<HTMLInputElement>(`input[name="${name}"][value="${value}"]`)!.click() })
+const checked = (container: HTMLElement, name: string) => container.querySelector<HTMLInputElement>(`input[name="${name}"]:checked`)?.value
+
+it('sends a multiple-choice answer only once an option and a confidence are chosen', async () => {
+  const { container, cleanup } = await renderPlay(false, false, 'mcq')
+  try {
+    const bar = container.querySelector('[role="progressbar"]')!
+    expect(bar.getAttribute('aria-valuenow')).toBe('1')
+    expect(bar.getAttribute('aria-valuetext')).toBe('1 of 1')
+    expect(button(container, 'Check').disabled).toBe(true)
+    await pick(container, 'answer', 'b')
+    expect(button(container, 'Check').disabled).toBe(true)
+    await pick(container, 'confidence', 'guess')
+    expect(button(container, 'Check').disabled).toBe(false)
+    await act(async () => { button(container, 'Check').click() })
+    expect(answerItem).toHaveBeenCalledTimes(1)
+    expect(answerItem).toHaveBeenCalledWith({ data: { sessionId: 's1', itemId: 'i1', answer: { optionId: 'b' }, confidence: 'guess', responseMs: expect.any(Number) } })
+    const { responseMs } = vi.mocked(answerItem).mock.calls[0][0]!.data as { responseMs: number }
+    expect(Number.isInteger(responseMs) && responseMs >= 0).toBe(true)
+  } finally { await cleanup() }
+})
+
+it('shows the server current question instead of replaying an answer that already landed (409)', async () => {
+  const { container, initial, cleanup } = await renderPlay(false, false, 'mcq')
+  try {
+    vi.mocked(answerItem).mockRejectedValueOnce(Object.assign(new Error('Already answered. Continue to the next question.'), { status: 409 }))
+    vi.mocked(getSession).mockResolvedValue({ ...initial, progress: { position: 2, total: 2 }, item: { ...initial.item!, id: 'i2', stem: 'Second question' } })
+    await pick(container, 'answer', 'b')
+    await pick(container, 'confidence', 'sure')
+    await act(async () => { button(container, 'Check').click() })
+    expect(container.querySelector('h1')!.textContent).toBe('Second question')
+    expect(answerItem).toHaveBeenCalledTimes(1)
+  } finally { await cleanup() }
+})
+
+it('ends the session from the top bar and returns to Today', async () => {
+  const { container, cleanup } = await renderPlay(false)
+  try {
+    vi.mocked(endSession).mockReset().mockResolvedValue({} as never)
+    await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="End session"]')!.click() })
+    expect(endSession).toHaveBeenCalledWith({ data: { sessionId: 's1' } })
+    expect(container.textContent).toContain('Today page')
+  } finally { await cleanup() }
+})
+
+it.each([
+  new TypeError('Failed to fetch'),
+  Object.assign(new Error('Internal error'), { status: 503 }),
+])('keeps the answer and offers Try again when checking fails (%s)', async (failure) => {
+  const { container, cleanup } = await renderPlay(false, false, 'mcq')
+  try {
+    vi.mocked(answerItem).mockRejectedValueOnce(failure).mockRejectedValueOnce(failure)
+    await pick(container, 'answer', 'b')
+    await pick(container, 'confidence', 'sure')
+    await act(async () => { button(container, 'Check').click() })
+    expect(container.querySelector('[role="alert"]')!.textContent).toBe('Couldn’t check your answer. It’s saved on this device.')
+    expect(document.activeElement).toBe(button(container, 'Try again'))
+    expect(button(container, 'Check')).toBeUndefined()
+    expect(checked(container, 'answer')).toBe('b')
+    expect(checked(container, 'confidence')).toBe('sure')
+    // Changing the answer brings Check back; failing again offers Try again once more.
+    await pick(container, 'answer', 'a')
+    expect(button(container, 'Try again')).toBeUndefined()
+    expect(button(container, 'Check').disabled).toBe(false)
+    await act(async () => { button(container, 'Check').click() })
+    expect(answerItem).toHaveBeenCalledTimes(2)
+    await act(async () => { button(container, 'Try again').click() })
+    expect(answerItem).toHaveBeenCalledTimes(3)
+    expect(answerItem).toHaveBeenLastCalledWith({ data: expect.objectContaining({ answer: { optionId: 'a' }, confidence: 'sure' }) })
+    expect(container.textContent).toContain('Correct')
+  } finally { await cleanup() }
+})
+
+it.each([
+  { format: 'multi' },
+  { format: 'order' },
+  { format: 'diagram' },
+])('tells the learner a $format question needs a newer app and lets them end the session', async ({ format }) => {
+  const { container, cleanup } = await renderPlay(false, false, 'mcq', false, { format: format as ItemView['format'], options: [] })
+  try {
+    const main = container.querySelector('form#play')!
+    expect(main.textContent).toContain('This question needs a newer version of the app.')
+    expect([...main.querySelectorAll('button')].some((b) => b.textContent?.trim() === 'End session')).toBe(true)
+    expect(button(container, 'Check')).toBeUndefined()
+    vi.mocked(endSession).mockReset().mockResolvedValue({} as never)
+    await act(async () => { button(container, 'End session').click() })
+    expect(endSession).toHaveBeenCalledWith({ data: { sessionId: 's1' } })
+  } finally { await cleanup() }
+})
+
+it('locks the answer and confidence while a check is in flight, so Try again sends what is shown', async () => {
+  const { container, cleanup } = await renderPlay(false, false, 'mcq')
+  try {
+    let fail!: (err: unknown) => void
+    vi.mocked(answerItem).mockReturnValueOnce(new Promise((_, reject) => { fail = reject }))
+    await pick(container, 'answer', 'b')
+    await pick(container, 'confidence', 'sure')
+    await act(async () => { button(container, 'Check').click() })
+    const optionA = container.querySelector<HTMLInputElement>('input[name="answer"][value="a"]')!
+    const unsure = container.querySelector<HTMLInputElement>('input[name="confidence"][value="unsure"]')!
+    expect(locked(optionA)).toBe(true)
+    expect(locked(unsure)).toBe(true)
+    await act(async () => { fail(new TypeError('Failed to fetch')) })
+    expect(locked(optionA)).toBe(false)
+    await act(async () => { button(container, 'Try again').click() })
+    expect(answerItem).toHaveBeenLastCalledWith({ data: expect.objectContaining({ answer: { optionId: 'b' }, confidence: 'sure' }) })
   } finally { await cleanup() }
 })
