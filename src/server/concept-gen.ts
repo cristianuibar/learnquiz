@@ -47,9 +47,12 @@ export async function processConcept(db: Db, conceptId: string): Promise<void> {
     else await settle({ genStatus: 'failed', genError: `Only ${total} of ${ITEMS_PER_CONCEPT} questions passed the self-check.` })
   } catch (e) {
     const status = (e as { status?: unknown }).status
-    if (status === 429) {
+    if (status === 429 && (e as Error).message === COMPANY_CAP_MESSAGE) {
       // Deferred to the next UTC day by drainConceptQueue.
       await settle({ genStatus: 'pending', genError: COMPANY_CAP_MESSAGE, genStartedAt: Date.now() })
+    } else if (status === 429) {
+      // A provider rate limit is transient: the next drain tries again.
+      await settle({ genStatus: 'pending', genError: (e as Error).message, genStartedAt: null })
     } else if (typeof status === 'number') {
       await settle({ genStatus: 'failed', genError: (e as Error).message })
     } else {

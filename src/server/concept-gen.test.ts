@@ -169,3 +169,14 @@ it('stores a nine-question top-up within the D1 parameter limit', async () => {
   expect(states()).toEqual([{ id: 'c00', gen_status: 'ready', gen_error: null }])
   expect(one("SELECT COUNT(*) AS n FROM items WHERE concept_id = 'c00' AND status = 'active'")).toEqual({ n: 9 })
 })
+
+it('retries a provider rate limit on the next drain instead of parking it as the company cap', async () => {
+  raw.exec("DELETE FROM concepts WHERE id <> 'c00'")
+  fetchModel.mockImplementation(async () => new Response('Slow down', { status: 429 }))
+  expect(await drainConceptQueue()).toBe(1)
+  expect(states()).toEqual([{ id: 'c00', gen_status: 'pending', gen_error: 'LLM request failed (429)' }])
+
+  fetchModel.mockImplementation(answerModel)
+  expect(await drainConceptQueue()).toBe(1)
+  expect(states()).toEqual([{ id: 'c00', gen_status: 'ready', gen_error: null }])
+})
