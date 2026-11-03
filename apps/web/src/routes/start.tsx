@@ -75,7 +75,6 @@ function Start() {
             <Label htmlFor="topic">Topic</Label>
             <Input
               id="topic"
-              className="h-12"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               minLength={2}
@@ -88,7 +87,6 @@ function Start() {
             <Label htmlFor="goal">Goal (optional)</Label>
             <Input
               id="goal"
-              className="h-12"
               value={goal}
               onChange={(e) => setGoal(e.target.value)}
               maxLength={300}
@@ -109,7 +107,7 @@ function Start() {
               {error}
             </p>
           )}
-          <Button type="submit" className="h-12 w-full px-6 sm:w-auto sm:self-end">
+          <Button type="submit" className="w-full px-6 sm:w-auto sm:self-end">
             Find my level
           </Button>
         </form>

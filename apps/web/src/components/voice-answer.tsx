@@ -115,8 +115,8 @@ export function VoiceAnswer({ sessionId, itemId, disabled, onTranscript, onBusyC
     <div className="flex flex-col gap-2">
       <Button
         type="button"
-        variant="outline"
-        className="h-12 touch-none select-none"
+        variant="secondary"
+        className="touch-none select-none"
         aria-pressed={state === 'recording'}
         aria-describedby="voice-status"
         disabled={disabled || state === 'transcribing'}
@@ -154,7 +154,7 @@ export function VoiceAnswer({ sessionId, itemId, disabled, onTranscript, onBusyC
           : state === 'done' ? 'Transcript ready. Edit your answer, then press Check.'
           : 'Hold the button or the Space key to speak. Your recording is sent for transcription when you release.'}
       </p>
-      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      {error && <p role="alert" className="text-sm text-ink">{error}</p>}
     </div>
   )
 }

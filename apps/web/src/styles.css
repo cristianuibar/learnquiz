@@ -15,7 +15,6 @@
   --secondary-foreground: var(--ink);
   --muted: var(--surface-sunken);
   --muted-foreground: var(--ink-muted);
-  --destructive: var(--feedback-wrong);
   --input: var(--border-strong);
   --ring: var(--brand);
   --learning: var(--feedback-learning);
@@ -39,7 +38,6 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
-  --color-destructive: var(--destructive);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-learning: var(--learning);
@@ -48,6 +46,50 @@
   --color-correct-soft: var(--correct-soft);
   --color-wrong: var(--wrong);
   --color-wrong-soft: var(--wrong-soft);
+}
+
+@theme {
+  --animate-dialog-enter: dialog-enter var(--duration-fast) cubic-bezier(0.2, 0, 0, 1);
+  --animate-dialog-exit: dialog-exit var(--duration-fast) cubic-bezier(0.2, 0, 0, 1) forwards;
+  --animate-scrim-enter: scrim-enter var(--duration-fast) cubic-bezier(0.2, 0, 0, 1);
+  --animate-scrim-exit: scrim-exit var(--duration-fast) cubic-bezier(0.2, 0, 0, 1) forwards;
+
+  @keyframes dialog-enter {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes dialog-exit {
+    from {
+      opacity: 1;
+      transform: none;
+    }
+    to {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+  }
+  @keyframes scrim-enter {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes scrim-exit {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
 }
 
 @layer base {

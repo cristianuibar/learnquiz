@@ -1,5 +1,14 @@
 import { clsx, type ClassValue } from 'clsx'
-import { twMerge } from 'tailwind-merge'
+import { extendTailwindMerge } from 'tailwind-merge'
+
+// Teach tailwind-merge the token type scale, so text-label is a font size and is not dropped next to a text color.
+const twMerge = extendTailwindMerge({
+  extend: {
+    theme: {
+      text: ['display', 'title-1', 'title-2', 'title-3', 'body-lg', 'body', 'label-lg', 'label', 'caption', 'overline', 'chip'],
+    },
+  },
+})
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
