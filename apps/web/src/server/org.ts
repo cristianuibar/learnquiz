@@ -203,7 +203,7 @@ export const getInvite = createServerFn({ method: 'GET' })
   .validator(z.object({ id: z.string().min(1).max(100) }))
   .handler(async ({ data }): Promise<InviteView | null> => {
     const row = await getDb()
-      .select({ company: organization.name, email: invitation.email, name: invitation.inviteeName, status: invitation.status, expiresAt: invitation.expiresAt, roleName: jobRoles.name, accent: orgSettings.accent })
+      .select({ company: organization.name, email: invitation.email, name: invitation.inviteeName, status: invitation.status, expiresAt: invitation.expiresAt, roleName: jobRoles.name, accent: orgSettings.accent, logoKey: orgSettings.logoKey })
       .from(invitation)
       .innerJoin(organization, eq(organization.id, invitation.organizationId))
       .innerJoin(jobRoles, and(eq(jobRoles.id, invitation.jobRoleId), eq(jobRoles.orgId, invitation.organizationId)))
@@ -214,5 +214,5 @@ export const getInvite = createServerFn({ method: 'GET' })
     const status = row.status === 'pending' && row.expiresAt.getTime() < Date.now() ? 'expired' : (row.status as InviteView['status'])
     const viewer = await getSessionUser()
     const otherAccount = !!viewer && !viewer.isAnonymous && viewer.email.toLowerCase() !== row.email.toLowerCase()
-    return { company: row.company, email: row.email, name: row.name, status, otherAccount, roleName: row.roleName, accent: row.accent !== null && brandProblem(row.accent) === null ? row.accent : null, logoUrl: null }
+    return { company: row.company, email: row.email, name: row.name, status, otherAccount, roleName: row.roleName, accent: row.accent !== null && brandProblem(row.accent) === null ? row.accent : null, logoUrl: row.logoKey ? `/api/invites/${encodeURIComponent(data.id)}/logo?v=${encodeURIComponent(row.logoKey)}` : null }
   })

@@ -36,6 +36,7 @@ import { Route as OrgSlugSettingsRouteImport } from './routes/org.$slug.settings
 import { Route as PlaySessionIdDoneRouteImport } from './routes/play.$sessionId_.done'
 import { Route as PlayQuickItemIdRouteImport } from './routes/play.quick.$itemId'
 import { Route as TTopicIdPathRouteImport } from './routes/t.$topicId.path'
+import { Route as ApiInvitesInvitationIdLogoRouteImport } from './routes/api/invites.$invitationId.logo'
 import { Route as ApiOrgOrgIdLogoRouteImport } from './routes/api/org.$orgId.logo'
 import { Route as OrgSlugPeopleIdRouteImport } from './routes/org.$slug.people_.$id'
 import { Route as OrgSlugRolesRoleIdRouteImport } from './routes/org.$slug.roles_.$roleId'
@@ -175,6 +176,12 @@ const TTopicIdPathRoute = TTopicIdPathRouteImport.update({
   path: '/t/$topicId/path',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiInvitesInvitationIdLogoRoute =
+  ApiInvitesInvitationIdLogoRouteImport.update({
+    id: '/api/invites/$invitationId/logo',
+    path: '/api/invites/$invitationId/logo',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiOrgOrgIdLogoRoute = ApiOrgOrgIdLogoRouteImport.update({
   id: '/api/org/$orgId/logo',
   path: '/api/org/$orgId/logo',
@@ -219,6 +226,7 @@ export interface FileRoutesByFullPath {
   '/play/quick/$itemId': typeof PlayQuickItemIdRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
   '/org/$slug/': typeof OrgSlugIndexRoute
+  '/api/invites/$invitationId/logo': typeof ApiInvitesInvitationIdLogoRoute
   '/api/org/$orgId/logo': typeof ApiOrgOrgIdLogoRoute
   '/org/$slug/people/$id': typeof OrgSlugPeopleIdRoute
   '/org/$slug/roles/$roleId': typeof OrgSlugRolesRoleIdRoute
@@ -249,6 +257,7 @@ export interface FileRoutesByTo {
   '/play/quick/$itemId': typeof PlayQuickItemIdRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
   '/org/$slug': typeof OrgSlugIndexRoute
+  '/api/invites/$invitationId/logo': typeof ApiInvitesInvitationIdLogoRoute
   '/api/org/$orgId/logo': typeof ApiOrgOrgIdLogoRoute
   '/org/$slug/people/$id': typeof OrgSlugPeopleIdRoute
   '/org/$slug/roles/$roleId': typeof OrgSlugRolesRoleIdRoute
@@ -282,6 +291,7 @@ export interface FileRoutesById {
   '/play/quick/$itemId': typeof PlayQuickItemIdRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
   '/org/$slug/': typeof OrgSlugIndexRoute
+  '/api/invites/$invitationId/logo': typeof ApiInvitesInvitationIdLogoRoute
   '/api/org/$orgId/logo': typeof ApiOrgOrgIdLogoRoute
   '/org/$slug/people_/$id': typeof OrgSlugPeopleIdRoute
   '/org/$slug/roles_/$roleId': typeof OrgSlugRolesRoleIdRoute
@@ -316,6 +326,7 @@ export interface FileRouteTypes {
     | '/play/quick/$itemId'
     | '/t/$topicId/path'
     | '/org/$slug/'
+    | '/api/invites/$invitationId/logo'
     | '/api/org/$orgId/logo'
     | '/org/$slug/people/$id'
     | '/org/$slug/roles/$roleId'
@@ -346,6 +357,7 @@ export interface FileRouteTypes {
     | '/play/quick/$itemId'
     | '/t/$topicId/path'
     | '/org/$slug'
+    | '/api/invites/$invitationId/logo'
     | '/api/org/$orgId/logo'
     | '/org/$slug/people/$id'
     | '/org/$slug/roles/$roleId'
@@ -378,6 +390,7 @@ export interface FileRouteTypes {
     | '/play/quick/$itemId'
     | '/t/$topicId/path'
     | '/org/$slug/'
+    | '/api/invites/$invitationId/logo'
     | '/api/org/$orgId/logo'
     | '/org/$slug/people_/$id'
     | '/org/$slug/roles_/$roleId'
@@ -402,6 +415,7 @@ export interface RootRouteChildren {
   PlaySessionIdDoneRoute: typeof PlaySessionIdDoneRoute
   PlayQuickItemIdRoute: typeof PlayQuickItemIdRoute
   TTopicIdPathRoute: typeof TTopicIdPathRoute
+  ApiInvitesInvitationIdLogoRoute: typeof ApiInvitesInvitationIdLogoRoute
   ApiOrgOrgIdLogoRoute: typeof ApiOrgOrgIdLogoRoute
 }
 
@@ -596,6 +610,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TTopicIdPathRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/invites/$invitationId/logo': {
+      id: '/api/invites/$invitationId/logo'
+      path: '/api/invites/$invitationId/logo'
+      fullPath: '/api/invites/$invitationId/logo'
+      preLoaderRoute: typeof ApiInvitesInvitationIdLogoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/org/$orgId/logo': {
       id: '/api/org/$orgId/logo'
       path: '/api/org/$orgId/logo'
@@ -678,6 +699,7 @@ const rootRouteChildren: RootRouteChildren = {
   PlaySessionIdDoneRoute: PlaySessionIdDoneRoute,
   PlayQuickItemIdRoute: PlayQuickItemIdRoute,
   TTopicIdPathRoute: TTopicIdPathRoute,
+  ApiInvitesInvitationIdLogoRoute: ApiInvitesInvitationIdLogoRoute,
   ApiOrgOrgIdLogoRoute: ApiOrgOrgIdLogoRoute,
 }
 export const routeTree = rootRouteImport
