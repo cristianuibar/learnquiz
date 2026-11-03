@@ -1,14 +1,16 @@
 import { createServerFn } from '@tanstack/react-start'
 import { and, asc, desc, eq, inArray, ne } from 'drizzle-orm'
 import { z } from 'zod'
-import { getDb } from '@/db'
-import { concepts, items, sources, topics } from '@/db/schema'
+import { getDb, type Db } from '@/db'
+import { concepts, items, jobRoles, sources, topics } from '@/db/schema'
 import { findSourceQuote } from '@/lib/curriculum/validate'
 import { ItemPayload } from '@/lib/llm/schemas'
 import { requireOrgAdmin } from '@/server/authz'
 import { httpError } from '@/server/helpers'
 
 const Slug = z.string().min(1).max(100)
+const companyRoleIds = (db: Db, orgId: string) =>
+  db.select({ id: jobRoles.id }).from(jobRoles).where(eq(jobRoles.orgId, orgId))
 
 export const getQuestionReview = createServerFn({ method: 'GET' })
   .validator(z.object({ slug: Slug, topicId: z.string().min(1).optional() }))
@@ -16,11 +18,11 @@ export const getQuestionReview = createServerFn({ method: 'GET' })
     const { org } = await requireOrgAdmin(data.slug)
     const db = getDb()
     const topicRows = await db.select({ id: topics.id, title: topics.title }).from(topics)
-      .where(eq(topics.orgId, org.id)).orderBy(desc(topics.createdAt))
+      .where(inArray(topics.jobRoleId, companyRoleIds(db, org.id))).orderBy(desc(topics.createdAt))
     const topic = data.topicId ? topicRows.find((t) => t.id === data.topicId) : topicRows[0]
     if (data.topicId && !topic) throw httpError('Topic not found', 404)
     if (!topic) return { name: org.name, topics: topicRows, topic: null, concepts: [] }
-    const scope = db.select({ id: topics.id }).from(topics).where(and(eq(topics.id, topic.id), eq(topics.orgId, org.id)))
+    const scope = db.select({ id: topics.id }).from(topics).where(and(eq(topics.id, topic.id), inArray(topics.jobRoleId, companyRoleIds(db, org.id))))
     const [conceptRows, itemRows] = await Promise.all([
       db.select({ id: concepts.id, name: concepts.name, sourceQuote: concepts.sourceQuote }).from(concepts)
         .where(inArray(concepts.topicId, scope)).orderBy(asc(concepts.unitId), asc(concepts.order)),
@@ -39,7 +41,7 @@ export const reviewQuestion = createServerFn({ method: 'POST' })
     const { org, user } = await requireOrgAdmin(data.slug)
     const db = getDb()
     // Scope the read AND the write through items.topic_id, including forged item ids.
-    const scope = and(eq(items.id, data.itemId), inArray(items.topicId, db.select({ id: topics.id }).from(topics).where(eq(topics.orgId, org.id))))
+    const scope = and(eq(items.id, data.itemId), inArray(items.topicId, db.select({ id: topics.id }).from(topics).where(inArray(topics.jobRoleId, companyRoleIds(db, org.id)))))
     const row = await db.select({ item: items, concept: concepts, sourceText: sources.bodyText }).from(items)
       .innerJoin(concepts, and(eq(concepts.id, items.conceptId), eq(concepts.topicId, items.topicId)))
       .leftJoin(sources, and(eq(sources.id, concepts.sourceId), eq(sources.topicId, items.topicId)))

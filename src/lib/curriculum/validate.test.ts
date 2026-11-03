@@ -48,6 +48,7 @@ it.each([
         summary: 'Concept summary',
         prerequisites: [],
         source_quote: quote,
+        critical: false,
         misconceptions: [],
       }],
     }],

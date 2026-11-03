@@ -26,8 +26,11 @@ import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as OrgSlugIndexRouteImport } from './routes/org.$slug.index'
 import { Route as OrgSlugPeopleRouteImport } from './routes/org.$slug.people'
 import { Route as OrgSlugQuestionsRouteImport } from './routes/org.$slug.questions'
+import { Route as OrgSlugRolesRouteImport } from './routes/org.$slug.roles'
+import { Route as OrgSlugSettingsRouteImport } from './routes/org.$slug.settings'
 import { Route as PlaySessionIdDoneRouteImport } from './routes/play.$sessionId_.done'
 import { Route as TTopicIdPathRouteImport } from './routes/t.$topicId.path'
+import { Route as ApiOrgOrgIdLogoRouteImport } from './routes/api/org.$orgId.logo'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -114,6 +117,16 @@ const OrgSlugQuestionsRoute = OrgSlugQuestionsRouteImport.update({
   path: '/org/$slug/questions',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OrgSlugRolesRoute = OrgSlugRolesRouteImport.update({
+  id: '/org/$slug/roles',
+  path: '/org/$slug/roles',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrgSlugSettingsRoute = OrgSlugSettingsRouteImport.update({
+  id: '/org/$slug/settings',
+  path: '/org/$slug/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlaySessionIdDoneRoute = PlaySessionIdDoneRouteImport.update({
   id: '/play/$sessionId_/done',
   path: '/play/$sessionId/done',
@@ -122,6 +135,11 @@ const PlaySessionIdDoneRoute = PlaySessionIdDoneRouteImport.update({
 const TTopicIdPathRoute = TTopicIdPathRouteImport.update({
   id: '/t/$topicId/path',
   path: '/t/$topicId/path',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOrgOrgIdLogoRoute = ApiOrgOrgIdLogoRouteImport.update({
+  id: '/api/org/$orgId/logo',
+  path: '/api/org/$orgId/logo',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -142,9 +160,12 @@ export interface FileRoutesByFullPath {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/org/$slug/people': typeof OrgSlugPeopleRoute
   '/org/$slug/questions': typeof OrgSlugQuestionsRoute
+  '/org/$slug/roles': typeof OrgSlugRolesRoute
+  '/org/$slug/settings': typeof OrgSlugSettingsRoute
   '/play/$sessionId/done': typeof PlaySessionIdDoneRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
   '/org/$slug/': typeof OrgSlugIndexRoute
+  '/api/org/$orgId/logo': typeof ApiOrgOrgIdLogoRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -162,9 +183,12 @@ export interface FileRoutesByTo {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/org/$slug/people': typeof OrgSlugPeopleRoute
   '/org/$slug/questions': typeof OrgSlugQuestionsRoute
+  '/org/$slug/roles': typeof OrgSlugRolesRoute
+  '/org/$slug/settings': typeof OrgSlugSettingsRoute
   '/play/$sessionId/done': typeof PlaySessionIdDoneRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
   '/org/$slug': typeof OrgSlugIndexRoute
+  '/api/org/$orgId/logo': typeof ApiOrgOrgIdLogoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -184,9 +208,12 @@ export interface FileRoutesById {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/org/$slug/people': typeof OrgSlugPeopleRoute
   '/org/$slug/questions': typeof OrgSlugQuestionsRoute
+  '/org/$slug/roles': typeof OrgSlugRolesRoute
+  '/org/$slug/settings': typeof OrgSlugSettingsRoute
   '/play/$sessionId_/done': typeof PlaySessionIdDoneRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
   '/org/$slug/': typeof OrgSlugIndexRoute
+  '/api/org/$orgId/logo': typeof ApiOrgOrgIdLogoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -207,9 +234,12 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/org/$slug/people'
     | '/org/$slug/questions'
+    | '/org/$slug/roles'
+    | '/org/$slug/settings'
     | '/play/$sessionId/done'
     | '/t/$topicId/path'
     | '/org/$slug/'
+    | '/api/org/$orgId/logo'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -227,9 +257,12 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/org/$slug/people'
     | '/org/$slug/questions'
+    | '/org/$slug/roles'
+    | '/org/$slug/settings'
     | '/play/$sessionId/done'
     | '/t/$topicId/path'
     | '/org/$slug'
+    | '/api/org/$orgId/logo'
   id:
     | '__root__'
     | '/'
@@ -248,9 +281,12 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/org/$slug/people'
     | '/org/$slug/questions'
+    | '/org/$slug/roles'
+    | '/org/$slug/settings'
     | '/play/$sessionId_/done'
     | '/t/$topicId/path'
     | '/org/$slug/'
+    | '/api/org/$orgId/logo'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -266,9 +302,12 @@ export interface RootRouteChildren {
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   OrgSlugPeopleRoute: typeof OrgSlugPeopleRoute
   OrgSlugQuestionsRoute: typeof OrgSlugQuestionsRoute
+  OrgSlugRolesRoute: typeof OrgSlugRolesRoute
+  OrgSlugSettingsRoute: typeof OrgSlugSettingsRoute
   PlaySessionIdDoneRoute: typeof PlaySessionIdDoneRoute
   TTopicIdPathRoute: typeof TTopicIdPathRoute
   OrgSlugIndexRoute: typeof OrgSlugIndexRoute
+  ApiOrgOrgIdLogoRoute: typeof ApiOrgOrgIdLogoRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -392,6 +431,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrgSlugQuestionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/org/$slug/roles': {
+      id: '/org/$slug/roles'
+      path: '/org/$slug/roles'
+      fullPath: '/org/$slug/roles'
+      preLoaderRoute: typeof OrgSlugRolesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/org/$slug/settings': {
+      id: '/org/$slug/settings'
+      path: '/org/$slug/settings'
+      fullPath: '/org/$slug/settings'
+      preLoaderRoute: typeof OrgSlugSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/play/$sessionId_/done': {
       id: '/play/$sessionId_/done'
       path: '/play/$sessionId/done'
@@ -404,6 +457,13 @@ declare module '@tanstack/react-router' {
       path: '/t/$topicId/path'
       fullPath: '/t/$topicId/path'
       preLoaderRoute: typeof TTopicIdPathRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/org/$orgId/logo': {
+      id: '/api/org/$orgId/logo'
+      path: '/api/org/$orgId/logo'
+      fullPath: '/api/org/$orgId/logo'
+      preLoaderRoute: typeof ApiOrgOrgIdLogoRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -438,9 +498,12 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   OrgSlugPeopleRoute: OrgSlugPeopleRoute,
   OrgSlugQuestionsRoute: OrgSlugQuestionsRoute,
+  OrgSlugRolesRoute: OrgSlugRolesRoute,
+  OrgSlugSettingsRoute: OrgSlugSettingsRoute,
   PlaySessionIdDoneRoute: PlaySessionIdDoneRoute,
   TTopicIdPathRoute: TTopicIdPathRoute,
   OrgSlugIndexRoute: OrgSlugIndexRoute,
+  ApiOrgOrgIdLogoRoute: ApiOrgOrgIdLogoRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

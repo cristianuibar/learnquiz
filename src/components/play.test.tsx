@@ -11,8 +11,9 @@ import type { Reveal, SessionView } from '@/lib/learning/types'
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
 vi.mock('@/server/play', () => ({ answerItem: vi.fn(), getSession: vi.fn(), transcribeAnswer: vi.fn(), nextItem: vi.fn(), endSession: vi.fn(), reportItem: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
+vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => 't1' }))
-vi.mock('@/server/session-fn', () => ({ getSessionFn: async () => ({ user: { id: 'u1', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false }) }))
+vi.mock('@/server/session-fn', () => ({ getSessionFn: async () => ({ user: { id: 'u1', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] }) }))
 
 let stopTrack: ReturnType<typeof vi.fn>
 let finishPermission: ((stream: MediaStream) => void) | undefined

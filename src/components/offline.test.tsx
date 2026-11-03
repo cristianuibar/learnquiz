@@ -12,6 +12,7 @@ import { getSessionFn } from '@/server/session-fn'
 
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
+vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => 'topic' }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/curriculum', () => ({ getTopicPath: vi.fn(), getConceptItems: vi.fn() }))
@@ -26,7 +27,7 @@ beforeEach(() => {
   Object.defineProperty(reducedMotion, 'matches', { value: true })
   vi.spyOn(window, 'matchMedia').mockReturnValue(reducedMotion)
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
-  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'learner', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false })
+  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'learner', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })
   vi.mocked(getTopicPath).mockResolvedValue({
     topic: { id: 'topic', title: 'Arithmetic', goal: null, status: 'ready', generatedBy: null },
     learner: { level: 1, levelLine: null, levelLineModel: null, placed: false, xp: 0, streak: 0 }, units: [], edges: [],

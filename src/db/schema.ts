@@ -1,16 +1,18 @@
 import { integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { organization } from './auth-schema'
+import type { WorkingHours } from '@/lib/company-settings'
 
 // learner_id everywhere is the Better Auth user id (guest or Facebook). ids are crypto.randomUUID().
 // Times are epoch milliseconds. JSON lives in *_json text columns.
 
 export const topics = sqliteTable('topics', {
   id: text('id').primaryKey(),
-  orgId: text('org_id'), // null for personal topics
-  learnerId: text('learner_id').notNull(),
+  learnerId: text('learner_id'), // Personal topics belong to a learner; company topics belong to a job role.
+  jobRoleId: text('job_role_id').unique().references(() => jobRoles.id),
   title: text('title').notNull(),
   goal: text('goal'),
   generatedBy: text('generated_by'),
-  status: text('status', { enum: ['generating', 'ready', 'failed'] }).notNull().default('generating'),
+  status: text('status', { enum: ['draft', 'generating', 'ready', 'failed'] }).notNull().default('generating'),
   createdAt: integer('created_at').notNull(),
 })
 
@@ -20,6 +22,7 @@ export const sources = sqliteTable('sources', {
   kind: text('kind', { enum: ['text', 'url', 'pdf', 'image'] }).notNull(),
   title: text('title').notNull(),
   bodyText: text('body_text').notNull(),
+  deletedAt: integer('deleted_at'),
   createdAt: integer('created_at').notNull(),
 })
 
@@ -44,6 +47,7 @@ export const concepts = sqliteTable('concepts', {
   sourceQuote: text('source_quote'),
   misconceptionsJson: text('misconceptions_json').notNull().default('[]'),
   grounded: integer('grounded', { mode: 'boolean' }).notNull().default(false),
+  critical: integer('critical', { mode: 'boolean' }).notNull().default(false),
   visual: integer('visual', { mode: 'boolean' }).notNull().default(false),
   imageKey: text('image_key'),
   imageAlt: text('image_alt'),
@@ -234,3 +238,12 @@ export const consents = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.userId, t.kind] })],
 )
+
+export const orgSettings = sqliteTable('org_settings', {
+  orgId: text('org_id').primaryKey().references(() => organization.id, { onDelete: 'cascade' }),
+  companyName: text('company_name').notNull(),
+  timezone: text('timezone').notNull().default('UTC'),
+  workingHours: text('working_hours_json', { mode: 'json' }).$type<WorkingHours>().notNull(),
+  logoKey: text('logo_key'),
+  accent: text('accent'),
+})

@@ -54,7 +54,10 @@ beforeAll(() => {
     raw.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, ?)').run(id, org, id, role, Date.now())
   }
   for (const [id, org] of [['a', 'org-a'], ['b', 'org-b'], ['personal', null]]) {
-    raw.prepare("INSERT INTO topics (id, org_id, learner_id, title, status, created_at) VALUES (?, ?, 'admin-a', ?, 'ready', ?)").run(id, org, id, Date.now())
+    const roleId = org ? `role-${id}` : null
+    if (org) raw.prepare('INSERT INTO job_roles (id, org_id, name, created_at) VALUES (?, ?, ?, ?)').run(roleId, org, id, Date.now())
+    raw.prepare("INSERT INTO topics (id, job_role_id, learner_id, title, status, created_at) VALUES (?, ?, ?, ?, 'ready', ?)")
+      .run(id, roleId, org ? null : 'admin-a', id, Date.now())
     raw.prepare("INSERT INTO units (id, topic_id, 'order', name) VALUES (?, ?, 0, 'Basics')").run(`unit-${id}`, id)
     raw.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, created_at) VALUES (?, ?, 'text', 'Algebra', ?, ?)").run(`source-${id}`, id, 'To solve the equation: Subtract 1 from both sides.', Date.now())
     raw.prepare("INSERT INTO concepts (id, topic_id, unit_id, 'order', name, summary, source_id, source_quote, grounded) VALUES (?, ?, ?, 0, 'Equations', '', ?, ?, 1)")
@@ -90,8 +93,10 @@ it('lists company questions and learner flags, approves, edits and retires witho
   })
   await reviewQuestion({ data: { slug: 'alpha', itemId: 'a-live', action: 'retire' } })
   await expect(reviewQuestion({ data: { slug: 'alpha', itemId: 'a-live', action: 'approve' } })).rejects.toMatchObject({ status: 409 })
-  await expect(reportItem({ data: { itemId: 'a-live' } })).rejects.toMatchObject({ status: 404 })
   expect(row('SELECT status FROM items WHERE id = ?', 'a-live')).toEqual({ status: 'retired' })
+  raw.prepare("UPDATE items SET status = 'retired' WHERE id = 'personal-live'").run()
+  await expect(reportItem({ data: { itemId: 'personal-live' } })).rejects.toMatchObject({ status: 404 })
+  expect(row('SELECT status FROM items WHERE id = ?', 'personal-live')).toEqual({ status: 'retired' })
 })
 
 it('rejects invalid payloads, invented quotes and removing grounding with a message, preserving the stored question', async () => {
