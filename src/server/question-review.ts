@@ -63,7 +63,8 @@ export const reviewQuestion = createServerFn({ method: 'POST' })
       changes = { payloadJson: JSON.stringify(payload), format: payload.format, difficultyPrior: payload.difficulty, checkJson: null, reviewedBy: null, reviewedAt: null }
     } else if (data.action === 'approve') {
       if (row.item.status === 'retired') throw httpError('Retired questions cannot be approved', 409)
-      changes = { reviewedBy: user.id, reviewedAt: Date.now() }
+      // Approval clears a learner flag so the question returns to sessions, which only serve 'active' items.
+      changes = { status: 'active', reviewedBy: user.id, reviewedAt: Date.now() }
     } else {
       changes = { status: 'retired' }
     }
