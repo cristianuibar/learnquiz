@@ -5,13 +5,13 @@ import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { Route as playRoute } from '@/routes/play.$sessionId'
 import { Route as appRootRoute } from '@/routes/__root'
-import { answerItem, getSession, nextItem, transcribeAnswer } from '@/server/play'
+import { answerItem, getSession, nextItem, prepareNextSession, transcribeAnswer } from '@/server/play'
 import { getModelTrace } from '@/server/model-trace'
 import { generateConceptDiagram } from '@/server/diagrams'
 import type { Reveal, SessionView } from '@learnquiz/api'
 
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
-vi.mock('@/server/play', () => ({ answerItem: vi.fn(), getSession: vi.fn(), transcribeAnswer: vi.fn(), nextItem: vi.fn(), endSession: vi.fn(), reportItem: vi.fn() }))
+vi.mock('@/server/play', () => ({ prepareNextSession: vi.fn(async () => ({ ok: true })), answerItem: vi.fn(), getSession: vi.fn(), transcribeAnswer: vi.fn(), nextItem: vi.fn(), endSession: vi.fn(), reportItem: vi.fn() }))
 vi.mock('@/server/model-trace', () => ({ getModelTrace: vi.fn() }))
 vi.mock('@/server/diagrams', () => ({ generateConceptDiagram: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
@@ -168,6 +168,7 @@ it('records, uploads WAV, lets the learner edit the transcript, and checks the e
   const { container, cleanup } = await renderPlay()
   try {
     expect(container.textContent).toContain('x + 1 = 2')
+    expect(prepareNextSession).toHaveBeenCalledWith({ data: { sessionId: 's1' } })
     await key(container, 'keydown')
     expect(button(container, 'Check').disabled).toBe(true)
     await key(container, 'keyup')

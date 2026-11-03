@@ -26,6 +26,7 @@ import { Route as OrgNewRouteImport } from './routes/org.new'
 import { Route as PlaySessionIdRouteImport } from './routes/play.$sessionId'
 import { Route as AdminCompaniesSlugRouteImport } from './routes/admin.companies_.$slug'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
 import { Route as MediaConceptsConceptIdRouteImport } from './routes/media/concepts/$conceptId'
 import { Route as OrgSlugIndexRouteImport } from './routes/org.$slug.index'
 import { Route as OrgSlugPeopleRouteImport } from './routes/org.$slug.people'
@@ -35,6 +36,7 @@ import { Route as OrgSlugSettingsRouteImport } from './routes/org.$slug.settings
 import { Route as PlaySessionIdDoneRouteImport } from './routes/play.$sessionId_.done'
 import { Route as PlayQuickItemIdRouteImport } from './routes/play.quick.$itemId'
 import { Route as TTopicIdPathRouteImport } from './routes/t.$topicId.path'
+import { Route as ApiInvitesInvitationIdLogoRouteImport } from './routes/api/invites.$invitationId.logo'
 import { Route as ApiOrgOrgIdLogoRouteImport } from './routes/api/org.$orgId.logo'
 import { Route as OrgSlugPeopleIdRouteImport } from './routes/org.$slug.people_.$id'
 import { Route as OrgSlugRolesRoleIdRouteImport } from './routes/org.$slug.roles_.$roleId'
@@ -124,6 +126,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiV1SplatRoute = ApiV1SplatRouteImport.update({
+  id: '/api/v1/$',
+  path: '/api/v1/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MediaConceptsConceptIdRoute = MediaConceptsConceptIdRouteImport.update({
   id: '/media/concepts/$conceptId',
   path: '/media/concepts/$conceptId',
@@ -169,6 +176,12 @@ const TTopicIdPathRoute = TTopicIdPathRouteImport.update({
   path: '/t/$topicId/path',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiInvitesInvitationIdLogoRoute =
+  ApiInvitesInvitationIdLogoRouteImport.update({
+    id: '/api/invites/$invitationId/logo',
+    path: '/api/invites/$invitationId/logo',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiOrgOrgIdLogoRoute = ApiOrgOrgIdLogoRouteImport.update({
   id: '/api/org/$orgId/logo',
   path: '/api/org/$orgId/logo',
@@ -203,6 +216,7 @@ export interface FileRoutesByFullPath {
   '/me/': typeof MeIndexRoute
   '/admin/companies/$slug': typeof AdminCompaniesSlugRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/v1/$': typeof ApiV1SplatRoute
   '/media/concepts/$conceptId': typeof MediaConceptsConceptIdRoute
   '/org/$slug/people': typeof OrgSlugPeopleRoute
   '/org/$slug/questions': typeof OrgSlugQuestionsRoute
@@ -212,6 +226,7 @@ export interface FileRoutesByFullPath {
   '/play/quick/$itemId': typeof PlayQuickItemIdRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
   '/org/$slug/': typeof OrgSlugIndexRoute
+  '/api/invites/$invitationId/logo': typeof ApiInvitesInvitationIdLogoRoute
   '/api/org/$orgId/logo': typeof ApiOrgOrgIdLogoRoute
   '/org/$slug/people/$id': typeof OrgSlugPeopleIdRoute
   '/org/$slug/roles/$roleId': typeof OrgSlugRolesRoleIdRoute
@@ -232,6 +247,7 @@ export interface FileRoutesByTo {
   '/me': typeof MeIndexRoute
   '/admin/companies/$slug': typeof AdminCompaniesSlugRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/v1/$': typeof ApiV1SplatRoute
   '/media/concepts/$conceptId': typeof MediaConceptsConceptIdRoute
   '/org/$slug/people': typeof OrgSlugPeopleRoute
   '/org/$slug/questions': typeof OrgSlugQuestionsRoute
@@ -241,6 +257,7 @@ export interface FileRoutesByTo {
   '/play/quick/$itemId': typeof PlayQuickItemIdRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
   '/org/$slug': typeof OrgSlugIndexRoute
+  '/api/invites/$invitationId/logo': typeof ApiInvitesInvitationIdLogoRoute
   '/api/org/$orgId/logo': typeof ApiOrgOrgIdLogoRoute
   '/org/$slug/people/$id': typeof OrgSlugPeopleIdRoute
   '/org/$slug/roles/$roleId': typeof OrgSlugRolesRoleIdRoute
@@ -264,6 +281,7 @@ export interface FileRoutesById {
   '/me/': typeof MeIndexRoute
   '/admin/companies_/$slug': typeof AdminCompaniesSlugRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/v1/$': typeof ApiV1SplatRoute
   '/media/concepts/$conceptId': typeof MediaConceptsConceptIdRoute
   '/org/$slug/people': typeof OrgSlugPeopleRoute
   '/org/$slug/questions': typeof OrgSlugQuestionsRoute
@@ -273,6 +291,7 @@ export interface FileRoutesById {
   '/play/quick/$itemId': typeof PlayQuickItemIdRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
   '/org/$slug/': typeof OrgSlugIndexRoute
+  '/api/invites/$invitationId/logo': typeof ApiInvitesInvitationIdLogoRoute
   '/api/org/$orgId/logo': typeof ApiOrgOrgIdLogoRoute
   '/org/$slug/people_/$id': typeof OrgSlugPeopleIdRoute
   '/org/$slug/roles_/$roleId': typeof OrgSlugRolesRoleIdRoute
@@ -297,6 +316,7 @@ export interface FileRouteTypes {
     | '/me/'
     | '/admin/companies/$slug'
     | '/api/auth/$'
+    | '/api/v1/$'
     | '/media/concepts/$conceptId'
     | '/org/$slug/people'
     | '/org/$slug/questions'
@@ -306,6 +326,7 @@ export interface FileRouteTypes {
     | '/play/quick/$itemId'
     | '/t/$topicId/path'
     | '/org/$slug/'
+    | '/api/invites/$invitationId/logo'
     | '/api/org/$orgId/logo'
     | '/org/$slug/people/$id'
     | '/org/$slug/roles/$roleId'
@@ -326,6 +347,7 @@ export interface FileRouteTypes {
     | '/me'
     | '/admin/companies/$slug'
     | '/api/auth/$'
+    | '/api/v1/$'
     | '/media/concepts/$conceptId'
     | '/org/$slug/people'
     | '/org/$slug/questions'
@@ -335,6 +357,7 @@ export interface FileRouteTypes {
     | '/play/quick/$itemId'
     | '/t/$topicId/path'
     | '/org/$slug'
+    | '/api/invites/$invitationId/logo'
     | '/api/org/$orgId/logo'
     | '/org/$slug/people/$id'
     | '/org/$slug/roles/$roleId'
@@ -357,6 +380,7 @@ export interface FileRouteTypes {
     | '/me/'
     | '/admin/companies_/$slug'
     | '/api/auth/$'
+    | '/api/v1/$'
     | '/media/concepts/$conceptId'
     | '/org/$slug/people'
     | '/org/$slug/questions'
@@ -366,6 +390,7 @@ export interface FileRouteTypes {
     | '/play/quick/$itemId'
     | '/t/$topicId/path'
     | '/org/$slug/'
+    | '/api/invites/$invitationId/logo'
     | '/api/org/$orgId/logo'
     | '/org/$slug/people_/$id'
     | '/org/$slug/roles_/$roleId'
@@ -385,10 +410,12 @@ export interface RootRouteChildren {
   PlaySessionIdRoute: typeof PlaySessionIdRoute
   MeIndexRoute: typeof MeIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiV1SplatRoute: typeof ApiV1SplatRoute
   MediaConceptsConceptIdRoute: typeof MediaConceptsConceptIdRoute
   PlaySessionIdDoneRoute: typeof PlaySessionIdDoneRoute
   PlayQuickItemIdRoute: typeof PlayQuickItemIdRoute
   TTopicIdPathRoute: typeof TTopicIdPathRoute
+  ApiInvitesInvitationIdLogoRoute: typeof ApiInvitesInvitationIdLogoRoute
   ApiOrgOrgIdLogoRoute: typeof ApiOrgOrgIdLogoRoute
 }
 
@@ -513,6 +540,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/v1/$': {
+      id: '/api/v1/$'
+      path: '/api/v1/$'
+      fullPath: '/api/v1/$'
+      preLoaderRoute: typeof ApiV1SplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/media/concepts/$conceptId': {
       id: '/media/concepts/$conceptId'
       path: '/media/concepts/$conceptId'
@@ -574,6 +608,13 @@ declare module '@tanstack/react-router' {
       path: '/t/$topicId/path'
       fullPath: '/t/$topicId/path'
       preLoaderRoute: typeof TTopicIdPathRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/invites/$invitationId/logo': {
+      id: '/api/invites/$invitationId/logo'
+      path: '/api/invites/$invitationId/logo'
+      fullPath: '/api/invites/$invitationId/logo'
+      preLoaderRoute: typeof ApiInvitesInvitationIdLogoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/org/$orgId/logo': {
@@ -653,10 +694,12 @@ const rootRouteChildren: RootRouteChildren = {
   PlaySessionIdRoute: PlaySessionIdRoute,
   MeIndexRoute: MeIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiV1SplatRoute: ApiV1SplatRoute,
   MediaConceptsConceptIdRoute: MediaConceptsConceptIdRoute,
   PlaySessionIdDoneRoute: PlaySessionIdDoneRoute,
   PlayQuickItemIdRoute: PlayQuickItemIdRoute,
   TTopicIdPathRoute: TTopicIdPathRoute,
+  ApiInvitesInvitationIdLogoRoute: ApiInvitesInvitationIdLogoRoute,
   ApiOrgOrgIdLogoRoute: ApiOrgOrgIdLogoRoute,
 }
 export const routeTree = rootRouteImport
