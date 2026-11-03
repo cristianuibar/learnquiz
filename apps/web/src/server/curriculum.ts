@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { getDb } from '@/db'
 import { conceptEdges, concepts, items, learnerConcept, learnerItem, learnerTopic, learnerUnit, placements, sources, topics, units } from '@/db/schema'
 import { validateSkeleton, fallbackSkeleton } from '@/lib/curriculum/validate'
+import { streakShown } from '@/lib/learning/session'
 import { chatJson, jobModel, LlmError } from '@/lib/llm/client'
 import { curriculumPrompt } from '@/lib/llm/prompts'
 import { CurriculumSkeleton } from '@/lib/llm/schemas'
@@ -15,7 +16,7 @@ import { requireOrgAdmin } from '@/server/authz'
 import { requireLearnerId } from '@/server/session'
 import { drainConceptQueue } from '@/server/concept-gen'
 import { runInBackground } from '@/server/env'
-import { learnerCanAccess, rolePlayable, roleCompany, seedLearnerTopic } from '@/server/topic-access'
+import { learnerCanAccess, notFlaggedBy, rolePlayable, roleCompany, seedLearnerTopic } from '@/server/topic-access'
 import { buildRoleCurriculum, curriculumWrites } from '@/server/role-curriculum'
 
 export const createTopic = createServerFn({ method: 'POST' })
@@ -144,7 +145,7 @@ export const getTopicPath = createServerFn({ method: 'GET' })
         .select({ conceptId: items.conceptId, n: count() })
         .from(items)
         .innerJoin(learnerItem, and(eq(learnerItem.itemId, items.id), eq(learnerItem.learnerId, learnerId)))
-        .where(and(eq(items.topicId, topic.id), eq(items.status, 'active')))
+        .where(and(eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId)))
         .groupBy(items.conceptId),
       db
         .select({ conceptId: learnerConcept.conceptId, pKnown: learnerConcept.pKnown, nAttempts: learnerConcept.nAttempts })
@@ -152,7 +153,7 @@ export const getTopicPath = createServerFn({ method: 'GET' })
         .innerJoin(concepts, eq(concepts.id, learnerConcept.conceptId))
         .where(and(eq(learnerConcept.learnerId, learnerId), eq(concepts.topicId, topic.id))),
       db
-        .select({ level: learnerTopic.level, xp: learnerTopic.xp, streak: learnerTopic.streakCount })
+        .select({ level: learnerTopic.level, xp: learnerTopic.xp, streakCount: learnerTopic.streakCount, lastSessionAt: learnerTopic.lastSessionAt })
         .from(learnerTopic)
         .where(and(eq(learnerTopic.learnerId, learnerId), eq(learnerTopic.topicId, topic.id))),
       db
@@ -177,7 +178,7 @@ export const getTopicPath = createServerFn({ method: 'GET' })
         levelLineModel: placement ? ((JSON.parse(placement.logJson) as { levelLineModel?: string }).levelLineModel ?? null) : null,
         placed: Boolean(placement),
         xp: lt?.xp ?? 0,
-        streak: lt?.streak ?? 0,
+        streak: lt ? streakShown(lt, Date.now()) : 0,
       },
       units: unitRows.map((u) => {
         const unitConcepts = conceptRows
@@ -219,7 +220,7 @@ export const getConceptItems = createServerFn({ method: 'GET' })
       .from(items)
       .innerJoin(topics, eq(topics.id, items.topicId))
       .innerJoin(learnerItem, and(eq(learnerItem.itemId, items.id), eq(learnerItem.learnerId, learnerId)))
-      .where(and(eq(items.conceptId, data.conceptId), eq(items.status, 'active'), learnerCanAccess(db, learnerId)))
+      .where(and(eq(items.conceptId, data.conceptId), eq(items.status, 'active'), notFlaggedBy(db, learnerId), learnerCanAccess(db, learnerId)))
       .orderBy(desc(items.createdAt))
     return { items: rows.map((r) => asItem(r.item)) }
   })

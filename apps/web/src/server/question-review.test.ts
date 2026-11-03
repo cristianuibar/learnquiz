@@ -43,7 +43,12 @@ beforeAll(() => {
     stmt.setReturnArrays(true)
     if (method === 'run') { stmt.run(...params); return { rows: [] } }
     return { rows: (method === 'get' ? stmt.get(...params) : stmt.all(...params)) as never }
-  })
+  }, async (queries) => queries.map(({ sql, params, method }) => {
+    const stmt = raw.prepare(sql)
+    stmt.setReturnArrays(true)
+    if (method === 'run') { stmt.run(...params); return { rows: [] } }
+    return { rows: (method === 'get' ? stmt.get(...params) : stmt.all(...params)) as never }
+  }))
   for (const id of ['admin-a', 'member-a', 'owner-b']) {
     raw.prepare('INSERT INTO user (id, name, email) VALUES (?, ?, ?)').run(id, id, `${id}@example.test`)
   }
@@ -67,7 +72,7 @@ beforeAll(() => {
         .run(`${id}-${name}`, `concept-${id}`, id, JSON.stringify(payload), Date.now())
     }
   }
-  raw.prepare("UPDATE items SET status = 'reported' WHERE id = 'a-flag'").run()
+  raw.prepare("INSERT INTO item_flags (id, item_id, user_id, reason, note, created_at) VALUES ('flag-1', 'a-flag', 'member-a', 'unclear', 'Which x do you mean?', ?)").run(Date.now())
 })
 afterAll(() => { raw.close(); vi.useRealTimers() })
 
@@ -76,8 +81,9 @@ it('lists company questions and learner flags, approves, edits and retires witho
   const review = await getQuestionReview({ data: { slug: 'alpha' } })
   expect(review.topics).toEqual([{ id: 'a', title: 'a' }])
   expect(review.concepts[0]).toMatchObject({ name: 'Equations', sourceQuote: payload.source_quote })
-  expect(review.concepts[0].questions.map((q) => [q.id, q.status])).toEqual([
-    ['a-live', 'active'], ['a-invalid', 'active'], ['a-flag', 'reported'],
+  expect(review.concepts[0].questions.map((q) => [q.id, q.flags])).toEqual([
+    ['a-live', []], ['a-invalid', []],
+    ['a-flag', [{ reason: 'unclear', label: 'The question is unclear', note: 'Which x do you mean?', createdAt: Date.now() }]],
   ])
 
   await reviewQuestion({ data: { slug: 'alpha', itemId: 'a-live', action: 'approve' } })
@@ -92,8 +98,11 @@ it('lists company questions and learner flags, approves, edits and retires witho
     payload_json: JSON.stringify({ ...edited, source_quote: payload.source_quote }),
   })
   await reviewQuestion({ data: { slug: 'alpha', itemId: 'a-flag', action: 'edit', payload: edited } })
-  expect(row('SELECT status FROM items WHERE id = ?', 'a-flag')).toEqual({ status: 'reported' })
+  expect(row('SELECT resolved_at FROM item_flags WHERE id = ?', 'flag-1')).toEqual({ resolved_at: null })
   await reviewQuestion({ data: { slug: 'alpha', itemId: 'a-flag', action: 'approve' } })
+  expect(row('SELECT resolved_at FROM item_flags WHERE id = ?', 'flag-1')).toEqual({ resolved_at: Date.now() })
+  const after = await getQuestionReview({ data: { slug: 'alpha' } })
+  expect(after.concepts[0].questions.find((q) => q.id === 'a-flag')?.flags).toEqual([])
   expect(row('SELECT status, reviewed_by FROM items WHERE id = ?', 'a-flag')).toEqual({ status: 'active', reviewed_by: 'admin-a' })
   await reviewQuestion({ data: { slug: 'alpha', itemId: 'a-live', action: 'retire' } })
   await expect(reviewQuestion({ data: { slug: 'alpha', itemId: 'a-live', action: 'approve' } })).rejects.toMatchObject({ status: 409 })

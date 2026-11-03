@@ -73,3 +73,8 @@ export function streakAfter(
   const streakCount = gap === 0 ? Math.max(1, prev.streakCount) : gap === 1 ? prev.streakCount + 1 : 1
   return { streakCount, lastSessionAt: now.getTime() }
 }
+
+// The stored streak only changes when a session finishes; a read shows 0 once a UTC day was missed, as streakAfter would reset it.
+export function streakShown(prev: { streakCount: number; lastSessionAt: number | null }, now: number): number {
+  return prev.lastSessionAt !== null && Math.floor(now / DAY) - Math.floor(prev.lastSessionAt / DAY) <= 1 ? prev.streakCount : 0
+}

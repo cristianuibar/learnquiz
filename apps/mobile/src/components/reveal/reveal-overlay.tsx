@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { View } from 'react-native'
 import type { Answer, Confidence, ItemView, Reveal } from '@learnquiz/api'
-import { initialOverlay, overlayStep, type ContinueRequest, type OverlayAction, type OverlayState } from '../../lib/session/overlay'
+import { initialOverlay, overlayStep, reportAvailable, type ContinueRequest, type OverlayAction, type OverlayState } from '../../lib/session/overlay'
 import type { Branding } from '../../lib/session-store'
 import { Sheet } from '../sheet/sheet'
 import { useReportSheet } from './report-sheet'
@@ -53,7 +53,7 @@ export function RevealOverlay({ reveal, item, answer, confidence, onContinue, bu
     reflection: state.reflection,
     onReflection: (text) => dispatch({ type: 'reflection', text }),
     onContinue: () => dispatch({ type: 'continue' }),
-    onReport: state.reported ? undefined : onReport,
+    onReport: reportAvailable(state, busy) ? onReport : undefined,
     busy,
     error,
     branding,

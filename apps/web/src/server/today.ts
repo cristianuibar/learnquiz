@@ -2,13 +2,14 @@ import type { Today } from '@learnquiz/api'
 import { createServerFn } from '@tanstack/react-start'
 import { and, count, countDistinct, desc, eq, gt, gte, inArray, min, ne, sql } from 'drizzle-orm'
 import { getDb } from '@/db'
+import { streakShown } from '@/lib/learning/session'
 import { attempts, concepts, items, learnerItem, learnerTopic, placements, sessions, topics, units } from '@/db/schema'
 import { dueCount } from '@/server/due'
 import { loadPKnown } from '@/server/helpers'
 import { liveConcept } from '@/server/live-concept'
 import { loadFrontier, SESSION_SIZE } from '@/server/play'
 import { getLearnerId } from '@/server/session'
-import { assignedRoleTopic, rolePlayable } from '@/server/topic-access'
+import { assignedRoleTopic, notFlaggedBy, rolePlayable } from '@/server/topic-access'
 
 const DAY = 86_400_000
 
@@ -61,7 +62,7 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
   const [placement, lt, dueN, frontier, played, done, cleared, next] = await Promise.all([
     db.select({ id: placements.id }).from(placements)
       .where(and(eq(placements.learnerId, learnerId), eq(placements.topicId, topicId))).limit(1).get(),
-    db.select({ xp: learnerTopic.xp, streak: learnerTopic.streakCount, last: learnerTopic.lastSessionAt }).from(learnerTopic)
+    db.select({ xp: learnerTopic.xp, streakCount: learnerTopic.streakCount, lastSessionAt: learnerTopic.lastSessionAt }).from(learnerTopic)
       .where(and(eq(learnerTopic.learnerId, learnerId), eq(learnerTopic.topicId, topicId))).get(),
     dueCount(db, learnerId, topicId, now),
     loadFrontier(db, learnerId, topicId),
@@ -82,7 +83,7 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
       )).get(),
     db.select({ at: min(learnerItem.due) }).from(learnerItem)
       .innerJoin(items, eq(items.id, learnerItem.itemId))
-      .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topicId), eq(items.status, 'active'), gt(learnerItem.due, now)))
+      .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topicId), eq(items.status, 'active'), notFlaggedBy(db, learnerId), gt(learnerItem.due, now)))
       .get(),
     roleStats(),
   ])
@@ -99,11 +100,11 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
       const ids = frontier.slice(0, 4).map((f) => f.concept.id)
       if (!ids.length) return false
       return Boolean(await db.select({ id: items.id }).from(items)
-        .where(and(inArray(items.conceptId, ids), eq(items.status, 'active'), ne(items.format, 'short'))).limit(1).get())
+        .where(and(inArray(items.conceptId, ids), eq(items.status, 'active'), ne(items.format, 'short'), notFlaggedBy(db, learnerId))).limit(1).get())
     })(),
   ])
   return {
-    topic: { id: topicId, title: topic.title, placed, placeable, due: dueN, xp: lt?.xp ?? 0, streak: lt?.last != null && lt.last >= dayStart - DAY ? lt.streak : 0 },
+    topic: { id: topicId, title: topic.title, placed, placeable, due: dueN, xp: lt?.xp ?? 0, streak: lt ? streakShown(lt, now) : 0 },
     role,
     plan: {
       state: sessionDone ? 'done' : played ? 'normal' : 'first',

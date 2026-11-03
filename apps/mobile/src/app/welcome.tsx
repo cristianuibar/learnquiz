@@ -13,6 +13,7 @@ import { Text } from '@/components/ui/Text'
 import { api } from '@/lib/api'
 import { acknowledgeDisclosure } from '@/lib/disclosure'
 import { takeHeldTarget } from '@/lib/held-target'
+import { canOpenTarget } from '@/lib/route-gates'
 import { useSession } from '@/lib/session-store'
 import { useTheme } from '@/theme/ThemeProvider'
 
@@ -59,7 +60,10 @@ export default function Welcome() {
       takeHeldTarget,
     }).then(
       (target) => {
-        setDestination(target)
+        // Acknowledged, so the learner is ready and disclosed. A held link that
+        // is still closed (for example /sign-in) falls back to Today, so Got it
+        // always leaves this screen. busyRef stays set: the screen is leaving.
+        setDestination(canOpenTarget(target, { status: 'ready', needsDisclosure: false }) ? target : TODAY)
         setPending(false)
       },
       () => {
