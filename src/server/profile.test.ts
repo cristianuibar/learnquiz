@@ -129,6 +129,22 @@ it('uses the assigned role benchmark and recorded time to proficiency', async ()
   expect((await getProfile({ data: {} })).proficiency).toEqual({ achievedAt: start + 3 * DAY, days: 3, estimatedDays: null, projectedAt: null })
 })
 
+it('uses a ready role curriculum and falls back to the latest personal topic while it is a draft', async () => {
+  seedWeek()
+  raw.prepare('INSERT INTO job_roles (id, org_id, name, benchmark, created_at) VALUES (?, ?, ?, ?, ?)').run('role', 'org-a', 'Safety officer', 0.95, start)
+  raw.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES (?, ?, ?, ?)').run('learner-a', 'org-a', 'role', start)
+  raw.exec("UPDATE topics SET learner_id = NULL, job_role_id = 'role', status = 'draft' WHERE id = 'training'")
+  expect((await getProfile({ data: {} })).topic).toEqual({ id: 'old', title: 'Old topic' })
+  raw.exec("UPDATE topics SET status = 'ready' WHERE id = 'training'")
+  const profile = await getProfile({ data: {} })
+  expect(profile.topic).toEqual({ id: 'training', title: 'Workplace safety' })
+  expect(profile.benchmark).toBe(0.95)
+  expect(profile.units[0].concepts[0]).toMatchObject({ name: 'Emergency exits', pKnown: 0.8, critical: true })
+  expect(profile.sessionCounts).toEqual({ week: 7, total: 7 })
+  holder.user = { id: 'admin-a', name: 'Admin', isAnonymous: false }
+  expect(await getProfile({ data: { org: 'company-a', learnerId: 'learner-a' } })).toEqual(profile)
+})
+
 it.each(['recent attempts', 'older attempts', 'no attempts', 'later lapse'])('recognizes mastery at role start with %s', async (history) => {
   seedWeek()
   raw.exec("UPDATE learner_concept SET p_known = 0.9; UPDATE attempts SET p_known_after = 0.9 WHERE id IN ('a5', 'a6')")

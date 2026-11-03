@@ -40,7 +40,7 @@ Built solo by Cristian Uibar for the Meta Global AI Developer Hackathon
 | Muse Spark 1.3 | Short-answer grading and placement result text | Shipped; placement text has a template fallback |
 | Muse Voice Transcribe 1.0 (`muse-voice-transcribe-1.0`) | Transcribe spoken text answers for editing before submission | Implemented, opt-in; disabled in the checked-in configuration |
 | Muse Wonder 1.0 | Session planning with tools (coach) | Planned; current sessions use the code-based planner |
-| Muse Image 1.0 | Diagrams and visual questions | Planned; setting `IMAGE_MODEL` does not enable image generation |
+| Muse Image 1.0 | Procedure diagrams | Shipped; generated once per visual concept and shown on answer reveals and Path |
 
 Every model call is logged to the `model_calls` table. Open **Model trace** on a
 session summary or the Path screen to see each call's purpose, model, latency,
@@ -48,9 +48,9 @@ tokens and estimated USD cost, plus the total. Generated paths, questions and pl
 feedback name the model that wrote them. Traces are private to the learner.
 Topic links and model labels are recorded for newly generated content.
 
-Cost estimates use the configured price table, currently populated for Spark 1.3
-only. Models without a price entry, including voice, log a zero cost rather than a
-provider billing total.
+Cost estimates use the configured token price table for Spark 1.3 and a fixed
+$0.01 per successful image generation. Models without a price entry, including
+voice, log a zero cost rather than a provider billing total.
 
 With `VOICE_ENABLED=true` and `LLM_PROFILE=meta`, text-answer questions offer a
 hold-to-talk button. Allow microphone access, hold to speak (up to one minute), then
@@ -85,7 +85,7 @@ automatically distribute the learner's pasted handbook to other members.
 
 TanStack Start (React 19) on one Cloudflare Worker, D1 (SQLite) through Drizzle,
 Better Auth (guest login, email and password, organizations and invites, Facebook
-login when configured), shadcn/ui and Tailwind 4. R2 is bound for future media storage.
+login when configured), shadcn/ui and Tailwind 4. R2 stores generated procedure diagrams.
 
 ## Run locally
 
@@ -113,7 +113,7 @@ model configuration is in `wrangler.jsonc`. Local D1 data is separate from produ
 | `LLM_PROFILE`, `LLM_BASE_URL`, `LLM_MODEL` | Provider profile (`meta`, `baseten`, `ollama`), API URL and model identifier |
 | `LLM_API_KEY` | Model API credential; store as a secret |
 | `VOICE_ENABLED` | Enable voice only with the `meta` profile; default `false` |
-| `IMAGE_MODEL` | Reserved for planned image generation |
+| `IMAGE_MODEL` | Model for procedure diagrams; requires the `meta` profile |
 | `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET` | App origin and authentication secret |
 | `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET` | Optional Facebook login; both are required |
 
@@ -159,7 +159,8 @@ pnpm deploy
 Set `FACEBOOK_APP_ID` and `FACEBOOK_APP_SECRET` as well if using Facebook login.
 In the Cloudflare dashboard, add a WAF rate limiting rule for your zone: POST
 requests to the app hostname, 10 per minute per IP, block. The Worker also caps each
-learner at 20 model calls per UTC day, including retries and voice transcriptions.
+learner at 20 model calls per UTC day, including retries, voice transcriptions and
+image generations.
 
 `src/worker.ts` delegates HTTP requests to TanStack Start. Queue and scheduled
 handlers are empty; background processing and scheduled reminders are not shipped.

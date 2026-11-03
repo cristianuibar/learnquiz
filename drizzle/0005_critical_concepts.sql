@@ -1,1 +1,0 @@
-ALTER TABLE `concepts` ADD `critical` integer DEFAULT false NOT NULL;

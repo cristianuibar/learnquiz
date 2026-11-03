@@ -30,17 +30,19 @@ export const getProfile = createServerFn({ method: 'GET' })
       learnerId = await requireLearnerId()
     }
 
-    const [topic, role] = await Promise.all([
+    const [personalTopic, role] = await Promise.all([
       db.select({ id: topics.id, title: topics.title, createdAt: topics.createdAt }).from(topics)
         .where(and(eq(topics.learnerId, learnerId), eq(topics.status, 'ready')))
         .orderBy(desc(topics.createdAt)).limit(1).get(),
-      db.select({ name: jobRoles.name, benchmark: jobRoles.benchmark, assignedAt: memberRoleAssignments.assignedAt, proficientAt: memberRoleAssignments.proficientAt })
+      db.select({ name: jobRoles.name, benchmark: jobRoles.benchmark, assignedAt: memberRoleAssignments.assignedAt, proficientAt: memberRoleAssignments.proficientAt, topic: { id: topics.id, title: topics.title, createdAt: topics.createdAt } })
         .from(memberRoleAssignments)
         .innerJoin(member, and(eq(member.userId, memberRoleAssignments.userId), eq(member.organizationId, memberRoleAssignments.orgId)))
         .innerJoin(jobRoles, and(eq(jobRoles.id, memberRoleAssignments.jobRoleId), eq(jobRoles.orgId, memberRoleAssignments.orgId)))
+        .leftJoin(topics, and(eq(topics.jobRoleId, jobRoles.id), eq(topics.status, 'ready')))
         .where(and(eq(memberRoleAssignments.userId, learnerId), eq(jobRoles.status, 'active'), orgId ? eq(memberRoleAssignments.orgId, orgId) : undefined))
         .orderBy(desc(memberRoleAssignments.assignedAt)).limit(1).get(),
     ])
+    const topic = role?.topic ?? personalTopic
     const benchmark = role?.benchmark ?? 0.85
     const now = Date.now()
     const today = Math.floor(now / DAY) * DAY
