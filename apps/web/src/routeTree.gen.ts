@@ -17,6 +17,8 @@ import { Route as TodayRouteImport } from './routes/today'
 import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminCompaniesRouteImport } from './routes/admin.companies'
+import { Route as AdminFlagsRouteImport } from './routes/admin.flags'
+import { Route as AdminJobsRouteImport } from './routes/admin.jobs'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as JoinInvitationIdRouteImport } from './routes/join.$invitationId'
 import { Route as MeIndexRouteImport } from './routes/me.index'
@@ -80,6 +82,16 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
 const AdminCompaniesRoute = AdminCompaniesRouteImport.update({
   id: '/companies',
   path: '/companies',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminFlagsRoute = AdminFlagsRouteImport.update({
+  id: '/flags',
+  path: '/flags',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminJobsRoute = AdminJobsRouteImport.update({
+  id: '/jobs',
+  path: '/jobs',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
@@ -212,6 +224,8 @@ export interface FileRoutesByFullPath {
   '/today': typeof TodayRoute
   '/welcome': typeof WelcomeRoute
   '/admin/companies': typeof AdminCompaniesRoute
+  '/admin/flags': typeof AdminFlagsRoute
+  '/admin/jobs': typeof AdminJobsRoute
   '/admin/users': typeof AdminUsersRoute
   '/join/$invitationId': typeof JoinInvitationIdRoute
   '/me/profile': typeof MeProfileRoute
@@ -245,6 +259,8 @@ export interface FileRoutesByTo {
   '/today': typeof TodayRoute
   '/welcome': typeof WelcomeRoute
   '/admin/companies': typeof AdminCompaniesRoute
+  '/admin/flags': typeof AdminFlagsRoute
+  '/admin/jobs': typeof AdminJobsRoute
   '/admin/users': typeof AdminUsersRoute
   '/join/$invitationId': typeof JoinInvitationIdRoute
   '/me/profile': typeof MeProfileRoute
@@ -279,6 +295,8 @@ export interface FileRoutesById {
   '/today': typeof TodayRoute
   '/welcome': typeof WelcomeRoute
   '/admin/companies': typeof AdminCompaniesRoute
+  '/admin/flags': typeof AdminFlagsRoute
+  '/admin/jobs': typeof AdminJobsRoute
   '/admin/users': typeof AdminUsersRoute
   '/join/$invitationId': typeof JoinInvitationIdRoute
   '/me/profile': typeof MeProfileRoute
@@ -315,6 +333,8 @@ export interface FileRouteTypes {
     | '/today'
     | '/welcome'
     | '/admin/companies'
+    | '/admin/flags'
+    | '/admin/jobs'
     | '/admin/users'
     | '/join/$invitationId'
     | '/me/profile'
@@ -348,6 +368,8 @@ export interface FileRouteTypes {
     | '/today'
     | '/welcome'
     | '/admin/companies'
+    | '/admin/flags'
+    | '/admin/jobs'
     | '/admin/users'
     | '/join/$invitationId'
     | '/me/profile'
@@ -381,6 +403,8 @@ export interface FileRouteTypes {
     | '/today'
     | '/welcome'
     | '/admin/companies'
+    | '/admin/flags'
+    | '/admin/jobs'
     | '/admin/users'
     | '/join/$invitationId'
     | '/me/profile'
@@ -488,6 +512,20 @@ declare module '@tanstack/react-router' {
       path: '/companies'
       fullPath: '/admin/companies'
       preLoaderRoute: typeof AdminCompaniesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/flags': {
+      id: '/admin/flags'
+      path: '/flags'
+      fullPath: '/admin/flags'
+      preLoaderRoute: typeof AdminFlagsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/jobs': {
+      id: '/admin/jobs'
+      path: '/jobs'
+      fullPath: '/admin/jobs'
+      preLoaderRoute: typeof AdminJobsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/users': {
@@ -663,6 +701,8 @@ declare module '@tanstack/react-router' {
 
 interface AdminRouteChildren {
   AdminCompaniesRoute: typeof AdminCompaniesRoute
+  AdminFlagsRoute: typeof AdminFlagsRoute
+  AdminJobsRoute: typeof AdminJobsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminCompaniesSlugRoute: typeof AdminCompaniesSlugRoute
@@ -670,6 +710,8 @@ interface AdminRouteChildren {
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminCompaniesRoute: AdminCompaniesRoute,
+  AdminFlagsRoute: AdminFlagsRoute,
+  AdminJobsRoute: AdminJobsRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminCompaniesSlugRoute: AdminCompaniesSlugRoute,
