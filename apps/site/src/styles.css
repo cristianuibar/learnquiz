@@ -10,6 +10,7 @@
     color: var(--brand);
     text-decoration: underline;
     text-underline-offset: 3px;
+    transition: color var(--duration-fast) var(--ease-out);
   }
 
   a:hover {
@@ -20,5 +21,22 @@
     display: inline-flex;
     align-items: center;
     min-height: var(--target);
+    min-width: var(--target);
+  }
+}
+
+@layer components {
+  .site-container {
+    @apply mx-auto max-w-[1120px] px-4 md:px-8;
+  }
+
+  .site-action {
+    @apply inline-flex min-h-target items-center justify-center rounded-md px-6 py-3 text-label no-underline;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  a {
+    transition: none;
   }
 }
