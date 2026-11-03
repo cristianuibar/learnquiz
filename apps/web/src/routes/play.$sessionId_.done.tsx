@@ -97,7 +97,7 @@ function Done() {
       {s.push && <div className="mt-10"><PushSettings {...s.push} prompt /></div>}
       <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center">
         {placed ? (
-          <Button asChild className="h-12 w-full px-6 sm:w-auto">
+          <Button asChild className="w-full px-6 sm:w-auto">
             <Link to="/t/$topicId/path" params={{ topicId: s.topicId }}>
               See your path
             </Link>
@@ -105,7 +105,7 @@ function Done() {
         ) : (
           <>
             <StartButton topicId={s.topicId}>Another session</StartButton>
-            <Button asChild variant="outline" className="h-12 w-full px-6 sm:w-auto">
+            <Button asChild variant="secondary" className="w-full px-6 sm:w-auto">
               <Link to="/t/$topicId/path" params={{ topicId: s.topicId }}>
                 Your path
               </Link>

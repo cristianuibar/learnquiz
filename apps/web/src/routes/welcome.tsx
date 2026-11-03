@@ -58,7 +58,7 @@ function Welcome() {
           {error}
         </p>
       )}
-      <Button className="mt-8 h-12 px-6" onClick={submit} disabled={busy}>
+      <Button className="mt-8 px-6" onClick={submit} disabled={busy}>
         Got it
       </Button>
     </main>

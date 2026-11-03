@@ -31,9 +31,9 @@ export function ModelTrace({ scope }: { scope: Scope }) {
   return (
     <Dialog onOpenChange={(open) => { if (open) void refresh() }}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="mt-4 h-12 px-6">Model trace</Button>
+        <Button variant="secondary" className="mt-4 px-6">Model trace</Button>
       </DialogTrigger>
-      <DialogContent className="top-0 right-0 left-auto flex h-dvh max-w-full translate-x-0 translate-y-0 flex-col gap-6 overflow-y-auto rounded-none sm:max-w-xl [&>[data-slot=dialog-close]]:size-12 [&>[data-slot=dialog-close]]:top-2 [&>[data-slot=dialog-close]]:right-2 [&>[data-slot=dialog-close]]:flex [&>[data-slot=dialog-close]]:items-center [&>[data-slot=dialog-close]]:justify-center">
+      <DialogContent className="top-0 right-0 left-auto flex h-dvh max-w-full translate-x-0 translate-y-0 flex-col gap-6 overflow-y-auto rounded-none sm:max-w-xl">
         <DialogHeader className="pr-10 text-left">
           <DialogTitle>Model trace</DialogTitle>
           <DialogDescription>

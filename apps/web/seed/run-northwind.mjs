@@ -36,7 +36,6 @@ if (args.length === 1 && ['--help', '-h'].includes(args[0])) {
         logLevel: 'error',
         persist: true,
         vars,
-        r2: [],
         experimental: {
           disableDevRegistry: true,
           disableExperimentalWarning: true,

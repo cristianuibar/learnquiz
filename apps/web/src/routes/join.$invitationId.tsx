@@ -50,14 +50,14 @@ function Join() {
           </p>
           {invite?.status === 'accepted' &&
             (!user || user.isAnonymous ? (
-              <Button className="h-12 self-end px-6" asChild>
+              <Button className="self-end px-6" asChild>
                 <Link to="/sign-in" search={{ redirect: '/today', email: invite.email }}>
                   Sign in as {invite.email}
                 </Link>
               </Button>
             ) : (
               !invite.otherAccount && (
-                <Button className="h-12 self-end px-6" asChild>
+                <Button className="self-end px-6" asChild>
                   <Link to="/today">Continue to Today</Link>
                 </Button>
               )
@@ -77,7 +77,7 @@ function Join() {
             )}
             {invite.otherAccount ? (
               <Button
-                className="h-12 self-end px-6"
+                className="self-end px-6"
                 disabled={busy}
                 onClick={async () => {
                   setBusy(true)
@@ -96,7 +96,7 @@ function Join() {
               </Button>
             ) : (
               <Button
-                className="h-12 self-end px-6"
+                className="self-end px-6"
                 disabled={busy}
                 onClick={async () => {
                   setBusy(true)

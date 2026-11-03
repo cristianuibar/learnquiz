@@ -78,21 +78,21 @@ function Roles() {
         <form ref={formRef} className="mt-6 flex flex-col gap-6" onSubmit={submit}>
           <div className="flex flex-col gap-2">
             <Label htmlFor="name">Role name</Label>
-            <Input id="name" name="name" className="h-11" maxLength={80} required aria-invalid={!!fields.name || undefined} aria-describedby={fields.name ? 'name-error' : undefined} />
+            <Input id="name" name="name" maxLength={80} required aria-invalid={!!fields.name || undefined} aria-describedby={fields.name ? 'name-error' : undefined} />
             {fields.name && <p id="name-error" role="alert" className="text-sm font-medium text-wrong">{fields.name}</p>}
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="benchmark">Benchmark (%)</Label>
-            <Input id="benchmark" name="benchmark" type="number" className="h-11" min={50} max={100} step="any" defaultValue={85} required aria-invalid={!!fields.benchmark || undefined} aria-describedby={fields.benchmark ? 'benchmark-error' : undefined} />
+            <Input id="benchmark" name="benchmark" type="number" min={50} max={100} step="any" defaultValue={85} required aria-invalid={!!fields.benchmark || undefined} aria-describedby={fields.benchmark ? 'benchmark-error' : undefined} />
             {fields.benchmark && <p id="benchmark-error" role="alert" className="text-sm font-medium text-wrong">{fields.benchmark}</p>}
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="onboardingDays">Onboarding days</Label>
-            <Input id="onboardingDays" name="onboardingDays" type="number" className="h-11" min={1} max={365} step={1} defaultValue={30} required aria-invalid={!!fields.onboardingDays || undefined} aria-describedby={fields.onboardingDays ? 'onboardingDays-error' : undefined} />
+            <Input id="onboardingDays" name="onboardingDays" type="number" min={1} max={365} step={1} defaultValue={30} required aria-invalid={!!fields.onboardingDays || undefined} aria-describedby={fields.onboardingDays ? 'onboardingDays-error' : undefined} />
             {fields.onboardingDays && <p id="onboardingDays-error" role="alert" className="text-sm font-medium text-wrong">{fields.onboardingDays}</p>}
           </div>
           {error && <p role="alert" className="text-sm font-medium text-wrong">{error}</p>}
-          <Button type="submit" className="h-11 self-end px-6" disabled={busy}>
+          <Button type="submit" className="self-end px-6" disabled={busy}>
             {busy ? 'Creating…' : 'Create role'}
           </Button>
         </form>
