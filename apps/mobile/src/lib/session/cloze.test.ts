@@ -3,31 +3,41 @@ import { clozeAnswer, clozeMaxLength, splitClozeStem } from './cloze'
 test('splits words around the first marker', () => {
   expect(splitClozeStem('The quick ____ jumps high')).toEqual({
     before: ['The', 'quick'],
+    suffix: '',
     after: ['jumps', 'high'],
   })
 })
 
 test('marker at the start leaves before empty', () => {
-  expect(splitClozeStem('____ jumps high')).toEqual({ before: [], after: ['jumps', 'high'] })
+  expect(splitClozeStem('____ jumps high')).toEqual({ before: [], suffix: '', after: ['jumps', 'high'] })
 })
 
 test('marker at the end leaves after empty', () => {
-  expect(splitClozeStem('The quick ____')).toEqual({ before: ['The', 'quick'], after: [] })
+  expect(splitClozeStem('The quick ____')).toEqual({ before: ['The', 'quick'], suffix: '', after: [] })
 })
 
 test('missing marker keeps every word before the blank', () => {
-  expect(splitClozeStem('No blank here')).toEqual({ before: ['No', 'blank', 'here'], after: [] })
+  expect(splitClozeStem('No blank here')).toEqual({ before: ['No', 'blank', 'here'], suffix: '', after: [] })
 })
 
 test('only the first marker splits; later markers stay literal', () => {
-  expect(splitClozeStem('a ____ b ____ c')).toEqual({ before: ['a'], after: ['b', '____', 'c'] })
+  expect(splitClozeStem('a ____ b ____ c')).toEqual({ before: ['a'], suffix: '', after: ['b', '____', 'c'] })
 })
 
 test('extra whitespace is ignored but punctuation is preserved', () => {
   expect(splitClozeStem('  Hello,   world  ____  again!  ')).toEqual({
     before: ['Hello,', 'world'],
+    suffix: '',
     after: ['again!'],
   })
+})
+
+test.each([
+  ['The pallet limit is ____.', '.', []],
+  ['Lift ____, then rest', ',', ['then', 'rest']],
+  ['Lift ____... then rest', '...', ['then', 'rest']],
+])('keeps punctuation beside the blank in %s', (stem, suffix, after) => {
+  expect(splitClozeStem(stem)).toMatchObject({ suffix, after })
 })
 
 test('max length is 3 for numbers and 40 for words', () => {

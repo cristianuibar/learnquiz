@@ -303,16 +303,20 @@ function SessionQuestion({ item, notice, marks, answer, onAnswer, disabled, onSu
   onSubmit(): void
 }) {
   const { space } = useTheme()
-  const stemRef = useRef<NativeText>(null)
-  useHeadingFocus(stemRef)
   useEffect(() => {
     if (notice) AccessibilityInfo.announceForAccessibility(notice)
   }, [notice])
   return (
     <View style={{ gap: space[6] }}>
       {notice ? <Text variant="caption" muted>{notice}</Text> : null}
-      <Text ref={stemRef} variant="title2" header>{item.stem}</Text>
+      {item.format !== 'cloze' ? <SessionStem stem={item.stem} /> : null}
       <QuestionBody key={item.id} item={item} answer={answer} onAnswer={onAnswer} marks={marks} disabled={disabled} onSubmit={onSubmit} />
     </View>
   )
+}
+
+function SessionStem({ stem }: { stem: string }) {
+  const stemRef = useRef<NativeText>(null)
+  useHeadingFocus(stemRef)
+  return <Text ref={stemRef} variant="title2" header>{stem}</Text>
 }
