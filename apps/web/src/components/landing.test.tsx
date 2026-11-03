@@ -226,7 +226,7 @@ function seedTopic(learnerId: string) {
     sqlite.prepare("INSERT INTO items (id, concept_id, topic_id, format, payload_json, created_at) VALUES (?, 'c1', 't1', 'mcq', '{}', 1)").run(id)
     sqlite.prepare('INSERT INTO learner_item (learner_id, item_id, due, stability, difficulty, state) VALUES (?, ?, ?, 1, 5, 2)').run(learnerId, id, due)
   }
-  sqlite.prepare("INSERT INTO learner_topic (learner_id, topic_id, streak_count, xp) VALUES (?, 't1', 4, 120)").run(learnerId)
+  sqlite.prepare("INSERT INTO learner_topic (learner_id, topic_id, streak_count, last_session_at, xp) VALUES (?, 't1', 4, ?, 120)").run(learnerId, Date.now())
   sqlite.prepare("INSERT INTO placements (id, learner_id, topic_id, log_json, created_at) VALUES ('p1', ?, 't1', '{}', 1)").run(learnerId)
 }
 

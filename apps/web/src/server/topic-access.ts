@@ -17,7 +17,7 @@ export const learnerCanAccess = (db: Db, learnerId: string): SQL =>
 
 // The topic of the learner's newest role assignment, whatever its status, with the company's name; null for the personal edition.
 export async function assignedRoleTopic(db: Db, learnerId: string) {
-  const row = await db.select({ topic: topics, roleName: jobRoles.name, orgName: organization.name, companyName: orgSettings.companyName })
+  const row = await db.select({ topic: topics, roleName: jobRoles.name, assignedAt: memberRoleAssignments.assignedAt, benchmark: jobRoles.benchmark, onboardingDays: jobRoles.onboardingDays, orgName: organization.name, companyName: orgSettings.companyName })
     .from(memberRoleAssignments)
     .innerJoin(member, and(eq(member.userId, memberRoleAssignments.userId), eq(member.organizationId, memberRoleAssignments.orgId)))
     .innerJoin(jobRoles, and(eq(jobRoles.id, memberRoleAssignments.jobRoleId), eq(jobRoles.orgId, memberRoleAssignments.orgId)))
