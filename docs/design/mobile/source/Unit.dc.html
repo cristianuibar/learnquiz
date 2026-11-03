@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Receiving</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="lq.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" data-brand="{{brand}}" style="width: {{w}}px; height: {{h}}px; font-family: var(--font-sans); color: var(--ink);">
+
+  <header class="topbar">
+    <a class="icon-btn" href="Path.dc.html" aria-label="Back to Path">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+    </a>
+    <h1 class="t-title2">Receiving</h1>
+  </header>
+
+  <main class="scroll" ref="{{scrollRef}}" style="padding: 8px 16px 24px; display: flex; flex-direction: column; gap: 32px;">
+
+    <section aria-label="Unit mastery" style="display: flex; flex-direction: column; gap: 12px;">
+      <div style="display: flex; align-items: baseline; gap: 8px;">
+        <p class="t-title1 num">82%</p>
+        <p class="t-body muted num">of 85% benchmark</p>
+      </div>
+      <div class="bar bar-lg" role="progressbar" aria-label="Receiving mastery" aria-valuenow="82" aria-valuemin="0" aria-valuemax="100" aria-valuetext="82%, benchmark 85%">
+        <span class="bar-fill" style="width: 82%;"></span>
+        <span class="bar-bench" style="left: 85%;"></span>
+      </div>
+    </section>
+
+    <section aria-labelledby="unit-concepts" style="display: flex; flex-direction: column; gap: 8px;">
+      <h2 id="unit-concepts" class="section-title">Concepts</h2>
+      <ul class="card rows" style="padding: 0 16px;">
+        <sc-for list="{{concepts}}" as="c" hint-placeholder-count="5">
+          <li style="display: flex; flex-direction: column; gap: 8px; padding: 12px 0 16px;">
+            <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+              <h3 class="t-body" style="font-weight: 500;">{{c.name}}</h3>
+              <span class="t-label num" style="padding-top: 1px;">{{c.pct}}%</span>
+            </div>
+            <div class="bar" role="progressbar" aria-label="{{c.barLabel}}" aria-valuenow="{{c.pct}}" aria-valuemin="0" aria-valuemax="100" aria-valuetext="{{c.valueText}}">
+              <span class="bar-fill" style="width: {{c.pct}}%;"></span>
+              <span class="bar-bench" style="left: 85%;"></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <sc-if value="{{c.mastered}}" hint-placeholder-val="{{ false }}">
+                <span class="chip chip-mastered">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12.5l5 5L19.5 7"></path></svg>
+                  Mastered
+                </span>
+              </sc-if>
+              <sc-if value="{{c.learning}}" hint-placeholder-val="{{ true }}">
+                <span class="chip chip-learning">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none"></path><circle cx="12" cy="12" r="9"></circle></svg>
+                  Still learning
+                </span>
+              </sc-if>
+              <sc-if value="{{c.critical}}" hint-placeholder-val="{{ true }}">
+                <span class="chip chip-critical">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>
+                  Critical
+                </span>
+              </sc-if>
+            </div>
+          </li>
+        </sc-for>
+      </ul>
+    </section>
+
+    <section aria-labelledby="unit-procedure" style="display: flex; flex-direction: column; gap: 8px;">
+      <h2 id="unit-procedure" class="section-title">Procedure</h2>
+      <figure class="card" style="padding: 16px 0;">
+        <svg viewBox="1 0 326 360" width="326" height="360" role="img" aria-label="Receiving procedure. 1, pallet arrives at the dock door. 2, inspect it. 3, is it damaged? If yes: photograph the damage and note it on the delivery receipt, a critical step, then move the pallet to Quarantine bay Q1. If no: move it to staging, then put it away." style="display: block;">
+          <g fill="none" stroke="var(--border-strong)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <!-- Dock door to Inspect -->
+            <path d="M164 48v24"></path>
+            <path d="M159 67l5 5 5-5"></path>
+            <!-- Inspect to decision -->
+            <path d="M164 112v16"></path>
+            <path d="M159 123l5 5 5-5"></path>
+            <!-- Yes branch -->
+            <path d="M120 156H84v48"></path>
+            <path d="M79 199l5 5 5-5"></path>
+            <path d="M84 264v24"></path>
+            <path d="M79 283l5 5 5-5"></path>
+            <!-- No branch -->
+            <path d="M208 156h36v48"></path>
+            <path d="M239 199l5 5 5-5"></path>
+            <path d="M244 248v40"></path>
+            <path d="M239 283l5 5 5-5"></path>
+          </g>
+
+          <!-- Steps -->
+          <g stroke="var(--border-strong)" stroke-width="1.5" fill="var(--surface-card)">
+            <rect x="104" y="8" width="120" height="40" rx="8"></rect>
+            <rect x="104" y="72" width="120" height="40" rx="8"></rect>
+            <path d="M164 128l44 28-44 28-44-28z" stroke-linejoin="round"></path>
+            <rect x="172" y="204" width="144" height="44" rx="8"></rect>
+            <rect x="12" y="288" width="144" height="56" rx="8"></rect>
+            <rect x="172" y="288" width="144" height="44" rx="8"></rect>
+          </g>
+          <!-- Critical step: heavier ink outline, never red -->
+          <rect x="12" y="204" width="144" height="60" rx="8" fill="var(--surface-sunken)" stroke="var(--ink)" stroke-width="2"></rect>
+          <g transform="translate(22 222)" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path>
+            <circle cx="12" cy="11.5" r="1.5" fill="var(--ink)" stroke="none"></circle>
+          </g>
+
+          <g fill="var(--ink)" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="500" text-anchor="middle">
+            <text x="164" y="33">Dock door</text>
+            <text x="164" y="97">Inspect</text>
+            <text x="164" y="161">Damage?</text>
+            <text x="244" y="231">Staging</text>
+            <text x="244" y="315">Put-away</text>
+            <text x="84" y="312">Quarantine</text>
+            <text x="84" y="330">bay Q1</text>
+            <text x="98" y="230" text-anchor="middle">Photo + note</text>
+            <text x="98" y="248" text-anchor="middle">on receipt</text>
+          </g>
+          <g fill="var(--ink-muted)" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="500">
+            <text x="114" y="148" text-anchor="end">Yes</text>
+            <text x="214" y="148">No</text>
+          </g>
+        </svg>
+        <figcaption class="t-caption muted" style="display: flex; align-items: center; gap: 4px; padding: 8px 16px 0;">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5M9 13h6M9 17h4"></path></svg>
+          Receiving SOP v3 · §2
+        </figcaption>
+      </figure>
+    </section>
+  </main>
+
+  <div class="dock">
+    <a class="btn btn-primary btn-lg btn-block num" href="QChoice.dc.html">Practise Receiving · 5 min</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"brand":{"editor":"enum","options":["default","plum"],"default":"default","section":"Theme"},"w":{"editor":"int","default":360,"section":"Frame"},"h":{"editor":"int","default":740,"section":"Frame"},"scroll":{"editor":"int","default":0,"section":"Variant"},"$preview":{"width":360,"height":740}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    // Stable ref callback (a new function per render would re-run and reset the scroll).
+    this.scrollEl = null;
+    this.scrollRef = (el) => {
+      this.scrollEl = el;
+      this.applyScroll();
+    };
+  }
+  applyScroll() {
+    const y = Number(this.props.scroll || 0);
+    if (this.scrollEl && y) this.scrollEl.scrollTop = y;
+  }
+  componentDidMount() {
+    this.applyScroll();
+  }
+  renderVals() {
+    const raw = [
+      { name: 'Check the delivery against the ASN', pct: 94, critical: false },
+      { name: 'Damaged pallet: record before moving', pct: 72, critical: true },
+      { name: 'Count and label inbound cartons', pct: 88, critical: false },
+      { name: 'Quarantine bay Q1', pct: 79, critical: true },
+      { name: 'Hazmat cartons need sign-off', pct: 77, critical: true }
+    ];
+    const concepts = raw.map((c) => {
+      const mastered = c.pct >= 85;
+      const status = mastered ? 'Mastered' : 'Still learning';
+      return {
+        name: c.name,
+        pct: c.pct,
+        critical: c.critical,
+        mastered,
+        learning: !mastered,
+        barLabel: c.name + ' mastery',
+        valueText: c.pct + '%, ' + status + (c.critical ? ', critical' : '') + ', benchmark 85%'
+      };
+    });
+    return {
+      theme: this.props.theme ?? 'light',
+      brand: this.props.brand ?? 'default',
+      w: this.props.w ?? 360,
+      h: this.props.h ?? 740,
+      scrollRef: this.scrollRef,
+      concepts
+    };
+  }
+}
+</script>
+</body>
+</html>

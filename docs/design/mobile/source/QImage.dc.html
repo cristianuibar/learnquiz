@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Image question</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="lq.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" data-brand="{{brand}}" style="width: {{w}}px; height: {{h}}px; font-family: var(--font-sans); color: var(--ink);">
+  <header class="topbar">
+    <a class="icon-btn" href="Today.dc.html" aria-label="End session">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+    </a>
+    <div style="flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px;">
+      <div class="bar" style="flex: 1;" role="progressbar" aria-label="Session progress" aria-valuenow="12" aria-valuemin="0" aria-valuemax="20" aria-valuetext="12 of 20">
+        <span class="bar-fill" style="width: 60%;"></span>
+      </div>
+      <span class="t-overline num muted">12 of 20</span>
+    </div>
+    <button class="icon-btn" type="button" aria-label="Read aloud" aria-pressed="{{listenOn}}" onClick="{{toggleListen}}">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"></path><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"></path></svg>
+    </button>
+  </header>
+
+  <main class="scroll" style="display: flex; flex-direction: column; gap: 12px; padding-bottom: 8px;">
+    <h1 class="t-title2">On this location label, which part do you read back to the scanner?</h1>
+    <svg viewBox="0 0 328 148" width="100%" height="148" role="img" aria-label="Pick-face location label. A white card with a barcode at top left, the location A12-04-C-2 in large type below it, and a boxed check-digit field reading 57 on the right. Labels point to the parts: Aisle is A12, Bay is 04, Level is C, Position is 2, and Check digits is the boxed 57.">
+      <rect x="8" y="40" width="312" height="68" rx="8" style="fill: var(--surface-card); stroke: var(--border-strong); stroke-width: 1.5;"></rect>
+      <g transform="translate(0 0)"><path d="M20 48h4v20h-4zM26 48h6v20h-6zM34 48h4v20h-4zM42 48h2v20h-2zM50 48h2v20h-2zM54 48h4v20h-4zM64 48h2v20h-2zM70 48h2v20h-2zM78 48h4v20h-4zM84 48h2v20h-2zM90 48h6v20h-6zM98 48h4v20h-4zM104 48h2v20h-2zM112 48h4v20h-4zM118 48h4v20h-4zM124 48h6v20h-6zM132 48h4v20h-4zM140 48h2v20h-2z" style="fill: var(--ink);"></path></g>
+      <text x="20" y="96" textLength="196" lengthAdjust="spacing" style="font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 26px; font-weight: 700; fill: var(--ink);">A12-04-C-2</text>
+      <rect x="244" y="50" width="60" height="48" rx="4" style="fill: var(--surface-card); stroke: var(--ink); stroke-width: 2;"></rect>
+      <text x="274" y="84" text-anchor="middle" style="font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 28px; font-weight: 700; fill: var(--ink);">57</text>
+      <path d="M167 22V66" style="stroke: var(--ink-muted); stroke-width: 1.5; fill: none;"></path><circle cx="167" cy="68" r="2" style="fill: var(--ink-muted);"></circle>
+      <path d="M274 22V48" style="stroke: var(--ink-muted); stroke-width: 1.5; fill: none;"></path><circle cx="274" cy="49" r="2" style="fill: var(--ink-muted);"></circle>
+      <path d="M49 102V122" style="stroke: var(--ink-muted); stroke-width: 1.5; fill: none;"></path><circle cx="49" cy="101" r="2" style="fill: var(--ink-muted);"></circle>
+      <path d="M118 102V122" style="stroke: var(--ink-muted); stroke-width: 1.5; fill: none;"></path><circle cx="118" cy="101" r="2" style="fill: var(--ink-muted);"></circle>
+      <path d="M206 102V122" style="stroke: var(--ink-muted); stroke-width: 1.5; fill: none;"></path><circle cx="206" cy="101" r="2" style="fill: var(--ink-muted);"></circle>
+      <text x="167" y="15" text-anchor="middle" style="font-size: 13px; font-weight: 600; fill: var(--ink); font-family: var(--font-sans);">Level</text>
+      <text x="274" y="15" text-anchor="middle" style="font-size: 13px; font-weight: 600; fill: var(--ink); font-family: var(--font-sans);">Check digits</text>
+      <text x="49" y="140" text-anchor="middle" style="font-size: 13px; font-weight: 600; fill: var(--ink); font-family: var(--font-sans);">Aisle</text>
+      <text x="118" y="140" text-anchor="middle" style="font-size: 13px; font-weight: 600; fill: var(--ink); font-family: var(--font-sans);">Bay</text>
+      <text x="206" y="140" text-anchor="middle" style="font-size: 13px; font-weight: 600; fill: var(--ink); font-family: var(--font-sans);">Position</text>
+    </svg>
+    <div class="opt-list" role="radiogroup" aria-label="Answer">
+      <button type="button" class="opt" role="radio" aria-checked="{{o1}}" onClick="{{pick1}}">
+        <span class="radio" aria-hidden="true"></span>
+        <span class="opt-text">Aisle and bay (A12-04)</span>
+      </button>
+      <button type="button" class="opt" role="radio" aria-checked="{{o2}}" onClick="{{pick2}}">
+        <span class="radio" aria-hidden="true"></span>
+        <span class="opt-text">The check digits (57)</span>
+      </button>
+      <button type="button" class="opt" role="radio" aria-checked="{{o3}}" onClick="{{pick3}}">
+        <span class="radio" aria-hidden="true"></span>
+        <span class="opt-text">The level letter (C)</span>
+      </button>
+      <button type="button" class="opt" role="radio" aria-checked="{{o4}}" onClick="{{pick4}}">
+        <span class="radio" aria-hidden="true"></span>
+        <span class="opt-text">The barcode number</span>
+      </button>
+    </div>
+  </main>
+
+  <div class="dock">
+    <fieldset>
+      <legend class="conf-legend" id="qi-conf">How sure are you?</legend>
+      <div class="conf" role="radiogroup" aria-labelledby="qi-conf">
+        <button class="conf-btn" type="button" role="radio" aria-checked="{{cSure}}" onClick="{{pickSure}}"><span class="conf-tick" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></span>Sure</button>
+        <button class="conf-btn" type="button" role="radio" aria-checked="{{cUnsure}}" onClick="{{pickUnsure}}"><span class="conf-tick" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></span>Unsure</button>
+        <button class="conf-btn" type="button" role="radio" aria-checked="{{cGuess}}" onClick="{{pickGuess}}"><span class="conf-tick" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></span>Guessing</button>
+      </div>
+    </fieldset>
+    <sc-if value="{{canCheck}}" hint-placeholder-val="{{ true }}">
+      <a class="btn btn-primary btn-lg btn-block" href="Summary.dc.html">Check</a>
+    </sc-if>
+    <sc-if value="{{cannotCheck}}" hint-placeholder-val="{{ false }}">
+      <button class="btn btn-lg btn-block" type="button" disabled>Check</button>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"brand":{"editor":"enum","options":["default","plum"],"default":"default","section":"Theme"},"w":{"editor":"int","default":360,"section":"Frame"},"h":{"editor":"int","default":740,"section":"Frame"},"$preview":{"width":360,"height":740}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { pick: 0, conf: null, listen: false };
+  }
+  renderVals() {
+    const pick = this.state.pick;
+    const conf = this.state.conf;
+    const ok = pick > 0 && conf !== null;
+    return {
+      theme: this.props.theme ?? 'light',
+      brand: this.props.brand ?? 'default',
+      w: this.props.w ?? 360,
+      h: this.props.h ?? 740,
+      o1: pick === 1 ? 'true' : 'false',
+      o2: pick === 2 ? 'true' : 'false',
+      o3: pick === 3 ? 'true' : 'false',
+      o4: pick === 4 ? 'true' : 'false',
+      pick1: () => this.setState({ pick: 1 }),
+      pick2: () => this.setState({ pick: 2 }),
+      pick3: () => this.setState({ pick: 3 }),
+      pick4: () => this.setState({ pick: 4 }),
+      listenOn: this.state.listen ? 'true' : 'false',
+      toggleListen: () => this.setState({ listen: !this.state.listen }),
+      cSure: conf === 'sure' ? 'true' : 'false',
+      cUnsure: conf === 'unsure' ? 'true' : 'false',
+      cGuess: conf === 'guess' ? 'true' : 'false',
+      pickSure: () => this.setState({ conf: 'sure' }),
+      pickUnsure: () => this.setState({ conf: 'unsure' }),
+      pickGuess: () => this.setState({ conf: 'guess' }),
+      canCheck: ok,
+      cannotCheck: !ok
+    };
+  }
+}
+</script>
+</body>
+</html>

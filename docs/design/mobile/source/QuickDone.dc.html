@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Quick question done</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="lq.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" data-brand="{{brand}}" style="width: {{w}}px; height: {{h}}px; font-family: var(--font-sans); color: var(--ink);">
+  <header class="topbar">
+    <a class="icon-btn" href="Today.dc.html" aria-label="Close">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+    </a>
+  </header>
+
+  <main class="scroll" style="padding: 8px 16px 16px; display: flex; flex-direction: column; gap: 16px;">
+    <h1 class="sr-only">Quick question done</h1>
+
+    <div class="fb-correct" style="border-radius: var(--radius-md); overflow: hidden; background: var(--surface-card); border: 1px solid var(--border);">
+      <div class="fb-head" role="status" aria-live="polite" style="background: var(--t); padding: 12px 16px;">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12.5l5 5L19.5 7"></path></svg>
+        Correct
+      </div>
+      <p class="t-body-lg" style="padding: 12px 16px 16px;">Put the item back in its slot.</p>
+    </div>
+
+    <figure class="quote">
+      <blockquote class="quote-text">“A double beep means wrong item. Put the item back in its slot, then re-scan the location label.”</blockquote>
+      <figcaption class="quote-src">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5M9 13h6M9 17h4"></path></svg>
+        Scanning SOP v2 · §3.2
+      </figcaption>
+    </figure>
+
+    <p class="t-label num muted">1 review cleared · 3 left today</p>
+  </main>
+
+  <div class="dock">
+    <a class="btn btn-primary btn-lg btn-block" href="Today.dc.html">Back to Today</a>
+    <a class="link-btn muted-link" href="Report.dc.html" style="align-self: center;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>Report this question</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"brand":{"editor":"enum","options":["default","plum"],"default":"default","section":"Theme"},"w":{"editor":"int","default":360,"section":"Frame"},"h":{"editor":"int","default":740,"section":"Frame"},"$preview":{"width":360,"height":740}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      theme: this.props.theme ?? 'light',
+      brand: this.props.brand ?? 'default',
+      w: this.props.w ?? 360,
+      h: this.props.h ?? 740
+    };
+  }
+}
+</script>
+</body>
+</html>

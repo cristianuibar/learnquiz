@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Short answer by voice</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="lq.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" data-brand="{{brand}}" style="width: {{w}}px; height: {{h}}px; font-family: var(--font-sans); color: var(--ink);">
+  <header class="topbar">
+    <a class="icon-btn" href="Today.dc.html" aria-label="End session">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+    </a>
+    <div style="flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px;">
+      <div class="bar" style="flex: 1;" role="progressbar" aria-label="Session progress" aria-valuenow="10" aria-valuemin="0" aria-valuemax="20" aria-valuetext="10 of 20">
+        <span class="bar-fill" style="width: 50%;"></span>
+      </div>
+      <span class="t-overline num muted">10 of 20</span>
+    </div>
+    <button class="icon-btn" type="button" aria-label="Read aloud" aria-pressed="{{listenOn}}" onClick="{{toggleListen}}">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"></path><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"></path></svg>
+    </button>
+  </header>
+
+  <main class="scroll" style="display: flex; flex-direction: column; gap: 12px;">
+    <h1 class="t-title2">A carton is stuck in the conveyor. What do you do, in order?</h1>
+
+    <sc-if value="{{isIdle}}" hint-placeholder-val="{{ false }}">
+      <section aria-label="Voice answer" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding-bottom: 24px;">
+        <button type="button" aria-label="Record answer" onClick="{{micClick}}" style="width: 64px; height: 64px; border: 0; border-radius: var(--radius-full); background: var(--brand); color: var(--on-brand); display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>
+        </button>
+        <p class="t-label" style="margin-top: 8px;">Tap to record</p>
+        <button type="button" class="link-btn" onClick="{{typeInstead}}">Type instead</button>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{isRecording}}" hint-placeholder-val="{{ false }}">
+      <section aria-label="Recording" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding-bottom: 24px;">
+        <div class="sunken" style="width: 100%; min-height: 72px;">
+          <p class="t-body-lg" aria-live="polite">Hit the stop button, put my…</p>
+        </div>
+        <div aria-hidden="true" style="display: flex; align-items: center; gap: 4px; height: 32px;">
+          <span style="width: 4px; height: 8px; border-radius: 2px; background: var(--brand);"></span>
+          <span style="width: 4px; height: 20px; border-radius: 2px; background: var(--brand);"></span>
+          <span style="width: 4px; height: 32px; border-radius: 2px; background: var(--brand);"></span>
+          <span style="width: 4px; height: 16px; border-radius: 2px; background: var(--brand);"></span>
+          <span style="width: 4px; height: 24px; border-radius: 2px; background: var(--brand);"></span>
+        </div>
+        <button type="button" aria-label="Stop recording" aria-pressed="true" onClick="{{micClick}}" style="width: 64px; height: 64px; border: 0; border-radius: var(--radius-full); background: var(--brand-hover); color: var(--on-brand); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 0 0 4px var(--surface-page), 0 0 0 6px var(--brand);">
+          <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"></rect></svg>
+        </button>
+        <p class="t-label">Tap to stop</p>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{isReview}}" hint-placeholder-val="{{ true }}">
+      <section aria-label="Review your answer" style="display: flex; flex-direction: column; align-items: flex-start; gap: 12px;">
+        <div class="field" style="width: 100%;">
+          <label class="field-label" for="qv-answer">Your answer</label>
+          <textarea id="qv-answer" class="input" rows="4" value="{{text}}" onChange="{{onText}}"></textarea>
+        </div>
+        <button type="button" class="btn btn-secondary" onClick="{{micClick}}">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>
+          Record again
+        </button>
+      </section>
+    </sc-if>
+  </main>
+
+  <div class="dock">
+    <fieldset>
+      <legend class="conf-legend" id="qv-conf">How sure are you?</legend>
+      <div class="conf" role="radiogroup" aria-labelledby="qv-conf">
+        <button class="conf-btn" type="button" role="radio" aria-checked="{{cSure}}" onClick="{{pickSure}}"><span class="conf-tick" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></span>Sure</button>
+        <button class="conf-btn" type="button" role="radio" aria-checked="{{cUnsure}}" onClick="{{pickUnsure}}"><span class="conf-tick" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></span>Unsure</button>
+        <button class="conf-btn" type="button" role="radio" aria-checked="{{cGuess}}" onClick="{{pickGuess}}"><span class="conf-tick" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></span>Guessing</button>
+      </div>
+    </fieldset>
+    <sc-if value="{{canCheck}}" hint-placeholder-val="{{ true }}">
+      <a class="btn btn-primary btn-lg btn-block" href="QOrder.dc.html">Check</a>
+    </sc-if>
+    <sc-if value="{{cannotCheck}}" hint-placeholder-val="{{ false }}">
+      <button class="btn btn-lg btn-block" type="button" disabled>Check</button>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"brand":{"editor":"enum","options":["default","plum"],"default":"default","section":"Theme"},"step":{"editor":"enum","options":["idle","recording","review"],"default":"review","section":"Variant"},"w":{"editor":"int","default":360,"section":"Frame"},"h":{"editor":"int","default":740,"section":"Frame"},"$preview":{"width":360,"height":740}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { step: null, text: null, conf: null, listen: false };
+  }
+  renderVals() {
+    const step = this.state.step ?? this.props.step ?? 'review';
+    const text = this.state.text ?? 'Hit the stop button, put my own lock on the switch, then clear the carton.';
+    const conf = this.state.conf;
+    const ok = step === 'review' && text.trim().length > 0 && conf !== null;
+    return {
+      theme: this.props.theme ?? 'light',
+      brand: this.props.brand ?? 'default',
+      w: this.props.w ?? 360,
+      h: this.props.h ?? 740,
+      isIdle: step === 'idle',
+      isRecording: step === 'recording',
+      isReview: step === 'review',
+      text,
+      onText: (e) => this.setState({ text: e.target.value }),
+      micClick: () => this.setState(step === 'recording' ? { step: 'review', text: null } : { step: 'recording' }),
+      typeInstead: () => this.setState({ step: 'review', text: '' }),
+      listenOn: this.state.listen ? 'true' : 'false',
+      toggleListen: () => this.setState({ listen: !this.state.listen }),
+      cSure: conf === 'sure' ? 'true' : 'false',
+      cUnsure: conf === 'unsure' ? 'true' : 'false',
+      cGuess: conf === 'guess' ? 'true' : 'false',
+      pickSure: () => this.setState({ conf: 'sure' }),
+      pickUnsure: () => this.setState({ conf: 'unsure' }),
+      pickGuess: () => this.setState({ conf: 'guess' }),
+      canCheck: ok,
+      cannotCheck: !ok
+    };
+  }
+}
+</script>
+</body>
+</html>

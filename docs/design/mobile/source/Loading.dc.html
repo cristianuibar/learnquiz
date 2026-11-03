@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Preparing your session</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="lq.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" data-brand="{{brand}}" style="width: {{w}}px; height: {{h}}px; font-family: var(--font-sans); color: var(--ink);">
+  <header class="topbar">
+    <a class="icon-btn" href="Today.dc.html" aria-label="Cancel">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+    </a>
+  </header>
+
+  <main class="scroll" style="display: flex; flex-direction: column; gap: 24px;">
+    <div aria-hidden="true" style="display: flex; flex-direction: column; gap: 24px;">
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div class="skel" style="height: 24px; width: 92%;"></div>
+        <div class="skel" style="height: 24px; width: 64%;"></div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div class="skel" style="height: 56px;"></div>
+        <div class="skel" style="height: 56px;"></div>
+        <div class="skel" style="height: 56px;"></div>
+        <div class="skel" style="height: 56px;"></div>
+      </div>
+    </div>
+    <div role="status" aria-live="polite" style="margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding-bottom: 24px;">
+      <h1 class="t-title2">Preparing your session</h1>
+      <div class="bar" style="width: 100%;" role="progressbar" aria-label="Questions ready" aria-valuenow="{{ready}}" aria-valuemin="0" aria-valuemax="{{total}}" aria-valuetext="{{readyText}}">
+        <span class="bar-fill" style="width: {{pct}}%;"></span>
+      </div>
+      <p class="t-body muted num">{{readyText}}</p>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"brand":{"editor":"enum","options":["default","plum"],"default":"default","section":"Theme"},"w":{"editor":"int","default":360,"section":"Frame"},"h":{"editor":"int","default":740,"section":"Frame"},"$preview":{"width":360,"height":740}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const ready = 12;
+    const total = 20;
+    return {
+      theme: this.props.theme ?? 'light',
+      brand: this.props.brand ?? 'default',
+      w: this.props.w ?? 360,
+      h: this.props.h ?? 740,
+      ready,
+      total,
+      readyText: ready + ' of ' + total + ' questions ready',
+      pct: Math.round((ready / total) * 100)
+    };
+  }
+}
+</script>
+</body>
+</html>
