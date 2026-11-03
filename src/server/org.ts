@@ -91,7 +91,7 @@ export const getPeople = createServerFn({ method: 'GET' })
     const [roles, members, invites] = await Promise.all([
       rolesOf(org.id),
       db
-        .select({ id: member.id, name: user.name, email: user.email, role: member.role, jobRole: jobRoles.name })
+        .select({ id: member.id, userId: member.userId, name: user.name, email: user.email, role: member.role, jobRole: jobRoles.name })
         .from(member)
         .innerJoin(user, eq(user.id, member.userId))
         .leftJoin(memberRoleAssignments, and(eq(memberRoleAssignments.userId, member.userId), eq(memberRoleAssignments.orgId, member.organizationId)))

@@ -34,6 +34,7 @@ import { Route as PlaySessionIdDoneRouteImport } from './routes/play.$sessionId_
 import { Route as PlayQuickItemIdRouteImport } from './routes/play.quick.$itemId'
 import { Route as TTopicIdPathRouteImport } from './routes/t.$topicId.path'
 import { Route as ApiOrgOrgIdLogoRouteImport } from './routes/api/org.$orgId.logo'
+import { Route as OrgSlugPeopleIdRouteImport } from './routes/org.$slug.people_.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -160,6 +161,11 @@ const ApiOrgOrgIdLogoRoute = ApiOrgOrgIdLogoRouteImport.update({
   path: '/api/org/$orgId/logo',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OrgSlugPeopleIdRoute = OrgSlugPeopleIdRouteImport.update({
+  id: '/org/$slug/people_/$id',
+  path: '/org/$slug/people/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -187,6 +193,7 @@ export interface FileRoutesByFullPath {
   '/t/$topicId/path': typeof TTopicIdPathRoute
   '/org/$slug/': typeof OrgSlugIndexRoute
   '/api/org/$orgId/logo': typeof ApiOrgOrgIdLogoRoute
+  '/org/$slug/people/$id': typeof OrgSlugPeopleIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -213,6 +220,7 @@ export interface FileRoutesByTo {
   '/t/$topicId/path': typeof TTopicIdPathRoute
   '/org/$slug': typeof OrgSlugIndexRoute
   '/api/org/$orgId/logo': typeof ApiOrgOrgIdLogoRoute
+  '/org/$slug/people/$id': typeof OrgSlugPeopleIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -241,6 +249,7 @@ export interface FileRoutesById {
   '/t/$topicId/path': typeof TTopicIdPathRoute
   '/org/$slug/': typeof OrgSlugIndexRoute
   '/api/org/$orgId/logo': typeof ApiOrgOrgIdLogoRoute
+  '/org/$slug/people_/$id': typeof OrgSlugPeopleIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -270,6 +279,7 @@ export interface FileRouteTypes {
     | '/t/$topicId/path'
     | '/org/$slug/'
     | '/api/org/$orgId/logo'
+    | '/org/$slug/people/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -296,6 +306,7 @@ export interface FileRouteTypes {
     | '/t/$topicId/path'
     | '/org/$slug'
     | '/api/org/$orgId/logo'
+    | '/org/$slug/people/$id'
   id:
     | '__root__'
     | '/'
@@ -323,6 +334,7 @@ export interface FileRouteTypes {
     | '/t/$topicId/path'
     | '/org/$slug/'
     | '/api/org/$orgId/logo'
+    | '/org/$slug/people_/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -347,6 +359,7 @@ export interface RootRouteChildren {
   TTopicIdPathRoute: typeof TTopicIdPathRoute
   OrgSlugIndexRoute: typeof OrgSlugIndexRoute
   ApiOrgOrgIdLogoRoute: typeof ApiOrgOrgIdLogoRoute
+  OrgSlugPeopleIdRoute: typeof OrgSlugPeopleIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -526,6 +539,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiOrgOrgIdLogoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/org/$slug/people_/$id': {
+      id: '/org/$slug/people_/$id'
+      path: '/org/$slug/people/$id'
+      fullPath: '/org/$slug/people/$id'
+      preLoaderRoute: typeof OrgSlugPeopleIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -567,6 +587,7 @@ const rootRouteChildren: RootRouteChildren = {
   TTopicIdPathRoute: TTopicIdPathRoute,
   OrgSlugIndexRoute: OrgSlugIndexRoute,
   ApiOrgOrgIdLogoRoute: ApiOrgOrgIdLogoRoute,
+  OrgSlugPeopleIdRoute: OrgSlugPeopleIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

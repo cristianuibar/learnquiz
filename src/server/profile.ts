@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, asc, desc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '@/db'
-import { member } from '@/db/auth-schema'
+import { member, user } from '@/db/auth-schema'
 import { attempts, concepts, jobRoles, learnerConcept, memberRoleAssignments, sessions, topics, units } from '@/db/schema'
 import { requireOrgAdmin } from '@/server/authz'
 import { httpError, mean } from '@/server/helpers'
@@ -30,7 +30,8 @@ export const getProfile = createServerFn({ method: 'GET' })
       learnerId = await requireLearnerId()
     }
 
-    const [personalTopic, role] = await Promise.all([
+    const [person, personalTopic, role] = await Promise.all([
+      db.select({ name: user.name }).from(user).where(eq(user.id, learnerId)).get(),
       db.select({ id: topics.id, title: topics.title, createdAt: topics.createdAt }).from(topics)
         .where(and(eq(topics.learnerId, learnerId), eq(topics.status, 'ready')))
         .orderBy(desc(topics.createdAt)).limit(1).get(),
@@ -106,6 +107,7 @@ export const getProfile = createServerFn({ method: 'GET' })
     const estimatedDays = achievedAt === null && activeDays >= 2 && gainPerDay > 0 ? Math.ceil(weekly[6].gap / gainPerDay) : null
 
     return {
+      name: person?.name ?? '',
       topic: topic ? { id: topic.id, title: topic.title } : null,
       role: role?.name ?? null,
       benchmark,
