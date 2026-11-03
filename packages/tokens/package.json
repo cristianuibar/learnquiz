@@ -3,11 +3,14 @@
 	"private": true,
 	"type": "module",
 	"exports": {
-		".": "./src/index.ts"
+		".": "./src/index.ts",
+		"./native": "./src/native.ts",
+		"./theme.css": "./theme.css"
 	},
 	"scripts": {
 		"typecheck": "tsc --noEmit",
-		"test": "vitest run --passWithNoTests"
+		"test": "vitest run",
+		"build:css": "node --experimental-strip-types scripts/build-css.ts"
 	},
 	"devDependencies": {
 		"typescript": "6.0.3",
