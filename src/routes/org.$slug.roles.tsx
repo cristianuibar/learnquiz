@@ -84,7 +84,7 @@ function Roles() {
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="onboardingDays">Onboarding days</Label>
-            <Input id="onboardingDays" name="onboardingDays" type="number" className="h-11" min={1} step={1} defaultValue={30} required aria-invalid={!!fields.onboardingDays || undefined} aria-describedby={fields.onboardingDays ? 'onboardingDays-error' : undefined} />
+            <Input id="onboardingDays" name="onboardingDays" type="number" className="h-11" min={1} max={365} step={1} defaultValue={30} required aria-invalid={!!fields.onboardingDays || undefined} aria-describedby={fields.onboardingDays ? 'onboardingDays-error' : undefined} />
             {fields.onboardingDays && <p id="onboardingDays-error" role="alert" className="text-sm font-medium text-wrong">{fields.onboardingDays}</p>}
           </div>
           {error && <p role="alert" className="text-sm font-medium text-wrong">{error}</p>}
