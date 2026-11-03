@@ -237,6 +237,8 @@ it('retires a document and its items without touching other items', async () => 
   await expect(retireRoleDocument({ data: { slug: 'acme', roleId: 'role-a', sourceId: 'src-1' } })).resolves.toEqual({ ok: true })
   expect(sqlite.prepare("SELECT retired_at IS NOT NULL AS retired FROM sources WHERE id = 'src-1'").get()).toEqual({ retired: 1 })
   expect(itemStatus()).toEqual({ 'item-1': 'retired', 'item-2': 'retired', 'item-other': 'active' })
+  expect(sqlite.prepare("SELECT gen_status, gen_error, gen_started_at FROM concepts WHERE id = 'con-1'").get())
+    .toEqual({ gen_status: 'failed', gen_error: 'The document behind this concept was retired', gen_started_at: null })
   await expect(retireRoleDocument({ data: { slug: 'acme', roleId: 'role-a', sourceId: 'src-1' } })).rejects.toMatchObject({ status: 404 })
 })
 

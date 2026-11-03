@@ -2,7 +2,7 @@ import { and, asc, count, eq, isNotNull, isNull, lt, or } from 'drizzle-orm'
 import { getDb, type Db } from '@/db'
 import { concepts, items, topics, units } from '@/db/schema'
 import { utcDayStart } from '@/lib/limits'
-import { generateConceptItems } from '@/server/helpers'
+import { generateConceptItems, liveConcept } from '@/server/helpers'
 import { assertWithinCompanyCap, COMPANY_CAP_MESSAGE } from '@/server/model-cap'
 
 export const ITEMS_PER_CONCEPT = 6
@@ -19,6 +19,7 @@ export async function processConcept(db: Db, conceptId: string): Promise<void> {
   const claimed = await db.update(concepts).set({ genStatus: 'generating', genStartedAt: now })
     .where(and(
       eq(concepts.id, conceptId),
+      liveConcept,
       or(eq(concepts.genStatus, 'pending'), and(eq(concepts.genStatus, 'generating'), lt(concepts.genStartedAt, now - STALE_CLAIM_MS))),
     ))
     .returning({ id: concepts.id })
@@ -71,6 +72,7 @@ export async function drainConceptQueue(opts: { limit: number; concurrency: numb
     .innerJoin(units, eq(units.id, concepts.unitId))
     .where(and(
       isNotNull(topics.orgId),
+      liveConcept,
       or(
         and(eq(concepts.genStatus, 'pending'), or(isNull(concepts.genStartedAt), lt(concepts.genStartedAt, utcDayStart(now)))),
         and(eq(concepts.genStatus, 'generating'), lt(concepts.genStartedAt, now - STALE_CLAIM_MS)),

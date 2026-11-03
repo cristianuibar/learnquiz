@@ -203,11 +203,28 @@ it('retires questions when the document is replaced after generation read it but
   expect(raw.prepare("SELECT status, COUNT(*) AS n FROM items WHERE source_id = 'co-topic-src' GROUP BY status").all()).toEqual([{ status: 'retired', n: 6 }])
 })
 
-it('fails a concept whose document was retired without calling the model', async () => {
+it('never selects a pending concept whose document is retired, and never calls the model for it', async () => {
   raw.exec("DELETE FROM concepts WHERE id <> 'c00'; UPDATE sources SET retired_at = 1 WHERE id = 'co-topic-src'")
-  await drainConceptQueue()
+  expect(await drainConceptQueue()).toBe(0)
   expect(fetchModel).not.toHaveBeenCalled()
-  expect(states()).toEqual([{ id: 'c00', gen_status: 'failed', gen_error: 'The document behind this concept was retired' }])
+  expect(states()).toEqual([{ id: 'c00', gen_status: 'pending', gen_error: null }])
+})
+
+it('refuses the claim of a concept whose document is retired between the drain selecting it and claiming it', async () => {
+  raw.exec("DELETE FROM concepts WHERE id <> 'c00'")
+  beforeSql = { prefix: 'update "concepts"', fn: () => raw.exec("UPDATE sources SET retired_at = 1 WHERE id = 'co-topic-src'") }
+  expect(await drainConceptQueue()).toBe(1)
+  expect(beforeSql).toBeNull()
+  expect(fetchModel).not.toHaveBeenCalled()
+  expect(states()).toEqual([{ id: 'c00', gen_status: 'pending', gen_error: null }])
+  expect(one("SELECT COUNT(*) AS n FROM items WHERE concept_id = 'c00'")).toEqual({ n: 0 })
+})
+
+it('refuses to requeue a failed concept whose document was retired', async () => {
+  raw.exec("DELETE FROM concepts WHERE id <> 'c00'; UPDATE concepts SET gen_status = 'failed' WHERE id = 'c00'; UPDATE sources SET retired_at = 1 WHERE id = 'co-topic-src'")
+  await expect(retryConceptGeneration({ data: { slug: 'northwind', conceptId: 'c00' } }))
+    .rejects.toMatchObject({ status: 409, message: 'The document behind this concept was retired' })
+  expect(states()).toEqual([{ id: 'c00', gen_status: 'failed', gen_error: null }])
 })
 
 it('keeps a concept reset by a document replacement pending, then regenerates it from the new version', async () => {

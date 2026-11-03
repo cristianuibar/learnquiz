@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull, lt, or } from 'drizzle-orm'
+import { and, asc, eq, exists, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb, type Db } from '@/db'
 import { conceptEdges, concepts, jobRoles, sources, topics, units } from '@/db/schema'
@@ -28,6 +28,30 @@ export function curriculumWrites(db: Db, topicId: string, valid: ValidatedSkelet
     ...chunks(valid.edges.map((e) => ({ topicId, ...e })), 20).map((rows) => db.insert(conceptEdges).values(rows)),
     db.update(topics).set({ status: 'ready', generatedBy }).where(eq(topics.id, topicId)),
   ] as const
+}
+
+// Role publication in one atomic batch: the topic turns ready only while this build still holds its claim and none of the
+// documents it cites is retired or deleted; otherwise the inserted path is deleted again. genStartedAt keeps the claim's value.
+async function publishRoleCurriculum(db: Db, topicId: string, claimAt: number, valid: ValidatedSkeleton, generatedBy: string | null): Promise<boolean> {
+  const inserts = curriculumWrites(db, topicId, valid, generatedBy, 'pending').slice(0, -1)
+  const cited = [...new Set(valid.units.flatMap((u) => u.concepts.map((c) => c.sourceId)).filter((id): id is string => Boolean(id)))]
+  const deadSource = exists(db.select({ one: sql`1` }).from(sources)
+    .where(and(inArray(sources.id, cited.length ? cited : ['']), or(isNotNull(sources.retiredAt), isNotNull(sources.deletedAt)))))
+  const held = and(eq(topics.id, topicId), eq(topics.status, 'generating'), eq(topics.genStartedAt, claimAt))
+  const published = exists(db.select({ one: sql`1` }).from(topics)
+    .where(and(eq(topics.id, topicId), eq(topics.status, 'ready'), eq(topics.genStartedAt, claimAt))))
+  const notPublished = sql`not ${published}`
+  const conceptIds = valid.units.flatMap((u) => u.concepts.map((c) => c.id))
+  const queries = [
+    ...inserts,
+    db.update(topics).set({ status: 'ready', generatedBy }).where(and(held, sql`not ${deadSource}`)).returning({ id: topics.id }),
+    ...chunks(conceptIds, 40).map((ids) => db.delete(conceptEdges).where(and(inArray(conceptEdges.fromId, ids), notPublished))),
+    ...chunks(conceptIds, 40).map((ids) => db.delete(concepts).where(and(inArray(concepts.id, ids), notPublished))),
+    ...chunks(valid.units.map((u) => u.id), 40).map((ids) => db.delete(units).where(and(inArray(units.id, ids), notPublished))),
+  ]
+  const [first, ...rest] = queries
+  const results = await db.batch([first, ...rest])
+  return (results[inserts.length] as unknown[]).length > 0
 }
 
 // A build claim outlives its request only when the request died mid call; claims from before the timestamp count as stale.
@@ -86,13 +110,16 @@ export async function buildRoleCurriculum({ orgId, ownerId, roleId }: { orgId: s
       throw httpError('The curriculum contains concepts without a matching document quote. Try again.', 422)
     }
     // Publish the complete path and its ready status together; never publish a generic fallback for an SOP.
-    const [first, ...rest] = curriculumWrites(db, topicId, valid, jobModel('curriculum').model, 'pending')
-    await db.batch([first, ...rest])
+    if (!(await publishRoleCurriculum(db, topicId, now, valid, jobModel('curriculum').model))) {
+      throw httpError('A document changed while the curriculum was generating. Build it again.', 409)
+    }
     // Questions are generated per concept for the whole company, not per learner.
     runInBackground(drainConceptQueue())
     return { topicId }
   } catch (e) {
-    await db.update(topics).set({ status: 'failed' }).where(eq(topics.id, topicId)).catch(() => {})
+    // Only the build that still holds the claim may fail the topic; a stale one must not overwrite another build's result.
+    await db.update(topics).set({ status: 'failed' })
+      .where(and(eq(topics.id, topicId), eq(topics.status, 'generating'), eq(topics.genStartedAt, now))).catch(() => {})
     throw e
   }
 }

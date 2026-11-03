@@ -282,3 +282,34 @@ it('builds from a document replaced between the first read and the claim, never 
   expect(raw.prepare("SELECT DISTINCT source_id FROM concepts WHERE topic_id = 'picker-topic' ORDER BY source_id").all())
     .toEqual([{ source_id: 'packing' }, { source_id: 'receiving-v2' }])
 })
+
+const retireReceiving = () => raw.exec("UPDATE sources SET retired_at = 1 WHERE id = 'receiving'")
+const noPath = { units: { n: 0 }, concepts: { n: 0 }, edges: { n: 0 } }
+
+it('publishes nothing when the claim went stale and a replacement retired the document during the model call', async () => {
+  fetchModel.mockImplementation(async () => {
+    raw.exec("UPDATE topics SET status = 'failed' WHERE id = 'picker-topic'") // releaseStaleBuild
+    retireReceiving()
+    raw.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, created_at) VALUES ('receiving-v2', 'picker-topic', 'text', 'Receiving and picking', ?, 3)").run(documents[0])
+    return modelReply(skeleton())
+  })
+  await expect(generate()).rejects.toMatchObject({ status: 409, message: 'A document changed while the curriculum was generating. Build it again.' })
+  expect(storedPath()).toEqual(noPath)
+  expect(topicState()).toEqual({ status: 'failed' })
+})
+
+it('publishes nothing and fails the topic when a cited document is retired while the claim is still held', async () => {
+  fetchModel.mockImplementation(async () => { retireReceiving(); return modelReply(skeleton()) })
+  await expect(generate()).rejects.toMatchObject({ status: 409, message: 'A document changed while the curriculum was generating. Build it again.' })
+  expect(storedPath()).toEqual(noPath)
+  expect(topicState()).toEqual({ status: 'failed' })
+})
+
+it('does not let a stale build mark another build\'s ready topic failed', async () => {
+  fetchModel.mockImplementation(async () => {
+    raw.exec("UPDATE topics SET status = 'ready', gen_started_at = 42 WHERE id = 'picker-topic'") // a newer build finished
+    return modelReply({ units: [] })
+  })
+  await expect(generate()).rejects.toMatchObject({ status: 422 })
+  expect(topicState()).toEqual({ status: 'ready' })
+})

@@ -170,6 +170,10 @@ export const retireRoleDocument = createServerFn({ method: 'POST' })
         eq(items.sourceId, source.id), inArray(items.status, LIVE),
         exists(db.select({ one: sql`1` }).from(sources).where(and(eq(sources.id, source.id), eq(sources.retiredAt, retiredAt)))),
       )),
+      db.update(concepts).set({ genStatus: 'failed', genError: 'The document behind this concept was retired', genStartedAt: null }).where(and(
+        eq(concepts.sourceId, source.id),
+        exists(db.select({ one: sql`1` }).from(sources).where(and(eq(sources.id, source.id), eq(sources.retiredAt, retiredAt)))),
+      )),
     ])
     if (!retired.length) {
       throw await refusal(row.topic.id)

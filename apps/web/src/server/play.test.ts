@@ -638,6 +638,52 @@ describe('learner practice and unit unlocks', () => {
     expect(chatJson).not.toHaveBeenCalled()
     expect(scalar(raw, 'SELECT COUNT(*) AS n FROM model_calls').n).toBe(0)
   })
+
+  const PAYLOAD = JSON.stringify({
+    format: 'cloze', stem: 'Solve x + 1 = 2: x = ____.', options: [], accepted_answers: ['1'], model_answer: '1',
+    explanation: 'Subtract 1 from both sides.', difficulty: 1, source_quote: null, grounded: false, bloom: 'apply',
+  })
+  const seedSources = () => {
+    const src = raw.prepare('INSERT INTO sources (id, topic_id, kind, title, body_text, retired_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    src.run('src-old', 't1', 'text', 'Old handbook', 'Old.', Date.now(), 1)
+    src.run('src-new', 't1', 'text', 'New handbook', 'New.', null, 1)
+  }
+  const seedConcept = (id: string, unit: string, order: number, source: string, itemIds: string[]) => {
+    raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary, source_id) VALUES (?, ?, ?, ?, ?, ?, ?)').run(id, 't1', unit, order, id, '', source)
+    for (const itemId of itemIds) {
+      raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run(itemId, id, 't1', 'cloze', PAYLOAD, 1, Date.now())
+    }
+  }
+
+  it('practises a live document when four retired-document concepts rank first in the frontier', async () => {
+    seedSources()
+    raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un1', 't1', 0, 'Basics')
+    raw.prepare('INSERT INTO learner_unit (learner_id, unit_id, unlocked_at) VALUES (?, ?, ?)').run('u1', 'un1', 1)
+    for (let i = 1; i <= 4; i++) seedConcept(`dead${i}`, 'un1', i, 'src-old', [])
+    seedConcept('live', 'un1', 5, 'src-new', ['l1', 'l2', 'l3'])
+
+    const { sessionId } = await startSession({ data: { topicId: 't1' } })
+    const plan = JSON.parse(scalar(raw, 'SELECT plan_json FROM sessions WHERE id = ?', sessionId).plan_json as string)
+    expect([...plan.queue].sort()).toEqual(['l1', 'l2', 'l3'])
+    expect(chatJson).not.toHaveBeenCalled()
+  })
+
+  it('places from live concepts when the first concept of every unit cites a retired document', async () => {
+    seedSources()
+    for (const [i, unit] of ['un1', 'un2', 'un3'].entries()) {
+      raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run(unit, 't1', i, unit)
+      seedConcept(`dead-${unit}`, unit, 0, 'src-old', [`d-${unit}`])
+      seedConcept(`live-${unit}`, unit, 1, 'src-new', [1, 2, 3, 4, 5, 6].map((n) => `l${n}-${unit}`))
+    }
+
+    const { sessionId } = await startPlacement({ data: { topicId: 't1' } })
+    const plan = JSON.parse(scalar(raw, 'SELECT plan_json FROM sessions WHERE id = ?', sessionId).plan_json as string)
+    const pool = plan.pool as { id: string; conceptId: string }[]
+    expect(pool).toHaveLength(18)
+    expect(new Set(pool.map((p) => p.conceptId))).toEqual(new Set(['live-un1', 'live-un2', 'live-un3']))
+    expect(chatJson).not.toHaveBeenCalled()
+  })
 })
 
 it('credits the session bonus once when two finishing nextItem calls race (practice)', async () => {
