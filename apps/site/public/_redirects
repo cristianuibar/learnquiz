@@ -1,0 +1,15 @@
+/join/*     https://app.learnquiz.com/join/:splat     308
+/play/*     https://app.learnquiz.com/play/:splat     308
+/t/*        https://app.learnquiz.com/t/:splat        308
+/org/*      https://app.learnquiz.com/org/:splat      308
+/me/*       https://app.learnquiz.com/me/:splat       308
+/admin/*    https://app.learnquiz.com/admin/:splat    308
+/api/*      https://app.learnquiz.com/api/:splat      308
+/media/*    https://app.learnquiz.com/media/:splat    308
+/me         https://app.learnquiz.com/me              308
+/admin      https://app.learnquiz.com/admin           308
+/sign-in    https://app.learnquiz.com/sign-in         308
+/today      https://app.learnquiz.com/today           308
+/welcome    https://app.learnquiz.com/welcome         308
+/start      https://app.learnquiz.com/start           308
+/opt-in     https://app.learnquiz.com/opt-in          308
