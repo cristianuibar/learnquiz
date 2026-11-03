@@ -1,10 +1,30 @@
 import { useRouter } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 
+// Server validation failures arrive as a JSON-stringified zod issues array.
+function issuesOf(err: unknown) {
+  if (!(err instanceof Error)) return null
+  try {
+    const issues: unknown = JSON.parse(err.message)
+    const ok = Array.isArray(issues) && issues.length > 0 && issues.every((i) => i && typeof i.message === 'string' && Array.isArray(i.path))
+    return ok ? (issues as { message: string; path: unknown[] }[]) : null
+  } catch {
+    return null
+  }
+}
+
+export function fieldErrors(err: unknown): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const { message, path } of issuesOf(err) ?? []) {
+    if (path.length && !(String(path[0]) in out)) out[String(path[0])] = message
+  }
+  return out
+}
+
 export const errorMessage = (err: unknown) =>
   typeof navigator !== 'undefined' && navigator.onLine === false
     ? "You're offline"
-    : (err instanceof Error && err.message) || 'Something went wrong'
+    : issuesOf(err)?.[0].message || (err instanceof Error && err.message) || 'Something went wrong'
 
 export function InlineError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (

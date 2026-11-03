@@ -14,7 +14,7 @@ import { getSessionUser } from '@/server/session'
 
 const Slug = z.object({ slug: z.string().min(1).max(100) })
 const Role = z.object({
-  name: z.string().trim().min(2).max(80),
+  name: z.string().trim().min(1, 'Enter a role name').min(2, 'Use at least 2 characters for the role name').max(80, 'Use at most 80 characters for the role name'),
   benchmark: z.number().min(0).max(1).default(0.85),
   onboardingDays: z.number().int().positive().default(30),
 })
@@ -101,7 +101,7 @@ async function insertRole(orgId: string, data: z.input<typeof Role>) {
 }
 
 export const createCompany = createServerFn({ method: 'POST' })
-  .validator(z.object({ name: z.string().trim().min(2).max(80), roleName: Role.shape.name }))
+  .validator(z.object({ name: z.string().trim().min(1, 'Enter a company name').min(2, 'Use at least 2 characters for the company name').max(80, 'Use at most 80 characters for the company name'), roleName: Role.shape.name }))
   .handler(async ({ data }): Promise<{ slug: string }> => {
     const me = await getSessionUser()
     if (!me) throw httpError('Sign in first', 401)

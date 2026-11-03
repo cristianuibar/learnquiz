@@ -244,8 +244,11 @@ describe('learner practice and unit unlocks', () => {
       .run('u2', 'i6', Date.now(), 1, 5, 2)
 
     const { sessionId } = await startPlacement({ data: { topicId: 't1' } })
-    const { item } = await getSession({ data: { sessionId } })
+    const served = await getSession({ data: { sessionId } })
+    const { item } = served
     // Being served a question must not reveal its answers before submission.
+    expect(JSON.stringify(served)).not.toMatch(/is_correct|accepted_answers|model_answer/)
+    expect(JSON.stringify(await nextItem({ data: { sessionId } }))).not.toMatch(/is_correct|accepted_answers|model_answer/)
     expect(await getConceptItems({ data: { conceptId: 'c1' } })).toEqual({ items: [] })
     await answerItem({ data: { sessionId, itemId: item!.id, answer: { text: '1' }, confidence: 'sure', responseMs: 1000 } })
     await endSession({ data: { sessionId } })
