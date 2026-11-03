@@ -65,6 +65,10 @@ or transcription fails.
 
 ## Demo company walkthrough
 
+The [Northwind Logistics seed](seed/README.md) creates a warehouse demo with an
+original SOP, generated training questions and employees at invited, onboarding
+and proficient stages. Passwords are supplied from Proton Pass at runtime.
+
 Use a fictional **Acme Support** company with **Customer support** as its first job
 role. Create the company and accounts through the app; this walkthrough does not
 require a preloaded demo account or a seed script.
