@@ -163,7 +163,7 @@ export const getPeople = createServerFn({ method: 'GET' })
         .orderBy(desc(invitation.createdAt)),
       trainingOf(org.id),
     ])
-    return { id: org.id, name: org.name, slug: org.slug, baseUrl: getEnv().BETTER_AUTH_URL, roles, members: members.map(({ userId, ...row }) => ({ ...row, training: training.get(userId) ?? null })), readOnly, invites: invites.map((i) => ({ ...i, expired: i.expiresAt.getTime() < Date.now() })) }
+    return { id: org.id, name: org.name, slug: org.slug, baseUrl: getEnv().BETTER_AUTH_URL, roles, members: members.map((row) => ({ ...row, training: training.get(row.userId) ?? null })), readOnly, invites: invites.map((i) => ({ ...i, expired: i.expiresAt.getTime() < Date.now() })) }
   })
 
 // Public on purpose: the invitation id is the secret in the invite link, and the page needs it before the invitee has an account.
