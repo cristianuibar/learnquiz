@@ -45,7 +45,7 @@ function Users() {
         const form = new FormData(event.currentTarget)
         void navigate({ search: { search: String(form.get('search')).trim(), field: form.get('field') === 'name' ? 'name' : 'email', offset: 0 } })
       }}>
-        <div className="flex flex-col gap-2"><Label htmlFor="user-search">Search users</Label><Input id="user-search" name="search" defaultValue={search.search} maxLength={200} className="h-11" /></div>
+        <div className="flex min-w-0 flex-1 basis-64 flex-col gap-2"><Label htmlFor="user-search">Search users</Label><Input id="user-search" name="search" defaultValue={search.search} maxLength={200} className="h-11" /></div>
         <div className="flex flex-col gap-2"><Label htmlFor="search-field">Search by</Label><select id="search-field" name="field" defaultValue={search.field} className="h-11 rounded-md border border-input bg-background px-3 focus-visible:ring-[3px] focus-visible:ring-ring/50"><option value="email">Email</option><option value="name">Name</option></select></div>
         <Button type="submit" className="h-11">Search</Button>
       </form>
