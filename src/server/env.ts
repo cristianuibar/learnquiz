@@ -1,5 +1,5 @@
 // The only module allowed to import "cloudflare:workers". Server-side only.
-import { env as workerEnv } from 'cloudflare:workers'
+import { env as workerEnv, waitUntil } from 'cloudflare:workers'
 import type { JobModels } from '@/lib/llm/models'
 
 export type AppEnv = Omit<Env, 'LLM_PROFILE' | 'LLM_BASE_URL' | 'LLM_MODEL' | 'LLM_API_KEY' | 'JOB_MODELS' | 'IMAGE_MODEL' | 'VOICE_ENABLED' | 'BETTER_AUTH_URL' | 'BETTER_AUTH_SECRET'> & {
@@ -24,4 +24,9 @@ export type AppEnv = Omit<Env, 'LLM_PROFILE' | 'LLM_BASE_URL' | 'LLM_MODEL' | 'L
 // Call inside request handlers only: touching bindings at import time breaks the build.
 export function getEnv(): AppEnv {
   return workerEnv as unknown as AppEnv
+}
+
+// Keeps background work alive after the response (about 30 s); a failure is logged, never thrown into the request.
+export function runInBackground(task: Promise<unknown>): void {
+  waitUntil(task.catch((e) => console.error('background task failed', e)))
 }

@@ -14,9 +14,11 @@ import { httpError, mean } from '@/server/helpers'
 import { getSessionUser } from '@/server/session'
 
 const Slug = z.object({ slug: z.string().min(1).max(100) })
+const benchmarkMessage = 'Enter a whole percentage from 50 to 100'
 const Role = z.object({
   name: z.string().trim().min(1, 'Enter a role name').min(2, 'Use at least 2 characters for the role name').max(80, 'Use at most 80 characters for the role name'),
-  benchmark: z.number().min(0).max(1).default(0.85),
+  // Entered as a whole percentage, stored as a fraction.
+  benchmark: z.number().int(benchmarkMessage).min(50, benchmarkMessage).max(100, benchmarkMessage).default(85).transform((percent) => percent / 100),
   onboardingDays: z.number().int('Use whole days for the onboarding period').min(1, 'Use at least 1 day for the onboarding period').max(365, 'Use at most 365 days for the onboarding period').default(30),
 })
 
@@ -88,7 +90,7 @@ async function trainingOf(orgId: string) {
   return training
 }
 
-async function insertRole(orgId: string, data: z.input<typeof Role>) {
+async function insertRole(orgId: string, data: { name: string } & Partial<z.output<typeof Role>>) {
   const db = getDb()
   const id = crypto.randomUUID()
   const createdAt = Date.now()

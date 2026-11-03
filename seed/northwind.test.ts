@@ -6,7 +6,7 @@ import { getOrgOverview, getPeople } from '@/server/org'
 import { NORTHWIND, seedNorthwind } from './northwind'
 
 const request = vi.hoisted(() => ({ headers: new Headers() }))
-const bindings = vi.hoisted(() => ({ env: {
+const bindings = vi.hoisted(() => ({ waitUntil: () => {}, env: {
   DB: null as unknown,
   BETTER_AUTH_URL: 'http://127.0.0.1:8800',
   BETTER_AUTH_SECRET: '',

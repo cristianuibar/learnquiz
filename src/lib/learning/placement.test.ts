@@ -27,3 +27,10 @@ it('picks the closest unseen difficulty, avoiding recent concepts', () => {
   expect(pickNext(3, pool, [{ id: 'x', conceptId: 'c1' }])).toBe('b')
   expect(pickNext(3, pool.slice(0, 1), [{ id: 'a', conceptId: 'c1' }])).toBeNull()
 })
+
+it('places a tied mean at the lower level', () => {
+  let level = 3
+  const answers = [true, true, true, false, true, false, true, false]
+  const entries = answers.map((correct) => ({ level: (level = nextLevel(level, correct, 'sure')) }))
+  expect(levelResult(entries)).toBe(4)
+})

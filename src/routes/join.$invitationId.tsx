@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { CredentialsForm } from '@/components/credentials-form'
 import { RouteError } from '@/components/inline-error'
 import { Button } from '@/components/ui/button'
@@ -44,9 +44,25 @@ function Join() {
     <main className="mx-auto w-full max-w-xl px-4 pt-8 pb-16">
       <h1 className="mb-8 text-3xl font-bold tracking-tight">{invite ? `Join ${invite.company}` : 'Invite'}</h1>
       {message ? (
-        <p role="alert" className="font-medium">
-          {message}
-        </p>
+        <div className="flex flex-col gap-6">
+          <p role="alert" className="font-medium">
+            {message}
+          </p>
+          {invite?.status === 'accepted' &&
+            (!user || user.isAnonymous ? (
+              <Button className="h-12 self-end px-6" asChild>
+                <Link to="/sign-in" search={{ redirect: '/today', email: invite.email }}>
+                  Sign in as {invite.email}
+                </Link>
+              </Button>
+            ) : (
+              !invite.otherAccount && (
+                <Button className="h-12 self-end px-6" asChild>
+                  <Link to="/today">Continue to Today</Link>
+                </Button>
+              )
+            ))}
+        </div>
       ) : (
         invite &&
         (user && !user.isAnonymous ? (

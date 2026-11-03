@@ -9,6 +9,8 @@
   "main": "src/worker.ts",
   "observability": { "enabled": true },
   "upload_source_maps": true,
+  // Per-minute sweep that drains pending company-topic question generation (waitUntil alone stops about 30 s after the response).
+  "triggers": { "crons": ["* * * * *"] },
   "routes": [{ "pattern": "learnquiz.com", "custom_domain": true }],
   "vars": {
     "LLM_PROFILE": "meta",

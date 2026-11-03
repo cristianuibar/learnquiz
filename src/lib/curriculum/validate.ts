@@ -48,13 +48,16 @@ export function validateSkeleton(
       if (!byName.has(key(c.name))) byName.set(key(c.name), id)
       // Match whitespace, case and quote-style variants, retaining the exact source substring.
       const quote = c.source_quote && norm(c.source_quote)
-      let sourceId: string | null = null
-      let kept: string | null = null
-      for (const source of sources) {
-        kept = findSourceQuote(quote, source.bodyText)
-        if (kept) { sourceId = source.id; break }
-      }
-      if (quote && sources.length && !kept) notes.push(`dropped quote not found in source: ${c.name}`)
+      const matches = sources.flatMap((source) => {
+        const found = findSourceQuote(quote, source.bodyText)
+        return found ? [{ sourceId: source.id, kept: found }] : []
+      })
+      // A quote found in several documents cannot name its source, so it does not ground the concept.
+      const match = matches.length === 1 ? matches[0] : null
+      const sourceId = match?.sourceId ?? null
+      const kept = match?.kept ?? null
+      if (matches.length > 1) notes.push(`dropped quote found in more than one source: ${c.name}`)
+      else if (quote && sources.length && !kept) notes.push(`dropped quote not found in source: ${c.name}`)
       return { id, name: c.name, summary: c.summary, visual: c.visual, sourceId, sourceQuote: kept, grounded: kept !== null, critical: c.critical, misconceptions: c.misconceptions }
     }),
   }))

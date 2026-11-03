@@ -427,6 +427,21 @@ describe('learner practice and unit unlocks', () => {
     expect(scalar(raw, 'SELECT COUNT(*) AS n FROM attempts').n).toBe(1)
   })
 
+  it.each([
+    { name: 'a quote with its source', quote: 'Subtract 1 from both sides.', deleted: null, title: 'Algebra Handbook' },
+    { name: 'a quote whose source was deleted', quote: 'Subtract 1 from both sides.', deleted: 5, title: null },
+    { name: 'no quote', quote: null, deleted: null, title: null },
+  ])('reveals the source title for $name', async ({ quote, deleted, title }) => {
+    seedFrontier(raw, 1, true)
+    raw.prepare('INSERT INTO sources (id, topic_id, kind, title, body_text, deleted_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run('s1', 't1', 'text', 'Algebra Handbook', 'Subtract 1 from both sides.', deleted, 1)
+    const payload = JSON.parse(scalar(raw, 'SELECT payload_json FROM items WHERE id = ?', 'i1').payload_json as string)
+    raw.prepare('UPDATE items SET payload_json = ?, source_id = ? WHERE id = ?').run(JSON.stringify({ ...payload, source_quote: quote }), 's1', 'i1')
+    const { sessionId } = await startMiniSession({ data: { itemId: 'i1' } })
+    const reveal = await answerItem({ data: { sessionId, itemId: 'i1', answer: { text: '1' }, confidence: 'sure', responseMs: 1000 } })
+    expect(reveal).toMatchObject({ sourceQuote: quote, sourceTitle: title })
+  })
+
   it('only exposes the learner\'s answered active questions in Path after placement', async () => {
     seedFrontier(raw, 8, false)
     raw.prepare('UPDATE items SET status = ? WHERE id = ?').run('reported', 'i7')
@@ -457,6 +472,35 @@ describe('learner practice and unit unlocks', () => {
     })
     vi.mocked(requireLearnerId).mockResolvedValueOnce('u2')
     expect(await getConceptItems({ data: { conceptId: 'c1' } })).toEqual({ items: [] })
+  })
+
+  it('marks only units with answered concepts as measured in Path after placement', async () => {
+    seedFrontier(raw, 6, false)
+    // Placement asks the first, middle and last unit's first concept; unit 2 has no questions and is never asked.
+    const payload = JSON.stringify({
+      format: 'cloze', stem: 'Solve x + 1 = 2: x = ____.', options: [], accepted_answers: ['1'], model_answer: '1',
+      explanation: 'Subtract 1 from both sides.', difficulty: 1, source_quote: null, grounded: false, bloom: 'apply',
+    })
+    for (const [order, withItems] of [[1, true], [2, false], [3, true]] as const) {
+      raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run(`ux${order}`, 't1', order, `Unit ${order}`)
+      raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(`cx${order}`, 't1', `ux${order}`, 0, `Concept ${order}`, '')
+      if (withItems) for (let i = 0; i < 6; i++) {
+        raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+          .run(`cx${order}-i${i}`, `cx${order}`, 't1', 'cloze', payload, 1, Date.now())
+      }
+    }
+
+    const { sessionId } = await startPlacement({ data: { topicId: 't1' } })
+    const { item } = await getSession({ data: { sessionId } })
+    await answerItem({ data: { sessionId, itemId: item!.id, answer: { text: '1' }, confidence: 'sure', responseMs: 1000 } })
+    await endSession({ data: { sessionId } })
+
+    const path = await getTopicPath({ data: { topicId: 't1' } })
+    expect(path.learner.placed).toBe(true)
+    const answered = scalar(raw, 'SELECT concept_id FROM learner_concept WHERE n_attempts > 0').concept_id as string
+    expect(path.units.filter((u) => u.measured).map((u) => u.concepts[0].id)).toEqual([answered])
+    expect(path.units.find((u) => u.id === 'ux2')!.measured).toBe(false)
   })
 
   it('keeps unit 2 locked in another learner\'s Path and practice after placement', async () => {

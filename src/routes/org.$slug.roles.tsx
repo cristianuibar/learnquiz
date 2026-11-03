@@ -77,8 +77,8 @@ function Roles() {
             {fields.name && <p id="name-error" role="alert" className="text-sm font-medium text-wrong">{fields.name}</p>}
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="benchmark">Benchmark (0–1)</Label>
-            <Input id="benchmark" name="benchmark" type="number" className="h-11" min={0} max={1} step="any" defaultValue={0.85} required aria-invalid={!!fields.benchmark || undefined} aria-describedby={fields.benchmark ? 'benchmark-error' : undefined} />
+            <Label htmlFor="benchmark">Benchmark (%)</Label>
+            <Input id="benchmark" name="benchmark" type="number" className="h-11" min={50} max={100} step="any" defaultValue={85} required aria-invalid={!!fields.benchmark || undefined} aria-describedby={fields.benchmark ? 'benchmark-error' : undefined} />
             {fields.benchmark && <p id="benchmark-error" role="alert" className="text-sm font-medium text-wrong">{fields.benchmark}</p>}
           </div>
           <div className="flex flex-col gap-2">
