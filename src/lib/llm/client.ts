@@ -274,12 +274,15 @@ async function logCall(
 
 // Images use their job's provider and model, with the same daily cap and call ledger as text.
 // No automatic retry: a second paid generation needs an explicit retry by the learner.
-export async function generateImage(opts: { prompt: string; learnerId: string; topicId: string }): Promise<Uint8Array> {
+export async function generateImage(opts: { prompt: string; learnerId: string; topicId: string; orgId?: string | null }): Promise<Uint8Array> {
   if (!isImageEnabled()) throw new LlmError('Diagrams are unavailable.', 404)
   const selected = jobModel('image')
   const log = { purpose: 'diagram', learnerId: opts.learnerId, topicId: opts.topicId, model: selected.model }
-  const reservedId = await reserve({ ...log, id: crypto.randomUUID() })
-  if (reservedId === false) throw dailyCapError()
+  const reservedId = await reserve({ ...log, id: crypto.randomUUID() }, opts.orgId)
+  if (reservedId === false) {
+    if (opts.orgId && (await companyOverCap(opts.orgId))) throw new LlmError(COMPANY_CAP_MESSAGE, 429)
+    throw dailyCapError()
+  }
   const started = Date.now()
   let error: string | null = null
   try {

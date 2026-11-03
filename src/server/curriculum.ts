@@ -14,7 +14,7 @@ import { requireOrgAdmin } from '@/server/authz'
 import { requireLearnerId } from '@/server/session'
 import { drainConceptQueue } from '@/server/concept-gen'
 import { runInBackground } from '@/server/env'
-import { learnerCanAccess, rolePlayable, seedLearnerTopic } from '@/server/topic-access'
+import { learnerCanAccess, rolePlayable, roleCompany, seedLearnerTopic } from '@/server/topic-access'
 import { buildRoleCurriculum, curriculumWrites } from '@/server/role-curriculum'
 
 export const createTopic = createServerFn({ method: 'POST' })
@@ -120,8 +120,10 @@ export const getTopicPath = createServerFn({ method: 'GET' })
     if (!row) throw httpError('Topic not found', 404)
     const { jobRoleId, ...topic } = row
     if (jobRoleId !== null && topic.status === 'ready') await seedLearnerTopic(db, learnerId, topic.id)
-    // Nothing to start until the topic is ready; a role topic also needs a stored question it can play.
-    const preparing = jobRoleId !== null ? !(await rolePlayable(db, topic)) : topic.status !== 'ready'
+    // Nothing to start until the topic is ready. A role topic without a playable stored question skips the placement.
+    const preparing = topic.status !== 'ready'
+    const placeable = jobRoleId !== null ? await rolePlayable(db, topic) : true
+    const company = jobRoleId !== null ? await roleCompany(db, jobRoleId) : null
 
     const [unitRows, conceptRows, edges, counts, known, [lt], [placement]] = await Promise.all([
       db
@@ -159,6 +161,8 @@ export const getTopicPath = createServerFn({ method: 'GET' })
     return {
       topic,
       preparing,
+      placeable,
+      company,
       // The reveal line lives in placements.log_json as { log, levelLine }.
       learner: {
         level: lt?.level ?? 3,

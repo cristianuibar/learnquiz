@@ -143,6 +143,29 @@ it.each([null, 'other-learner'])('refuses generation and media access for %s', a
   expect(boundary.env.MEDIA.put).toHaveBeenCalledTimes(1)
 })
 
+it('lets an assigned employee generate and view a shared role diagram, and refuses an unassigned user', async () => {
+  const run = (sql: string, ...args: (string | number | null)[]) => raw.prepare(sql).run(...args)
+  for (const id of ['employee', 'stranger']) run('INSERT INTO user (id, name, email) VALUES (?, ?, ?)', id, id, `${id}@example.test`)
+  run('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, ?)', 'org', 'Northwind', 'northwind', 1)
+  run('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, ?)', 'm1', 'org', 'employee', 'member', 1)
+  run('INSERT INTO job_roles (id, org_id, name, created_at) VALUES (?, ?, ?, ?)', 'role', 'org', 'Dispatcher', 1)
+  run('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES (?, ?, ?, ?)', 'employee', 'org', 'role', 1)
+  run('INSERT INTO topics (id, learner_id, org_id, job_role_id, title, status, created_at) VALUES (?, NULL, ?, ?, ?, ?, ?)', 'role-topic', 'org', 'role', 'Dispatcher role', 'ready', 1)
+  run('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)', 'role-unit', 'role-topic', 0, 'Orders')
+  run('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary, visual) VALUES (?, ?, ?, ?, ?, ?, ?)', 'role-concept', 'role-topic', 'role-unit', 0, 'Dispatch an order', 'Check stock, pack, dispatch.', 1)
+
+  boundary.learnerId = 'employee'
+  expect(await generateConceptDiagram({ data: { conceptId: 'role-concept' } })).toMatchObject({ status: 'ready' })
+  expect((await serveConceptDiagram('role-concept')).status).toBe(200)
+  expect(row("SELECT topic_id, learner_id FROM model_calls WHERE purpose = 'diagram'")).toEqual({ topic_id: 'role-topic', learner_id: 'employee' })
+  expect(fetchModel).toHaveBeenCalledTimes(1)
+
+  boundary.learnerId = 'stranger'
+  await expect(generateConceptDiagram({ data: { conceptId: 'role-concept' } })).rejects.toMatchObject({ status: 404, message: 'Concept not found' })
+  expect((await serveConceptDiagram('role-concept')).status).toBe(404)
+  expect(fetchModel).toHaveBeenCalledTimes(1)
+})
+
 it('does not generate for nonvisual concepts, local models, or capped learners', async () => {
   raw.exec('UPDATE concepts SET visual = 0')
   expect(await generateConceptDiagram({ data: { conceptId: 'procedure' } })).toEqual({ status: 'disabled' })

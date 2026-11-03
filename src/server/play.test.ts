@@ -782,6 +782,45 @@ describe('employees training on their role topic', () => {
     expect(fetchModel).not.toHaveBeenCalled()
   })
 
+  // The real chatJson answers the shared generation of one concept: six playable mcq items, all kept by the self-check.
+  const stubGeneration = async () => {
+    const original = vi.mocked(chatJson).getMockImplementation()!
+    const real = await vi.importActual<typeof import('@/lib/llm/client')>('@/lib/llm/client')
+    const reply = (value: unknown) => Response.json({ choices: [{ message: { content: JSON.stringify(value) }, finish_reason: 'stop' }] })
+    fetchModel.mockImplementation(async (_url: unknown, init: RequestInit) => {
+      const schema = JSON.parse(init.body as string).response_format.json_schema.name
+      return schema === 'item_batch'
+        ? reply({ items: Array.from({ length: 6 }, (_, n) => JSON.parse(mcq(n + 10))) })
+        : reply({ results: Array.from({ length: 6 }, (_, index) => ({ index, keep: true, reasons: [] })) })
+    })
+    Object.assign(getEnv(), { LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://llm.example/v1', LLM_MODEL: 'muse-spark-1.3' })
+    vi.mocked(chatJson).mockImplementation(real.chatJson as typeof chatJson)
+    return () => { getEnv().LLM_PROFILE = 'ollama'; vi.mocked(chatJson).mockImplementation(original) }
+  }
+
+  it('starts a session on a ready role topic without stored questions', async () => {
+    seedRoleTopic(0)
+    raw.exec("UPDATE concepts SET gen_status = 'pending' WHERE topic_id = 'rt'")
+    const restore = await stubGeneration()
+    try {
+      const { sessionId } = await startSession({ data: { topicId: 'rt' } })
+      expect((await getSession({ data: { sessionId } })).item).not.toBeNull()
+      expect(count('learner_unit')).toBe(2)
+      expect(scalar(raw, "SELECT COUNT(*) AS n FROM items WHERE topic_id = 'rt' AND status = 'active'").n).toBeGreaterThan(0)
+      expect(scalar(raw, "SELECT COUNT(*) AS n FROM model_calls WHERE topic_id = 'rt' AND purpose IN ('items', 'self_check')").n).toBeGreaterThan(0)
+      expect(scalar(raw, "SELECT COUNT(*) AS n FROM model_calls WHERE learner_id IS NOT NULL").n).toBe(0)
+    } finally {
+      restore()
+    }
+  })
+
+  it('asks the employee to wait when the role topic cannot be generated yet', async () => {
+    seedRoleTopic(0)
+    await expect(startSession({ data: { topicId: 'rt' } })).rejects.toMatchObject({ status: 503, message: expect.stringContaining('being prepared') })
+    expect(count('sessions')).toBe(0)
+    expect(fetchModel).not.toHaveBeenCalled()
+  })
+
   it('places on a stored question outside the first concept of each unit', async () => {
     seedRoleTopic(0)
     raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)').run('rc-late', 'rt', 'ru0', 1, 'Later concept', '')

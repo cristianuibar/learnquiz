@@ -301,16 +301,23 @@ it.each([
 })
 
 it.each([
-  ['mcq', 'ready', false], [null, 'ready', true], ['short', 'ready', true], [null, 'draft', true],
-] as const)('opens Today and the Path tab on the role topic (item %s, %s, preparing %s)', async (format, topicStatus, preparing) => {
+  ['mcq', 'ready', 'northwind', false, true, 'northwind'],
+  [null, 'ready', 'northwind', false, false, 'northwind'],
+  ['short', 'ready', 'northwind', false, false, 'northwind'],
+  [null, 'draft', 'northwind', true, false, 'northwind'],
+  ['mcq', 'ready', 'Northwind Logistics', false, true, 'Northwind Logistics'],
+] as const)('opens Today and the Path tab on the role topic (item %s, %s, settings name %s)', async (format, topicStatus, settingsName, preparing, placeable, company) => {
   seedRoleCurriculum(format !== null)
   if (format) raw.exec(`UPDATE items SET format = '${format}' WHERE id = 'i1'`)
   raw.exec(`UPDATE topics SET status = '${topicStatus}' WHERE id = 'picker-topic'`)
+  if (settingsName !== 'northwind') raw.exec(`INSERT INTO org_settings (org_id, company_name, working_hours_json) VALUES ('northwind', '${settingsName}', '{}')`)
   holder.userId = 'employee'
   raw.exec("INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES ('employee', 'northwind', 'picker', 1)")
   const today = await getToday()
-  expect(today.role).toEqual({ name: 'Warehouse picker', topicTitle: 'Warehouse picker', preparing })
+  expect(today.role).toEqual({ name: 'Warehouse picker', company, topicTitle: 'Warehouse picker', preparing })
   expect(today.topic?.id).toBe(preparing ? undefined : 'picker-topic')
+  if (!preparing) expect(today.topic?.placeable).toBe(placeable)
   expect(await getLatestTopicIdFn()).toBe('picker-topic')
-  expect((await curriculum.getTopicPath({ data: { topicId: 'picker-topic' } })).preparing).toBe(preparing)
+  const path = await curriculum.getTopicPath({ data: { topicId: 'picker-topic' } })
+  expect(path).toMatchObject({ preparing, placeable, company })
 })

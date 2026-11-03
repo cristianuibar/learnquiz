@@ -6,11 +6,11 @@ import { getLearnerId } from '@/server/session'
 import { assignedRoleTopic, rolePlayable } from '@/server/topic-access'
 
 export type Today = {
-  topic: { id: string; title: string; placed: boolean; due: number; xp: number; streak: number } | null
-  role: { name: string; topicTitle: string; preparing: boolean } | null
+  topic: { id: string; title: string; placed: boolean; placeable: boolean; due: number; xp: number; streak: number } | null
+  role: { name: string; company: string; topicTitle: string; preparing: boolean } | null
 }
 
-// The home screen. An employee's Today is their role topic (or "preparing" until it is ready with questions);
+// The home screen. An employee's Today is their role topic (or "preparing" until the curriculum is ready);
 // the personal edition shows the newest ready personal topic.
 export const getToday = createServerFn({ method: 'GET' }).handler(async (): Promise<Today> => {
   const learnerId = await getLearnerId()
@@ -18,11 +18,13 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
   const db = getDb()
   const assigned = await assignedRoleTopic(db, learnerId)
   let topic: { id: string; title: string } | undefined
+  let placeable = true
   let role: Today['role'] = null
   if (assigned) {
-    const active = await rolePlayable(db, assigned.topic)
-    role = { name: assigned.roleName, topicTitle: assigned.topic.title, preparing: !active }
-    if (active) topic = { id: assigned.topic.id, title: assigned.topic.title }
+    const ready = assigned.topic.status === 'ready'
+    role = { name: assigned.roleName, company: assigned.company, topicTitle: assigned.topic.title, preparing: !ready }
+    if (ready) placeable = await rolePlayable(db, assigned.topic)
+    if (ready) topic = { id: assigned.topic.id, title: assigned.topic.title }
   } else {
     topic = await db.select({ id: topics.id, title: topics.title }).from(topics)
       .where(and(eq(topics.learnerId, learnerId), eq(topics.status, 'ready')))
@@ -40,7 +42,7 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
       .get(),
   ])
   return {
-    topic: { id: topic.id, title: topic.title, placed: Boolean(placement), due: due?.n ?? 0, xp: lt?.xp ?? 0, streak: lt?.streak ?? 0 },
+    topic: { id: topic.id, title: topic.title, placed: Boolean(placement), placeable, due: due?.n ?? 0, xp: lt?.xp ?? 0, streak: lt?.streak ?? 0 },
     role,
   }
 })

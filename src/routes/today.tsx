@@ -30,16 +30,16 @@ function Today() {
             </p>
             <p className="text-sm text-muted-foreground">Streak {topic.streak} · {topic.xp} XP</p>
           </div>
-          <StartButton topicId={topic.id} placement={!topic.placed}>
-            {topic.placed ? 'Start session' : 'Find my level'}
+          <StartButton topicId={topic.id} placement={!topic.placed && topic.placeable}>
+            {!topic.placed && topic.placeable ? 'Find my level' : 'Start session'}
           </StartButton>
         </div>
       )}
       {role && (
         <section className="mt-8 flex flex-col gap-2">
-          <h2 className="text-xl font-semibold tracking-tight">Your role training</h2>
+          <h2 className="text-xl font-semibold tracking-tight">Your role training at {role.company}</h2>
           <p>{role.name}: {role.topicTitle}</p>
-          {role.preparing && <p className="text-muted-foreground">Your training is being prepared</p>}
+          {role.preparing && <p role="status" className="text-muted-foreground">Your training at {role.company} is being prepared</p>}
           <Link to="/me/profile" className="inline-flex min-h-11 items-center self-start rounded-md font-medium text-primary underline focus-visible:ring-[3px] focus-visible:ring-ring/50">
             Training progress
           </Link>
