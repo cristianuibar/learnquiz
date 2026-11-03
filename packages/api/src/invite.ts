@@ -1,6 +1,6 @@
 export type InviteStatus = 'pending' | 'accepted' | 'expired' | 'canceled' | 'rejected'
 
-// logoUrl is null until the invite logo route exists.
+// logoUrl is relative to the app host (`/api/invites/<id>/logo?v=<key>`); null when the company has no logo.
 export type InviteView = {
   company: string
   email: string

@@ -4,6 +4,7 @@ import { getInvite } from '@/server/org'
 import { getCompanyBranding } from '@/server/org-settings'
 import { answerItem, endSession, getSession, nextItem, reportItem, startMiniSession, startPlacement, startSession } from '@/server/play'
 import { getProfile } from '@/server/profile'
+import { getPushSettings, savePushPreferences, subscribeExpo, unsubscribe } from '@/server/push'
 import { acceptDisclosure, getSessionFn } from '@/server/session-fn'
 import { getToday } from '@/server/today'
 
@@ -34,6 +35,10 @@ export const v1Routes: V1Route[] = [
   { method: 'GET', pattern: '/concepts/:conceptId/items', fn: getConceptItems },
   // Always the caller's own profile: a learner can never read another learner's profile through this API.
   { method: 'GET', pattern: '/me/profile', fn: () => getProfile({ data: {} }) },
+  { method: 'GET', pattern: '/push/settings', fn: getPushSettings },
+  { method: 'PUT', pattern: '/push/preferences', fn: savePushPreferences },
+  { method: 'PUT', pattern: '/push/expo', fn: subscribeExpo },
+  { method: 'DELETE', pattern: '/push/expo', fn: unsubscribe },
 ]
 
 function match(pattern: string, path: string): Record<string, string> | null {
