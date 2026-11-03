@@ -8,6 +8,8 @@ const fns = vi.hoisted(() => ({
   answerItem: vi.fn(),
   getTopicPath: vi.fn(),
   getProfile: vi.fn(),
+  subscribeExpo: vi.fn(),
+  unsubscribe: vi.fn(),
 }))
 
 vi.mock('@/server/curriculum', () => ({ getConceptItems: vi.fn(), getTopicPath: fns.getTopicPath }))
@@ -25,6 +27,12 @@ vi.mock('@/server/play', () => ({
   startSession: vi.fn(),
 }))
 vi.mock('@/server/profile', () => ({ getProfile: fns.getProfile }))
+vi.mock('@/server/push', () => ({
+  getPushSettings: vi.fn(),
+  savePushPreferences: vi.fn(),
+  subscribeExpo: fns.subscribeExpo,
+  unsubscribe: fns.unsubscribe,
+}))
 vi.mock('@/server/session-fn', () => ({ acceptDisclosure: vi.fn(), getSessionFn: vi.fn() }))
 vi.mock('@/server/today', () => ({ getToday: fns.getToday }))
 
@@ -96,4 +104,22 @@ it('always reads the caller own profile, ignoring learnerId', async () => {
   expect(res.status).toBe(200)
   expect(fns.getProfile).toHaveBeenCalledTimes(1)
   expect(fns.getProfile).toHaveBeenCalledWith({ data: {} })
+})
+
+it('registers an Expo push token only with a bearer', async () => {
+  fns.subscribeExpo.mockResolvedValue({ subscribed: true })
+  const body = JSON.stringify({ token: 'ExponentPushToken[abc]' })
+  expect((await call('/push/expo', { method: 'PUT', body })).status).toBe(401)
+  expect(fns.subscribeExpo).not.toHaveBeenCalled()
+  const res = await call('/push/expo', { method: 'PUT', body, headers: auth })
+  expect(res.status).toBe(200)
+  expect(await res.json()).toEqual({ subscribed: true })
+  expect(fns.subscribeExpo).toHaveBeenCalledWith({ data: { token: 'ExponentPushToken[abc]' } })
+})
+
+it('forwards the endpoint on DELETE /push/expo', async () => {
+  fns.unsubscribe.mockResolvedValue({ subscribed: false })
+  const res = await call('/push/expo', { method: 'DELETE', body: JSON.stringify({ endpoint: 'ExponentPushToken[abc]' }), headers: auth })
+  expect(res.status).toBe(200)
+  expect(fns.unsubscribe).toHaveBeenCalledWith({ data: { endpoint: 'ExponentPushToken[abc]' } })
 })
