@@ -1,0 +1,725 @@
+{
+ "v": 3,
+ "createdOnFiles": {
+  "v": 1,
+  "at": "2026-11-03T09:20:00Z"
+ },
+ "title": "Learn Quiz \u2014 Learner App",
+ "launch": {
+  "view": "canvas"
+ },
+ "pages": [],
+ "designSystems": [
+  {
+   "title": "Learn Quiz",
+   "namespace": "learnquiz",
+   "artifact": "https://claude.ai/artifact/E1TJkimx8FJtEA3fABn3wd",
+   "version": "1793673342-4ffe",
+   "copiedAt": "2026-11-03T09:20:00Z"
+  }
+ ],
+ "notes": {
+  "s1": {
+   "x": 0,
+   "y": -280,
+   "text": "1  Join and first sign-in",
+   "kind": "title1",
+   "maxW": 2600
+  },
+  "s2": {
+   "x": 0,
+   "y": 1800,
+   "text": "2  Today",
+   "kind": "title1",
+   "maxW": 3030
+  },
+  "s3": {
+   "x": 0,
+   "y": 3880,
+   "text": "3  Session: question formats",
+   "kind": "title1",
+   "maxW": 3030
+  },
+  "s4": {
+   "x": 0,
+   "y": 5960,
+   "text": "4  Reveal: the one expressive moment",
+   "kind": "title1",
+   "maxW": 3030
+  },
+  "s5": {
+   "x": 0,
+   "y": 8040,
+   "text": "5  After the session: summary, pushes, quick session",
+   "kind": "title1",
+   "maxW": 3080
+  },
+  "s6": {
+   "x": 0,
+   "y": 10120,
+   "text": "6  Path, Training progress, Settings",
+   "kind": "title1",
+   "maxW": 2600
+  },
+  "s7": {
+   "x": 0,
+   "y": 12200,
+   "text": "7  System states",
+   "kind": "title1",
+   "maxW": 2600
+  },
+  "s8": {
+   "x": 0,
+   "y": 14280,
+   "text": "8  Design-system additions and handoff",
+   "kind": "title1",
+   "maxW": 3000
+  }
+ },
+ "boards": {
+  "Main.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 360,
+   "h": 740,
+   "title": "Join by invite",
+   "is_interactive": true
+  },
+  "Disclosure.dc.html": {
+   "x": 440,
+   "y": 0,
+   "w": 360,
+   "h": 740,
+   "title": "First sign-in disclosure",
+   "is_interactive": true
+  },
+  "MainDark.dc.html": {
+   "x": 0,
+   "y": 980,
+   "w": 360,
+   "h": 740,
+   "title": "Join by invite \u00b7 dark"
+  },
+  "DisclosureDark.dc.html": {
+   "x": 440,
+   "y": 980,
+   "w": 360,
+   "h": 740,
+   "title": "Disclosure \u00b7 dark"
+  },
+  "Today.dc.html": {
+   "x": 0,
+   "y": 2080,
+   "w": 360,
+   "h": 740,
+   "title": "Today \u00b7 normal day",
+   "is_interactive": true
+  },
+  "TodayPlum.dc.html": {
+   "x": 440,
+   "y": 2080,
+   "w": 360,
+   "h": 740,
+   "title": "Today \u00b7 white-label (plum)"
+  },
+  "TodayFirst.dc.html": {
+   "x": 880,
+   "y": 2080,
+   "w": 360,
+   "h": 740,
+   "title": "Today \u00b7 first day",
+   "is_interactive": true
+  },
+  "TodayDone.dc.html": {
+   "x": 1320,
+   "y": 2080,
+   "w": 360,
+   "h": 740,
+   "title": "Today \u00b7 all done"
+  },
+  "TodayGenerating.dc.html": {
+   "x": 1760,
+   "y": 2080,
+   "w": 360,
+   "h": 740,
+   "title": "Today \u00b7 content still generating"
+  },
+  "Today390.dc.html": {
+   "x": 2200,
+   "y": 2080,
+   "w": 390,
+   "h": 844,
+   "title": "Today \u00b7 390 \u00d7 844"
+  },
+  "TodayDark.dc.html": {
+   "x": 0,
+   "y": 3060,
+   "w": 360,
+   "h": 740,
+   "title": "Today \u00b7 dark"
+  },
+  "TodayPlumDark.dc.html": {
+   "x": 440,
+   "y": 3060,
+   "w": 360,
+   "h": 740,
+   "title": "Today \u00b7 plum \u00b7 dark"
+  },
+  "TodayFirstDark.dc.html": {
+   "x": 880,
+   "y": 3060,
+   "w": 360,
+   "h": 740,
+   "title": "Today \u00b7 first day \u00b7 dark"
+  },
+  "TodayDoneDark.dc.html": {
+   "x": 1320,
+   "y": 3060,
+   "w": 360,
+   "h": 740,
+   "title": "Today \u00b7 all done \u00b7 dark"
+  },
+  "TodayGeneratingDark.dc.html": {
+   "x": 1760,
+   "y": 3060,
+   "w": 360,
+   "h": 740,
+   "title": "Today \u00b7 generating \u00b7 dark"
+  },
+  "QChoice.dc.html": {
+   "x": 0,
+   "y": 4160,
+   "w": 360,
+   "h": 740,
+   "title": "Question \u00b7 multiple choice",
+   "is_interactive": true
+  },
+  "QMulti.dc.html": {
+   "x": 440,
+   "y": 4160,
+   "w": 360,
+   "h": 740,
+   "title": "Question \u00b7 multi-select",
+   "is_interactive": true
+  },
+  "QCloze.dc.html": {
+   "x": 880,
+   "y": 4160,
+   "w": 360,
+   "h": 740,
+   "title": "Question \u00b7 cloze, keyboard open",
+   "is_interactive": true
+  },
+  "QVoice.dc.html": {
+   "x": 1320,
+   "y": 4160,
+   "w": 360,
+   "h": 740,
+   "title": "Question \u00b7 short answer, voice",
+   "is_interactive": true
+  },
+  "QOrder.dc.html": {
+   "x": 1760,
+   "y": 4160,
+   "w": 360,
+   "h": 740,
+   "title": "Question \u00b7 order the steps",
+   "is_interactive": true
+  },
+  "QImage.dc.html": {
+   "x": 2200,
+   "y": 4160,
+   "w": 360,
+   "h": 740,
+   "title": "Question \u00b7 procedure diagram",
+   "is_interactive": true
+  },
+  "QChoiceDark.dc.html": {
+   "x": 0,
+   "y": 5140,
+   "w": 360,
+   "h": 740,
+   "title": "Multiple choice \u00b7 dark"
+  },
+  "QMultiDark.dc.html": {
+   "x": 440,
+   "y": 5140,
+   "w": 360,
+   "h": 740,
+   "title": "Multi-select \u00b7 dark"
+  },
+  "QClozeDark.dc.html": {
+   "x": 880,
+   "y": 5140,
+   "w": 360,
+   "h": 740,
+   "title": "Cloze \u00b7 dark"
+  },
+  "QVoiceDark.dc.html": {
+   "x": 1320,
+   "y": 5140,
+   "w": 360,
+   "h": 740,
+   "title": "Voice \u00b7 dark"
+  },
+  "QOrderDark.dc.html": {
+   "x": 1760,
+   "y": 5140,
+   "w": 360,
+   "h": 740,
+   "title": "Order \u00b7 dark"
+  },
+  "QImageDark.dc.html": {
+   "x": 2200,
+   "y": 5140,
+   "w": 360,
+   "h": 740,
+   "title": "Diagram \u00b7 dark"
+  },
+  "Reveal.dc.html": {
+   "x": 0,
+   "y": 6240,
+   "w": 360,
+   "h": 740,
+   "title": "Reveal \u00b7 correct, sure",
+   "is_interactive": true
+  },
+  "RevealUnsure.dc.html": {
+   "x": 440,
+   "y": 6240,
+   "w": 360,
+   "h": 740,
+   "title": "Reveal \u00b7 correct, unsure",
+   "is_interactive": true
+  },
+  "RevealNotQuite.dc.html": {
+   "x": 880,
+   "y": 6240,
+   "w": 360,
+   "h": 740,
+   "title": "Reveal \u00b7 not quite",
+   "is_interactive": true
+  },
+  "RevealSureWrong.dc.html": {
+   "x": 1320,
+   "y": 6240,
+   "w": 360,
+   "h": 740,
+   "title": "Reveal \u00b7 sure and wrong, critical",
+   "is_interactive": true
+  },
+  "RevealNoSource.dc.html": {
+   "x": 1760,
+   "y": 6240,
+   "w": 360,
+   "h": 740,
+   "title": "Reveal \u00b7 no source quote",
+   "is_interactive": true
+  },
+  "Report.dc.html": {
+   "x": 2200,
+   "y": 6240,
+   "w": 360,
+   "h": 740,
+   "title": "Report this question",
+   "is_interactive": true
+  },
+  "RevealDark.dc.html": {
+   "x": 0,
+   "y": 7220,
+   "w": 360,
+   "h": 740,
+   "title": "Correct, sure \u00b7 dark"
+  },
+  "RevealUnsureDark.dc.html": {
+   "x": 440,
+   "y": 7220,
+   "w": 360,
+   "h": 740,
+   "title": "Correct, unsure \u00b7 dark"
+  },
+  "RevealNotQuiteDark.dc.html": {
+   "x": 880,
+   "y": 7220,
+   "w": 360,
+   "h": 740,
+   "title": "Not quite \u00b7 dark"
+  },
+  "RevealSureWrongDark.dc.html": {
+   "x": 1320,
+   "y": 7220,
+   "w": 360,
+   "h": 740,
+   "title": "Sure and wrong \u00b7 dark"
+  },
+  "RevealNoSourceDark.dc.html": {
+   "x": 1760,
+   "y": 7220,
+   "w": 360,
+   "h": 740,
+   "title": "No source \u00b7 dark"
+  },
+  "ReportDark.dc.html": {
+   "x": 2200,
+   "y": 7220,
+   "w": 360,
+   "h": 740,
+   "title": "Report \u00b7 dark"
+  },
+  "Summary.dc.html": {
+   "x": 0,
+   "y": 8320,
+   "w": 360,
+   "h": 740,
+   "title": "Session summary",
+   "is_interactive": true
+  },
+  "OptIn.dc.html": {
+   "x": 440,
+   "y": 8320,
+   "w": 360,
+   "h": 740,
+   "title": "Push opt-in \u00b7 Android",
+   "is_interactive": true
+  },
+  "OptInIOS.dc.html": {
+   "x": 880,
+   "y": 8320,
+   "w": 360,
+   "h": 740,
+   "title": "Push opt-in \u00b7 iOS, add to Home Screen first",
+   "is_interactive": true
+  },
+  "PushLock.dc.html": {
+   "x": 1320,
+   "y": 8320,
+   "w": 360,
+   "h": 740,
+   "title": "Push \u00b7 Android lock screen",
+   "is_interactive": true
+  },
+  "PushHeadsUp.dc.html": {
+   "x": 1760,
+   "y": 8320,
+   "w": 360,
+   "h": 740,
+   "title": "Push \u00b7 heads-up",
+   "is_interactive": true
+  },
+  "QuickQuestion.dc.html": {
+   "x": 2200,
+   "y": 8320,
+   "w": 360,
+   "h": 740,
+   "title": "Quick session \u00b7 one question",
+   "is_interactive": true
+  },
+  "QuickDone.dc.html": {
+   "x": 2640,
+   "y": 8320,
+   "w": 360,
+   "h": 740,
+   "title": "Quick session \u00b7 done",
+   "is_interactive": true
+  },
+  "SummaryDark.dc.html": {
+   "x": 0,
+   "y": 9300,
+   "w": 360,
+   "h": 740,
+   "title": "Summary \u00b7 dark"
+  },
+  "OptInDark.dc.html": {
+   "x": 440,
+   "y": 9300,
+   "w": 360,
+   "h": 740,
+   "title": "Opt-in \u00b7 dark"
+  },
+  "OptInIOSDark.dc.html": {
+   "x": 880,
+   "y": 9300,
+   "w": 360,
+   "h": 740,
+   "title": "Opt-in iOS \u00b7 dark"
+  },
+  "QuickQuestionDark.dc.html": {
+   "x": 2200,
+   "y": 9300,
+   "w": 360,
+   "h": 740,
+   "title": "Quick question \u00b7 dark"
+  },
+  "QuickDoneDark.dc.html": {
+   "x": 2640,
+   "y": 9300,
+   "w": 360,
+   "h": 740,
+   "title": "Quick done \u00b7 dark"
+  },
+  "Path.dc.html": {
+   "x": 0,
+   "y": 10400,
+   "w": 360,
+   "h": 740,
+   "title": "Path",
+   "is_interactive": true
+  },
+  "Unit.dc.html": {
+   "x": 440,
+   "y": 10400,
+   "w": 360,
+   "h": 740,
+   "title": "Unit detail \u00b7 Receiving",
+   "is_interactive": true
+  },
+  "Profile.dc.html": {
+   "x": 880,
+   "y": 10400,
+   "w": 360,
+   "h": 740,
+   "title": "Profile \u00b7 Training progress",
+   "is_interactive": true
+  },
+  "Settings.dc.html": {
+   "x": 1320,
+   "y": 10400,
+   "w": 360,
+   "h": 740,
+   "title": "Settings",
+   "is_interactive": true
+  },
+  "PathDark.dc.html": {
+   "x": 0,
+   "y": 11380,
+   "w": 360,
+   "h": 740,
+   "title": "Path \u00b7 dark"
+  },
+  "UnitDark.dc.html": {
+   "x": 440,
+   "y": 11380,
+   "w": 360,
+   "h": 740,
+   "title": "Unit \u00b7 dark"
+  },
+  "ProfileDark.dc.html": {
+   "x": 880,
+   "y": 11380,
+   "w": 360,
+   "h": 740,
+   "title": "Training progress \u00b7 dark"
+  },
+  "SettingsDark.dc.html": {
+   "x": 1320,
+   "y": 11380,
+   "w": 360,
+   "h": 740,
+   "title": "Settings \u00b7 dark"
+  },
+  "TodayOffline.dc.html": {
+   "x": 0,
+   "y": 12480,
+   "w": 360,
+   "h": 740,
+   "title": "Offline"
+  },
+  "Loading.dc.html": {
+   "x": 440,
+   "y": 12480,
+   "w": 360,
+   "h": 740,
+   "title": "Loading \u00b7 preparing the session"
+  },
+  "QError.dc.html": {
+   "x": 880,
+   "y": 12480,
+   "w": 360,
+   "h": 740,
+   "title": "Error inside a session",
+   "is_interactive": true
+  },
+  "ProfileEmpty.dc.html": {
+   "x": 1320,
+   "y": 12480,
+   "w": 360,
+   "h": 740,
+   "title": "Empty \u00b7 Training progress before session 1"
+  },
+  "TodayOfflineDark.dc.html": {
+   "x": 0,
+   "y": 13460,
+   "w": 360,
+   "h": 740,
+   "title": "Offline \u00b7 dark"
+  },
+  "LoadingDark.dc.html": {
+   "x": 440,
+   "y": 13460,
+   "w": 360,
+   "h": 740,
+   "title": "Loading \u00b7 dark"
+  },
+  "QErrorDark.dc.html": {
+   "x": 880,
+   "y": 13460,
+   "w": 360,
+   "h": 740,
+   "title": "Error \u00b7 dark"
+  },
+  "ProfileEmptyDark.dc.html": {
+   "x": 1320,
+   "y": 13460,
+   "w": 360,
+   "h": 740,
+   "title": "Empty \u00b7 dark"
+  },
+  "DSAdditions.dc.html": {
+   "x": 0,
+   "y": 14560,
+   "w": 1600,
+   "h": 2400,
+   "title": "Design-system additions"
+  },
+  "Handoff.dc.html": {
+   "x": 1720,
+   "y": 14560,
+   "w": 1280,
+   "h": 12940,
+   "title": "Handoff notes",
+   "expand": "fill"
+  },
+  "TodayBasics.dc.html": {
+   "x": 2670,
+   "y": 2080,
+   "w": 360,
+   "h": 740,
+   "title": "Today \u00b7 back to basics",
+   "is_interactive": true
+  },
+  "TodayBasicsDark.dc.html": {
+   "x": 2200,
+   "y": 3060,
+   "w": 360,
+   "h": 740,
+   "title": "Back to basics \u00b7 dark"
+  },
+  "QVoiceRecording.dc.html": {
+   "x": 2640,
+   "y": 4160,
+   "w": 360,
+   "h": 740,
+   "title": "Voice \u00b7 recording",
+   "is_interactive": true
+  },
+  "RevealPartial.dc.html": {
+   "x": 2640,
+   "y": 6240,
+   "w": 360,
+   "h": 740,
+   "title": "Reveal \u00b7 partly right (multi-select)",
+   "is_interactive": true
+  },
+  "RevealPartialDark.dc.html": {
+   "x": 2640,
+   "y": 7220,
+   "w": 360,
+   "h": 740,
+   "title": "Partly right \u00b7 dark"
+  },
+  "UnitDiagram.dc.html": {
+   "x": 1760,
+   "y": 10400,
+   "w": 360,
+   "h": 740,
+   "title": "Unit \u00b7 procedure diagram",
+   "is_interactive": true
+  },
+  "ProfileErrors.dc.html": {
+   "x": 2200,
+   "y": 10400,
+   "w": 360,
+   "h": 740,
+   "title": "Training progress \u00b7 critical errors",
+   "is_interactive": true
+  }
+ },
+ "order": [
+  "Main.dc.html",
+  "Disclosure.dc.html",
+  "MainDark.dc.html",
+  "DisclosureDark.dc.html",
+  "Today.dc.html",
+  "TodayPlum.dc.html",
+  "TodayFirst.dc.html",
+  "TodayDone.dc.html",
+  "TodayGenerating.dc.html",
+  "Today390.dc.html",
+  "TodayDark.dc.html",
+  "TodayPlumDark.dc.html",
+  "TodayFirstDark.dc.html",
+  "TodayDoneDark.dc.html",
+  "TodayGeneratingDark.dc.html",
+  "QChoice.dc.html",
+  "QMulti.dc.html",
+  "QCloze.dc.html",
+  "QVoice.dc.html",
+  "QOrder.dc.html",
+  "QImage.dc.html",
+  "QChoiceDark.dc.html",
+  "QMultiDark.dc.html",
+  "QClozeDark.dc.html",
+  "QVoiceDark.dc.html",
+  "QOrderDark.dc.html",
+  "QImageDark.dc.html",
+  "Reveal.dc.html",
+  "RevealUnsure.dc.html",
+  "RevealNotQuite.dc.html",
+  "RevealSureWrong.dc.html",
+  "RevealNoSource.dc.html",
+  "Report.dc.html",
+  "RevealDark.dc.html",
+  "RevealUnsureDark.dc.html",
+  "RevealNotQuiteDark.dc.html",
+  "RevealSureWrongDark.dc.html",
+  "RevealNoSourceDark.dc.html",
+  "ReportDark.dc.html",
+  "Summary.dc.html",
+  "OptIn.dc.html",
+  "OptInIOS.dc.html",
+  "PushLock.dc.html",
+  "PushHeadsUp.dc.html",
+  "QuickQuestion.dc.html",
+  "QuickDone.dc.html",
+  "SummaryDark.dc.html",
+  "OptInDark.dc.html",
+  "OptInIOSDark.dc.html",
+  "QuickQuestionDark.dc.html",
+  "QuickDoneDark.dc.html",
+  "Path.dc.html",
+  "Unit.dc.html",
+  "Profile.dc.html",
+  "Settings.dc.html",
+  "PathDark.dc.html",
+  "UnitDark.dc.html",
+  "ProfileDark.dc.html",
+  "SettingsDark.dc.html",
+  "TodayOffline.dc.html",
+  "Loading.dc.html",
+  "QError.dc.html",
+  "ProfileEmpty.dc.html",
+  "TodayOfflineDark.dc.html",
+  "LoadingDark.dc.html",
+  "QErrorDark.dc.html",
+  "ProfileEmptyDark.dc.html",
+  "TodayBasics.dc.html",
+  "TodayBasicsDark.dc.html",
+  "QVoiceRecording.dc.html",
+  "RevealPartial.dc.html",
+  "RevealPartialDark.dc.html",
+  "UnitDiagram.dc.html",
+  "ProfileErrors.dc.html",
+  "DSAdditions.dc.html",
+  "Handoff.dc.html"
+ ]
+}

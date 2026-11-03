@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Before you start</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="lq.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" data-brand="{{brand}}" style="width: {{w}}px; height: {{h}}px; font-family: var(--font-sans); color: var(--ink);">
+  <main class="scroll" style="padding: 48px 16px 16px; display: flex; flex-direction: column; gap: 24px;">
+    <h1 class="t-title1">Before you start</h1>
+
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+      <section aria-labelledby="d-record" style="display: flex; flex-direction: column; gap: 4px;">
+        <h2 id="d-record" class="t-label">What we record</h2>
+        <p class="t-body">Your answers, how sure you were, how long you took, and your progress.</p>
+      </section>
+      <section aria-labelledby="d-see" style="display: flex; flex-direction: column; gap: 4px;">
+        <h2 id="d-see" class="t-label">Who sees it</h2>
+        <p class="t-body">You and Northwind Logistics’ training admins.</p>
+      </section>
+      <section aria-labelledby="d-use" style="display: flex; flex-direction: column; gap: 4px;">
+        <h2 id="d-use" class="t-label">What it’s for</h2>
+        <p class="t-body">Your training and development. Nothing else.</p>
+      </section>
+    </div>
+
+    <section class="sunken" style="display: flex; gap: 16px; align-items: flex-start; padding: 16px;" aria-labelledby="d-never">
+      <span style="color: var(--ink-muted); padding-top: 1px;">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
+      </span>
+      <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+        <h2 id="d-never" class="t-label">Never recorded</h2>
+        <p class="t-body">Camera, location, sensors or health data. The microphone only while you record a voice answer.</p>
+      </div>
+    </section>
+
+    <div>
+      <a class="link-btn" href="https://learnquiz.com/privacy" style="padding-left: 0;">Read the full privacy notice</a>
+    </div>
+  </main>
+
+  <div class="dock">
+    <a class="btn btn-primary btn-lg btn-block" href="TodayFirst.dc.html">Got it</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"brand":{"editor":"enum","options":["default","plum"],"default":"default","section":"Theme"},"w":{"editor":"int","default":360,"section":"Frame"},"h":{"editor":"int","default":740,"section":"Frame"},"$preview":{"width":360,"height":740}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      theme: this.props.theme ?? 'light',
+      brand: this.props.brand ?? 'default',
+      w: this.props.w ?? 360,
+      h: this.props.h ?? 740
+    };
+  }
+}
+</script>
+</body>
+</html>

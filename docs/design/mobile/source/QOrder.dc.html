@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Order the steps</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="lq.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" data-brand="{{brand}}" style="width: {{w}}px; height: {{h}}px; font-family: var(--font-sans); color: var(--ink);">
+  <header class="topbar">
+    <a class="icon-btn" href="Today.dc.html" aria-label="End session">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+    </a>
+    <div style="flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px;">
+      <div class="bar" style="flex: 1;" role="progressbar" aria-label="Session progress" aria-valuenow="11" aria-valuemin="0" aria-valuemax="20" aria-valuetext="11 of 20">
+        <span class="bar-fill" style="width: 55%;"></span>
+      </div>
+      <span class="t-overline num muted">11 of 20</span>
+    </div>
+    <button class="icon-btn" type="button" aria-label="Read aloud" aria-pressed="{{listenOn}}" onClick="{{toggleListen}}">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"></path><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"></path></svg>
+    </button>
+  </header>
+
+  <main class="scroll" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h1 class="t-title2">Put the returns steps in order.</h1>
+      <div style="display: flex; align-items: center; justify-content: space-between;">
+        <p class="t-caption muted">Tap the steps in order</p>
+        <sc-if value="{{anyPlaced}}" hint-placeholder-val="{{ true }}">
+          <button type="button" class="btn btn-ghost" style="margin: -12px -16px -12px 0;" onClick="{{clearAll}}">Clear</button>
+        </sc-if>
+      </div>
+    </div>
+    <ul class="opt-list" aria-label="Returns steps">
+      <li>
+        <button type="button" class="{{s1Cls}}" aria-label="{{s1Aria}}" onClick="{{s1Tap}}">
+          <span class="num t-label" style="{{s1Badge}}" aria-hidden="true">{{s1Pos}}</span>
+          <span class="opt-text">{{s1Label}}</span>
+        </button>
+      </li>
+      <li>
+        <button type="button" class="{{s2Cls}}" aria-label="{{s2Aria}}" onClick="{{s2Tap}}">
+          <span class="num t-label" style="{{s2Badge}}" aria-hidden="true">{{s2Pos}}</span>
+          <span class="opt-text">{{s2Label}}</span>
+        </button>
+      </li>
+      <li>
+        <button type="button" class="{{s3Cls}}" aria-label="{{s3Aria}}" onClick="{{s3Tap}}">
+          <span class="num t-label" style="{{s3Badge}}" aria-hidden="true">{{s3Pos}}</span>
+          <span class="opt-text">{{s3Label}}</span>
+        </button>
+      </li>
+      <li>
+        <button type="button" class="{{s4Cls}}" aria-label="{{s4Aria}}" onClick="{{s4Tap}}">
+          <span class="num t-label" style="{{s4Badge}}" aria-hidden="true">{{s4Pos}}</span>
+          <span class="opt-text">{{s4Label}}</span>
+        </button>
+      </li>
+    </ul>
+  </main>
+
+  <div class="dock">
+    <fieldset>
+      <legend class="conf-legend" id="qo-conf">How sure are you?</legend>
+      <div class="conf" role="radiogroup" aria-labelledby="qo-conf">
+        <button class="conf-btn" type="button" role="radio" aria-checked="{{cSure}}" onClick="{{pickSure}}"><span class="conf-tick" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></span>Sure</button>
+        <button class="conf-btn" type="button" role="radio" aria-checked="{{cUnsure}}" onClick="{{pickUnsure}}"><span class="conf-tick" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></span>Unsure</button>
+        <button class="conf-btn" type="button" role="radio" aria-checked="{{cGuess}}" onClick="{{pickGuess}}"><span class="conf-tick" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></span>Guessing</button>
+      </div>
+    </fieldset>
+    <sc-if value="{{canCheck}}" hint-placeholder-val="{{ true }}">
+      <a class="btn btn-primary btn-lg btn-block" href="QImage.dc.html">Check</a>
+    </sc-if>
+    <sc-if value="{{cannotCheck}}" hint-placeholder-val="{{ false }}">
+      <button class="btn btn-lg btn-block" type="button" disabled>Check</button>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"brand":{"editor":"enum","options":["default","plum"],"default":"default","section":"Theme"},"w":{"editor":"int","default":360,"section":"Frame"},"h":{"editor":"int","default":740,"section":"Frame"},"$preview":{"width":360,"height":740}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { order: [2, 0], conf: null, listen: false };
+  }
+  renderVals() {
+    const order = this.state.order;
+    const conf = this.state.conf;
+    const labels = [
+      'Inspect the item',
+      'Close the return in the scanner',
+      'Scan the return label',
+      'Restock it or put it in the damage bin'
+    ];
+    const ok = order.length === 4 && conf !== null;
+    const vals = {
+      theme: this.props.theme ?? 'light',
+      brand: this.props.brand ?? 'default',
+      w: this.props.w ?? 360,
+      h: this.props.h ?? 740,
+      anyPlaced: order.length > 0,
+      clearAll: () => this.setState({ order: [] }),
+      listenOn: this.state.listen ? 'true' : 'false',
+      toggleListen: () => this.setState({ listen: !this.state.listen }),
+      cSure: conf === 'sure' ? 'true' : 'false',
+      cUnsure: conf === 'unsure' ? 'true' : 'false',
+      cGuess: conf === 'guess' ? 'true' : 'false',
+      pickSure: () => this.setState({ conf: 'sure' }),
+      pickUnsure: () => this.setState({ conf: 'unsure' }),
+      pickGuess: () => this.setState({ conf: 'guess' }),
+      canCheck: ok,
+      cannotCheck: !ok
+    };
+    labels.forEach((label, i) => {
+      const k = 's' + (i + 1);
+      const at = order.indexOf(i);
+      const placed = at !== -1;
+      vals[k + 'Label'] = label;
+      vals[k + 'Pos'] = placed ? String(at + 1) : '';
+      vals[k + 'Cls'] = placed ? 'opt is-selected' : 'opt';
+      vals[k + 'Aria'] = placed ? label + ', position ' + (at + 1) : label + ', not placed yet';
+      vals[k + 'Badge'] = placed
+        ? 'flex: none; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 9999px; background: var(--brand); color: var(--on-brand); border: 2px solid var(--brand);'
+        : 'flex: none; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 9999px; background: transparent; color: var(--ink); border: 2px dashed var(--border-strong);';
+      vals[k + 'Tap'] = () => this.setState({ order: placed ? order.filter((x) => x !== i) : order.concat([i]) });
+    });
+    return vals;
+  }
+}
+</script>
+</body>
+</html>

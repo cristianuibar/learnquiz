@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Turn on questions</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="lq.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" data-brand="{{brand}}" style="width: {{w}}px; height: {{h}}px; font-family: var(--font-sans); color: var(--ink);">
+
+  <sc-if value="{{isAndroid}}" hint-placeholder-val="{{ true }}">
+    <main class="scroll" style="padding: 48px 16px 16px; display: flex; flex-direction: column; gap: 24px;">
+      <h1 class="t-title1">Get a question during your shift?</h1>
+
+      <div role="img" aria-label="Preview of a notification from Learn Quiz: Your scanner double-beeps on a pick. What do you do first?" style="background: var(--os-card); color: var(--os-ink); border-radius: var(--radius-lg); padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px; color: var(--os-ink-muted);" aria-hidden="true">
+          <span style="width: 20px; height: 20px; border-radius: var(--radius-full); background: var(--brand); display: inline-flex; align-items: center; justify-content: center;">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><mask id="lqn-optin" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"></rect><circle cx="18" cy="18" r="6"></circle></mask><path fill="var(--on-brand)" fill-rule="evenodd" mask="url(#lqn-optin)" d="M11 1a10 10 0 1 0 0 20a10 10 0 1 0 0-20zm0 5a5 5 0 1 1 0 10a5 5 0 1 1 0-10z"></path><circle cx="18" cy="18" r="4" fill="var(--on-brand)"></circle></svg>
+          </span>
+          <span class="t-caption">Learn Quiz · now</span>
+        </div>
+        <p class="t-body" style="font-weight: 600; color: var(--os-ink);" aria-hidden="true">Your scanner double-beeps on a pick. What do you do first?</p>
+      </div>
+
+      <ul style="display: flex; flex-direction: column; gap: 12px;" aria-label="How questions work">
+        <li class="t-body-lg">Up to <span class="num">6</span> a day while you’re onboarding, then <span class="num">3</span>.</li>
+        <li class="t-body-lg">Only <span class="num">6:00 AM–6:00 PM</span>, Monday to Friday. You can narrow it in Settings.</li>
+        <li class="t-body-lg">Skip any. Nothing is lost.</li>
+      </ul>
+    </main>
+
+    <div class="dock">
+      <a class="btn btn-primary btn-lg btn-block" href="PushLock.dc.html">Turn on questions</a>
+      <a class="btn btn-ghost btn-block" href="TodayDone.dc.html">Not now</a>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isIos}}" hint-placeholder-val="{{ false }}">
+    <header class="topbar" style="justify-content: flex-end; padding-right: 16px;">
+      <p class="t-overline num muted"><span class="sr-only">Step </span>1 of 2</p>
+    </header>
+    <main class="scroll" style="padding: 24px 16px 16px; display: flex; flex-direction: column; gap: 24px;">
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <h1 class="t-title1">Add Learn Quiz to your Home Screen</h1>
+        <p class="t-body-lg">iPhone only sends questions to apps on the Home Screen.</p>
+      </div>
+
+      <ol style="display: flex; flex-direction: column; gap: 4px;" aria-label="Steps">
+        <li style="display: flex; align-items: center; gap: 16px; min-height: 56px;">
+          <span class="t-label num" style="flex: none; width: 32px; height: 32px; border-radius: var(--radius-full); border: 2px solid var(--border-strong); display: inline-flex; align-items: center; justify-content: center;" aria-hidden="true">1</span>
+          <span class="t-body-lg">Tap Share <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Share icon" style="vertical-align: -4px; color: var(--brand);"><path d="M12 3v12M8 7l4-4 4 4M7 11H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-1"></path></svg> in Safari’s toolbar</span>
+        </li>
+        <li style="display: flex; align-items: center; gap: 16px; min-height: 56px;">
+          <span class="t-label num" style="flex: none; width: 32px; height: 32px; border-radius: var(--radius-full); border: 2px solid var(--border-strong); display: inline-flex; align-items: center; justify-content: center;" aria-hidden="true">2</span>
+          <span class="t-body-lg">Choose Add to Home Screen <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Add icon" style="vertical-align: -4px; color: var(--brand);"><rect x="3" y="3" width="18" height="18" rx="4"></rect><path d="M12 8v8M8 12h8"></path></svg></span>
+        </li>
+        <li style="display: flex; align-items: center; gap: 16px; min-height: 56px;">
+          <span class="t-label num" style="flex: none; width: 32px; height: 32px; border-radius: var(--radius-full); border: 2px solid var(--border-strong); display: inline-flex; align-items: center; justify-content: center;" aria-hidden="true">3</span>
+          <span class="t-body-lg">Open Learn Quiz from your Home Screen</span>
+        </li>
+      </ol>
+    </main>
+
+    <div class="dock">
+      <a class="btn btn-primary btn-lg btn-block" href="OptIn.dc.html">I’ve added it</a>
+      <a class="btn btn-ghost btn-block" href="TodayDone.dc.html">Not now</a>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"brand":{"editor":"enum","options":["default","plum"],"default":"default","section":"Theme"},"platform":{"editor":"enum","options":["android","ios"],"default":"android","section":"Variant"},"w":{"editor":"int","default":360,"section":"Frame"},"h":{"editor":"int","default":740,"section":"Frame"},"$preview":{"width":360,"height":740}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const platform = this.props.platform ?? 'android';
+    return {
+      theme: this.props.theme ?? 'light',
+      brand: this.props.brand ?? 'default',
+      w: this.props.w ?? 360,
+      h: this.props.h ?? 740,
+      isAndroid: platform !== 'ios',
+      isIos: platform === 'ios'
+    };
+  }
+}
+</script>
+</body>
+</html>
