@@ -48,6 +48,7 @@ function makeDb() {
   }
 
   const runOne = (sqlText: string, params: unknown[], method: Method): { rows: unknown[] } => {
+    if (params.length > 100) throw new Error('D1 supports at most 100 bound parameters per statement')
     const stmt = raw.prepare(sqlText)
     ;(stmt as unknown as { setReturnArrays: (v: boolean) => void }).setReturnArrays(true)
     const args = params as (string | number | bigint | null)[]
@@ -150,6 +151,41 @@ it('refuses another learner’s question or notification and inactive questions 
   expect(scalar(raw, 'SELECT COUNT(*) AS n FROM push_log WHERE opened_at IS NOT NULL').n).toBe(0)
 })
 
+it.each(['session', 'placement'])('skips retired questions in a queued %s, including reloads', async (kind) => {
+  seedTopicAndLearner(raw, 0)
+  seedFrontier(raw, 3, false)
+  raw.prepare("UPDATE items SET status = 'retired' WHERE id IN ('i1', 'i2')").run()
+  const plan = {
+    position: 0, answered: false,
+    ...(kind === 'placement'
+      ? { workingLevel: 1, log: [], pool: ['i1', 'i2', 'i3'].map((id) => ({ id, conceptId: 'c1', difficulty: 1 })) }
+      : { queue: ['i1', 'i2', 'i3'], reinserted: [], reasons: { due: 3, frontier: 0, closers: 0 }, unitStart: {} }),
+  }
+  raw.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, item_ids_json, plan_json, started_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run('queued', 'u1', 't1', kind, JSON.stringify(kind === 'placement' ? ['i1'] : ['i1', 'i2', 'i3']), JSON.stringify(plan), 1)
+  expect((await getSession({ data: { sessionId: 'queued' } })).item?.id).toBe('i3')
+  expect(scalar(raw, 'SELECT COUNT(*) AS n FROM attempts').n).toBe(0)
+  raw.prepare("UPDATE items SET status = 'retired' WHERE id = 'i3'").run()
+  await expect(answerItem({ data: { sessionId: 'queued', itemId: 'i3', answer: { text: '1' }, confidence: 'sure', responseMs: 100 } }))
+    .rejects.toMatchObject({ status: 409, message: 'This question has been retired' })
+  expect(scalar(raw, 'SELECT COUNT(*) AS n FROM attempts').n).toBe(0)
+  expect((await getSession({ data: { sessionId: 'queued' } })).ended).toBe(true)
+  expect((await nextItem({ data: { sessionId: 'queued' } })).item).toBeNull()
+})
+
+it.each(['session', 'placement'])('excludes retired questions from a new %s', async (kind) => {
+  seedTopicAndLearner(raw, 0)
+  seedFrontier(raw, 7, true)
+  raw.prepare("UPDATE items SET status = 'retired' WHERE id = 'i1'").run()
+  raw.prepare("DELETE FROM learner_item WHERE item_id <> 'i1'").run()
+  const result = await (kind === 'placement' ? startPlacement : startSession)({ data: { topicId: 't1' } })
+  const stored = scalar(raw, 'SELECT item_ids_json, plan_json FROM sessions WHERE id = ?', result.sessionId)
+  const plan = JSON.parse(stored.plan_json as string)
+  expect(JSON.parse(stored.item_ids_json as string)).toEqual(kind === 'placement' ? ['i2'] : ['i2', 'i3', 'i4', 'i5', 'i6', 'i7'])
+  if (kind === 'placement') expect(plan.pool.map((i: { id: string }) => i.id)).toEqual(['i2', 'i3', 'i4', 'i5', 'i6', 'i7'])
+  expect((await getSession({ data: result })).item?.id).toBe('i2')
+})
+
 function seedFrontier(raw: DatabaseSync, itemCount: number, hasDue: boolean) {
   raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un1', 't1', 0, 'Basics')
   raw.prepare('INSERT INTO learner_unit (learner_id, unit_id, unlocked_at) VALUES (?, ?, ?)').run('u1', 'un1', 1)
@@ -175,6 +211,20 @@ describe('learner practice and unit unlocks', () => {
   })
   afterEach(() => {
     vi.useRealTimers()
+  })
+
+  it('continues a large placement pool within the D1 parameter limit and skips retired questions', async () => {
+    seedFrontier(raw, 205, false)
+    const { sessionId } = await startPlacement({ data: { topicId: 't1' } })
+    expect((await getSession({ data: { sessionId } })).item?.id).toBe('i1')
+    await answerItem({ data: { sessionId, itemId: 'i1', answer: { text: '1' }, confidence: 'sure', responseMs: 1000 } })
+    // The original pool spans several statements; only its last question remains available.
+    raw.prepare("UPDATE items SET status = 'retired' WHERE id NOT IN ('i1', 'i205')").run()
+
+    await expect(nextItem({ data: { sessionId } })).resolves.toMatchObject({ ended: false, item: { id: 'i205' } })
+    expect(scalar(raw, 'SELECT item_ids_json, correct_count FROM sessions WHERE id = ?', sessionId))
+      .toEqual({ item_ids_json: JSON.stringify(['i1', 'i205']), correct_count: 1 })
+    expect(scalar(raw, 'SELECT COUNT(*) AS n FROM attempts').n).toBe(1)
   })
 
   it('only exposes the learner\'s answered active questions in Path after placement', async () => {

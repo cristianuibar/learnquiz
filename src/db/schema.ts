@@ -1,5 +1,6 @@
 import { index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
-import { user } from './auth-schema'
+import { organization, user } from './auth-schema'
+import type { WorkingHours } from '@/lib/company-settings'
 
 // learner_id everywhere is the Better Auth user id (guest or Facebook). ids are crypto.randomUUID().
 // Times are epoch milliseconds. JSON lives in *_json text columns.
@@ -21,6 +22,7 @@ export const sources = sqliteTable('sources', {
   kind: text('kind', { enum: ['text', 'url', 'pdf', 'image'] }).notNull(),
   title: text('title').notNull(),
   bodyText: text('body_text').notNull(),
+  deletedAt: integer('deleted_at'),
   createdAt: integer('created_at').notNull(),
 })
 
@@ -45,9 +47,11 @@ export const concepts = sqliteTable('concepts', {
   sourceQuote: text('source_quote'),
   misconceptionsJson: text('misconceptions_json').notNull().default('[]'),
   grounded: integer('grounded', { mode: 'boolean' }).notNull().default(false),
+  critical: integer('critical', { mode: 'boolean' }).notNull().default(false),
   visual: integer('visual', { mode: 'boolean' }).notNull().default(false),
   imageKey: text('image_key'),
   imageAlt: text('image_alt'),
+  imageGenerationStartedAt: integer('image_generation_started_at'),
 })
 
 export const conceptEdges = sqliteTable(
@@ -72,7 +76,9 @@ export const items = sqliteTable('items', {
   difficultyPrior: integer('difficulty_prior').notNull().default(3),
   eloDifficulty: real('elo_difficulty'),
   checkJson: text('check_json'),
-  status: text('status', { enum: ['active', 'rejected', 'reported'] }).notNull().default('active'),
+  status: text('status', { enum: ['active', 'rejected', 'reported', 'retired'] }).notNull().default('active'),
+  reviewedBy: text('reviewed_by'),
+  reviewedAt: integer('reviewed_at'),
   createdAt: integer('created_at').notNull(),
 })
 
@@ -264,3 +270,12 @@ export const pushLog = sqliteTable('push_log', {
   openedAt: integer('opened_at'),
   createdAt: integer('created_at').notNull(),
 }, (t) => [index('push_log_user_idx').on(t.userId)])
+
+export const orgSettings = sqliteTable('org_settings', {
+  orgId: text('org_id').primaryKey().references(() => organization.id, { onDelete: 'cascade' }),
+  companyName: text('company_name').notNull(),
+  timezone: text('timezone').notNull().default('UTC'),
+  workingHours: text('working_hours_json', { mode: 'json' }).$type<WorkingHours>().notNull(),
+  logoKey: text('logo_key'),
+  accent: text('accent'),
+})

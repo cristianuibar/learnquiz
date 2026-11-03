@@ -46,8 +46,10 @@ it.each([
       concepts: [{
         name: 'Concept',
         summary: 'Concept summary',
+        visual: false,
         prerequisites: [],
         source_quote: quote,
+        critical: false,
         misconceptions: [],
       }],
     }],

@@ -1,0 +1,1 @@
+ALTER TABLE `concepts` ADD `image_generation_started_at` integer;

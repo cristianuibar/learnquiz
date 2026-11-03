@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, type CSSProperties } from 'react'
 import { HeadContent, Outlet, Scripts, createRootRoute, redirect, useLocation } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
@@ -7,6 +7,7 @@ import { RouteError } from '@/components/inline-error'
 import { TopBar } from '@/components/top-bar'
 import { getLatestTopicIdFn } from '@/server/latest-topic'
 import { getSessionFn } from '@/server/session-fn'
+import { getCompanyBranding } from '@/server/org-settings'
 
 import appCss from '../styles.css?url'
 
@@ -17,14 +18,17 @@ export const Route = createRootRoute({
     if (session.needsDisclosure && location.pathname !== '/welcome') throw redirect({ to: '/welcome', search: { redirect: location.href } })
     return session
   },
-  loader: ({ context }) => (context.user ? getLatestTopicIdFn() : null),
+  loader: async ({ context }) => {
+    const [latestTopicId, branding] = context.user ? await Promise.all([getLatestTopicIdFn(), getCompanyBranding()]) : [null, null]
+    return { latestTopicId, branding }
+  },
   errorComponent: RouteError,
   notFoundComponent: () => (
     <main className="mx-auto w-full max-w-xl px-4 pt-8">
       <p className="text-lg font-medium">Page not found.</p>
     </main>
   ),
-  head: () => ({
+  head: ({ loaderData }) => ({
     meta: [
       {
         charSet: 'utf-8',
@@ -33,7 +37,7 @@ export const Route = createRootRoute({
         name: 'viewport',
         content: 'width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content',
       },
-      { name: 'theme-color', content: '#00785f' }, // --primary in styles.css
+      { name: 'theme-color', content: loaderData?.branding?.accent ?? '#00785f' },
       { name: 'mobile-web-app-capable', content: 'yes' },
       { name: 'apple-mobile-web-app-capable', content: 'yes' },
       { name: 'apple-mobile-web-app-title', content: 'Learn Quiz' },
@@ -58,7 +62,7 @@ export const Route = createRootRoute({
 
 function Root() {
   const { user } = Route.useRouteContext()
-  const latestTopicId = Route.useLoaderData()
+  const { latestTopicId, branding } = Route.useLoaderData()
   const { pathname } = useLocation()
   const focus = /^\/play\/(?:quick\/)?[^/]+\/?$/.test(pathname) // an active session has no chrome
   const nav = user && !focus && !/^\/(org|admin|welcome|join|sign-in)(\/|$)/.test(pathname)
@@ -69,7 +73,7 @@ function Root() {
 
   return (
     <>
-      {!focus && <TopBar signIn={(!user || user.isAnonymous) && pathname !== '/sign-in'} />}
+      {!focus && <TopBar branding={branding} home={user ? '/start' : '/'} signIn={(!user || user.isAnonymous) && pathname !== '/sign-in'} />}
       <Outlet />
       {nav && <BottomNav topicId={latestTopicId} />}
     </>
@@ -77,12 +81,15 @@ function Root() {
 }
 
 function RootDocument({ children }: { children: React.ReactNode }) {
+  const data = Route.useLoaderData()
+  const accent = data?.branding?.accent
+  const style = accent ? { '--primary': accent, '--ring': accent, '--accent': `color-mix(in srgb, ${accent} 10%, white)`, '--accent-foreground': 'var(--foreground)' } as CSSProperties : undefined
   return (
     <html lang="en">
       <head>
         <HeadContent />
       </head>
-      <body className="font-sans antialiased [overflow-wrap:anywhere]">
+      <body className="font-sans antialiased [overflow-wrap:anywhere]" style={style}>
         {children}
         {import.meta.env.DEV && (
           <TanStackDevtools
