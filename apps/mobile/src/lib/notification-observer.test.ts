@@ -81,27 +81,29 @@ test.each([
 })
 
 test.each([
-  ['/sign-in'],
-  ['//evil'],
-  ['https://evil'],
-  ['/play/quick/a/b'],
-  ['javascript:alert(1)'],
-  ['/play/quick/i1?other=1'],
-  ['/play/quick/i1?pushId=p1&x=1'],
-  ['/play/quick/i1#frag'],
-  ['/play/quick/'],
-  ['/play/quick'],
-  ['/play/quick/i1?pushId='],
-  ['/play/quick/i1?pushid=p1'],
-  ['/play/quick/i 1'],
+  '/sign-in',
+  '//evil',
+  'https://evil',
+  '/play/quick/a/b',
+  'javascript:',
+  'javascript:alert(1)',
+  '/play/quick/i1?other=1',
+  '/play/quick/i1?pushId=p1&x=1',
+  '/play/quick/i1?pushId=p1&redirect=//evil',
+  '/play/quick/i1#frag',
+  '/play/quick/',
+  '/play/quick',
+  '/play/quick/i1?pushId=',
+  '/play/quick/i1?pushid=p1',
+  '/play/quick/i 1',
   '/play/quick/i1 ',
   '/play/quick/i1\n',
   '',
-  null,
-  undefined,
-  42,
-  {},
 ])('quickRoute rejects %s', (url) => {
+  expect(quickRoute(url)).toBeNull()
+})
+
+test.each([[null], [undefined], [42], [{}]])('quickRoute rejects non-string %s', (url) => {
   expect(quickRoute(url)).toBeNull()
 })
 
