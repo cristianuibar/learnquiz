@@ -163,7 +163,8 @@ async function viewOf(db: Db, session: SessionRow, topic: TopicRow, plan: Placem
     progress: { position: plan.position + 1, total: placement ? Math.max(PLACEMENT_TOTAL, plan.position + 1) : ids.length },
     item,
     ended,
-    voiceEnabled: isVoiceEnabled(),
+    // Role topics play without any model call, so transcription is off there.
+    voiceEnabled: topic.jobRoleId === null && isVoiceEnabled(),
   }
 }
 
@@ -405,7 +406,8 @@ export const transcribeAnswer = createServerFn({ method: 'POST' })
     const learnerId = await requireLearnerId()
     if (!isVoiceEnabled()) throw httpError('Voice answers are unavailable.', 404)
     const db = getDb()
-    const { session } = await loadSession(db, learnerId, data.sessionId)
+    const { session, topic } = await loadSession(db, learnerId, data.sessionId)
+    if (topic.jobRoleId !== null) throw httpError('Voice answers are unavailable.', 404)
     const plan = readPlan(session)
     if (session.endedAt !== null || plan.answered || (JSON.parse(session.itemIdsJson) as string[])[plan.position] !== data.itemId) {
       throw httpError('That is not the current question', 409)
