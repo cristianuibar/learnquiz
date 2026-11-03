@@ -2,6 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
+import { errorMessage, fieldErrors } from '@/components/inline-error'
 import { getSessionUser } from '@/server/session'
 import { createCompany, createRole, getOrgOverview, getPeople, listRoles } from './org'
 
@@ -181,4 +182,14 @@ it('rolls back the role when its draft topic cannot be stored', async () => {
   sqlite.exec("CREATE TEMP TRIGGER reject_topic BEFORE INSERT ON topics WHEN NEW.title = 'Unavailable' BEGIN SELECT RAISE(ABORT, 'Topic unavailable'); END")
   await expect(createRole({ data: { slug: 'alpha', name: 'Unavailable' } })).rejects.toThrow()
   expect(sqlite.prepare('SELECT id FROM job_roles WHERE name = ?').all('Unavailable')).toEqual([])
+})
+
+it('turns a whitespace-only role name into a friendly message and per-field error', async () => {
+  const role = await (async () => createRole({ data: { slug: 'alpha', name: '   ' } }))().catch((e: unknown) => e)
+  expect(errorMessage(role)).toBe('Enter a role name')
+  expect(fieldErrors(role)).toEqual({ name: 'Enter a role name' })
+  const company = await (async () => createCompany({ data: { name: 'New company', roleName: '   ' } }))().catch((e: unknown) => e)
+  expect(errorMessage(company)).toBe('Enter a role name')
+  expect(fieldErrors(company)).toEqual({ roleName: 'Enter a role name' })
+  expect(sqlite.prepare('SELECT id FROM organization WHERE slug = ?').all('new-company')).toEqual([])
 })
