@@ -1030,4 +1030,31 @@ describe('employees training on their role topic', () => {
     expect((await getSession({ data: { sessionId } })).item?.id).toBe('ri-late')
     expect(fetchModel).not.toHaveBeenCalled()
   })
+
+  it('never tops up role questions with a model, even when the concepts hold few', async () => {
+    seedRoleTopic(1)
+    const { sessionId } = await startPlacement({ data: { topicId: 'rt' } })
+    const before = count('items')
+    expect(await prepareNextSession({ data: { sessionId } })).toEqual({ ok: true })
+    expect(chatJson).not.toHaveBeenCalled()
+    expect(fetchModel).not.toHaveBeenCalled()
+    expect(count('items')).toBe(before)
+  })
+
+  it('never serves a short question in a role session', async () => {
+    seedRoleTopic(3)
+    // The first concept holds one mcq among its short items, so a raw read would mostly pick short ones.
+    raw.exec("DELETE FROM items WHERE concept_id = 'rc0' AND format = 'mcq' AND id <> 'ri0-0'")
+    const { sessionId } = await startSession({ data: { topicId: 'rt' } })
+    const formats: string[] = []
+    for (let view = await getSession({ data: { sessionId } }); view.item; view = await nextItem({ data: { sessionId } })) {
+      formats.push(view.item.format)
+      if (view.item.format === 'short') break
+      await answerItem({ data: { sessionId, itemId: view.item.id, answer: { optionId: 'a' }, confidence: 'sure', responseMs: 1000 } })
+    }
+    expect(formats.length).toBeGreaterThan(0)
+    expect(formats).not.toContain('short')
+    expect(chatJson).not.toHaveBeenCalled()
+    expect(fetchModel).not.toHaveBeenCalled()
+  })
 })

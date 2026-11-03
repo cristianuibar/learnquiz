@@ -253,7 +253,8 @@ export const startSession = createServerFn({ method: 'POST' })
     const top = frontier.slice(0, 4)
     // Anything practisable stored starts the session at once (a shorter one is fine); prepareNextSession tops up during play.
     const storedRows = top.length
-      ? await db.select().from(items).where(and(eq(items.topicId, topic.id), inArray(items.conceptId, top.map((f) => f.concept.id)), eq(items.status, 'active')))
+      ? await db.select().from(items).where(and(eq(items.topicId, topic.id), inArray(items.conceptId, top.map((f) => f.concept.id)), eq(items.status, 'active'),
+        topic.jobRoleId !== null ? ne(items.format, 'short') : undefined))
       : []
     const stored = top.map((f) => storedRows.filter((r) => r.conceptId === f.concept.id).map(asItem))
     const storedFresh = stored.flat().filter((it) => !seen.has(it.id)).length
@@ -388,6 +389,8 @@ export const prepareNextSession = createServerFn({ method: 'POST' })
     const learnerId = await requireLearnerId()
     const db = getDb()
     const { session, topic } = await loadSession(db, learnerId, data.sessionId)
+    // Role questions are built by the company queue, never per learner (#40).
+    if (topic.jobRoleId !== null) return { ok: true as const }
     const reserved = session.kind === 'session' ? (JSON.parse(session.itemIdsJson) as string[]) : []
     await topUpFrontier(db, learnerId, topic, reserved, session.kind === 'placement' && session.endedAt === null)
     return { ok: true as const }
