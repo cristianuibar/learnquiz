@@ -1,7 +1,7 @@
 import { DatabaseSync } from 'node:sqlite'
 import { readFileSync, readdirSync } from 'node:fs'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import type { z } from 'zod'
 import { chatJson, LlmError } from '@/lib/llm/client'
 import { requireLearnerId } from '@/server/session'
@@ -32,6 +32,9 @@ vi.mock('@/lib/llm/client', () => ({
     constructor(message: string, public status: number) {
       super(message)
     }
+  },
+  DailyCapError: class DailyCapError extends Error {
+    status = 429
   },
 }))
 
@@ -176,6 +179,9 @@ it.each(['session', 'placement'])('skips retired questions in a queued %s, inclu
 })
 
 it.each(['session', 'placement'])('excludes retired questions from a new %s', async (kind) => {
+  // Items are ordered by creation time; a frozen clock keeps their seeded order.
+  vi.useFakeTimers({ toFake: ['Date'] })
+  onTestFinished(() => { vi.useRealTimers() })
   seedTopicAndLearner(raw, 0)
   seedFrontier(raw, 7, true)
   raw.prepare("UPDATE items SET status = 'retired' WHERE id = 'i1'").run()
