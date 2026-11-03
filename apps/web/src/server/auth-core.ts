@@ -35,6 +35,20 @@ function isLearnquizHost(url: string): boolean {
   return host === 'learnquiz.com' || host.endsWith('.learnquiz.com')
 }
 
+// A company member asks their company's admin to lift a ban. Personal users keep the library text until a support address exists.
+async function bannedUserMessage(userId: string): Promise<string> {
+  const { member, organization } = authSchema
+  const companies = await getDb()
+    .select({ name: organization.name })
+    .from(member)
+    .innerJoin(organization, eq(member.organizationId, organization.id))
+    .where(eq(member.userId, userId))
+    .orderBy(organization.name)
+  if (!companies.length) return 'You have been banned from this application. Please contact support if you believe this is an error.'
+  const names = new Intl.ListFormat('en', { type: 'disjunction' }).format(companies.map((c) => c.name))
+  return `Your account has been suspended. To get access back, contact your company admin at ${names}.`
+}
+
 const PEOPLE_ENDPOINTS = ['/organization/list-members', '/organization/list-invitations', '/organization/get-full-organization']
 
 // Per call: Cloudflare bindings are only valid inside a request.
@@ -59,7 +73,7 @@ export function createAuth(transportPlugins: BetterAuthPlugin[] = []) {
     },
     plugins: [
       anonymous({ onLinkAccount: ({ anonymousUser, newUser }) => moveGuestData(anonymousUser.user.id, newUser.user.id) }),
-      admin(),
+      admin({ bannedUserMessage: (user) => bannedUserMessage(user.id) }),
       organization({
         allowUserToCreateOrganization: (user) => !user.isAnonymous,
         invitationExpiresIn: 60 * 60 * 24 * 7,
