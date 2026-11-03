@@ -1,6 +1,8 @@
 import type { ReportReason } from '@learnquiz/api/reveal'
 import { api } from './api'
 
+const noteLimit = 300
+
 export async function sendReport(input: {
   itemId: string
   attemptId: string | null
@@ -10,7 +12,7 @@ export async function sendReport(input: {
   try {
     const data = await api<unknown>(`/items/${encodeURIComponent(input.itemId)}/report`, {
       method: 'POST',
-      body: { reason: input.reason, note: input.note, attemptId: input.attemptId },
+      body: { reason: input.reason, note: input.note.trim().slice(0, noteLimit), attemptId: input.attemptId },
     })
     return data !== null && typeof data === 'object' && 'ok' in data && data.ok === true
   } catch {
