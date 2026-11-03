@@ -12,3 +12,22 @@ export function takeHeldTarget(): string | null {
   held = null
   return target
 }
+
+// While a screen owns the next navigation (the join flow between sign-up and
+// accept), the root layout must not replay a held link. Holds nest.
+let deferrals = 0
+
+export function deferReplay(): () => void {
+  deferrals++
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    deferrals--
+  }
+}
+
+// The root layout's replay: nothing while deferred, and the link stays held.
+export function takeReplayTarget(): string | null {
+  return deferrals > 0 ? null : takeHeldTarget()
+}

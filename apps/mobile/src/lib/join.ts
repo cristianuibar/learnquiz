@@ -135,6 +135,8 @@ export type JoinApi = {
   accept(invitationId: string): Promise<unknown>
   session(): Promise<{ needsDisclosure: boolean }>
   takeHeldTarget(): string | null
+  // Keeps the root layout from replaying a held link while the flow runs.
+  deferReplay(): () => void
 }
 
 export type JoinInput = {
@@ -162,6 +164,15 @@ export function createJoinFlow(api: JoinApi, invitationId: string) {
   let accepted = false
 
   async function run(input: JoinInput, signedIn: boolean): Promise<JoinOutcome> {
+    const release = api.deferReplay()
+    try {
+      return await steps(input, signedIn)
+    } finally {
+      release()
+    }
+  }
+
+  async function steps(input: JoinInput, signedIn: boolean): Promise<JoinOutcome> {
     if (!signedIn && !authenticated) {
       try {
         if (input.mode === 'signUp') await api.signUp(input.email, input.password, input.name.trim())

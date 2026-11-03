@@ -1,6 +1,7 @@
 import type { InviteView } from '@learnquiz/api/invite'
 import { networkError } from '@learnquiz/api/system-copy'
 import { ApiError } from './api'
+import { deferReplay, holdTarget, takeHeldTarget, takeReplayTarget } from './held-target'
 import {
   accountExists,
   canSubmit,
@@ -35,6 +36,7 @@ function fakeApi(overrides: Partial<JoinApi> = {}) {
     accept: jest.fn(async () => ({})),
     session: jest.fn(async () => ({ needsDisclosure: true })),
     takeHeldTarget: jest.fn((): string | null => null),
+    deferReplay,
     ...overrides,
   }
 }
@@ -126,6 +128,59 @@ describe('sequence', () => {
     expect(api.signIn).toHaveBeenCalledWith(invite.email, 'correct horse')
     expect(api.accept).not.toHaveBeenCalled()
     expect(outcome).toEqual({ kind: 'done', target: TODAY })
+  })
+})
+
+describe('held link while joining', () => {
+  beforeEach(() => { takeHeldTarget() })
+
+  test('the root layout cannot replay a held link during sign-up and accept', async () => {
+    holdTarget('/unit/u1')
+    const seen: (string | null)[] = []
+    const api = fakeApi({
+      signUp: jest.fn(async () => { seen.push(takeReplayTarget()) }),
+      accept: jest.fn(async () => { seen.push(takeReplayTarget()) }),
+      session: jest.fn(async () => { seen.push(takeReplayTarget()); return { needsDisclosure: true } }),
+      takeHeldTarget,
+    })
+    const outcome = await createJoinFlow(api, 'inv-1').run(form, false)
+    expect(seen).toEqual([null, null, null])
+    // The Disclosure comes first; the link is still held for after it.
+    expect(outcome).toEqual({ kind: 'done', target: WELCOME })
+    expect(takeReplayTarget()).toBe('/unit/u1')
+  })
+
+  test('without the Disclosure the flow takes the held link itself', async () => {
+    holdTarget('/unit/u1')
+    const api = fakeApi({ session: jest.fn(async () => ({ needsDisclosure: false })), takeHeldTarget })
+    expect(await createJoinFlow(api, 'inv-1').run(form, false)).toEqual({ kind: 'done', target: '/unit/u1' })
+    expect(takeReplayTarget()).toBeNull()
+  })
+
+  test('a failed accept keeps the retry state and the held link while the screen holds replay', async () => {
+    holdTarget('/unit/u1')
+    const screenHold = deferReplay()
+    const accept = jest.fn().mockRejectedValueOnce(new ApiError(500, 'Request failed with status 500')).mockResolvedValueOnce({})
+    const api = fakeApi({ accept, session: jest.fn(async () => ({ needsDisclosure: true })), takeHeldTarget })
+    const flow = createJoinFlow(api, 'inv-1')
+
+    expect(await flow.run(form, false)).toEqual({ kind: 'error', message: joinFailed })
+    expect(flow.authenticated).toBe(true)
+    // A session refresh landing now must not navigate away from the retry.
+    expect(takeReplayTarget()).toBeNull()
+
+    expect(await flow.run(form, false)).toEqual({ kind: 'done', target: WELCOME })
+    expect(api.signUp).toHaveBeenCalledTimes(1)
+    screenHold()
+    expect(takeReplayTarget()).toBe('/unit/u1')
+  })
+
+  test('a held link replays normally when nothing defers it', () => {
+    holdTarget('/unit/u1')
+    const release = deferReplay()
+    release()
+    release()
+    expect(takeReplayTarget()).toBe('/unit/u1')
   })
 })
 

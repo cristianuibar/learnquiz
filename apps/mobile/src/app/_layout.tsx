@@ -14,7 +14,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { ThemeProvider } from '@/theme/ThemeProvider'
 import { SessionProvider, useSession } from '@/lib/session-store'
-import { holdTarget, takeHeldTarget } from '@/lib/held-target'
+import { holdTarget, takeReplayTarget } from '@/lib/held-target'
 import { canOpenTarget, targetFromURL } from '@/lib/route-gates'
 import { useNotificationObserver } from '@/lib/notification-observer'
 
@@ -62,7 +62,7 @@ function SessionRoutes({ fontsLoaded }: { fontsLoaded: boolean }) {
     }
     // The native router handles open links. Only replay links held by a gate.
     if (!resolved) return
-    const target = takeHeldTarget()
+    const target = takeReplayTarget()
     if (target) {
       if (canOpenTarget(target, session)) router.replace(target as Href)
       else holdTarget(target)
