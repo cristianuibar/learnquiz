@@ -1,4 +1,4 @@
-import { and, count, eq, inArray, isNull } from 'drizzle-orm'
+import { and, count, eq, inArray, isNull, ne } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '@/db'
 import { invitation, member, organization, user } from '@/db/auth-schema'
@@ -7,12 +7,16 @@ import { BKT, MASTERY, guessFor, update } from '@/lib/learning/bkt'
 import { review } from '@/lib/learning/fsrs'
 import { gradeAnswer } from '@/lib/learning/grade'
 import { MAX_SOURCE_TEXT_CHARS } from '@/lib/limits'
+import { ItemPayload } from '@/lib/llm/schemas'
 import { createAuth } from '@/server/auth-core'
+import { getEnv } from '@/server/env'
 import { chunks, ensureConceptItems, httpError } from '@/server/helpers'
 import { addRoleDocument, buildRoleCurriculum } from '@/server/role-curriculum'
+import { LOCATION_LABEL_ALT, LOCATION_LABEL_HEIGHT, LOCATION_LABEL_SVG, LOCATION_LABEL_WIDTH } from './location-label'
 
 const DAY = 86_400_000
 const marker = 'northwind-logistics-v1'
+const LABEL_ITEM_ID = 'northwind-demo-v1:label-item'
 export const NORTHWIND = {
   slug: 'northwind-logistics', roleId: 'northwind-demo-v1:picker', topicId: 'northwind-demo-v1:topic', sourceId: 'northwind-demo-v1:sop',
   emails: {
@@ -127,18 +131,37 @@ export async function seedNorthwind(input: z.input<typeof Input>) {
   // Three representative concepts keep generation within the normal daily cap.
   const selected = [critical, ...conceptRows.filter((c) => c.id !== critical.id).slice(0, 2)]
   for (const concept of selected) {
-    const stored = await db.select({ id: items.id, format: items.format }).from(items).where(and(eq(items.conceptId, concept.id), eq(items.status, 'active')))
+    const stored = await db.select({ id: items.id, format: items.format }).from(items).where(and(eq(items.conceptId, concept.id), eq(items.status, 'active'), ne(items.id, LABEL_ITEM_ID)))
     // The demo error needs a multiple-choice question, so a rerun regenerates until the self-check keeps one.
     const missing = concept.id === critical.id ? !stored.some((item) => item.format === 'mcq') : !stored.length
     if (missing) await ensureConceptItems(db, metadata.accounts.owner, concept, readyTopic, { targetDifficulty: 3, unseen: new Set(stored.map((item) => item.id)) })
   }
-  const criticalItems = await db.select().from(items).where(and(eq(items.conceptId, critical.id), eq(items.status, 'active')))
+  const criticalItems = await db.select().from(items).where(and(eq(items.conceptId, critical.id), eq(items.status, 'active'), ne(items.id, LABEL_ITEM_ID)))
   const criticalItem = criticalItems.find((item) => item.format === 'mcq')
   if (!criticalItem) throw httpError('The critical scanning step needs a multiple-choice question for the demo error.', 422)
   const payload = JSON.parse(criticalItem.payloadJson) as import('@/lib/llm/schemas').ItemPayload
   const wrongOption = payload.options.find((option) => !option.is_correct)!
   const answer = { optionId: wrongOption.id }
   if (gradeAnswer(payload, answer).correct) throw httpError('The demo answer must be incorrect.', 422)
+
+  // One authored question with an image: the SVG goes to R2 under the item's key, the payload points at it.
+  const labelPayload = ItemPayload.parse({
+    format: 'mcq', stem: 'What level does the label A12-04-C-2 point to?',
+    options: [
+      { id: 'a', text: 'Level A', is_correct: false, feedback: 'A12 is the aisle, the first part of the label, not the level.' },
+      { id: 'b', text: 'Level C', is_correct: true, feedback: 'Correct: the third part of A12-04-C-2 is the level, C.' },
+      { id: 'c', text: 'Level 2', is_correct: false, feedback: 'The final 2 is the position on that level, not the level.' },
+      { id: 'd', text: 'Level 57', is_correct: false, feedback: '57 is the check digits boxed on the label, used to confirm the scan.' },
+    ],
+    accepted_answers: [], model_answer: '', explanation: 'Read the label as aisle A12, bay 04, level C, position 2; the boxed 57 is the check digits.',
+    difficulty: 2, source_quote: null, grounded: false, bloom: 'understand',
+    image: { key: 'label.svg', alt: LOCATION_LABEL_ALT, width: LOCATION_LABEL_WIDTH, height: LOCATION_LABEL_HEIGHT },
+  })
+  await getEnv().MEDIA.put(`items/${LABEL_ITEM_ID}/label.svg`, LOCATION_LABEL_SVG, { httpMetadata: { contentType: 'image/svg+xml' } })
+  await db.insert(items).values({
+    id: LABEL_ITEM_ID, conceptId: critical.id, topicId: NORTHWIND.topicId, format: 'mcq', payloadJson: JSON.stringify(labelPayload),
+    difficultyPrior: 2, status: 'active', createdAt: now - 10 * DAY,
+  }).onConflictDoNothing()
 
   async function invite(email: string, name: string) {
     const existing = await db.select().from(invitation).where(and(eq(invitation.organizationId, org!.id), eq(invitation.email, email), eq(invitation.status, 'pending'))).get()
