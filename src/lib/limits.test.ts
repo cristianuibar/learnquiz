@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import { z } from 'zod'
-import { DAILY_MODEL_CALL_CAP, isOverDailyCap, MAX_SOURCE_TEXT_CHARS, utcDayStart } from './limits'
+import { ACCOUNT_DAILY_MODEL_CALL_CAP, GUEST_DAILY_MODEL_CALL_CAP, isOverDailyCap, MAX_SOURCE_TEXT_CHARS, utcDayStart } from './limits'
 
 it('counts only the current UTC day towards the daily cap', () => {
   const now = Date.UTC(2026, 9, 29, 15, 30)
@@ -12,11 +12,13 @@ it('counts only the current UTC day towards the daily cap', () => {
   expect(isOverDailyCap(today.length)).toBe(false)
 })
 
-it('blocks at the daily cap so a capped guest gets no further model call', () => {
-  expect(DAILY_MODEL_CALL_CAP).toBe(20)
-  expect(isOverDailyCap(DAILY_MODEL_CALL_CAP - 1)).toBe(false)
-  expect(isOverDailyCap(DAILY_MODEL_CALL_CAP)).toBe(true)
-  expect(isOverDailyCap(DAILY_MODEL_CALL_CAP + 5)).toBe(true)
+it.each([
+  { who: 'guest', cap: GUEST_DAILY_MODEL_CALL_CAP },
+  { who: 'account', cap: ACCOUNT_DAILY_MODEL_CALL_CAP },
+])('blocks a $who at exactly its daily cap', ({ cap }) => {
+  expect(isOverDailyCap(cap - 1, cap)).toBe(false)
+  expect(isOverDailyCap(cap, cap)).toBe(true)
+  expect(isOverDailyCap(cap + 5, cap)).toBe(true)
 })
 
 it('rejects a pasted source over the stored-size limit before any model call', () => {
