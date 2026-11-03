@@ -567,6 +567,22 @@ describe('learner practice and unit unlocks', () => {
     expect(await getConceptItems({ data: { conceptId: 'c1' } })).toEqual({ items: [] })
   })
 
+  it('counts only the learner\'s answered active questions per concept in Path', async () => {
+    seedFrontier(raw, 6, false)
+    raw.prepare('UPDATE items SET status = ? WHERE id = ?').run('reported', 'i6')
+    raw.prepare('DELETE FROM learner_item WHERE item_id IN (?, ?)').run('i4', 'i5')
+    const conceptCount = async () => (await getTopicPath({ data: { topicId: 't1' } })).units.flatMap((u) => u.concepts).find((c) => c.id === 'c1')!.answeredCount
+
+    // c1 has 5 active questions; u1 has a schedule for 3 of them (plus a reported one that must not count).
+    expect(await conceptCount()).toBe(3)
+    expect((await getConceptItems({ data: { conceptId: 'c1' } })).items).toHaveLength(3)
+
+    raw.prepare('UPDATE topics SET learner_id = ? WHERE id = ?').run('u2', 't1')
+    raw.prepare('INSERT INTO learner_topic (learner_id, topic_id) VALUES (?, ?)').run('u2', 't1')
+    vi.mocked(requireLearnerId).mockResolvedValueOnce('u2')
+    expect(await conceptCount()).toBe(0)
+  })
+
   it('marks only units with answered concepts as measured in Path after placement', async () => {
     seedFrontier(raw, 6, false)
     // Placement asks the first, middle and last unit's first concept; unit 2 has no questions and is never asked.
