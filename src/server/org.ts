@@ -144,9 +144,13 @@ export const getOrgOverview = createServerFn({ method: 'GET' })
     const { org, readOnly } = await requireOrgReader(data.slug)
     const db = getDb()
     const now = Date.now()
-    const [roles, progress, [errors]] = await Promise.all([
+    const [roles, progress, [invited], [errors]] = await Promise.all([
       rolesOf(org.id),
       trainingOf(org.id),
+      // Invited employees count before they join, the same ones People shows as Invited rather than Expired.
+      db.select({ n: count() })
+        .from(invitation)
+        .where(and(eq(invitation.organizationId, org.id), eq(invitation.status, 'pending'), gt(invitation.expiresAt, new Date(now)))),
       db.select({ n: count() })
         .from(attempts)
         .innerJoin(concepts, and(eq(concepts.id, attempts.conceptId), eq(concepts.critical, true)))
@@ -157,7 +161,7 @@ export const getOrgOverview = createServerFn({ method: 'GET' })
     ])
     const proficient = [...progress.values()].filter((row) => row.stage === 'proficient')
     const days = proficient.flatMap((row) => row.daysToProficiency === null ? [] : [row.daysToProficiency])
-    return { name: org.name, slug: org.slug, roles, readOnly, training: { employees: progress.size, proficientEmployees: proficient.length, daysToProficiency: days.length ? Math.ceil(mean(days)) : null, criticalErrorsThisWeek: errors?.n ?? 0, documentsToReview: null as number | null } }
+    return { name: org.name, slug: org.slug, roles, readOnly, training: { employees: progress.size + (invited?.n ?? 0), proficientEmployees: proficient.length, daysToProficiency: days.length ? Math.ceil(mean(days)) : null, criticalErrorsThisWeek: errors?.n ?? 0, documentsToReview: null as number | null } }
   })
 
 export const getPeople = createServerFn({ method: 'GET' })
