@@ -343,6 +343,19 @@ describe('getToday', () => {
       expect(plan?.state).toBe('normal')
       expect(r?.mastery).toBeCloseTo(0.4, 10)
     })
+
+    it('leaves concepts of a retired document out of the average', async () => {
+      role()
+      unit('un1', 0)
+      concept('c1', 'un1')
+      concept('c2', 'un1')
+      run('INSERT INTO sources (id, topic_id, kind, title, body_text, retired_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', 'old', 't1', 'text', 'Old', 'Old.', 1, 1)
+      run("UPDATE concepts SET source_id = 'old' WHERE id = 'c2'")
+      item('i1', 'c1')
+      learn('c1', 0.8)
+      attempt('i1', 'c1', NOW - 1000)
+      expect((await getToday()).role?.mastery).toBeCloseTo(0.8, 10)
+    })
   })
 
   describe('onboarding day', () => {

@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, count, desc, eq, inArray } from 'drizzle-orm'
+import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '@/db'
 import { conceptEdges, concepts, items, learnerConcept, learnerItem, learnerTopic, learnerUnit, placements, sources, topics, units } from '@/db/schema'
@@ -9,6 +9,7 @@ import { curriculumPrompt } from '@/lib/llm/prompts'
 import { CurriculumSkeleton } from '@/lib/llm/schemas'
 import { MAX_SOURCE_TEXT_CHARS } from '@/lib/limits'
 import { asItem, httpError, mean, type StoredItem } from '@/server/helpers'
+import { liveConcept } from '@/server/live-concept'
 import { assertWithinDailyCap } from '@/server/model-cap'
 import { requireOrgAdmin } from '@/server/authz'
 import { requireLearnerId } from '@/server/session'
@@ -99,11 +100,16 @@ export const retryConceptGeneration = createServerFn({ method: 'POST' })
     const db = getDb()
     const reset = await db.update(concepts).set({ genStatus: 'pending', genError: null, genStartedAt: null })
       .where(and(
-        eq(concepts.id, data.conceptId), eq(concepts.genStatus, 'failed'),
+        eq(concepts.id, data.conceptId), eq(concepts.genStatus, 'failed'), liveConcept(),
         inArray(concepts.topicId, db.select({ id: topics.id }).from(topics).where(eq(topics.orgId, org.id))),
       ))
       .returning({ id: concepts.id })
-    if (!reset.length) throw httpError('Failed concept not found', 404)
+    if (!reset.length) {
+      // A concept of a retired document would only wait in the queue forever.
+      const [dead] = await db.select({ id: concepts.id }).from(concepts).where(and(eq(concepts.id, data.conceptId), sql`not (${liveConcept()})`,
+        inArray(concepts.topicId, db.select({ id: topics.id }).from(topics).where(eq(topics.orgId, org.id)))))
+      throw dead ? httpError('The document behind this concept was retired', 409) : httpError('Failed concept not found', 404)
+    }
     runInBackground(drainConceptQueue())
     return { ok: true }
   })
