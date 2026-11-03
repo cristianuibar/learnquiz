@@ -117,7 +117,7 @@ it('shows a company admin the member’s Training progress read-only and refuses
     Object.assign(authClient, { signOut })
     const switchButton = () => container.querySelector('button')!
     await act(async () => { switchButton().click() })
-    expect(container.textContent).toContain('Failed to fetch')
+    expect(container.textContent).toContain('Could not sign out')
     expect(switchButton().disabled).toBe(false)
     expect(router.state.location.pathname).toBe('/org/acme/people/learner')
     await act(async () => { switchButton().click() })

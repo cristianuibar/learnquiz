@@ -69,7 +69,7 @@ function PermissionError({ message }: { message: string }) {
             setError('')
             const redirect = router.state.location.href
             // Offline, signOut rejects instead of resolving with an error; both must re-enable the button.
-            const { error } = await authClient.signOut().catch((err: unknown) => ({ error: { message: errorMessage(err, 'Could not sign out') } }))
+            const { error } = await authClient.signOut().catch(() => ({ error: { message: 'Could not sign out' } }))
             if (error) {
               setError(error.message ?? 'Could not sign out')
               setBusy(false)

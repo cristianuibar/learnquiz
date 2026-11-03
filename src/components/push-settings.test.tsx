@@ -3,6 +3,7 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createMemoryHistory, createRootRoute, createRoute, createRouter, RouterProvider } from '@tanstack/react-router'
 import { afterEach, expect, it, vi } from 'vitest'
+import { authClient } from '@/lib/auth-client'
 import { Route as appRootRoute } from '@/routes/__root'
 import { Route as meRoute } from '@/routes/me.index'
 import { getPushSettings, savePushPreferences, sendTestPush, subscribe, unsubscribe } from '@/server/push'
@@ -128,5 +129,38 @@ it("replaces another account's leftover browser subscription when enabling notif
     await act(async () => root.unmount())
     container.remove()
     Reflect.deleteProperty(navigator, 'serviceWorker')
+  }
+})
+
+it('keeps the user on Profile and shows why when sign-out fails', async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+  const signOut = vi.fn()
+    .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    .mockResolvedValueOnce({ data: null, error: { message: 'Session expired' } })
+  Object.assign(authClient, { signOut })
+  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'b', name: 'B', role: 'learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })
+  const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader })
+  const me = createRoute({ getParentRoute: () => rootRoute, path: '/me/', beforeLoad: meRoute.options.beforeLoad, loader: meRoute.options.loader, component: meRoute.options.component })
+  const home = createRoute({ getParentRoute: () => rootRoute, path: '/', component: () => <h1>Home</h1> })
+  const router = createRouter({ routeTree: rootRoute.addChildren([me, home]), history: createMemoryHistory({ initialEntries: ['/me/'] }) })
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  const signOutButton = () => [...container.querySelectorAll('button')].find((b) => b.textContent === 'Sign out')!
+  try {
+    await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
+    await act(async () => signOutButton().click())
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe('Could not sign out')
+    expect(signOutButton().disabled).toBe(false)
+    expect(router.state.location.pathname).toBe('/me/')
+
+    await act(async () => signOutButton().click())
+    expect(signOut).toHaveBeenCalledTimes(2)
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe('Session expired')
+    expect(signOutButton().disabled).toBe(false)
+    expect(router.state.location.pathname).toBe('/me/')
+  } finally {
+    await act(async () => root.unmount())
+    container.remove()
   }
 })
