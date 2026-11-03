@@ -5,7 +5,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vite
 import { z } from 'zod'
 import { modelCalls } from '@/db/schema'
 import { getEnv } from '@/server/env'
-import { chatJson, LlmError } from './client'
+import { ACCOUNT_DAILY_MODEL_CALL_CAP } from '@/lib/limits'
+import { chatJson, DailyCapError, LlmError } from './client'
 
 const holder = vi.hoisted(() => ({ db: null as unknown }))
 
@@ -202,4 +203,30 @@ it('refuses a malformed-output retry after the twentieth daily model call', asyn
   expect(calls.filter((call) => !call.ok)).toEqual([
     expect.objectContaining({ learnerId: 'u1', error: expect.stringContaining('invalid JSON:') }),
   ])
+})
+
+it.each([
+  { calls: 20, capped: false },
+  { calls: ACCOUNT_DAILY_MODEL_CALL_CAP, capped: true },
+])('lets a signed-in account with $calls calls today be capped: $capped', async ({ calls, capped }) => {
+  raw.exec(`INSERT INTO user (id, name, email, is_anonymous) VALUES ('u1', 'Ada', 'ada@example.test', 0)`)
+  await db.insert(modelCalls).values(Array.from({ length: calls }, (_, i) => ({
+    id: `call-${i}`, learnerId: 'u1', purpose: 'test', model: 'muse-spark-1.3', latencyMs: 0, ok: true, createdAt: Date.now(),
+  })))
+  const fetchModel = vi.fn(async () => Response.json({ choices: [{ message: { content: '{"answer":"ok"}' }, finish_reason: 'stop' }] }))
+  vi.stubGlobal('fetch', fetchModel)
+
+  const result = await chatJson({ ...answerRequest, purpose: 'items' }).catch((e: unknown) => e)
+
+  if (capped) {
+    expect(result).toBeInstanceOf(DailyCapError)
+    expect(result).toBeInstanceOf(LlmError)
+    expect(result).toMatchObject({ status: 429 })
+    expect(fetchModel).not.toHaveBeenCalled()
+    expect(await db.select().from(modelCalls)).toHaveLength(calls)
+  } else {
+    expect(result).toEqual({ answer: 'ok' })
+    expect(fetchModel).toHaveBeenCalledTimes(1)
+    expect(await db.select().from(modelCalls)).toHaveLength(calls + 1)
+  }
 })

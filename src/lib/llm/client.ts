@@ -1,11 +1,9 @@
-import { and, count, eq, gte } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '@/db'
 import { modelCalls } from '@/db/schema'
-import { isOverDailyCap, utcDayStart } from '@/lib/limits'
 import { META_MODELS, PROVIDERS, type ModelJob } from '@/lib/llm/models'
 import { getEnv } from '@/server/env'
-import { assertWithinDailyCap } from '@/server/model-cap'
+import { assertWithinDailyCap, isOverLearnerDailyCap } from '@/server/model-cap'
 
 // USD per million tokens; reasoning tokens bill as output. Unlisted prices are unknown.
 export const PRICES: Record<string, { in: number; out: number }> = {
@@ -18,6 +16,13 @@ export class LlmError extends Error {
     super(message)
     this.name = 'LlmError'
     this.status = status
+  }
+}
+
+export class DailyCapError extends LlmError {
+  constructor() {
+    super('You have reached the daily limit for generating new content. Try again tomorrow.', 429)
+    this.name = 'DailyCapError'
   }
 }
 
@@ -105,11 +110,7 @@ export async function chatJson<T>(opts: {
     // shortcut: count-then-call is not atomic, so concurrent calls can overshoot by a few; the per-handler check keeps the common path exact.
     if (opts.learnerId) {
       try {
-        const [row] = await getDb()
-          .select({ n: count() })
-          .from(modelCalls)
-          .where(and(eq(modelCalls.learnerId, opts.learnerId), gte(modelCalls.createdAt, utcDayStart(Date.now()))))
-        if (isOverDailyCap(row?.n ?? 0)) throw new LlmError('You have reached the daily limit for generating new content. Try again tomorrow.', 429)
+        if (await isOverLearnerDailyCap(getDb(), opts.learnerId)) throw new DailyCapError()
       } catch (e) {
         if (e instanceof LlmError) throw e
         console.error('daily cap check failed, allowing call', e instanceof Error ? e.message : e)

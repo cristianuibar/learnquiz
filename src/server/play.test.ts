@@ -33,6 +33,9 @@ vi.mock('@/lib/llm/client', () => ({
       super(message)
     }
   },
+  DailyCapError: class DailyCapError extends Error {
+    status = 429
+  },
 }))
 
 vi.mock('cloudflare:workers', () => ({ env: {} }))
