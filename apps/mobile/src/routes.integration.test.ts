@@ -12,6 +12,11 @@ jest.mock('./lib/session-store', () => ({
   useSession: jest.fn(),
 }))
 jest.mock('./lib/api', () => ({ api: jest.fn() }))
+// The real Today screen loads /today; this file only checks that the route is reachable.
+jest.mock('./app/(tabs)/today', () => ({
+  __esModule: true,
+  default: () => require('react').createElement(require('react-native').Text, null, 'Today screen'),
+}))
 jest.mock('react-native-gesture-handler', () => ({ GestureHandlerRootView: 'View' }))
 jest.mock('react-native-keyboard-controller', () => ({
   KeyboardProvider: 'View',
@@ -73,6 +78,7 @@ test('the actual router keeps sign-in closed for a signed-in learner', async () 
   const navigation = renderRouter('src/app', { initialUrl: '/sign-in' })
   await navigation
   expect(navigation.getPathname()).toBe('/today')
+  expect(screen.getByText('Today screen')).toBeOnTheScreen()
   expect(screen.queryByText('Sign in')).toBeNull()
 })
 
