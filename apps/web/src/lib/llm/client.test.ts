@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { modelCalls, topics } from '@/db/schema'
 import { getEnv } from '@/server/env'
 import { ACCOUNT_DAILY_MODEL_CALL_CAP, GUEST_DAILY_MODEL_CALL_CAP } from '@/lib/limits'
-import { chatJson, DailyCapError, LlmError, transcribeAudio } from './client'
+import { chatJson, chatJsonWithModel, DailyCapError, LlmError, transcribeAudio } from './client'
 
 const holder = vi.hoisted(() => ({ db: null as unknown }))
 
@@ -150,6 +150,49 @@ it.each([
     { session_id: 's1', purpose: 'items', model: 'muse-spark-1.3', ok: 1 },
     { session_id: 's1', purpose: 'self_check', model, ok: 0 },
     { session_id: 's1', purpose: 'self_check', model, ok: 1 },
+  ])
+})
+
+const llama = 'accounts/fireworks/models/llama-v3p3-70b-instruct'
+
+it('runs placement_line on Llama 3.3 70B via Fireworks and prices the call at 0.9/0.9', async () => {
+  Object.assign(getEnv(), { JOB_MODELS: { placement_line: { provider: 'fireworks', model: llama } }, FIREWORKS_API_KEY: 'fw-key' })
+  const fetchModel = vi.fn(async () => Response.json({
+    choices: [{ message: { content: '{"answer":"ok"}' } }],
+    usage: { prompt_tokens: 1000, completion_tokens: 1000 },
+  }))
+  vi.stubGlobal('fetch', fetchModel)
+  await expect(chatJsonWithModel({ ...answerRequest, purpose: 'placement_line' })).resolves.toEqual({ data: { answer: 'ok' }, model: llama })
+  const [[endpoint, init]] = fetchModel.mock.calls as unknown as [[string, { headers: Record<string, string>; body: string }]]
+  const body = JSON.parse(init.body)
+  expect(endpoint).toBe('https://api.fireworks.ai/inference/v1/chat/completions')
+  expect(init.headers.authorization).toBe('Bearer fw-key')
+  expect(body.model).toBe(llama)
+  expect(body.response_format).toEqual({ type: 'json_object' })
+  expect(body.n).toBeUndefined()
+  expect(body.reasoning_effort).toBeUndefined()
+  expect(raw.prepare('SELECT purpose, model, ok, cost_usd FROM model_calls').all()).toEqual([
+    { purpose: 'placement_line', model: llama, ok: 1, cost_usd: 0.0018 },
+  ])
+})
+
+it.each([
+  { failure: 'HTTP 503', first: async () => new Response('down', { status: 503 }) },
+  { failure: 'timeout', first: async () => { throw new DOMException('timed out', 'TimeoutError') } },
+])('falls back to muse-spark-1.3 when Fireworks fails ($failure)', async ({ first }) => {
+  Object.assign(getEnv(), { JOB_MODELS: { placement_line: { provider: 'fireworks', model: llama } }, FIREWORKS_API_KEY: 'fw-key' })
+  const fetchModel = vi.fn()
+    .mockImplementationOnce(first)
+    .mockResolvedValueOnce(Response.json({ choices: [{ message: { content: '{"answer":"meta"}' } }] }))
+  vi.stubGlobal('fetch', fetchModel)
+  await expect(chatJsonWithModel({ ...answerRequest, purpose: 'placement_line' })).resolves.toEqual({ data: { answer: 'meta' }, model: 'muse-spark-1.3' })
+  expect(fetchModel.mock.calls.map(([endpoint, init]) => [endpoint, JSON.parse(init.body).model])).toEqual([
+    ['https://api.fireworks.ai/inference/v1/chat/completions', llama],
+    ['https://llm.example/chat/completions', 'muse-spark-1.3'],
+  ])
+  expect(raw.prepare('SELECT model, ok FROM model_calls ORDER BY rowid').all()).toEqual([
+    { model: llama, ok: 0 },
+    { model: 'muse-spark-1.3', ok: 1 },
   ])
 })
 
