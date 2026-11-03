@@ -13,6 +13,11 @@ export type OverlayState = {
   reflection: string
   /** A report was sent for this reveal: Report cannot open again. */
   reported: boolean
+  /**
+   * The trimmed `why` of the first `POST /next` attempt; null until one is made.
+   * A retry after a failed `/next` resends it, even if the reflection was edited.
+   */
+  submittedWhy: string | null
 }
 
 export type OverlayAction =
@@ -24,7 +29,7 @@ export type OverlayAction =
 
 export type ContinueRequest = { why?: string; reported: boolean }
 
-export const initialOverlay: OverlayState = { mode: 'result', focus: 'band', reflection: '', reported: false }
+export const initialOverlay: OverlayState = { mode: 'result', focus: 'band', reflection: '', reported: false, submittedWhy: null }
 
 /**
  * Applies one overlay action. `advance` is set when the session should call
@@ -43,18 +48,33 @@ export function overlayStep(state: OverlayState, action: OverlayAction): { state
       return { state: { ...state, mode: 'result', focus: 'report' }, advance: null }
     case 'sent': {
       if (state.mode !== 'report' || state.reported) return { state, advance: null }
-      const next: OverlayState = { ...state, mode: 'result', focus: 'band', reported: true }
+      const next = submit({ ...state, mode: 'result', focus: 'band', reported: true })
       return { state: next, advance: continueRequest(next) }
     }
-    case 'continue':
+    case 'continue': {
       if (state.mode !== 'result') return { state, advance: null }
-      return { state, advance: continueRequest(state) }
+      const next = submit(state)
+      return { state: next, advance: continueRequest(next) }
+    }
   }
 }
 
+/** Fixes the `why` on the first `POST /next` attempt so every retry sends the same one. */
+function submit(state: OverlayState): OverlayState {
+  return state.submittedWhy === null ? { ...state, submittedWhy: state.reflection.trim() } : state
+}
+
 export function continueRequest(state: OverlayState): ContinueRequest {
-  const why = state.reflection.trim()
+  const why = state.submittedWhy ?? state.reflection.trim()
   return { ...(why ? { why } : {}), reported: state.reported }
+}
+
+/**
+ * Report is offered only on the result, once per reveal, and never while
+ * `POST /next` is pending: its response would unmount a sending report.
+ */
+export function reportAvailable(state: OverlayState, busy: boolean): boolean {
+  return state.mode === 'result' && !state.reported && !busy
 }
 
 /**

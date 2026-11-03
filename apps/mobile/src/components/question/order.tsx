@@ -39,14 +39,15 @@ export function OrderBody({ item, answer, onAnswer, marks, disabled }: QuestionB
       <View style={{ gap: space[4] }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text variant="caption" muted style={{ flex: 1 }}>{ORDER_CAPTION}</Text>
-          {/* Clear is always laid out so the row keeps its scaled height; it is hidden until a step is placed. */}
+          {/* Clear is always laid out so the row keeps its scaled height; it is hidden until a step is placed.
+              borderWidth 0 drops the disabled border, so hidden and shown Clear have the same box. */}
           <View
             pointerEvents={showClear ? 'auto' : 'none'}
             accessibilityElementsHidden={!showClear}
             importantForAccessibility={showClear ? 'auto' : 'no-hide-descendants'}
             style={{ opacity: showClear ? 1 : 0, marginRight: -space[4] }}
           >
-            <Button variant="ghost" onPress={clear} disabled={!showClear}>Clear</Button>
+            <Button variant="ghost" onPress={clear} disabled={!showClear} style={{ borderWidth: 0 }}>Clear</Button>
           </View>
         </View>
         <View accessible={false} accessibilityLabel={item.stem} style={{ gap: space[3] }}>

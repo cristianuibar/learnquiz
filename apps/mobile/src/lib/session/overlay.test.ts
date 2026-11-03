@@ -1,5 +1,5 @@
 import type { Reveal } from '@learnquiz/api'
-import { canAdvance, canLoadSession, initialOverlay, noticeFor, overlayStep, pickedOptionIds, revealMarks, type OverlayAction, type OverlayState } from './overlay'
+import { canAdvance, canLoadSession, initialOverlay, noticeFor, overlayStep, pickedOptionIds, reportAvailable, revealMarks, type OverlayAction, type OverlayState } from './overlay'
 
 function run(actions: OverlayAction[], from: OverlayState = initialOverlay) {
   let state = from
@@ -13,7 +13,7 @@ function run(actions: OverlayAction[], from: OverlayState = initialOverlay) {
 }
 
 test('the overlay opens on the result with focus on the band', () => {
-  expect(initialOverlay).toEqual({ mode: 'result', focus: 'band', reflection: '', reported: false })
+  expect(initialOverlay).toEqual({ mode: 'result', focus: 'band', reflection: '', reported: false, submittedWhy: null })
 })
 
 test('Report swaps to the report content with focus on its heading', () => {
@@ -22,7 +22,7 @@ test('Report swaps to the report content with focus on its heading', () => {
 
 test('Back from Report returns to the result with focus on the Report link', () => {
   expect(run([{ type: 'report' }, { type: 'back' }])).toEqual({
-    state: { mode: 'result', focus: 'report', reflection: '', reported: false },
+    state: { mode: 'result', focus: 'report', reflection: '', reported: false, submittedWhy: null },
     advances: [],
   })
 })
@@ -48,7 +48,7 @@ test('an empty reflection sends no why', () => {
 
 test('a sent report advances the session once and returns to the result', () => {
   const { state, advances } = run([{ type: 'reflection', text: 'why' }, { type: 'report' }, { type: 'sent' }])
-  expect(state).toEqual({ mode: 'result', focus: 'band', reflection: 'why', reported: true })
+  expect(state).toEqual({ mode: 'result', focus: 'band', reflection: 'why', reported: true, submittedWhy: 'why' })
   expect(advances).toEqual([{ why: 'why', reported: true }])
 })
 
@@ -76,6 +76,41 @@ test('Continue retries keep the report flag after a send', () => {
 
 test('Continue does nothing while Report is showing', () => {
   expect(run([{ type: 'report' }, { type: 'continue' }]).advances).toEqual([])
+})
+
+test('a retry after a failed Continue sends the first why, even after the reflection is edited', () => {
+  const { state, advances } = run([
+    { type: 'reflection', text: ' I mixed up the steps ' },
+    { type: 'continue' },
+    { type: 'reflection', text: 'Something else entirely' },
+    { type: 'continue' },
+  ])
+  expect(state.reflection).toBe('Something else entirely')
+  expect(advances).toEqual([{ why: 'I mixed up the steps', reported: false }, { why: 'I mixed up the steps', reported: false }])
+})
+
+test('a retry after a Continue with no reflection still sends no why', () => {
+  expect(run([{ type: 'continue' }, { type: 'reflection', text: 'Added later' }, { type: 'continue' }]).advances)
+    .toEqual([{ reported: false }, { reported: false }])
+})
+
+test('a report sent after a failed Continue keeps the first why', () => {
+  expect(run([
+    { type: 'reflection', text: 'first' },
+    { type: 'continue' },
+    { type: 'reflection', text: 'second' },
+    { type: 'report' },
+    { type: 'sent' },
+  ]).advances).toEqual([{ why: 'first', reported: false }, { why: 'first', reported: true }])
+})
+
+test.each([
+  ['on the result while idle', initialOverlay, false, true],
+  ['while Continue is pending', initialOverlay, true, false],
+  ['after a report was sent', { ...initialOverlay, reported: true }, false, false],
+  ['while Report is showing', { ...initialOverlay, mode: 'report' as const }, false, false],
+])('Report availability %s', (_case, state, busy, available) => {
+  expect(reportAvailable(state, busy)).toBe(available)
 })
 
 test.each([
