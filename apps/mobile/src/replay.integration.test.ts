@@ -22,6 +22,11 @@ jest.mock('expo-router', () => {
   Stack.Protected = ({ guard, children }: { guard: boolean; children: unknown }) => guard ? children : null
   return { Stack, useRouter: () => ({ replace: mockReplace }) }
 })
+jest.mock('expo-notifications', () => ({
+  DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
+  getLastNotificationResponseAsync: jest.fn(async () => null),
+  addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+}))
 jest.mock('react-native-gesture-handler', () => ({ GestureHandlerRootView: 'View' }))
 jest.mock('react-native-safe-area-context', () => ({ SafeAreaProvider: 'View' }))
 jest.mock('react-native-keyboard-controller', () => ({ KeyboardProvider: 'View' }))
