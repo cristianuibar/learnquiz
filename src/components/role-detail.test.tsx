@@ -40,6 +40,7 @@ it('shows a role with its documents and concepts and saves the Critical toggle',
     expect(container.textContent).toContain('Cash float')
     expect(container.textContent).toContain('Card reader')
     expect(container.textContent).toContain('1 of 2 concepts done')
+    expect(container.textContent).toContain('Training: Preparing training')
     expect(getRoleDetail).toHaveBeenCalledWith({ data: { slug: 'x', roleId: 'r1' } })
     const before = vi.mocked(getRoleDetail).mock.calls.length
     const box = container.querySelector<HTMLInputElement>('input[type="checkbox"]')!
