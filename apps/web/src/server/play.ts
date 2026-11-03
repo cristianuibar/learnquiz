@@ -52,6 +52,7 @@ const readPlan = (s: SessionRow) => JSON.parse(s.planJson ?? '{}') as PlacementP
 const batch = (db: Db, stmts: Stmt[]) => db.batch(stmts as [Stmt, ...Stmt[]])
 // The longest grading call (the model client's 120 s timeout) plus slack.
 const CLAIM_TTL = 150_000
+const ROLE_UNGRADED = Symbol('role topic')
 
 // INSERT ... SELECT of one row that is written only while `when` holds. Every column must be set.
 function insertIf<T extends SQLiteTable>(db: Db, table: T, when: SQL, row: T['$inferInsert']) {
@@ -235,7 +236,8 @@ export const startSession = createServerFn({ method: 'POST' })
         .select({ row: learnerItem, conceptId: items.conceptId })
         .from(learnerItem)
         .innerJoin(items, eq(items.id, learnerItem.itemId))
-        .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topic.id), eq(items.status, 'active'))),
+        .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topic.id), eq(items.status, 'active'),
+          topic.jobRoleId !== null ? ne(items.format, 'short') : undefined)),
       loadFrontier(db, learnerId, topic.id),
     ])
     const targetDifficulty = targetFor(lt.level)
@@ -252,20 +254,18 @@ export const startSession = createServerFn({ method: 'POST' })
     // Seen items come back through the due list, not as fresh frontier questions.
     const top = frontier.slice(0, 4)
     // Anything practisable stored starts the session at once (a shorter one is fine); prepareNextSession tops up during play.
-    // Role questions are built once per concept by the company queue; a role session only plays what is stored.
-    const role = topic.jobRoleId !== null
-    const storedRows = top.length && !role
-      ? await db.select().from(items).where(and(eq(items.topicId, topic.id), inArray(items.conceptId, top.map((f) => f.concept.id)), eq(items.status, 'active')))
+    const storedRows = top.length
+      ? await db.select().from(items).where(and(eq(items.topicId, topic.id), inArray(items.conceptId, top.map((f) => f.concept.id)), eq(items.status, 'active'),
+        topic.jobRoleId !== null ? ne(items.format, 'short') : undefined))
       : []
-    const stored = role
-      ? await Promise.all(top.map((f) => storedItems(db, topic.id, f.concept.id)))
-      : top.map((f) => storedRows.filter((r) => r.conceptId === f.concept.id).map(asItem))
+    const stored = top.map((f) => storedRows.filter((r) => r.conceptId === f.concept.id).map(asItem))
     const storedFresh = stored.flat().filter((it) => !seen.has(it.id)).length
-    // Generation runs only when nothing is due, so a daily-cap refusal has no stored reviews to fall back on.
-    const generated = role || due.length + storedFresh > 0 ? stored
+    // Role questions are built once per concept by the company queue; a role session only plays what is stored (#40).
+    // A personal topic generates only when nothing is due, so a daily-cap refusal has no stored reviews to fall back on.
+    const generated = topic.jobRoleId !== null || due.length + storedFresh > 0 ? stored
       : await Promise.all(top.map((f) => ensureConceptItems(db, learnerId, f.concept, topic, { targetDifficulty, unseen: seen, sessionId })))
     // A role topic cannot generate more, so with nothing due or fresh it replays its stored questions ahead of schedule.
-    const replay = role && due.length + storedFresh === 0
+    const replay = topic.jobRoleId !== null && due.length + storedFresh === 0
     const frontierInput = top.map((f, i) => ({
       conceptId: f.concept.id,
       unitOrder: f.unitOrder,
@@ -367,8 +367,6 @@ export const startSession = createServerFn({ method: 'POST' })
 
 // Generates the frontier's items ahead so the next session starts without waiting on the model.
 async function topUpFrontier(db: Db, learnerId: string, topic: TopicRow, reserved: string[], placing: boolean) {
-  // Role questions come only from the company queue.
-  if (topic.jobRoleId !== null) return
   const [{ level }, seenRows, frontier] = await Promise.all([
     loadLearnerTopic(db, learnerId, topic.id),
     db
@@ -395,6 +393,8 @@ export const prepareNextSession = createServerFn({ method: 'POST' })
     const learnerId = await requireLearnerId()
     const db = getDb()
     const { session, topic } = await loadSession(db, learnerId, data.sessionId)
+    // Role questions are built by the company queue, never per learner (#40).
+    if (topic.jobRoleId !== null) return { ok: true as const }
     const reserved = session.kind === 'session' ? (JSON.parse(session.itemIdsJson) as string[]) : []
     await topUpFrontier(db, learnerId, topic, reserved, session.kind === 'placement' && session.endedAt === null)
     return { ok: true as const }
@@ -507,7 +507,7 @@ export const answerItem = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<Reveal> => {
     const learnerId = await requireLearnerId()
     const db = getDb()
-    const { session } = await loadSession(db, learnerId, data.sessionId)
+    const { session, topic } = await loadSession(db, learnerId, data.sessionId)
     if (session.endedAt !== null) throw httpError('This session has ended', 409)
     const plan = readPlan(session)
     const ids = JSON.parse(session.itemIdsJson) as string[]
@@ -562,6 +562,8 @@ export const answerItem = createServerFn({ method: 'POST' })
     let shortGrade: Grade | undefined
     if (payload.format === 'short') {
       try {
+        // Role topics play without any model call, so their short answers are revealed ungraded.
+        if (topic.jobRoleId !== null) throw ROLE_UNGRADED
         shortGrade = await chatJson({
           purpose: 'grade',
           schema: Grade,
@@ -575,7 +577,7 @@ export const answerItem = createServerFn({ method: 'POST' })
         grade.correct = shortGrade.score >= 0.8
       } catch (e) {
         const capped = e instanceof DailyCapError
-        if (!capped) console.error('short answer grading failed, revealing model answer', e instanceof Error ? e.message : e)
+        if (!capped && e !== ROLE_UNGRADED) console.error('short answer grading failed, revealing model answer', e instanceof Error ? e.message : e)
         // Advance without recording a wrong answer or changing mastery, scheduling or XP.
         const [kept] = await db
           .update(sessions)

@@ -21,6 +21,7 @@ export function ConceptDiagram({ conceptId }: { conceptId: string }) {
   }, [conceptId, generate, retry])
 
   if (result?.status === 'disabled') return null
+  if (result?.status === 'unavailable') return <p role="status" className="mt-4 text-sm text-muted-foreground">No diagram yet.</p>
   return (
     <div className="mt-4">
       {result?.status === 'ready' ? (

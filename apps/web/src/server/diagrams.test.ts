@@ -143,7 +143,7 @@ it.each([null, 'other-learner'])('refuses generation and media access for %s', a
   expect(boundary.env.MEDIA.put).toHaveBeenCalledTimes(1)
 })
 
-it('lets an assigned employee generate and view a shared role diagram, and refuses an unassigned user', async () => {
+it('never generates a shared role diagram for an employee, serves a stored one, and refuses an unassigned user', async () => {
   const run = (sql: string, ...args: (string | number | null)[]) => raw.prepare(sql).run(...args)
   for (const id of ['employee', 'stranger']) run('INSERT INTO user (id, name, email) VALUES (?, ?, ?)', id, id, `${id}@example.test`)
   run('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, ?)', 'org', 'Northwind', 'northwind', 1)
@@ -155,15 +155,22 @@ it('lets an assigned employee generate and view a shared role diagram, and refus
   run('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary, visual) VALUES (?, ?, ?, ?, ?, ?, ?)', 'role-concept', 'role-topic', 'role-unit', 0, 'Dispatch an order', 'Check stock, pack, dispatch.', 1)
 
   boundary.learnerId = 'employee'
+  expect(await generateConceptDiagram({ data: { conceptId: 'role-concept' } })).toEqual({ status: 'unavailable' })
+  expect(raw.prepare("SELECT count(*) AS n FROM model_calls").get()).toEqual({ n: 0 })
+  expect(fetchModel).not.toHaveBeenCalled()
+  expect(boundary.env.MEDIA.put).not.toHaveBeenCalled()
+
+  // A diagram the company side already stored is served to the assigned employee.
+  await boundary.env.MEDIA.put('concepts/role-concept/diagram.png', new Uint8Array([1, 2, 3]))
+  run('UPDATE concepts SET image_key = ?, image_alt = ? WHERE id = ?', 'concepts/role-concept/diagram.png', 'Dispatch an order', 'role-concept')
   expect(await generateConceptDiagram({ data: { conceptId: 'role-concept' } })).toMatchObject({ status: 'ready' })
   expect((await serveConceptDiagram('role-concept')).status).toBe(200)
-  expect(row("SELECT topic_id, learner_id FROM model_calls WHERE purpose = 'diagram'")).toEqual({ topic_id: 'role-topic', learner_id: 'employee' })
-  expect(fetchModel).toHaveBeenCalledTimes(1)
+  expect(fetchModel).not.toHaveBeenCalled()
 
   boundary.learnerId = 'stranger'
   await expect(generateConceptDiagram({ data: { conceptId: 'role-concept' } })).rejects.toMatchObject({ status: 404, message: 'Concept not found' })
   expect((await serveConceptDiagram('role-concept')).status).toBe(404)
-  expect(fetchModel).toHaveBeenCalledTimes(1)
+  expect(fetchModel).not.toHaveBeenCalled()
 })
 
 it('does not generate for nonvisual concepts, local models, or capped learners', async () => {

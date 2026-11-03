@@ -1,4 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
+import type { DisclosureAccepted } from '@learnquiz/api'
 import { and, asc, eq, isNull } from 'drizzle-orm'
 import { getDb } from '@/db'
 import { member, organization } from '@/db/auth-schema'
@@ -49,7 +50,7 @@ export const getSessionFn = createServerFn({ method: 'GET' }).handler(
 )
 
 // Returns the assigned role's ready topic so the invite flow can land on the training path.
-export const acceptDisclosure = createServerFn({ method: 'POST' }).handler(async (): Promise<{ roleTopicId: string | null }> => {
+export const acceptDisclosure = createServerFn({ method: 'POST' }).handler(async (): Promise<DisclosureAccepted> => {
   const user = await getSessionUser()
   if (!user || user.isAnonymous) throw httpError('Sign in first', 401)
   const db = getDb()
