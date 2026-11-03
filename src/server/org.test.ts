@@ -108,7 +108,7 @@ it('backfills one draft topic per existing role and preserves personal topics', 
 it.each(['owner', 'admin'])('%s creates and lists roles with defaults or custom targets in their own company', async (id) => {
   vi.mocked(getSessionUser).mockResolvedValue({ id } as never)
   const role = await createRole({ data: { slug: 'alpha', name: 'Support specialist' } })
-  const custom = await createRole({ data: { slug: 'alpha', name: 'Team lead', benchmark: 0.9, onboardingDays: 45 } })
+  const custom = await createRole({ data: { slug: 'alpha', name: 'Team lead', benchmark: 90, onboardingDays: 45 } })
   const org = await listRoles({ data: { slug: 'alpha' } })
   expect(org).toMatchObject({ name: 'Alpha', slug: 'alpha' })
   expect(org.roles).toHaveLength(3)
@@ -184,6 +184,14 @@ it('rolls back the role when its draft topic cannot be stored', async () => {
   sqlite.exec("CREATE TEMP TRIGGER reject_topic BEFORE INSERT ON topics WHEN NEW.title = 'Unavailable' BEGIN SELECT RAISE(ABORT, 'Topic unavailable'); END")
   await expect(createRole({ data: { slug: 'alpha', name: 'Unavailable' } })).rejects.toThrow()
   expect(sqlite.prepare('SELECT id FROM job_roles WHERE name = ?').all('Unavailable')).toEqual([])
+})
+
+it('stores a whole-percentage benchmark as a fraction and rejects decimals as a field error', async () => {
+  const role = await createRole({ data: { slug: 'alpha', name: 'Cashier', benchmark: 85 } })
+  expect(sqlite.prepare('SELECT benchmark FROM job_roles WHERE id = ?').get(role.id)).toEqual({ benchmark: 0.85 })
+  const decimal = await (async () => createRole({ data: { slug: 'alpha', name: 'Decimal', benchmark: 85.5 } }))().catch((e: unknown) => e)
+  expect(fieldErrors(decimal)).toEqual({ benchmark: 'Enter a whole percentage from 50 to 100' })
+  expect(sqlite.prepare('SELECT id FROM job_roles WHERE name = ?').all('Decimal')).toEqual([])
 })
 
 it('turns a whitespace-only role name into a friendly message and per-field error', async () => {
