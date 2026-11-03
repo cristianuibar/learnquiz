@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { View, type Text as NativeText } from 'react-native'
 import { useKeyboardState } from 'react-native-keyboard-controller'
-import { useIsFocused, useLocalSearchParams, useRouter, type Href } from 'expo-router'
+import { useIsFocused, useLocalSearchParams } from 'expo-router'
 import { AccountForm, type AccountFormValues } from '@/components/account-form'
 import { Mark } from '@/components/ui/Mark'
 import { Screen, useHeadingFocus } from '@/components/ui/Screen'
 import { Text } from '@/components/ui/Text'
 import { api } from '@/lib/api'
 import { acceptInvitation, signIn, signUp, subscribeAuth } from '@/lib/auth'
-import { peekHeldTarget, takeHeldTarget } from '@/lib/held-target'
 import { useSession } from '@/lib/session-store'
 import { createSignInFlow, type SignInState } from '@/lib/sign-in'
 import { useReplayHold } from '@/lib/use-replay-hold'
@@ -26,7 +25,6 @@ export default function SignInScreen() {
   const { space } = useTheme()
   const session = useSession()
   const { refresh } = session
-  const router = useRouter()
   const focused = useIsFocused()
   const holdReplay = useReplayHold()
   const keyboardVisible = useKeyboardState((state) => state.isVisible)
@@ -42,9 +40,6 @@ export default function SignInScreen() {
     const next = createSignInFlow(accountApi, {
       refresh,
       holdReplay,
-      peekHeldTarget,
-      takeHeldTarget,
-      replace: (target) => router.replace(target as Href),
       changed: setState,
       settled: () => setSettled((count) => count + 1),
     })
@@ -58,7 +53,7 @@ export default function SignInScreen() {
       next.dispose()
       flow.current = null
     }
-  }, [refresh, holdReplay, router])
+  }, [refresh, holdReplay])
 
   useEffect(() => { flow.current?.update({ focused, session }) }, [focused, session, settled])
 

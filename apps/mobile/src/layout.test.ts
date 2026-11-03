@@ -21,7 +21,7 @@ jest.mock('expo-router', () => {
   const Stack = ({ children }: { children: unknown }) => React.createElement(Text, null, children)
   Stack.Screen = ({ name }: { name: string }) => React.createElement(Text, null, name)
   Stack.Protected = ({ guard, children }: { guard: boolean; children: unknown }) => guard ? children : null
-  return { Stack, useRouter: () => ({ replace: mockReplace }) }
+  return { Stack, useRouter: () => ({ replace: mockReplace }), usePathname: () => '/settings' }
 })
 jest.mock('expo-notifications', () => ({
   DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',

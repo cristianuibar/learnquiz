@@ -1,14 +1,11 @@
 import { networkError } from '@learnquiz/api/system-copy'
-import { createJoinFlow, decideJoinNavigation, signInFailed, type GateState, type JoinApi, type JoinOutcome } from './join'
+import { createJoinFlow, signInFailed, type GateState, type JoinApi, type JoinOutcome } from './join'
 
 export type SignInState = { busy: boolean; error: string | null }
 
 type Effects = {
   refresh(): Promise<void>
   holdReplay(): void
-  peekHeldTarget(): string | null
-  takeHeldTarget(): string | null
-  replace(target: string): void
   changed(state: SignInState): void
   settled(): void
 }
@@ -31,27 +28,15 @@ export function createSignInFlow(api: JoinApi, effects: Effects) {
     if (!mounted || !focused || !pending) return
     const { token, outcome } = pending
     if (!account.isLive(token)) { pending = null; return }
-    if (outcome.kind === 'error') {
+    if (outcome.kind === 'error' || session.status === 'signedOut') {
       pending = null
-      state = { busy: false, error: outcome.message }
+      state = { busy: false, error: outcome.kind === 'error' ? outcome.message : networkError }
       publish()
       return
     }
-    const decision = decideJoinNavigation(outcome, {
-      live: account.isLive(token), focused, session, held: effects.peekHeldTarget(),
-    })
-    if (decision.kind === 'keep') return
-    pending = null
-    if (decision.kind === 'drop') return
-    if (decision.kind === 'offline') {
-      state = { busy: false, error: networkError }
-      publish()
-      return
-    }
-    // Consume only an openable held link, while replay is still held. Leaving
-    // the screen releases replay so the layout can handle any remaining link.
-    if (decision.takesHeld) effects.takeHeldTarget()
-    effects.replace(decision.target)
+    // Ready removes the protected auth screen. index then owns the destination;
+    // this flow never consumes a held link or tries to navigate after unmount.
+    if (session.status === 'ready') pending = null
   }
 
   return {
@@ -79,7 +64,7 @@ export function createSignInFlow(api: JoinApi, effects: Effects) {
         if (!live()) return
       }
       pending = { token, outcome }
-      // Let the screen commit the refreshed session before deciding navigation.
+      // Let the screen commit the refreshed store before reporting an offline error.
       // A blurred screen picks up this pending result when it regains focus.
       if (focused) effects.settled()
     },
