@@ -7,7 +7,7 @@ import type { ItemPayload } from '@/lib/llm/schemas'
 const holder = vi.hoisted(() => ({ db: null as unknown, learnerId: 'u1' }))
 vi.mock('@/db', () => ({ getDb: () => holder.db }))
 vi.mock('@/server/session', () => ({ requireLearnerId: async () => holder.learnerId }))
-vi.mock('cloudflare:workers', () => ({ env: {
+vi.mock('cloudflare:workers', () => ({ waitUntil: () => {}, env: {
   LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://llm.example/v1', LLM_MODEL: 'muse-spark-1.3',
 } }))
 // Keep validation, handlers, the model client and database writes real; replace

@@ -3,13 +3,13 @@ import { DatabaseSync } from 'node:sqlite'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 
-const holder = vi.hoisted(() => ({ db: null as unknown, learnerId: 'u1' as string | null }))
+const holder = vi.hoisted(() => ({ db: null as unknown, learnerId: 'u1' as string | null, pending: [] as Promise<unknown>[] }))
 vi.mock('@/db', () => ({ getDb: () => holder.db }))
 vi.mock('@/server/session', () => ({ requireLearnerId: async () => {
   if (!holder.learnerId) throw Object.assign(new Error('Sign in first'), { status: 401 })
   return holder.learnerId
 } }))
-vi.mock('cloudflare:workers', () => ({ env: {
+vi.mock('cloudflare:workers', () => ({ waitUntil: (p: Promise<unknown>) => { holder.pending.push(p) }, env: {
   LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://llm.example', LLM_MODEL: 'muse-spark-1.3',
 } }))
 // Keep validation, handlers, SQL, model retries and logging real; replace only
@@ -137,12 +137,13 @@ it.each(['placement', 'session'] as const)('traces real %s startup generation, r
     raw.prepare('UPDATE sessions SET plan_json = ? WHERE id = ?').run(JSON.stringify(plan), sessionId)
   }
   const summary = await endSession({ data: { sessionId } })
+  await Promise.all(holder.pending.splice(0))
   getEnv().LLM_MODEL = 'a-different-model'
   expect(path.topic.generatedBy).toBe('muse-wonder-1.0')
   expect((await getSession({ data: { sessionId } })).ended).toBe(true)
   expect(view.item?.generatedBy).toBe('muse-wonder-1.0')
   const stored = raw.prepare('SELECT generated_by FROM items WHERE concept_id = ?').all(view.item!.conceptId) as { generated_by: string }[]
-  expect(stored.map((i) => i.generated_by)).toEqual(Array(6).fill('muse-wonder-1.0'))
+  expect(stored.map((i) => i.generated_by)).toEqual(Array(kind === 'placement' ? 6 : 12).fill('muse-wonder-1.0'))
   if (kind === 'placement') {
     expect(summary.levelLineModel).toBe('muse-wonder-1.0')
     expect((await getTopicPath({ data: { topicId } })).learner.levelLineModel).toBe('muse-wonder-1.0')
@@ -157,5 +158,5 @@ it.each(['placement', 'session'] as const)('traces real %s startup generation, r
   const total = raw.prepare('SELECT SUM(cost_usd) AS cost FROM model_calls WHERE session_id = ?').get(sessionId) as { cost: number }
   expect(trace.totalCostUsd).toBe(trace.calls.reduce((sum, c) => sum + (c.costUsd ?? 0), 0))
   expect(trace.totalCostUsd).toBeCloseTo(total.cost, 12)
-  expect((await getModelTrace({ data: { scope: 'topic', topicId } })).calls).toHaveLength(kind === 'placement' ? 8 : 10)
+  expect((await getModelTrace({ data: { scope: 'topic', topicId } })).calls).toHaveLength(kind === 'placement' ? 14 : 12)
 })

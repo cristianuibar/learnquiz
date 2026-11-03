@@ -17,6 +17,7 @@ import { gradePrompt } from '@/lib/llm/prompts'
 import { Grade, type ItemPayload } from '@/lib/llm/schemas'
 import { validateVoiceWav } from '@/lib/voice'
 import { chunks, ensureConceptItems, httpError, loadPKnown, mean, targetFor } from '@/server/helpers'
+import { runInBackground } from '@/server/env'
 import { requireLearnerId } from '@/server/session'
 import { assertWithinDailyCap } from '@/server/model-cap'
 
@@ -345,8 +346,26 @@ export const startSession = createServerFn({ method: 'POST' })
       planJson: JSON.stringify(plan),
       startedAt: now.getTime(),
     })
+    // This session's items count as used, so concepts it exhausts are topped up while the learner plays.
+    runInBackground(prepareNextSession(db, learnerId, topic, queue))
     return { sessionId }
   })
+
+// Generates the frontier's items ahead so the next session starts without waiting on the model.
+async function prepareNextSession(db: Db, learnerId: string, topic: TopicRow, reserved: string[]) {
+  const [lt, seenRows, frontier] = await Promise.all([
+    loadLearnerTopic(db, learnerId, topic.id),
+    db
+      .select({ itemId: learnerItem.itemId })
+      .from(learnerItem)
+      .innerJoin(items, eq(items.id, learnerItem.itemId))
+      .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topic.id), eq(items.status, 'active'))),
+    loadFrontier(db, learnerId, topic.id),
+  ])
+  const seen = new Set([...seenRows.map((r) => r.itemId), ...reserved])
+  const targetDifficulty = targetFor(lt.level)
+  await Promise.all(frontier.slice(0, 4).map((f) => ensureConceptItems(db, learnerId, f.concept, topic, { targetDifficulty, unseen: seen })))
+}
 
 export const startMiniSession = createServerFn({ method: 'POST' })
   .validator(z.object({ itemId: z.string().min(1), pushId: z.string().min(1).optional() }))
@@ -827,6 +846,8 @@ async function finalise(db: Db, learnerId: string, session: SessionRow, topic: T
       .where(and(eq(sessions.id, session.id), isNull(sessions.endedAt))),
   )
   await batch(db, stmts)
+  // Placement seeds the frontier; a finished session retries a top-up that waitUntil's ~30 s window cut short.
+  if (!('log' in plan) || plan.log.length) runInBackground(prepareNextSession(db, learnerId, topic, []))
 }
 
 async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: TopicRow): Promise<SummaryView> {

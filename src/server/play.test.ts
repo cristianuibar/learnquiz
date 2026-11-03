@@ -9,7 +9,7 @@ import { requireLearnerId } from '@/server/session'
 // Only external boundaries are faked: the server-fn transport, auth, model HTTP
 // (the client for older placement/generation tests) and Cloudflare bindings. Handlers run for real
 // against an in-memory SQLite database speaking the drizzle proxy protocol.
-const holder = vi.hoisted(() => ({ db: null as unknown }))
+const holder = vi.hoisted(() => ({ db: null as unknown, pending: [] as Promise<unknown>[] }))
 
 vi.mock('@tanstack/react-start', () => ({
   createServerFn: () => ({
@@ -34,7 +34,7 @@ vi.mock('@/lib/llm/client', async (importOriginal) => {
 })
 
 
-vi.mock('cloudflare:workers', () => ({ env: { LLM_PROFILE: 'ollama', LLM_MODEL: 'muse-spark-1.3', LLM_BASE_URL: 'https://llm.example/v1' } }))
+vi.mock('cloudflare:workers', () => ({ waitUntil: (p: Promise<unknown>) => { holder.pending.push(p) }, env: { LLM_PROFILE: 'ollama', LLM_MODEL: 'muse-spark-1.3', LLM_BASE_URL: 'https://llm.example/v1' } }))
 
 import { answerItem, endSession, getSession, nextItem, startMiniSession, startPlacement, startSession } from './play'
 import { getEnv } from '@/server/env'
@@ -607,4 +607,36 @@ it('writes exactly one placement when two finishing nextItem calls race (placeme
   const summary = await endSession({ data: { sessionId: 's1' } })
   expect(summary.level).toBe(4)
   expect(summary.levelLine).toBe('You know the basics and will grow from here.')
+})
+
+it('generates the next concepts\' items in the background after placement so the first session makes no item calls', async () => {
+  seedTopicAndLearner(raw, 0)
+  raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un1', 't1', 0, 'Basics')
+  const concept = raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)')
+  concept.run('c1', 't1', 'un1', 0, 'Variables', '')
+  concept.run('c2', 't1', 'un1', 1, 'Equations', '')
+  const payload = { format: 'cloze', stem: 'Solve x + 1 = 2: x = ____.', options: [], accepted_answers: ['1'], model_answer: '1', explanation: 'Subtract 1.', difficulty: 3, source_quote: null, grounded: false, bloom: 'apply' }
+  raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run('i1', 'c1', 't1', 'cloze', JSON.stringify(payload), 3, 1)
+  const log = Array.from({ length: 8 }, () => ({ itemId: 'i1', correct: false, confidence: 'sure' as const, level: 1 }))
+  raw.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, item_ids_json, plan_json, started_at, correct_count, xp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run('p1', 'u1', 't1', 'placement', JSON.stringify(['i1']), JSON.stringify({ position: 7, answered: true, workingLevel: 1, log, pool: [{ id: 'i1', conceptId: 'c1', difficulty: 3 }], lastAttemptId: 'a1' }), 1, 0, 0)
+  const base = vi.mocked(chatJson).getMockImplementation()!
+  const batch = Array.from({ length: 6 }, (_, i) => ({ ...payload, stem: `Solve x + ${i} = ${i + 1}: x = ____.` }))
+  vi.mocked(chatJson).mockImplementation(async (opts) => opts.purpose === 'items' ? { items: batch }
+    : opts.purpose === 'self_check' ? { results: batch.map((_, index) => ({ index, keep: true, reasons: [] })) } : base(opts))
+  onTestFinished(() => { vi.mocked(chatJson).mockImplementation(base) })
+  const itemCalls = () => vi.mocked(chatJson).mock.calls.filter(([o]) => o.purpose === 'items').length
+
+  expect((await nextItem({ data: { sessionId: 'p1' } })).ended).toBe(true)
+  await Promise.all(holder.pending.splice(0))
+  expect(scalar(raw, "SELECT COUNT(*) AS n FROM items WHERE concept_id = 'c2'").n).toBe(6)
+  const before = itemCalls()
+
+  const { sessionId } = await startSession({ data: { topicId: 't1' } })
+  expect(itemCalls() - before).toBe(0)
+  const queue = JSON.parse(scalar(raw, 'SELECT item_ids_json AS ids FROM sessions WHERE id = ?', sessionId).ids as string) as string[]
+  expect(queue).toHaveLength(12)
+  expect(new Set(queue).size).toBe(12)
+  await Promise.all(holder.pending.splice(0))
 })

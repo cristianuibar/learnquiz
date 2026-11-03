@@ -114,8 +114,8 @@ function Start() {
         </form>
       ) : (
         <div className="flex flex-col gap-3">
-          <Working label="Building your curriculum" done={status === 'questions'} />
-          {status === 'questions' && <Working label="Writing your first questions" />}
+          <Working label="Building your curriculum" seconds={60} done={status === 'questions'} />
+          {status === 'questions' && <Working label="Writing your first questions" seconds={45} />}
         </div>
       )}
     </main>
