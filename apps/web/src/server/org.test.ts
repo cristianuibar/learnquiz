@@ -195,6 +195,25 @@ it('reports assigned training stages, unresolved critical errors and company pro
   expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { employees: 3, proficientEmployees: 0, daysToProficiency: null, criticalErrorsThisWeek: 1, documentsToReview: null } })
 })
 
+it('ignores concepts of a retired document when deciding an employee is proficient', async () => {
+  sqlite.prepare("UPDATE topics SET status = 'ready' WHERE job_role_id = 'legacy-role'").run()
+  const topic = sqlite.prepare('SELECT id FROM topics WHERE job_role_id = ?').get('legacy-role')!.id as string
+  sqlite.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES (?, ?, ?, ?)').run('member', 'org-a', 'legacy-role', 1)
+  const source = sqlite.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, created_at, retired_at) VALUES (?, ?, 'text', ?, '', 1, ?)")
+  source.run('live-doc', topic, 'Live handbook', null)
+  source.run('old-doc', topic, 'Retired handbook', 2)
+  const concept = sqlite.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary, critical, source_id) VALUES (?, ?, ?, 0, ?, ?, ?, ?)')
+  concept.run('live-critical', topic, 'warehouse', 'Scan each item', '', 1, 'live-doc')
+  concept.run('live-other', topic, 'warehouse', 'Read the pick ticket', '', 0, 'live-doc')
+  concept.run('dead-critical', topic, 'warehouse', 'Old forklift rule', '', 1, 'old-doc')
+  const known = sqlite.prepare('INSERT INTO learner_concept (learner_id, concept_id, p_known, updated_at) VALUES (?, ?, ?, 1)')
+  known.run('member', 'live-critical', 0.95)
+  known.run('member', 'live-other', 0.9)
+  const people = await getPeople({ data: { slug: 'alpha' } })
+  expect(people.members.find((m) => m.name === 'member')!.training).toEqual({ stage: 'proficient', progress: 1, daysToProficiency: null, criticalConfidentErrors: 0 })
+  expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { employees: 1, proficientEmployees: 1 } })
+})
+
 it('rolls back the role when its draft topic cannot be stored', async () => {
   sqlite.exec("CREATE TEMP TRIGGER reject_topic BEFORE INSERT ON topics WHEN NEW.title = 'Unavailable' BEGIN SELECT RAISE(ABORT, 'Topic unavailable'); END")
   await expect(createRole({ data: { slug: 'alpha', name: 'Unavailable' } })).rejects.toThrow()
