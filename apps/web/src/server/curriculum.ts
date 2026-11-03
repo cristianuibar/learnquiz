@@ -144,6 +144,7 @@ export const getTopicPath = createServerFn({ method: 'GET' })
       db
         .select({ conceptId: items.conceptId, n: count() })
         .from(items)
+        .innerJoin(learnerItem, and(eq(learnerItem.itemId, items.id), eq(learnerItem.learnerId, learnerId)))
         .where(and(eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId)))
         .groupBy(items.conceptId),
       db
@@ -164,7 +165,7 @@ export const getTopicPath = createServerFn({ method: 'GET' })
     ])
     const pKnown = new Map(known.map((r) => [r.conceptId, r.pKnown]))
     const attempted = new Set(known.filter((r) => r.nAttempts > 0).map((r) => r.conceptId))
-    const itemCount = new Map(counts.map((c) => [c.conceptId, c.n]))
+    const answeredCount = new Map(counts.map((c) => [c.conceptId, c.n]))
     return {
       topic,
       preparing,
@@ -190,7 +191,7 @@ export const getTopicPath = createServerFn({ method: 'GET' })
             visual: c.visual,
             grounded: c.grounded,
             critical: c.critical,
-            itemCount: itemCount.get(c.id) ?? 0,
+            answeredCount: answeredCount.get(c.id) ?? 0,
             pKnown: pKnown.get(c.id) ?? 0,
           }))
         return {
