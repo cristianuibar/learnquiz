@@ -1,0 +1,24 @@
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "tailwindcss";
+@import "@learnquiz/tokens/theme.css";
+
+@layer base {
+  a {
+    color: var(--brand);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  a:hover {
+    color: var(--brand-hover);
+  }
+
+  nav a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--target);
+  }
+}
