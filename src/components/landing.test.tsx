@@ -10,6 +10,7 @@ import { Route as appRootRoute } from '@/routes/__root'
 import { Route as indexRoute } from '@/routes/index'
 import { Route as meRoute } from '@/routes/me.index'
 import { Route as orgRoute } from '@/routes/org.$slug.index'
+import { Route as rolesRoute } from '@/routes/org.$slug.roles'
 import { Route as signInRoute } from '@/routes/sign-in'
 import { Route as startRoute } from '@/routes/start'
 import { Route as welcomeRoute } from '@/routes/welcome'
@@ -95,6 +96,7 @@ async function renderApp(initialEntry = '/sign-in') {
     createRoute({ getParentRoute: () => rootRoute, path: '/start', validateSearch: startRoute.options.validateSearch, component: startRoute.options.component }),
     createRoute({ getParentRoute: () => rootRoute, path: '/me', beforeLoad: meRoute.options.beforeLoad, loader: meRoute.options.loader, component: meRoute.options.component }),
     createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', loader: orgRoute.options.loader, errorComponent: orgRoute.options.errorComponent, component: orgRoute.options.component }),
+    createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug/roles', loader: rolesRoute.options.loader, errorComponent: rolesRoute.options.errorComponent, component: rolesRoute.options.component }),
     createRoute({ getParentRoute: () => rootRoute, path: '/welcome', beforeLoad: welcomeRoute.options.beforeLoad, validateSearch: welcomeRoute.options.validateSearch, component: welcomeRoute.options.component }),
   ]
   const router = createRouter({ routeTree: rootRoute.addChildren(routes), history: createMemoryHistory({ initialEntries: [initialEntry] }) })
@@ -171,5 +173,20 @@ it('requires disclosure before sending an owner to the portal', async () => {
       await vi.waitFor(() => expect(router.state.location.pathname).toBe('/org/northwind'))
     })
     expect(container.querySelector('h1')?.textContent).toBe('Northwind')
+  } finally { await cleanup() }
+})
+
+it('lists job roles without links to pages that do not exist', async () => {
+  sqlite.prepare('INSERT INTO job_roles (id, org_id, name, created_at) VALUES (?, ?, ?, ?)').run('barista', 'northwind', 'Barista', 1)
+  sqlite.prepare('INSERT INTO topics (id, job_role_id, title, created_at) VALUES (?, ?, ?, ?)').run('barista-topic', 'barista', 'Barista', 1)
+  vi.mocked(getSessionUser).mockResolvedValue({ id: 'owner', name: 'Owner', isAnonymous: false } as never)
+  const { container, router, cleanup } = await renderApp('/org/northwind')
+  try {
+    await act(async () => { container.querySelector<HTMLAnchorElement>('a[href="/org/northwind/roles"]')!.click(); await router.load() })
+    expect(container.querySelector('h1')?.textContent).toBe('Job roles')
+    expect(container.querySelector('main li')?.textContent).toContain('Barista')
+    for (const a of container.querySelectorAll<HTMLAnchorElement>('main a')) {
+      expect(router.matchRoutes(a.getAttribute('href')!).at(-1)?.pathname).toBe(a.getAttribute('href'))
+    }
   } finally { await cleanup() }
 })

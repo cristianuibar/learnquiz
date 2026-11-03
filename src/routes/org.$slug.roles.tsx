@@ -47,9 +47,7 @@ function Roles() {
         <ul className="mt-6 flex flex-col gap-3">
           {org.roles.map((role) => (
             <li key={role.id} className="rounded-lg border p-4">
-              <a href={`/org/${encodeURIComponent(org.slug)}/roles/${encodeURIComponent(role.id)}`} className="inline-flex min-h-11 items-center font-medium underline outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
-                {role.name}
-              </a>
+              <p className="font-medium">{role.name}</p>
               <p className="text-sm text-muted-foreground">Benchmark: {Math.round(role.benchmark * 100)}% · Onboarding: {role.onboardingDays} days · {role.topicStatus}</p>
             </li>
           ))}
