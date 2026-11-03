@@ -3,7 +3,7 @@ import { generateConceptDiagram } from '@/server/diagrams'
 import { flagResult } from '@/server/flags'
 import { getInvite } from '@/server/org'
 import { getCompanyBranding } from '@/server/org-settings'
-import { answerItem, endSession, getSession, nextItem, reportItem, startMiniSession, startPlacement, startSession } from '@/server/play'
+import { answerItem, endSession, getSession, nextItem, prepareNextSession, reportItem, startMiniSession, startPlacement, startSession } from '@/server/play'
 import { getProfile } from '@/server/profile'
 import { getPushSettings, savePushPreferences, subscribeExpo, unsubscribe } from '@/server/push'
 import { acceptDisclosure, getSessionFn } from '@/server/session-fn'
@@ -30,6 +30,7 @@ export const v1Routes: V1Route[] = [
   { method: 'POST', pattern: '/sessions/:sessionId/answer', fn: answerItem },
   { method: 'POST', pattern: '/sessions/:sessionId/next', fn: nextItem },
   { method: 'POST', pattern: '/sessions/:sessionId/end', fn: endSession },
+  { method: 'POST', pattern: '/sessions/:sessionId/prepare-next', fn: prepareNextSession },
   { method: 'POST', pattern: '/items/:itemId/report', fn: reportItem },
   { method: 'POST', pattern: '/concepts/:conceptId/diagram', fn: generateConceptDiagram },
   { method: 'GET', pattern: '/topics/:topicId/path', fn: getTopicPath },

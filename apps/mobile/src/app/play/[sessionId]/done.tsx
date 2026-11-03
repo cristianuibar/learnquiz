@@ -4,6 +4,7 @@ import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rou
 import * as Notifications from 'expo-notifications'
 import type { SummaryView } from '@learnquiz/api'
 import { ApiError, api } from '@/lib/api'
+import { placementToPrepare, prepareNext } from '@/lib/prepare-next'
 import { readPromptCounts, recordFinished, shouldPromptOptIn, type PushPermission } from '@/lib/push-prompt'
 import { scoreLine, streakLabel } from '@/lib/summary-format'
 import { useTheme } from '@/theme/ThemeProvider'
@@ -31,6 +32,7 @@ export default function SessionDone() {
   const { space } = useTheme()
   const [state, setState] = useState<State>({ status: 'loading' })
   const finished = useRef<Promise<unknown>>(Promise.resolve())
+  const preparedId = useRef<string | null>(null)
 
   const toToday = useCallback(() => router.dismissTo(TODAY), [router])
 
@@ -69,6 +71,13 @@ export default function SessionDone() {
       })
     return () => controller.abort()
   }, [sessionId, toToday])
+
+  useEffect(() => {
+    const id = placementToPrepare(state.status === 'ready' ? state.summary : null, preparedId.current)
+    if (!id) return
+    preparedId.current = id
+    void prepareNext(id)
+  }, [state])
 
   return (
     <>

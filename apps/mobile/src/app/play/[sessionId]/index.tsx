@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/Button'
 import { useHeadingFocus } from '@/components/ui/Screen'
 import { Text } from '@/components/ui/Text'
 import { api } from '@/lib/api'
+import { prepareNext, sessionToPrepare } from '@/lib/prepare-next'
 import { answerBody, answerError } from '@/lib/session/answer'
 import { deleteDraft, draftForView, writeDraft } from '@/lib/session/draft'
 import { sessionRefetchError, type SessionError } from '@/lib/session/error'
@@ -50,6 +51,7 @@ function ActiveSession({ sessionId }: { sessionId: string }) {
   const startedAt = useRef(Date.now())
   const mounted = useRef(false)
   const leaving = useRef(false)
+  const preparedId = useRef<string | null>(null)
   const dockRef = useRef<View>(null)
   const path = `/sessions/${encodeURIComponent(sessionId)}`
 
@@ -126,6 +128,13 @@ function ActiveSession({ sessionId }: { sessionId: string }) {
       request.current = null
     }
   }, [loadSession])
+
+  useEffect(() => {
+    const id = sessionToPrepare(viewRef.current, preparedId.current, active())
+    if (!id) return
+    preparedId.current = id
+    void prepareNext(id)
+  }, [active, view])
 
   useFocusEffect(useCallback(() => {
     let previousState = AppState.currentState
