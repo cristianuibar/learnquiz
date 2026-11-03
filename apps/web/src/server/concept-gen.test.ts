@@ -180,3 +180,21 @@ it('retries a provider rate limit on the next drain instead of parking it as the
   expect(await drainConceptQueue()).toBe(1)
   expect(states()).toEqual([{ id: 'c00', gen_status: 'ready', gen_error: null }])
 })
+
+it('never stores valid multi or order drafts while those formats are disabled', async () => {
+  raw.exec("DELETE FROM concepts WHERE id <> 'c00'")
+  const steps = (correct: boolean[]) => correct.map((is_correct, i) => ({ id: 'abcd'[i], text: `Step ${i}`, is_correct, feedback: `Why ${i}` }))
+  fetchModel.mockImplementation(async (url, init) => {
+    const schema = JSON.parse(init!.body as string).response_format.json_schema.name
+    if (schema !== 'item_batch') return answerModel(url, init)
+    const items = [
+      { ...item(), format: 'multi', options: steps([true, true, false, false]) },
+      { ...item(), format: 'order', options: steps([true, true, true]) },
+      item(), item(), item(),
+    ]
+    return modelReply({ items })
+  })
+  await drainAll()
+  expect(states()).toEqual([{ id: 'c00', gen_status: 'ready', gen_error: null }])
+  expect(raw.prepare("SELECT DISTINCT format FROM items WHERE concept_id = 'c00'").all()).toEqual([{ format: 'short' }])
+})
