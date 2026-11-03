@@ -1,4 +1,4 @@
-import { and, count, eq, inArray } from 'drizzle-orm'
+import { and, count, eq, inArray, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '@/db'
 import { invitation, member, organization, user } from '@/db/auth-schema'
@@ -83,6 +83,9 @@ export async function seedNorthwind(input: z.input<typeof Input>) {
     }
     const owner = await db.select().from(member).where(and(eq(member.organizationId, org.id), eq(member.userId, metadata.accounts.owner), eq(member.role, 'owner'))).get()
     if (!owner) throw httpError('The recorded demo owner no longer owns this company.', 409)
+    // Earlier seeds stored the topic without its company, so the question queue never saw its concepts.
+    await db.update(topics).set({ orgId: org.id }).where(and(eq(topics.id, NORTHWIND.topicId), isNull(topics.orgId),
+      inArray(topics.jobRoleId, db.select({ id: jobRoles.id }).from(jobRoles).where(eq(jobRoles.orgId, org.id)))))
     if (metadata.complete) {
       await addRoleDocument({ orgId: org.id, roleId: NORTHWIND.roleId, id: NORTHWIND.sourceId, title: 'Warehouse picker SOP', bodyText: data.sopText })
       return summary()
@@ -104,13 +107,13 @@ export async function seedNorthwind(input: z.input<typeof Input>) {
   const now = metadata.fixtureAt
   const role = await db.select().from(jobRoles).where(eq(jobRoles.id, NORTHWIND.roleId)).get()
   const topic = await db.select().from(topics).where(eq(topics.id, NORTHWIND.topicId)).get()
-  if ((role && (role.orgId !== org.id || role.name !== 'Warehouse picker')) || (topic && topic.jobRoleId !== NORTHWIND.roleId)) {
+  if ((role && (role.orgId !== org.id || role.name !== 'Warehouse picker')) || (topic && (topic.jobRoleId !== NORTHWIND.roleId || topic.orgId !== org.id))) {
     throw httpError('A reserved Northwind role or topic id is already in use.', 409)
   }
   if (!role && !topic) {
     await db.batch([
       db.insert(jobRoles).values({ id: NORTHWIND.roleId, orgId: org.id, name: 'Warehouse picker', benchmark: 0.85, onboardingDays: 14, createdAt: now - 10 * DAY }),
-      db.insert(topics).values({ id: NORTHWIND.topicId, jobRoleId: NORTHWIND.roleId, title: 'Warehouse picker', status: 'draft', createdAt: now - 10 * DAY }),
+      db.insert(topics).values({ id: NORTHWIND.topicId, orgId: org.id, jobRoleId: NORTHWIND.roleId, title: 'Warehouse picker', status: 'draft', createdAt: now - 10 * DAY }),
     ])
   } else if (!role || !topic) throw httpError('The demo role and topic are incomplete; no existing data was overwritten.', 409)
 
@@ -124,8 +127,10 @@ export async function seedNorthwind(input: z.input<typeof Input>) {
   // Three representative concepts keep generation within the normal daily cap.
   const selected = [critical, ...conceptRows.filter((c) => c.id !== critical.id).slice(0, 2)]
   for (const concept of selected) {
-    const stored = await db.select({ id: items.id }).from(items).where(and(eq(items.conceptId, concept.id), eq(items.status, 'active'))).get()
-    if (!stored) await ensureConceptItems(db, metadata.accounts.owner, concept, readyTopic, { targetDifficulty: 3 })
+    const stored = await db.select({ id: items.id, format: items.format }).from(items).where(and(eq(items.conceptId, concept.id), eq(items.status, 'active')))
+    // The demo error needs a multiple-choice question, so a rerun regenerates until the self-check keeps one.
+    const missing = concept.id === critical.id ? !stored.some((item) => item.format === 'mcq') : !stored.length
+    if (missing) await ensureConceptItems(db, metadata.accounts.owner, concept, readyTopic, { targetDifficulty: 3, unseen: new Set(stored.map((item) => item.id)) })
   }
   const criticalItems = await db.select().from(items).where(and(eq(items.conceptId, critical.id), eq(items.status, 'active')))
   const criticalItem = criticalItems.find((item) => item.format === 'mcq')
