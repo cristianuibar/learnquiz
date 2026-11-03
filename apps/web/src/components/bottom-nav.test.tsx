@@ -82,9 +82,21 @@ it('keeps the learner’s goal and material when Today is tapped on start', asyn
   }
 })
 
+it('names the company on Today while the role training is being prepared', async () => {
+  vi.mocked(getLatestTopicIdFn).mockResolvedValue(null)
+  vi.mocked(getToday).mockResolvedValue({ topic: null, role: { name: 'Cashier', topicTitle: 'Cashier', company: 'Northwind', preparing: true } })
+  const { container, cleanup } = await renderStart('/today')
+  try {
+    expect(container.textContent).toContain('Northwind')
+    expect(container.querySelector('[role="status"]')?.textContent).toBe('Your training at Northwind is being prepared')
+  } finally {
+    await cleanup()
+  }
+})
+
 it('sends a learner with a ready topic to Today, where one tap starts the session', async () => {
   vi.mocked(getLatestTopicIdFn).mockResolvedValue('topic-1')
-  vi.mocked(getToday).mockResolvedValue({ topic: { id: 'topic-1', title: 'Biology', placed: true, due: 2, xp: 40, streak: 1 }, role: null })
+  vi.mocked(getToday).mockResolvedValue({ topic: { id: 'topic-1', title: 'Biology', placed: true, placeable: true, due: 2, xp: 40, streak: 1 }, role: null })
   vi.mocked(startSession).mockResolvedValue({ sessionId: 's1' })
   const { container, router, cleanup } = await renderStart()
   try {

@@ -137,7 +137,7 @@ it('shows a company admin the member’s Training progress read-only and refuses
 })
 
 it('shows a guest their topic progress and reaches sign-up in one tap', async () => {
-  vi.mocked(getToday).mockResolvedValue({ topic: { id: 't1', title: 'Spanish verbs', placed: true, due: 0, xp: 120, streak: 3 }, role: null } as Awaited<ReturnType<typeof getToday>>)
+  vi.mocked(getToday).mockResolvedValue({ topic: { id: 't1', title: 'Spanish verbs', placed: true, placeable: true, due: 0, xp: 120, streak: 3 }, role: null } as Awaited<ReturnType<typeof getToday>>)
   vi.mocked(getPushSettings).mockClear()
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'guest', name: 'Anonymous', isAnonymous: true, role: 'user' }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })

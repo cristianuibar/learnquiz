@@ -1,4 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
+import type { DisclosureAccepted } from '@learnquiz/api'
 import { and, asc, eq, isNull } from 'drizzle-orm'
 import { getDb } from '@/db'
 import { member, organization } from '@/db/auth-schema'
@@ -6,6 +7,7 @@ import { consents } from '@/db/schema'
 import { facebookEnabled } from '@/server/auth'
 import { httpError } from '@/server/helpers'
 import { getSessionUser } from '@/server/session'
+import { assignedRoleTopic } from '@/server/topic-access'
 
 // Lives apart from the request helpers so no server-only import reaches the client bundle.
 export const getSessionFn = createServerFn({ method: 'GET' }).handler(
@@ -47,8 +49,12 @@ export const getSessionFn = createServerFn({ method: 'GET' }).handler(
   },
 )
 
-export const acceptDisclosure = createServerFn({ method: 'POST' }).handler(async (): Promise<void> => {
+// Returns the assigned role's ready topic so the invite flow can land on the training path.
+export const acceptDisclosure = createServerFn({ method: 'POST' }).handler(async (): Promise<DisclosureAccepted> => {
   const user = await getSessionUser()
   if (!user || user.isAnonymous) throw httpError('Sign in first', 401)
-  await getDb().insert(consents).values({ userId: user.id, kind: 'disclosure-v1', acceptedAt: Date.now() }).onConflictDoNothing()
+  const db = getDb()
+  await db.insert(consents).values({ userId: user.id, kind: 'disclosure-v1', acceptedAt: Date.now() }).onConflictDoNothing()
+  const role = await assignedRoleTopic(db, user.id)
+  return { roleTopicId: role?.topic.status === 'ready' ? role.topic.id : null }
 })

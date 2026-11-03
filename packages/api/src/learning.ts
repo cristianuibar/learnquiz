@@ -99,3 +99,6 @@ export type SummaryView = {
   mistakes: { itemId: string; stem: string; correctAnswer: string; wasSure: boolean; generatedBy: string | null }[]
   nextLine: string // coach: what happens next time
 }
+
+// After the disclosure: an employee with a ready role topic lands on its path.
+export type DisclosureAccepted = { roleTopicId: string | null }
