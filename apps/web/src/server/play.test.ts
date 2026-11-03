@@ -1057,4 +1057,26 @@ describe('employees training on their role topic', () => {
     expect(chatJson).not.toHaveBeenCalled()
     expect(fetchModel).not.toHaveBeenCalled()
   })
+
+  it('never serves a due short answer in a role session', async () => {
+    seedRoleTopic(1)
+    raw.prepare('INSERT INTO learner_item (learner_id, item_id, due, stability, difficulty, state) VALUES (?, ?, ?, ?, ?, ?)')
+      .run('u1', 'rs0-0', 1, 1, 5, 2)
+    const { sessionId } = await startSession({ data: { topicId: 'rt' } })
+    const served = JSON.parse(scalar(raw, 'SELECT item_ids_json FROM sessions WHERE id = ?', sessionId).item_ids_json as string) as string[]
+    expect(served.length).toBeGreaterThan(0)
+    expect(served).not.toContain('rs0-0')
+    expect(chatJson).not.toHaveBeenCalled()
+  })
+
+  it('reveals a role short answer ungraded without calling the model', async () => {
+    seedRoleTopic(1)
+    await startPlacement({ data: { topicId: 'rt' } })
+    const { sessionId } = await startMiniSession({ data: { itemId: 'rs0-0' } })
+    const reveal = await answerItem({ data: { sessionId, itemId: 'rs0-0', answer: { text: 'because' }, confidence: 'sure', responseMs: 1000 } })
+    expect(reveal).toMatchObject({ state: 'ungraded', attemptId: null })
+    expect(chatJson).not.toHaveBeenCalled()
+    expect(fetchModel).not.toHaveBeenCalled()
+    expect(count('model_calls')).toBe(0)
+  })
 })

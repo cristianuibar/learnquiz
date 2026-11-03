@@ -52,6 +52,7 @@ const readPlan = (s: SessionRow) => JSON.parse(s.planJson ?? '{}') as PlacementP
 const batch = (db: Db, stmts: Stmt[]) => db.batch(stmts as [Stmt, ...Stmt[]])
 // The longest grading call (the model client's 120 s timeout) plus slack.
 const CLAIM_TTL = 150_000
+const ROLE_UNGRADED = Symbol('role topic')
 
 // INSERT ... SELECT of one row that is written only while `when` holds. Every column must be set.
 function insertIf<T extends SQLiteTable>(db: Db, table: T, when: SQL, row: T['$inferInsert']) {
@@ -235,7 +236,8 @@ export const startSession = createServerFn({ method: 'POST' })
         .select({ row: learnerItem, conceptId: items.conceptId })
         .from(learnerItem)
         .innerJoin(items, eq(items.id, learnerItem.itemId))
-        .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topic.id), eq(items.status, 'active'))),
+        .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topic.id), eq(items.status, 'active'),
+          topic.jobRoleId !== null ? ne(items.format, 'short') : undefined)),
       loadFrontier(db, learnerId, topic.id),
     ])
     const targetDifficulty = targetFor(lt.level)
@@ -503,7 +505,7 @@ export const answerItem = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<Reveal> => {
     const learnerId = await requireLearnerId()
     const db = getDb()
-    const { session } = await loadSession(db, learnerId, data.sessionId)
+    const { session, topic } = await loadSession(db, learnerId, data.sessionId)
     if (session.endedAt !== null) throw httpError('This session has ended', 409)
     const plan = readPlan(session)
     const ids = JSON.parse(session.itemIdsJson) as string[]
@@ -558,6 +560,8 @@ export const answerItem = createServerFn({ method: 'POST' })
     let shortGrade: Grade | undefined
     if (payload.format === 'short') {
       try {
+        // Role topics play without any model call, so their short answers are revealed ungraded.
+        if (topic.jobRoleId !== null) throw ROLE_UNGRADED
         shortGrade = await chatJson({
           purpose: 'grade',
           schema: Grade,
@@ -571,7 +575,7 @@ export const answerItem = createServerFn({ method: 'POST' })
         grade.correct = shortGrade.score >= 0.8
       } catch (e) {
         const capped = e instanceof DailyCapError
-        if (!capped) console.error('short answer grading failed, revealing model answer', e instanceof Error ? e.message : e)
+        if (!capped && e !== ROLE_UNGRADED) console.error('short answer grading failed, revealing model answer', e instanceof Error ? e.message : e)
         // Advance without recording a wrong answer or changing mastery, scheduling or XP.
         const [kept] = await db
           .update(sessions)
