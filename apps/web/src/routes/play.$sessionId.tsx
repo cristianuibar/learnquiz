@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Working } from '@/components/working'
 import { stopSpeaking } from '@/lib/speech'
 import { isAnswerReady } from '@learnquiz/api'
-import type { Confidence, Reveal, SessionView } from '@learnquiz/api'
+import type { Answer, Confidence, ItemFormat, Reveal, SessionView } from '@learnquiz/api'
 import { checkFailedMessage } from '@learnquiz/api/system-copy'
 import { answerItem, endSession, getSession, nextItem, prepareNextSession, reportItem } from '@/server/play'
 
@@ -47,6 +47,17 @@ function isRetryableCheckError(err: unknown): boolean {
   const e = err as { status?: number; name?: string }
   if (typeof e?.status === 'number') return e.status >= 500
   return (typeof navigator !== 'undefined' && navigator.onLine === false) || err instanceof TypeError || e?.name === 'AbortError' || e?.name === 'TimeoutError'
+}
+
+function toAnswer(format: ItemFormat, choice: string): Answer {
+  const ids = choice ? choice.split(',') : []
+  switch (format) {
+    case 'mcq': return { optionId: choice }
+    case 'multi': return { optionIds: ids }
+    case 'order': return { order: ids }
+    case 'cloze':
+    case 'short': return { text: choice.trim() }
+  }
 }
 
 // Unsent answers survive a reload; storage can be unavailable (private mode, quota), so failures are ignored.
@@ -89,7 +100,7 @@ function Play({ initial }: { initial: SessionView }) {
   const sync = useServerFn(getSession)
   const prepare = useServerFn(prepareNextSession)
   const [view, setView] = useState(initial)
-  const [choice, setChoice] = useState('') // option id (mcq) or typed text
+  const [choice, setChoice] = useState('') // option id (mcq), comma-joined option ids (multi, order) or typed text
   const [confidence, setConfidence] = useState<Confidence | null>(null)
   const [reveal, setReveal] = useState<Reveal | null>(null)
   const [why, setWhy] = useState('')
@@ -104,7 +115,7 @@ function Play({ initial }: { initial: SessionView }) {
 
   const { item, progress } = view
   const placement = view.kind === 'placement'
-  const ready = Boolean(item && isAnswerReady(item.format, item.format === 'mcq' ? { optionId: choice } : { text: choice }, item.options.length)) && confidence !== null
+  const ready = Boolean(item && isAnswerReady(item.format, toAnswer(item.format, choice), item.options.length)) && confidence !== null
 
   useEffect(() => {
     // Writes the next session's questions while this one (placement included) is played; the open request outlives waitUntil's window.
@@ -190,7 +201,7 @@ function Play({ initial }: { initial: SessionView }) {
     const responseMs = Date.now() - shownAt.current
     stopSpeaking()
     void run(async () => {
-      const answer = item.format === 'mcq' ? { optionId: choice } : { text: choice.trim() }
+      const answer = toAnswer(item.format, choice)
       try {
         setReveal(await check({ data: { sessionId: view.id, itemId: item.id, answer, confidence, responseMs } }))
         writeDraft(draftKey(view.id, item.id), '', null)
@@ -227,7 +238,7 @@ function Play({ initial }: { initial: SessionView }) {
     })
   }
 
-  const chosen = item?.options.find((o) => o.id === choice)?.text ?? (item?.format === 'mcq' ? null : choice.trim())
+  const chosen = item?.options.find((o) => o.id === choice)?.text ?? (item?.format === 'cloze' || item?.format === 'short' ? choice.trim() : null)
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col px-4">

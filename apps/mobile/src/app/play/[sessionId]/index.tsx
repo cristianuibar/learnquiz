@@ -4,7 +4,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { isAnswerReady, type Answer, type Confidence, type Draft, type ItemView, type Reveal, type SessionView } from '@learnquiz/api'
 import { checkFailedMessage, networkError } from '@learnquiz/api/system-copy'
 import { QuestionBody } from '@/components/question/question-body'
-import { RevealSheet } from '@/components/reveal/reveal-sheet'
+import { RevealOverlay } from '@/components/reveal/reveal-overlay'
 import { ErrorRow } from '@/components/session/ErrorRow'
 import { QuestionDock } from '@/components/session/QuestionDock'
 import { SessionFrame } from '@/components/session/SessionFrame'
@@ -17,6 +17,7 @@ import { api } from '@/lib/api'
 import { answerBody, answerError } from '@/lib/session/answer'
 import { deleteDraft, draftForView, writeDraft } from '@/lib/session/draft'
 import { sessionRefetchError, type SessionError } from '@/lib/session/error'
+import { canAdvance, canLoadSession, noticeFor, revealMarks, type ContinueRequest } from '@/lib/session/overlay'
 import { useSession } from '@/lib/session-store'
 import { useTheme } from '@/theme/ThemeProvider'
 
@@ -40,6 +41,7 @@ function ActiveSession({ sessionId }: { sessionId: string }) {
   const [local, setLocal] = useState(emptyLocal)
   const [error, setError] = useState<SessionError | null>(null)
   const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState<{ key: string; text: string } | null>(null)
   const viewRef = useRef<SessionView | null>(null)
   const revealRef = useRef<Reveal | null>(null)
   const draftRef = useRef(draft)
@@ -85,7 +87,7 @@ function ActiveSession({ sessionId }: { sessionId: string }) {
 
   const loadSession = useCallback(async () => {
     // GET advances an answered slot on the server: it must never hide a reveal.
-    if (!active() || request.current || revealRef.current) return
+    if (!canLoadSession({ active: active(), inFlight: request.current !== null, overlayOpen: revealRef.current !== null })) return
     const controller = new AbortController()
     request.current = controller
     setBusy(true)
@@ -207,19 +209,18 @@ function ActiveSession({ sessionId }: { sessionId: string }) {
     }
   }
 
-  async function continueSession() {
-    if (!active() || request.current || !revealRef.current) return
+  async function continueSession({ why, reported }: ContinueRequest) {
+    if (!canAdvance({ active: active(), inFlight: request.current !== null, overlayOpen: revealRef.current !== null })) return
     const controller = new AbortController()
     request.current = controller
     setBusy(true)
     setError(null)
     try {
-      const next = await api<SessionView>(`${path}/next`, {
-        body: { why: local.reflection.trim() || undefined }, signal: controller.signal,
-      })
+      const next = await api<SessionView>(`${path}/next`, { body: { why }, signal: controller.signal })
       if (!active() || controller.signal.aborted) return
       revealRef.current = null
       setReveal(null)
+      setNotice(reported && next.item ? { key: `${next.item.id}:${next.progress.position}`, text: 'Report sent' } : null)
       await applyView(next, controller.signal)
     } catch {
       if (active() && !controller.signal.aborted) setError({ kind: revealRef.current ? 'next' : 'load', message: networkError })
@@ -256,16 +257,13 @@ function ActiveSession({ sessionId }: { sessionId: string }) {
 
   return (
     <SheetHost sheet={reveal && item ? (
-      <RevealSheet
-        key={item.id}
+      <RevealOverlay
+        key={`${item.id}:${view.progress.position}:${reveal.attemptId ?? ''}`}
         reveal={reveal}
         item={item}
         answer={draft.answer}
         confidence={draft.confidence}
-        reflection={local.reflection}
-        onReflection={(reflection) => setLocal((current) => ({ ...current, reflection }))}
-        onContinue={() => { void continueSession() }}
-        onReport={() => router.push({ pathname: '/flag', params: { itemId: item.id } })}
+        onContinue={(request) => { void continueSession(request) }}
         busy={busy}
         error={error?.kind === 'next' ? error.message : null}
         branding={branding}
@@ -282,6 +280,8 @@ function ActiveSession({ sessionId }: { sessionId: string }) {
           <SessionQuestion
             key={`${item.id}:${view.progress.position}`}
             item={item}
+            notice={noticeFor(notice, `${item.id}:${view.progress.position}`)}
+            marks={revealMarks(reveal, item.format, draft.answer)}
             answer={draft.answer}
             onAnswer={(answer) => changeDraft({ ...draftRef.current, answer })}
             disabled={busy || reveal !== null}
@@ -293,8 +293,10 @@ function ActiveSession({ sessionId }: { sessionId: string }) {
   )
 }
 
-function SessionQuestion({ item, answer, onAnswer, disabled, onSubmit }: {
+function SessionQuestion({ item, notice, marks, answer, onAnswer, disabled, onSubmit }: {
   item: ItemView
+  notice: string | null
+  marks: ReturnType<typeof revealMarks>
   answer: Answer
   onAnswer(answer: Answer): void
   disabled: boolean
@@ -303,10 +305,14 @@ function SessionQuestion({ item, answer, onAnswer, disabled, onSubmit }: {
   const { space } = useTheme()
   const stemRef = useRef<NativeText>(null)
   useHeadingFocus(stemRef)
+  useEffect(() => {
+    if (notice) AccessibilityInfo.announceForAccessibility(notice)
+  }, [notice])
   return (
     <View style={{ gap: space[6] }}>
+      {notice ? <Text variant="caption" muted>{notice}</Text> : null}
       <Text ref={stemRef} variant="title2" header>{item.stem}</Text>
-      <QuestionBody key={item.id} item={item} answer={answer} onAnswer={onAnswer} marks={null} disabled={disabled} onSubmit={onSubmit} />
+      <QuestionBody key={item.id} item={item} answer={answer} onAnswer={onAnswer} marks={marks} disabled={disabled} onSubmit={onSubmit} />
     </View>
   )
 }
