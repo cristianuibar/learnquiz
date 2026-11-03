@@ -193,3 +193,11 @@ it('turns a whitespace-only role name into a friendly message and per-field erro
   expect(fieldErrors(company)).toEqual({ roleName: 'Enter a role name' })
   expect(sqlite.prepare('SELECT id FROM organization WHERE slug = ?').all('new-company')).toEqual([])
 })
+
+it('rejects a role name that matches an existing role after trimming and case folding', async () => {
+  await createRole({ data: { slug: 'alpha', name: 'Customer Support' } })
+  const duplicate = await (async () => createRole({ data: { slug: 'alpha', name: 'customer support ' } }))().catch((e: unknown) => e)
+  expect(duplicate).toMatchObject({ status: 409 })
+  expect(fieldErrors(duplicate)).toEqual({ name: 'A role with this name already exists' })
+  expect(sqlite.prepare("SELECT name FROM job_roles WHERE lower(trim(name)) = 'customer support'").all()).toEqual([{ name: 'Customer Support' }])
+})

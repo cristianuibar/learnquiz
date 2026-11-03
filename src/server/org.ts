@@ -127,6 +127,10 @@ export const createRole = createServerFn({ method: 'POST' })
   .validator(Slug.extend(Role.shape))
   .handler(async ({ data: { slug, ...role } }) => {
     const { org } = await requireOrgAdmin(slug)
+    // Partners pick roles by name, so two active roles in one company must not share a name.
+    const key = role.name.trim().toLowerCase()
+    const roles = await getDb().select({ name: jobRoles.name }).from(jobRoles).where(and(eq(jobRoles.orgId, org.id), eq(jobRoles.status, 'active')))
+    if (roles.some((r) => r.name.trim().toLowerCase() === key)) throw httpError(JSON.stringify([{ code: 'custom', path: ['name'], message: 'A role with this name already exists' }]), 409)
     return insertRole(org.id, role)
   })
 
