@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label'
 import { Working } from '@/components/working'
 import { VoiceAnswer } from '@/components/voice-answer'
 import type { Confidence, Reveal, SessionView } from '@learnquiz/api'
-import { answerItem, endSession, getSession, nextItem, reportItem } from '@/server/play'
+import { answerItem, endSession, getSession, nextItem, prepareNextSession, reportItem } from '@/server/play'
 
 export const Route = createFileRoute('/play/$sessionId')({
   beforeLoad: ({ context }) => {
@@ -81,6 +81,7 @@ function Play({ initial }: { initial: SessionView }) {
   const end = useServerFn(endSession)
   const report = useServerFn(reportItem)
   const sync = useServerFn(getSession)
+  const prepare = useServerFn(prepareNextSession)
   const [view, setView] = useState(initial)
   const [choice, setChoice] = useState('') // option id (mcq) or typed text
   const [confidence, setConfidence] = useState<Confidence | null>(null)
@@ -98,6 +99,11 @@ function Play({ initial }: { initial: SessionView }) {
   const { item, progress } = view
   const placement = view.kind === 'placement'
   const ready = choice.trim() !== '' && confidence !== null
+
+  useEffect(() => {
+    // Writes the next session's questions while this one (placement included) is played; the open request outlives waitUntil's window.
+    prepare({ data: { sessionId: initial.id } }).catch(() => {})
+  }, [initial.id])
 
   useEffect(() => {
     questionHeading.current?.focus()

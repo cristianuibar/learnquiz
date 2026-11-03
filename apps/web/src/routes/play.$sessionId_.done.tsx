@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Link, createFileRoute, redirect } from '@tanstack/react-router'
 import { RouteError } from '@/components/inline-error'
 import { MasteryBar } from '@/components/mastery-bar'
@@ -6,7 +7,7 @@ import { ModelTrace } from '@/components/model-trace'
 import { StartButton } from '@/components/start-button'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { endSession } from '@/server/play'
+import { endSession, prepareNextSession } from '@/server/play'
 import { PushSettings } from '@/components/push-settings'
 import { getPushSettings } from '@/server/push'
 
@@ -29,6 +30,10 @@ const pct = (v: number) => `${Math.round(v * 100)}%`
 function Done() {
   const s = Route.useLoaderData()
   const placed = s.kind === 'placement' && s.level !== null
+  useEffect(() => {
+    // The frontier is known only once placement ends, so the first session's questions are written here.
+    if (placed) prepareNextSession({ data: { sessionId: s.sessionId } }).catch(() => {})
+  }, [placed, s.sessionId])
   return (
     <main className="mx-auto w-full max-w-xl px-4 pt-8 pb-8">
       <h1 className="text-3xl font-bold tracking-tight">
