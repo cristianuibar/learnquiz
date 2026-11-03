@@ -96,7 +96,7 @@ it('shows the offline message for answered questions on Path and loads them with
   vi.mocked(getTopicPath).mockResolvedValue({
     topic: { id: 'topic', title: 'Arithmetic', goal: null, status: 'ready', generatedBy: null },
     learner: { level: 1, levelLine: null, levelLineModel: null, placed: false, xp: 0, streak: 0 },
-    units: [{ id: 'unit', order: 0, name: 'Basics', summary: '', mastery: 0, unlocked: true, concepts: [{ id: 'concept', order: 0, name: 'Addition', summary: '', visual: false, grounded: false, critical: false, itemCount: 1, pKnown: 0 }] }],
+    units: [{ id: 'unit', order: 0, name: 'Basics', summary: '', mastery: 0, measured: false, unlocked: true, concepts: [{ id: 'concept', order: 0, name: 'Addition', summary: '', visual: false, grounded: false, critical: false, itemCount: 1, pKnown: 0 }] }],
     edges: [],
   })
   const { container, cleanup } = await renderApp('/t/topic/path')
