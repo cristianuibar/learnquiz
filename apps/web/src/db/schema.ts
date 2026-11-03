@@ -103,6 +103,9 @@ export const itemFlags = sqliteTable('item_flags', {
   itemId: text('item_id').notNull(),
   userId: text('user_id').notNull(),
   reason: text('reason').notNull(),
+  note: text('note'),
+  attemptId: text('attempt_id'),
+  sourceVersion: integer('source_version'),
   createdAt: integer('created_at').notNull(),
   resolvedAt: integer('resolved_at'),
 }, (t) => [index('item_flags_item_idx').on(t.itemId)])

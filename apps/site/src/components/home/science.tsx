@@ -82,13 +82,11 @@ export function Science() {
               className="curve-svg"
               viewBox="0 -22 360 248"
               role="img"
-              aria-label="Illustrative chart. Read once: recall falls steeply and is nearly gone by day 7. Reviewed on days 1, 3 and 7: each review brings recall back to the top, and each drop afterwards is shallower, so recall stays high at day 14."
+              aria-label="Recall over 14 days (illustration)"
               aria-describedby={descriptionId}
             >
               <desc id={descriptionId}>
-                The horizontal axis shows days 0, 1, 3, 7 and 14. The vertical axis shows recall.
-                The solid line and dots show reviews on days 1, 3 and 7; the dashed line shows reading once.
-                This is an illustration, not measured data.
+                Spaced reviews keep recall higher than reading once.
               </desc>
               <line x1="32" y1="20" x2="352" y2="20" stroke="var(--border)" strokeWidth="1" />
               <line x1="32" y1="190" x2="352" y2="190" stroke="var(--border-strong)" strokeWidth="1" />
@@ -124,6 +122,7 @@ export function Science() {
               </div>
               {motionOk ? <button className="link-btn" type="button" onClick={replay}><Icon name="replay" size={18} />Replay</button> : null}
             </div>
+            <p className="t-body muted">Read once: recall falls steeply and is nearly gone by day 7. Reviewed on days 1, 3 and 7: each review brings recall back to the top, and each drop afterwards is shallower, so recall stays high at day 14.</p>
           </figure>
           <ul className="claims">
             <li className="claim">

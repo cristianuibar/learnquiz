@@ -57,9 +57,20 @@ function QuestionCard({ question, slug }: { question: Question; slug: string }) 
   return (
     <li className="flex flex-col gap-4 rounded-lg border p-4">
       <p className="text-sm text-muted-foreground">
-        {question.status === 'active' ? 'Live' : question.status === 'retired' ? 'Retired' : question.status === 'reported' ? 'Flagged by learner' : 'Rejected'}
+        {question.status === 'retired' ? 'Retired' : question.flags.length || question.status === 'reported' ? 'Flagged by learner' : question.status === 'active' ? 'Live' : 'Rejected'}
         {question.reviewedAt !== null ? ` · Approved ${new Date(question.reviewedAt).toLocaleDateString()}` : ' · Unreviewed'}
       </p>
+      {question.flags.length > 0 && (
+        <ul aria-label="Learner flags" className="flex flex-col gap-1 rounded-md border p-3 text-sm">
+          {question.flags.map((f, i) => (
+            <li key={i}>
+              <span className="font-medium">{f.label}</span>
+              {f.note ? <> · {f.note}</> : null}
+              <span className="text-muted-foreground"> · {new Date(f.createdAt).toLocaleDateString()}</span>
+            </li>
+          ))}
+        </ul>
+      )}
       <h4 className="font-semibold">{p.stem}</h4>
       {editing ? (
         <form onSubmit={save}>

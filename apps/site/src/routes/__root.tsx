@@ -7,7 +7,8 @@ export const Route = createRootRoute({
   head: ({ matches }) => {
     const title = 'Learn Quiz: onboarding from your own SOPs'
     const description = 'Upload a role’s SOPs. New hires practice them on their phone in five-minute sessions until they reach your benchmark. Every explanation quotes your document.'
-    const url = new URL(matches.at(-1)?.pathname ?? '/', 'https://learnquiz.com').href
+    const pathname = matches.at(-1)?.pathname ?? '/'
+    const url = new URL(pathname.endsWith('/') ? pathname : `${pathname}/`, 'https://learnquiz.com').href
     const image = 'https://learnquiz.com/og.png'
     const imageAlt = 'The headline “New hires learn the job from your own SOPs.” beside a phone showing the scanner question with “Stop the pick” selected.'
 

@@ -5,8 +5,8 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { Science } from './science'
 
-const CHART_LABEL =
-  'Illustrative chart. Read once: recall falls steeply and is nearly gone by day 7. Reviewed on days 1, 3 and 7: each review brings recall back to the top, and each drop afterwards is shallower, so recall stays high at day 14.'
+const DATA_IN_WORDS =
+  'Read once: recall falls steeply and is nearly gone by day 7. Reviewed on days 1, 3 and 7: each review brings recall back to the top, and each drop afterwards is shallower, so recall stays high at day 14.'
 
 type ChangeListener = (event: { matches: boolean }) => void
 
@@ -146,16 +146,15 @@ it('prerenders the final static figure with four cites and a described chart', (
   expect(cites).toHaveLength(4)
   expect(holder.querySelector('button')).toBeNull()
   const svg = holder.querySelector('svg[role="img"]')
-  expect(svg?.getAttribute('aria-label')).toBe(CHART_LABEL)
+  expect(svg?.getAttribute('aria-label')).toBe('Recall over 14 days (illustration)')
   const describedId = svg?.getAttribute('aria-describedby')
   expect(describedId).toBeTruthy()
   const desc = holder.querySelector(`#${describedId}`)
   expect(desc?.tagName.toLowerCase()).toBe('desc')
-  const words = (desc?.textContent ?? '').toLowerCase()
-  expect(words).toContain('horizontal')
-  expect(words).toContain('vertical')
-  expect(words).toContain('solid')
-  expect(words).toContain('dashed')
+  expect(desc?.textContent?.trim()).toBe('Spaced reviews keep recall higher than reading once.')
+  const summary = [...staticFigure!.querySelectorAll('p')].find((p) => p.textContent === DATA_IN_WORDS)
+  expect(summary).toBeDefined()
+  expect(summary?.closest('svg, [hidden], [aria-hidden="true"], .sr-only')).toBeNull()
 })
 
 it('stays static with no Replay and no observer under reduced motion', async () => {

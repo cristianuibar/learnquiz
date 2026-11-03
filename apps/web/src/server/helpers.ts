@@ -5,6 +5,7 @@ import { chatJson, jobModel, LlmError } from '@/lib/llm/client'
 import { ENABLED_FORMATS, itemsPrompt, selfCheckPrompt } from '@/lib/llm/prompts'
 import { ItemBatch, ItemPayload, SelfCheck } from '@/lib/llm/schemas'
 import { liveConcept } from '@/server/live-concept'
+import { notFlaggedBy } from '@/server/topic-access'
 import { assertWithinDailyCap } from '@/server/model-cap'
 
 // Server-only helpers shared by the server-function files. They live apart from them so no server-only import reaches the client bundle.
@@ -56,7 +57,7 @@ export async function ensureConceptItems(
   const existing = await db
     .select()
     .from(items)
-    .where(and(eq(items.conceptId, concept.id), eq(items.topicId, topic.id), eq(items.status, 'active')))
+    .where(and(eq(items.conceptId, concept.id), eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId)))
     .orderBy(desc(items.createdAt))
   // Six stored items are enough unless the learner has already seen them all.
   const fresh = opts.unseen ? existing.filter((r) => !opts.unseen!.has(r.id)).length : existing.length
@@ -84,7 +85,7 @@ export async function ensureConceptItems(
       const stored = await db
         .select()
         .from(items)
-        .where(and(eq(items.conceptId, concept.id), eq(items.topicId, topic.id), eq(items.status, 'active')))
+        .where(and(eq(items.conceptId, concept.id), eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId)))
         .orderBy(desc(items.createdAt))
       return stored.map(asItem)
     }

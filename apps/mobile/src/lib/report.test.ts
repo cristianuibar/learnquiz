@@ -38,6 +38,24 @@ test('sends blank note unchanged with null attemptId', async () => {
   })
 })
 
+test('sends a 301-character note capped at 300', async () => {
+  mockApi.mockResolvedValue({ ok: true })
+  await sendReport({ itemId: 'item-1', attemptId: null, reason: 'other', note: 'x'.repeat(301) })
+  expect(mockApi.mock.calls[0][1].body.note).toBe('x'.repeat(300))
+})
+
+test('sends a whitespace-only note as an empty string', async () => {
+  mockApi.mockResolvedValue({ ok: true })
+  await sendReport({ itemId: 'item-1', attemptId: null, reason: 'other', note: '  \n\t ' })
+  expect(mockApi.mock.calls[0][1].body.note).toBe('')
+})
+
+test('trims surrounding whitespace from the note', async () => {
+  mockApi.mockResolvedValue({ ok: true })
+  await sendReport({ itemId: 'item-1', attemptId: null, reason: 'other', note: '  hi  ' })
+  expect(mockApi.mock.calls[0][1].body.note).toBe('hi')
+})
+
 test('encodes the item id in the path', async () => {
   mockApi.mockResolvedValue({ ok: true })
   await expect(
