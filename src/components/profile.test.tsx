@@ -6,6 +6,7 @@ import { expect, it, vi } from 'vitest'
 import { Route as appRootRoute } from '@/routes/__root'
 import { Route as meRoute } from '@/routes/me.index'
 import { Route as profileRoute } from '@/routes/me.profile'
+import { Route as orgRoute } from '@/routes/org.$slug'
 import { Route as personRoute } from '@/routes/org.$slug.people_.$id'
 import { getProfile } from '@/server/profile'
 import { getSessionFn } from '@/server/session-fn'
@@ -83,9 +84,10 @@ it('shows a company admin the member’s Training progress read-only and refuses
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'owner', name: 'Owner', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [{ name: 'Acme', slug: 'acme' }] })
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
-  const person = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug/people/$id', loader: personRoute.options.loader, errorComponent: personRoute.options.errorComponent, component: personRoute.options.component })
-  const people = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug/people', component: () => <h1>People</h1> })
-  const router = createRouter({ routeTree: rootRoute.addChildren([person, people]), history: createMemoryHistory({ initialEntries: ['/org/acme/people/learner'] }) })
+  const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, component: Outlet })
+  const person = createRoute({ getParentRoute: () => org, path: '/people/$id', loader: personRoute.options.loader as (ctx: { params: { slug: string; id: string } }) => unknown, errorComponent: personRoute.options.errorComponent, component: personRoute.options.component })
+  const people = createRoute({ getParentRoute: () => org, path: '/people', component: () => <h1>People</h1> })
+  const router = createRouter({ routeTree: rootRoute.addChildren([org.addChildren([person, people])]), history: createMemoryHistory({ initialEntries: ['/org/acme/people/learner'] }) })
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)

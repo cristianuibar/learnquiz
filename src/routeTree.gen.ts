@@ -168,9 +168,9 @@ const ApiOrgOrgIdLogoRoute = ApiOrgOrgIdLogoRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrgSlugPeopleIdRoute = OrgSlugPeopleIdRouteImport.update({
-  id: '/org/$slug/people_/$id',
-  path: '/org/$slug/people/$id',
-  getParentRoute: () => rootRouteImport,
+  id: '/people_/$id',
+  path: '/people/$id',
+  getParentRoute: () => OrgSlugRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -365,7 +365,6 @@ export interface RootRouteChildren {
   PlayQuickItemIdRoute: typeof PlayQuickItemIdRoute
   TTopicIdPathRoute: typeof TTopicIdPathRoute
   ApiOrgOrgIdLogoRoute: typeof ApiOrgOrgIdLogoRoute
-  OrgSlugPeopleIdRoute: typeof OrgSlugPeopleIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -554,10 +553,10 @@ declare module '@tanstack/react-router' {
     }
     '/org/$slug/people_/$id': {
       id: '/org/$slug/people_/$id'
-      path: '/org/$slug/people/$id'
+      path: '/people/$id'
       fullPath: '/org/$slug/people/$id'
       preLoaderRoute: typeof OrgSlugPeopleIdRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof OrgSlugRoute
     }
   }
 }
@@ -584,6 +583,7 @@ interface OrgSlugRouteChildren {
   OrgSlugRolesRoute: typeof OrgSlugRolesRoute
   OrgSlugSettingsRoute: typeof OrgSlugSettingsRoute
   OrgSlugIndexRoute: typeof OrgSlugIndexRoute
+  OrgSlugPeopleIdRoute: typeof OrgSlugPeopleIdRoute
 }
 
 const OrgSlugRouteChildren: OrgSlugRouteChildren = {
@@ -592,6 +592,7 @@ const OrgSlugRouteChildren: OrgSlugRouteChildren = {
   OrgSlugRolesRoute: OrgSlugRolesRoute,
   OrgSlugSettingsRoute: OrgSlugSettingsRoute,
   OrgSlugIndexRoute: OrgSlugIndexRoute,
+  OrgSlugPeopleIdRoute: OrgSlugPeopleIdRoute,
 }
 
 const OrgSlugRouteWithChildren =
@@ -615,7 +616,6 @@ const rootRouteChildren: RootRouteChildren = {
   PlayQuickItemIdRoute: PlayQuickItemIdRoute,
   TTopicIdPathRoute: TTopicIdPathRoute,
   ApiOrgOrgIdLogoRoute: ApiOrgOrgIdLogoRoute,
-  OrgSlugPeopleIdRoute: OrgSlugPeopleIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
