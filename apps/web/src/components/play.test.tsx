@@ -312,6 +312,11 @@ it('drops non-digits from a numeric blank, ignores a fourth digit, and sends "00
     expect(byLabel(container, 'Record answer')).toBeNull()
     await act(async () => type(input, 'a1b'))
     expect(input.value).toBe('1')
+    // A stray character that filters back to the current value is still removed from the field.
+    await act(async () => type(input, '1 '))
+    expect(input.value).toBe('1')
+    await act(async () => type(input, '1a'))
+    expect(input.value).toBe('1')
     await act(async () => type(input, '0071'))
     expect(input.value).toBe('007')
     await act(async () => container.querySelector<HTMLInputElement>('input[value="sure"]')!.click())
