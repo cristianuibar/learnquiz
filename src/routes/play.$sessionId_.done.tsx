@@ -38,7 +38,7 @@ function Done() {
       {placed && s.levelLine && <ModelLabel model={s.levelLineModel} />}
       <p className="mt-4 flex flex-wrap gap-x-6 text-lg font-medium">
         <span>
-          {s.correct} / {s.total} correct
+          {s.correct} of {s.total} correct{s.ungraded > 0 && ` · ${s.ungraded} not graded`}
         </span>
         {s.kind !== 'placement' && (
           <>
