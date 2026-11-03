@@ -23,7 +23,6 @@ import { assertWithinDailyCap } from '@/server/model-cap'
 
 // shortcut: 12 instead of the spec's 20 while generation is slow, raise it once items are generated ahead of play.
 const SESSION_SIZE = 12
-const PLACEMENT_TOTAL = 10 // what the header shows while placement runs; it may take up to PLACEMENT.max
 const CLOSER_MIN = 0.7
 const DAY = 86_400_000
 
@@ -166,7 +165,7 @@ async function viewOf(db: Db, session: SessionRow, topic: TopicRow, plan: Placem
     kind: session.kind,
     topicId: session.topicId,
     topicTitle: topic.title,
-    progress: { position: plan.position + 1, total: placement ? Math.max(PLACEMENT_TOTAL, plan.position + 1) : ids.length },
+    progress: { position: plan.position + 1, total: placement ? Math.max(PLACEMENT.max, plan.position + 1) : ids.length },
     item,
     ended,
     voiceEnabled: isVoiceEnabled(),
@@ -860,6 +859,8 @@ async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: 
       .where(and(eq(placements.id, session.id), eq(placements.learnerId, learnerId))),
   ])
 
+  const stored = placement ? (JSON.parse(placement.logJson) as { log?: { level: number }[]; levelLine?: string; levelLineModel?: string }) : null
+  const endedEarly = !!stored?.log && stored.log.length < PLACEMENT.max && shouldStop(stored.log)
   const before = 'unitStart' in plan ? plan.unitStart : {}
   // One entry per missed item; a later miss of the same item replaces the earlier one.
   const mistakes = new Map(
@@ -886,8 +887,9 @@ async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: 
     xp: session.xp,
     streak: lt.streakCount,
     level: lt.level,
-    levelLine: placement ? ((JSON.parse(placement.logJson) as { levelLine?: string }).levelLine ?? null) : null,
-    levelLineModel: placement ? ((JSON.parse(placement.logJson) as { levelLineModel?: string }).levelLineModel ?? null) : null,
+    levelLine: stored?.levelLine ?? null,
+    levelLineModel: stored?.levelLineModel ?? null,
+    endedEarly,
     masteryMoved: mastery
       .filter((u) => u.unitId in before && Math.abs(u.mastery - before[u.unitId]) > 0.001)
       .map((u) => ({ unitId: u.unitId, unitName: u.unitName, before: before[u.unitId], after: u.mastery })),

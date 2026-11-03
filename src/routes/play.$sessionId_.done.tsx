@@ -47,6 +47,9 @@ function Done() {
           </>
         )}
       </p>
+      {s.kind === 'placement' && s.endedEarly && (
+        <p className="mt-2 text-muted-foreground">Placement stopped early: it had enough answers to place you.</p>
+      )}
       <ModelTrace key={s.sessionId} scope={{ scope: 'session', sessionId: s.sessionId }} />
       {s.masteryMoved.length > 0 && (
         <section className="mt-10">
