@@ -3,7 +3,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { getSessionUser } from '@/server/session'
-import { createCompany, createRole, listRoles } from './org'
+import { createCompany, createRole, getOrgOverview, getPeople, listRoles } from './org'
 
 const holder = vi.hoisted(() => ({ db: null as unknown, createOrganization: vi.fn() }))
 
@@ -125,11 +125,56 @@ it.each([
   ['member', 403],
   ['other-owner', 403],
   [null, 401],
-] as const)('refuses both role functions for %s with %s without writing a role', async (id, status) => {
+] as const)('refuses company functions for %s with %s without writing a role', async (id, status) => {
   vi.mocked(getSessionUser).mockResolvedValue(id ? { id } as never : null)
   await expect.soft(listRoles({ data: { slug: 'alpha' } })).rejects.toMatchObject({ status })
   await expect.soft(createRole({ data: { slug: 'alpha', name: 'Unauthorized role' } })).rejects.toMatchObject({ status })
+  await expect.soft(getPeople({ data: { slug: 'alpha' } })).rejects.toMatchObject({ status })
+  await expect.soft(getOrgOverview({ data: { slug: 'alpha' } })).rejects.toMatchObject({ status })
   expect(sqlite.prepare('SELECT id FROM job_roles WHERE name = ?').all('Unauthorized role')).toEqual([])
+})
+
+it('reports assigned training stages, unresolved critical errors and company proficiency days', async () => {
+  const day = 86_400_000
+  const start = Date.now() - 10 * day
+  sqlite.prepare("UPDATE topics SET status = 'ready' WHERE job_role_id IN ('legacy-role', 'other-role')").run()
+  const topic = sqlite.prepare('SELECT id FROM topics WHERE job_role_id = ?').get('legacy-role')!.id as string
+  const foreignTopic = sqlite.prepare('SELECT id FROM topics WHERE job_role_id = ?').get('other-role')!.id as string
+  const assignment = sqlite.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at, proficient_at) VALUES (?, ?, ?, ?, ?)')
+  assignment.run('member', 'org-a', 'legacy-role', start, null)
+  assignment.run('admin', 'org-a', 'legacy-role', start, start + 4 * day)
+  assignment.run('other-owner', 'org-b', 'other-role', start, start + day)
+  const concept = sqlite.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary, critical) VALUES (?, ?, ?, 0, ?, ?, ?)')
+  concept.run('scan', topic, 'warehouse', 'Scan each item', 'Scan each item.', 1)
+  concept.run('pick', topic, 'warehouse', 'Read the pick ticket', 'Read the pick ticket.', 0)
+  concept.run('foreign', foreignTopic, 'other-unit', 'Other company safety', 'Other company safety.', 1)
+  const known = sqlite.prepare('INSERT INTO learner_concept (learner_id, concept_id, p_known, updated_at) VALUES (?, ?, ?, ?)')
+  known.run('member', 'scan', 0.4, start)
+  for (const id of ['scan', 'pick']) known.run('admin', id, 0.95, start + 4 * day)
+  known.run('other-owner', 'foreign', 0.99, start + day)
+  sqlite.prepare('INSERT INTO invitation (id, organization_id, email, expires_at, inviter_id, job_role_id, invitee_name) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run('waiting', 'org-a', 'waiting@x.test', Date.now() + day, 'owner', 'legacy-role', 'Waiting')
+  const attempt = sqlite.prepare('INSERT INTO attempts (id, learner_id, item_id, concept_id, at, answer_json, correct, score, confidence, response_ms, rating, p_known_before, p_known_after) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1000, 1, 0.5, 0.4)')
+  attempt.run('critical-error', 'member', 'scan-item', 'scan', start + day, '"skip scan"', 0, 0, 'sure')
+  attempt.run('ordinary-error', 'member', 'pick-item', 'pick', start + day, '"skip ticket"', 0, 0, 'sure')
+  attempt.run('foreign-error', 'member', 'foreign-item', 'foreign', start + day, '"skip safety"', 0, 0, 'sure')
+  const people = await getPeople({ data: { slug: 'alpha' } })
+  expect(people.members).toEqual([
+    expect.objectContaining({ name: 'owner', training: null }),
+    expect.objectContaining({ name: 'admin', training: { stage: 'proficient', daysToProficiency: 4, criticalConfidentErrors: 0 } }),
+    expect.objectContaining({ name: 'member', training: { stage: 'onboarding', daysToProficiency: null, criticalConfidentErrors: 1 } }),
+  ])
+  expect(people.invites).toEqual([expect.objectContaining({ name: 'Waiting', expired: false })])
+  expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { proficientEmployees: 1, daysToProficiency: 4 } })
+
+  attempt.run('corrected', 'member', 'scan-item', 'scan', start + 2 * day, '"scan"', 1, 1, 'sure')
+  sqlite.prepare('UPDATE learner_concept SET p_known = 0.5 WHERE learner_id = ? AND concept_id = ?').run('admin', 'scan')
+  expect((await getPeople({ data: { slug: 'alpha' } })).members).toEqual([
+    expect.objectContaining({ name: 'owner', training: null }),
+    expect.objectContaining({ name: 'admin', training: { stage: 'onboarding', daysToProficiency: null, criticalConfidentErrors: 0 } }),
+    expect.objectContaining({ name: 'member', training: { stage: 'onboarding', daysToProficiency: null, criticalConfidentErrors: 0 } }),
+  ])
+  expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { proficientEmployees: 0, daysToProficiency: null } })
 })
 
 it('rolls back the role when its draft topic cannot be stored', async () => {

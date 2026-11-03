@@ -148,6 +148,19 @@ function People() {
                 <span className="font-normal text-muted-foreground">{m.email}</span>
               </p>
               <p className="text-sm">{[m.role, m.jobRole].filter(Boolean).join(' · ')}</p>
+              {m.training && (
+                <>
+                  <p className="mt-2 text-sm">
+                    {m.training.stage === 'proficient' ? 'Proficient' : 'Onboarding'}
+                    {m.training.daysToProficiency !== null && ` · ${m.training.daysToProficiency} days to proficiency`}
+                  </p>
+                  {m.training.criticalConfidentErrors > 0 && (
+                    <p className="mt-1 text-sm font-medium text-wrong">
+                      {m.training.criticalConfidentErrors} confident {m.training.criticalConfidentErrors === 1 ? 'error' : 'errors'} on a critical step
+                    </p>
+                  )}
+                </>
+              )}
             </li>
           ))}
         </ul>
