@@ -68,7 +68,7 @@ or transcription fails.
 
 ## Demo company walkthrough
 
-The [Northwind Logistics seed](seed/README.md) creates a warehouse demo with an
+The [Northwind Logistics seed](apps/web/seed/README.md) creates a warehouse demo with an
 original SOP, generated training questions and employees at invited, onboarding
 and proficient stages. Passwords are supplied from Proton Pass at runtime.
 
@@ -99,43 +99,44 @@ login when configured), shadcn/ui and Tailwind 4. R2 stores generated procedure 
 
 ## Run locally
 
-Use Node.js 24 and pnpm 12.
+Use Node.js 24 and pnpm 12.14.0. The web app lives in `apps/web`; run these
+commands from the repository root.
 
 ```sh
 pnpm install --frozen-lockfile
-cp .dev.vars.example .dev.vars
+cp apps/web/.dev.vars.example apps/web/.dev.vars
 ```
 
-Edit `.dev.vars`: set `LLM_API_KEY` to your Meta Model API key, replace
+Edit `apps/web/.dev.vars`: set `LLM_API_KEY` to your Meta Model API key, replace
 `BETTER_AUTH_SECRET` with a random secret of at least 32 characters, and keep
 `BETTER_AUTH_URL=http://localhost:3000` for the local origin. Then run:
 
 ```sh
-pnpm exec wrangler d1 migrations apply learnquiz --local
+pnpm db:migrate:local
 pnpm dev                              # http://localhost:3000
 ```
 
-`.dev.vars` is git-ignored; keep credentials out of version control. The default
-model configuration is in `wrangler.jsonc`. Local D1 data is separate from production.
+`apps/web/.dev.vars` is git-ignored; keep credentials out of version control. The default
+model configuration is in `apps/web/wrangler.jsonc`. Local D1 data is separate from production.
 
 | Setting | Purpose |
 | --- | --- |
 | `JOB_MODELS` | Provider and model for each model job |
 | `LLM_PROFILE`, `LLM_BASE_URL`, `LLM_MODEL` | Legacy defaults for unmapped jobs (`meta`, `baseten`, `fireworks`, `ollama`) |
 | `LLM_API_KEY`, `BASETEN_API_KEY`, `FIREWORKS_API_KEY` | Provider credentials; store as secrets |
-| `VOICE_ENABLED` | Enable the voice job with Meta's transcription model; `true` in `wrangler.jsonc`; set `false` in `.dev.vars` to hide voice locally |
+| `VOICE_ENABLED` | Enable the voice job with Meta's transcription model; `true` in `apps/web/wrangler.jsonc`; set `false` in `apps/web/.dev.vars` to hide voice locally |
 | `IMAGE_MODEL` | Legacy model for an unmapped image job |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web Push key pair and contact; required to enable notifications |
 | `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET` | App origin and authentication secret |
 | `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET` | Optional Facebook login; both are required |
 
-`JOB_MODELS` in `wrangler.jsonc` maps `curriculum`, `items`, `self_check`, `plan`,
+`JOB_MODELS` in `apps/web/wrangler.jsonc` maps `curriculum`, `items`, `self_check`, `plan`,
 `grade`, `image`, `voice`, and the placement result's `placement_line` to a provider
 and model. For example, set `self_check` to
 `{ "provider": "baseten", "model": "muse-spark-open" }` and supply `BASETEN_API_KEY`
 to use a second model for checking questions. Session planning remains a reserved
 job for the planned coach feature. Only the Meta models listed in
-`src/lib/llm/models.ts` are accepted. Fireworks may prefix a model ID with
+`apps/web/src/lib/llm/models.ts` are accepted. Fireworks may prefix a model ID with
 `accounts/fireworks/models/`.
 
 | Provider | Base URL | Secret binding | JSON mode |
@@ -148,7 +149,7 @@ All JSON output is validated locally; invalid output gets one retry. Provider an
 network errors fail immediately. Requests, call logs and generated-content labels
 use the job's selected model, including failures and retries.
 
-`.dev.vars` can override `JOB_MODELS` with a JSON string. Unmapped jobs retain
+`apps/web/.dev.vars` can override `JOB_MODELS` with a JSON string. Unmapped jobs retain
 `LLM_PROFILE` and `LLM_MODEL` (or `IMAGE_MODEL` for images, Muse Voice Transcribe 1.0
 for voice). `LLM_BASE_URL` overrides the URL for `LLM_PROFILE`; that profile may
 also fall back to `LLM_API_KEY` for its secret. For the local edition, set
@@ -159,14 +160,15 @@ image generation switch off; no model server is bundled.
 For local staff access, sign up first, then grant that local account the staff role:
 
 ```sh
-pnpm exec wrangler d1 execute learnquiz --local --command "UPDATE user SET role='admin' WHERE email='you@example.com'"
+pnpm --filter @learnquiz/web exec wrangler d1 execute learnquiz --local --command "UPDATE user SET role='admin' WHERE email='you@example.com'"
 ```
 
 Verify with the same Node.js version as CI:
 
 ```sh
-pnpm exec tsc --noEmit
-pnpm test -- src/server/play.test.ts    # pass the touched test paths for a focused run
+pnpm typecheck
+pnpm test
+pnpm --filter @learnquiz/web test src/server/play.test.ts    # pass the touched test paths for a focused run
 pnpm build
 ```
 
@@ -208,17 +210,17 @@ the link; opening it records `push_log.opened_at` and resumes a single-question
 The checked-in Worker, database ID, bucket and custom domain target the live
 `learnquiz.com` service; its owner handles production deployments. For your own
 deployment, use your Cloudflare account, create a D1 database and R2 bucket, and
-update `wrangler.jsonc` with your Worker name, database ID, bucket name and domain.
+update `apps/web/wrangler.jsonc` with your Worker name, database ID, bucket name and domain.
 Set `BETTER_AUTH_URL` to that domain's HTTPS origin and check the model configuration.
 
 After verification, configure secrets interactively and apply migrations to your
 own database before deploying (use its name in place of `learnquiz` if different):
 
 ```sh
-pnpm exec wrangler secret put LLM_API_KEY
-pnpm exec wrangler secret put BETTER_AUTH_SECRET
-pnpm exec wrangler d1 migrations apply learnquiz --remote
-pnpm deploy
+pnpm --filter @learnquiz/web exec wrangler secret put LLM_API_KEY
+pnpm --filter @learnquiz/web exec wrangler secret put BETTER_AUTH_SECRET
+pnpm --filter @learnquiz/web exec wrangler d1 migrations apply learnquiz --remote
+pnpm --filter @learnquiz/web deploy
 ```
 
 Set `FACEBOOK_APP_ID` and `FACEBOOK_APP_SECRET` as well if using Facebook login.
@@ -227,7 +229,7 @@ requests to the app hostname, 10 per minute per IP, block. The Worker also caps 
 learner at 20 model calls per UTC day, including retries, voice transcriptions and
 image generations.
 
-`src/worker.ts` delegates HTTP requests to TanStack Start. Queue and scheduled
+`apps/web/src/worker.ts` delegates HTTP requests to TanStack Start. Queue and scheduled
 handlers are empty; background processing and scheduled reminders are not shipped.
 
 ## Disclosure for the judges

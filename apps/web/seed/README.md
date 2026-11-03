@@ -11,7 +11,7 @@ Use Node 24 and install the project's dependencies. Apply the existing migration
 to the selected database first. For local D1:
 
 ```sh
-pnpm exec wrangler d1 migrations apply learnquiz --local
+pnpm db:migrate:local
 ```
 
 Supply `NORTHWIND_OWNER_PASSWORD` and `NORTHWIND_LEARNER_PASSWORD` from Proton Pass.
@@ -21,10 +21,10 @@ untracked environment-reference file containing only your own `pass://`
 references, then run:
 
 ```sh
-pass-cli run --env-file /path/to/northwind-references.env -- pnpm seed:northwind --local
+pass-cli run --env-file /path/to/northwind-references.env -- pnpm --filter @learnquiz/web seed:northwind --local
 ```
 
-Configure the model provider and credentials as for the local app in `.dev.vars`.
+Configure the model provider and credentials as for the local app in `apps/web/.dev.vars`.
 The command also accepts model bindings supplied through the process environment.
 An invalid model response, missing critical scanning concept, exhausted daily
 limit or database conflict stops the seed rather than substituting a generic
@@ -34,7 +34,7 @@ record is refused.
 
 The command runs a temporary Worker on loopback and stops it when done. It does
 not deploy the app or apply migrations. `--remote` instead of `--local` selects
-the D1 database configured in `wrangler.jsonc` through a remote binding and needs
+the D1 database configured in `apps/web/wrangler.jsonc` through a remote binding and needs
 the operator's Cloudflare access. Its writes affect that remote database.
 
 Sign in as `owner@northwind.learnquiz.test` with the owner password and open

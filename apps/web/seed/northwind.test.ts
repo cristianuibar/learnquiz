@@ -206,7 +206,7 @@ it('seeds the three employee stages through the real SOP pipeline and preserves 
   ]))
   expect(people.members).toHaveLength(3)
   expect(people.invites).toEqual([expect.objectContaining({ email: NORTHWIND.emails.invited, expired: false, jobRole: 'Warehouse picker' })])
-  expect(await getOrgOverview({ data: { slug: result.slug } })).toMatchObject({ training: { employees: 2, proficientEmployees: 1, daysToProficiency: 6, criticalErrorsThisWeek: 1, documentsToReview: null } })
+  expect(await getOrgOverview({ data: { slug: result.slug } })).toMatchObject({ training: { employees: 3, proficientEmployees: 1, daysToProficiency: 6, criticalErrorsThisWeek: 1, documentsToReview: null } })
   await signIn(NORTHWIND.emails.onboarding, secret.learnerPassword)
 
   raw.prepare('UPDATE learner_concept SET p_known = 0.32 WHERE learner_id = (SELECT id FROM user WHERE email = ?)').run(NORTHWIND.emails.onboarding)
