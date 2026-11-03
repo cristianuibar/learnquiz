@@ -273,8 +273,9 @@ it.each([
   await expect(curriculum.getConceptItems({ data: { conceptId: 'c1' } })).resolves.toEqual({ items: [] })
 })
 
-it.each([[true, false], [false, true]])('opens Today and the Path tab on the role topic (items %s, preparing %s)', async (withItem, preparing) => {
+it.each([[true, 'ready', false], [false, 'ready', true], [false, 'draft', true]])('opens Today and the Path tab on the role topic (items %s, %s, preparing %s)', async (withItem, topicStatus, preparing) => {
   seedRoleCurriculum(withItem)
+  raw.exec(`UPDATE topics SET status = '${topicStatus}' WHERE id = 'picker-topic'`)
   holder.userId = 'employee'
   raw.exec("INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES ('employee', 'northwind', 'picker', 1)")
   const today = await getToday()

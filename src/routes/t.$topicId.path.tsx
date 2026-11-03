@@ -97,9 +97,13 @@ function Path() {
         ))}
       </ol>
       <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 -mx-4 mt-8 border-t bg-background px-4 py-4">
-        <StartButton topicId={topic.id} placement={!learner.placed}>
-          {learner.placed ? 'Start session' : 'Find my level'}
-        </StartButton>
+        {topic.status === 'ready' ? (
+          <StartButton topicId={topic.id} placement={!learner.placed}>
+            {learner.placed ? 'Start session' : 'Find my level'}
+          </StartButton>
+        ) : (
+          <p role="status" className="text-muted-foreground">Your training is being prepared</p>
+        )}
       </div>
     </main>
   )
