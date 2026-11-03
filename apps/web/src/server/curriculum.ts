@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { getDb } from '@/db'
 import { conceptEdges, concepts, items, learnerConcept, learnerItem, learnerTopic, learnerUnit, placements, sources, topics, units } from '@/db/schema'
 import { validateSkeleton, fallbackSkeleton } from '@/lib/curriculum/validate'
+import { streakShown } from '@/lib/learning/session'
 import { chatJson, jobModel, LlmError } from '@/lib/llm/client'
 import { curriculumPrompt } from '@/lib/llm/prompts'
 import { CurriculumSkeleton } from '@/lib/llm/schemas'
@@ -151,7 +152,7 @@ export const getTopicPath = createServerFn({ method: 'GET' })
         .innerJoin(concepts, eq(concepts.id, learnerConcept.conceptId))
         .where(and(eq(learnerConcept.learnerId, learnerId), eq(concepts.topicId, topic.id))),
       db
-        .select({ level: learnerTopic.level, xp: learnerTopic.xp, streak: learnerTopic.streakCount })
+        .select({ level: learnerTopic.level, xp: learnerTopic.xp, streakCount: learnerTopic.streakCount, lastSessionAt: learnerTopic.lastSessionAt })
         .from(learnerTopic)
         .where(and(eq(learnerTopic.learnerId, learnerId), eq(learnerTopic.topicId, topic.id))),
       db
@@ -176,7 +177,7 @@ export const getTopicPath = createServerFn({ method: 'GET' })
         levelLineModel: placement ? ((JSON.parse(placement.logJson) as { levelLineModel?: string }).levelLineModel ?? null) : null,
         placed: Boolean(placement),
         xp: lt?.xp ?? 0,
-        streak: lt?.streak ?? 0,
+        streak: lt ? streakShown(lt, Date.now()) : 0,
       },
       units: unitRows.map((u) => {
         const unitConcepts = conceptRows
