@@ -4,6 +4,7 @@ import { ChevronLeft } from 'lucide-react-native'
 import { reportReasons, type ReportReason } from '@learnquiz/api/reveal'
 import { reportFailed } from '@learnquiz/api/system-copy'
 import { sendReport } from '../../lib/report'
+import { canLeave, canSend, initialSendState, sendBusy, sendFailed, settleSend, startSend, type SendState } from '../../lib/report-send'
 import type { Branding } from '../../lib/session-store'
 import { useTheme } from '../../theme/ThemeProvider'
 import type { SheetProps } from '../sheet/sheet'
@@ -45,20 +46,18 @@ export function useReportSheet({ itemId, attemptId, onBack, onSent, branding }: 
   const { colors, space, radius, sizes, typography } = useTheme()
   const [reason, setReason] = useState<ReportReason | null>(null)
   const [note, setNote] = useState('')
-  const [sending, setSending] = useState(false)
-  const [failed, setFailed] = useState(false)
+  const [send, setSend] = useState<SendState>(initialSendState)
   const [focusedReason, setFocusedReason] = useState<ReportReason | null>(null)
   const headingRef = useRef<NativeText | null>(null)
-  const inflight = useRef(false)
+  const sendRef = useRef<SendState>(initialSendState)
   const generation = useRef(0)
 
   const reset = useCallback(() => {
     generation.current += 1
-    inflight.current = false
+    sendRef.current = initialSendState
     setReason(null)
     setNote('')
-    setSending(false)
-    setFailed(false)
+    setSend(initialSendState)
     setFocusedReason(null)
   }, [])
 
@@ -70,6 +69,7 @@ export function useReportSheet({ itemId, attemptId, onBack, onSent, branding }: 
   }, [itemId, attemptId, reset])
 
   const handleBack = useCallback(() => {
+    if (!canLeave(sendRef.current)) return
     reset()
     onBack()
   }, [onBack, reset])
@@ -80,17 +80,17 @@ export function useReportSheet({ itemId, attemptId, onBack, onSent, branding }: 
   }, [handleBack])
 
   const handleSend = useCallback(() => {
-    if (reason === null || inflight.current) return
+    const started = startSend(sendRef.current, reason)
+    if (!started.started || reason === null) return
     const request = ++generation.current
-    inflight.current = true
-    setSending(true)
-    setFailed(false)
+    sendRef.current = started.state
+    setSend(started.state)
     const settle = (ok: boolean) => {
       if (request !== generation.current) return
-      inflight.current = false
-      setSending(false)
-      if (ok) onSent()
-      else setFailed(true)
+      const settled = settleSend(sendRef.current, ok)
+      sendRef.current = settled.state
+      setSend(settled.state)
+      if (settled.notifySent) onSent()
     }
     void sendReport({ itemId, attemptId, reason, note }).then(
       (ok) => settle(ok),
@@ -105,7 +105,7 @@ export function useReportSheet({ itemId, attemptId, onBack, onSent, branding }: 
     grabber: false,
     band: (
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[1], paddingTop: space[2], paddingRight: space[4], paddingLeft: space[2] }}>
-        <IconButton icon={ChevronLeft} accessibilityLabel="Back to result" onPress={handleBack} />
+        <IconButton icon={ChevronLeft} accessibilityLabel="Back to result" disabled={!canLeave(send)} onPress={handleBack} />
         <Text ref={headingRef} header variant="title2" nativeID="report-heading" style={{ flex: 1 }}>
           Report this question
         </Text>
@@ -176,11 +176,11 @@ export function useReportSheet({ itemId, attemptId, onBack, onSent, branding }: 
     ),
     foot: (
       <>
-        {failed ? <AlertRow>{reportFailed}</AlertRow> : null}
-        <Button variant="primary" size="lg" disabled={reason === null} busy={sending} onPress={handleSend}>
+        {sendFailed(send) ? <AlertRow>{reportFailed}</AlertRow> : null}
+        <Button variant="primary" size="lg" disabled={!canSend(send, reason)} busy={sendBusy(send)} onPress={handleSend}>
           Send report
         </Button>
-        <Button variant="ghost" onPress={handleBack}>
+        <Button variant="ghost" disabled={!canLeave(send)} onPress={handleBack}>
           Cancel
         </Button>
       </>
