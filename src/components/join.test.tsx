@@ -11,6 +11,7 @@ const { signUp, acceptInvitation } = vi.hoisted(() => ({ signUp: vi.fn(), accept
 
 vi.mock('@/lib/auth-client', () => ({ authClient: { signUp: { email: signUp }, organization: { acceptInvitation } } }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
+vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => null }))
 vi.mock('@/server/org', () => ({
   getInvite: async () => ({ company: 'Acme', email: 'learner@example.test', name: 'Learner', status: 'pending' }),
