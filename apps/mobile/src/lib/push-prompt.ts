@@ -17,7 +17,9 @@ export const PUSH_TOKEN_KEY = 'lq:push-token'
 export const FINISHED_KEY = 'lq:push-prompt:finished'
 export const SKIPS_KEY = 'lq:push-prompt:skips'
 
-const MAX_IDS = 50
+// Prompt timing only distinguishes 0, 1, 2, 3 and 4-or-more completions.
+// Retain the counted IDs until saturation, then never count another session.
+const MAX_FINISHED = 4
 
 export function shouldPromptOptIn(s: OptInState): boolean {
   if (s.registered) return false
@@ -37,7 +39,10 @@ function readFinished(raw: unknown): Finished {
     Array.isArray((raw as Finished).ids) &&
     (raw as Finished).ids.every((id) => typeof id === 'string')
   ) {
-    return { count: Math.max(0, Math.floor((raw as Finished).count)), ids: (raw as Finished).ids }
+    return {
+      count: Math.min(MAX_FINISHED, Math.max(0, Math.floor((raw as Finished).count))),
+      ids: (raw as Finished).ids.slice(0, MAX_FINISHED),
+    }
   }
   return { count: 0, ids: [] }
 }
@@ -57,8 +62,10 @@ function serialize<T>(task: () => Promise<T>): Promise<T> {
 export function recordFinished(sessionId: string, store: PromptStore = kv): Promise<number> {
   return serialize(async () => {
     const current = readFinished(await store.getJSON<unknown>(FINISHED_KEY))
-    if (current.ids.includes(sessionId)) return current.count
-    const next: Finished = { count: current.count + 1, ids: [...current.ids, sessionId].slice(-MAX_IDS) }
+    // Also compacts the legacy { count, ids } record under the same kv key.
+    const next: Finished = current.count >= MAX_FINISHED || current.ids.includes(sessionId)
+      ? current
+      : { count: current.count + 1, ids: [...current.ids, sessionId] }
     await store.setJSON(FINISHED_KEY, next)
     return next.count
   })

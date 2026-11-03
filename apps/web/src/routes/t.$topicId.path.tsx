@@ -147,7 +147,7 @@ function Concept({
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="font-medium">{concept.name}</h3>
         {concept.grounded && <Badge variant="neutral">From your material</Badge>}
-        {concept.itemCount > 0 && <span className="text-sm text-muted-foreground">{plural(concept.itemCount, 'question', 'questions')}</span>}
+        {concept.answeredCount > 0 && <span className="text-sm text-muted-foreground">{concept.answeredCount} answered</span>}
       </div>
       <p className="mt-1 text-sm text-muted-foreground">{concept.summary}</p>
       {showDiagram && concept.visual && <ConceptDiagram conceptId={concept.id} />}
@@ -156,7 +156,7 @@ function Concept({
           <Working label="Loading answered questions" />
         </div>
       ) : (
-        concept.itemCount > 0 &&
+        concept.answeredCount > 0 &&
         !error && (
           <Button
             variant="secondary"

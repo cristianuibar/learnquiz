@@ -64,7 +64,7 @@ export const reviewQuestion = createServerFn({ method: 'POST' })
       const parsed = ItemPayload.safeParse(data.payload)
       if (!parsed.success) throw httpError(`Invalid question: ${parsed.error.issues.map((i) => i.message).join('; ')}`, 400)
       const payload = parsed.data
-      if (!ENABLED_FORMATS.includes(payload.format)) throw httpError(`Invalid question: ${payload.format} questions are not available yet`, 400)
+      if (!ENABLED_FORMATS.includes(payload.format) && payload.format !== row.item.format) throw httpError(`Invalid question: ${payload.format} questions are not available yet`, 400)
       const previouslyGrounded = (JSON.parse(row.item.payloadJson) as ItemPayload).grounded
       const quote = findSourceQuote(payload.source_quote, row.sourceText ?? row.concept.sourceQuote)
       if ((payload.source_quote !== null && !quote) ||

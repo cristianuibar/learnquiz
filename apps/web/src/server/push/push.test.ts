@@ -23,6 +23,7 @@ vi.mock('@tanstack/react-start/server', () => ({ setResponseStatus: vi.fn() }))
 
 import { getPushSettings, savePushPreferences, sendTestPush, subscribe, subscribeExpo, unsubscribe } from './index'
 import { sendPush } from './sender'
+import { sendDuePushes } from './schedule'
 import type { Db } from '@/db'
 import type { pushSubscriptions } from '@/db/schema'
 
@@ -363,4 +364,174 @@ it('reports the personal default schedule, then the company schedule, seeding an
   expect((await getPushSettings()).schedule.window).toEqual(company)
   await savePushPreferences({ data: { paused: false, startMinute: 540, endMinute: 600, timezone: 'UTC' } })
   expect((await getPushSettings()).schedule.window).toEqual({ ...company, startMinute: 540, endMinute: 600, source: 'learner' })
+})
+
+// Scheduled sends: a learner with one web and one Expo device, a personal topic and two due questions.
+const MIN = 60_000
+const noon = Date.parse('2026-11-02T12:00:00Z')
+async function seedLearner({ web = true, expo = true, paused = false, company = false } = {}) {
+  vi.mocked(getSessionUser).mockResolvedValue(learner as never)
+  if (company) {
+    raw.prepare('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, ?)').run('o1', 'Acme', 'acme', noon)
+    raw.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, ?)').run('m1', 'o1', 'learner', 'member', noon)
+    raw.prepare('INSERT INTO org_settings (org_id, company_name, timezone, working_hours_json) VALUES (?, ?, ?, ?)')
+      .run('o1', 'Acme', 'UTC', JSON.stringify({ days: [1, 2, 3, 4, 5], start: '09:00', end: '17:00' }))
+    raw.prepare('INSERT INTO job_roles (id, org_id, name, onboarding_days, status, created_at) VALUES (?, ?, ?, ?, ?, ?)').run('r1', 'o1', 'Barista', 30, 'active', noon)
+    raw.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES (?, ?, ?, ?)').run('learner', 'o1', 'r1', noon - 86_400_000)
+  }
+  if (web) await subscribe({ data: { endpoint, keys } })
+  if (expo) await subscribeExpo({ data: { token } })
+  await savePushPreferences({ data: { ...preferences, paused } })
+  raw.prepare('INSERT INTO topics (id, learner_id, title, status, created_at) VALUES (?, ?, ?, ?, ?)').run('t1', 'learner', 'Maths', 'ready', noon)
+  for (const [id, stem, due] of [['i-new', 'New stem?', noon - 60 * MIN], ['i-old', 'Old stem?', noon - 5 * 86_400_000]] as const) {
+    raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(id, 'c1', 't1', 'mcq', JSON.stringify({ format: 'mcq', stem }), 'active', noon)
+    raw.prepare('INSERT INTO learner_item (learner_id, item_id, due, stability, difficulty, state) VALUES (?, ?, ?, ?, ?, ?)').run('learner', id, due, 1, 5, 2)
+  }
+  http.mockImplementation(async (input) => String(input) === expoUrl ? Response.json({ data: { status: 'ok' } }) : new Response(null, { status: 201 }))
+}
+// Accepted pushes for distinct items, the last `lastAgo` minutes before the current time, spaced 70 minutes apart.
+const seedPushes = (count: number, lastAgo = 70) => {
+  for (let i = 0; i < count; i++) {
+    raw.prepare('INSERT INTO push_log (id, user_id, subscription_id, outcome, item_id, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(`old-${i}`, 'learner', 'gone-sub', 'accepted', `earlier-${i}`, Date.now() - (lastAgo + (count - 1 - i) * 70) * MIN)
+  }
+}
+const pushLogRows = () => rows("SELECT item_id, outcome FROM push_log WHERE id NOT LIKE 'old-%' ORDER BY subscription_id")
+
+it('sends the most overdue question once to every device of an eligible learner', async () => {
+  await seedLearner()
+  await expect(sendDuePushes(Date.now(), holder.db as Db)).resolves.toBe(2)
+  expect(http.mock.calls.map(([destination]) => String(destination)).sort()).toEqual([endpoint, expoUrl].sort())
+  const log = rows("SELECT id, item_id, outcome FROM push_log WHERE item_id = 'i-old' AND outcome = 'accepted'")
+  expect(log).toHaveLength(2)
+  expect(pushLogRows()).toEqual([{ item_id: 'i-old', outcome: 'accepted' }, { item_id: 'i-old', outcome: 'accepted' }])
+  const expoCall = http.mock.calls.find(([destination]) => String(destination) === expoUrl)!
+  const body = JSON.parse(expoCall[1]!.body as string)
+  expect(body).toMatchObject({ to: token, title: 'Old stem?', ttl: 3600 })
+  expect(log.map((r) => `/play/quick/i-old?pushId=${r.id}`)).toContain(body.data.url)
+})
+
+it('skips web devices without VAPID config but still sends to Expo', async () => {
+  await seedLearner()
+  holder.env = {}
+  await expect(sendDuePushes(Date.now(), holder.db as Db)).resolves.toBe(1)
+  expect(http.mock.calls.map(([destination]) => String(destination))).toEqual([expoUrl])
+})
+
+it.each([
+  { name: 'steady learner with 2 pushes today', company: false, pushes: 2, sends: 2 },
+  { name: 'steady learner at the cap of 3', company: false, pushes: 3, sends: 0 },
+  { name: 'onboarding learner past the steady cap', company: true, pushes: 3, sends: 2 },
+  { name: 'onboarding learner at the cap of 6', company: true, pushes: 6, sends: 0 },
+])('$name', async ({ company, pushes, sends }) => {
+  await seedLearner({ company })
+  seedPushes(pushes)
+  expect(await sendDuePushes(Date.now(), holder.db as Db)).toBe(sends)
+  expect(http).toHaveBeenCalledTimes(sends)
+  expect(pushLogRows()).toHaveLength(sends)
+})
+
+it('counts a push to several devices once and ignores pushes before the local day', async () => {
+  await seedLearner()
+  seedPushes(2)
+  // A second device row for an earlier push, and a push from yesterday.
+  raw.prepare('INSERT INTO push_log (id, user_id, subscription_id, outcome, item_id, created_at) VALUES (?, ?, ?, ?, ?, ?)').run('old-dup', 'learner', 'gone-sub-2', 'accepted', 'earlier-0', noon - 300 * MIN)
+  raw.prepare('INSERT INTO push_log (id, user_id, subscription_id, outcome, item_id, created_at) VALUES (?, ?, ?, ?, ?, ?)').run('old-yesterday', 'learner', 'gone-sub', 'accepted', 'earlier-y', noon - 20 * 3_600_000)
+  expect(await sendDuePushes(Date.now(), holder.db as Db)).toBe(2)
+})
+
+it.each([
+  { name: 'the last push was 30 minutes ago', prepare: () => seedPushes(1, 30) },
+  { name: 'the last push was 59 minutes ago', prepare: () => seedPushes(1, 59) },
+  { name: 'there is no subscription', prepare: () => raw.exec('DELETE FROM push_subscriptions') },
+  { name: 'pushes are paused', prepare: () => raw.exec('UPDATE push_prefs SET paused = 1') },
+  { name: 'pushes are disabled', prepare: () => raw.exec('UPDATE push_prefs SET enabled = 0') },
+  { name: 'the account is banned', prepare: () => raw.exec("UPDATE user SET banned = 1 WHERE id = 'learner'") },
+  { name: 'it is after the window', prepare: () => vi.setSystemTime(new Date('2026-11-02T18:00:00Z')) },
+  { name: 'it is before the window', prepare: () => vi.setSystemTime(new Date('2026-11-02T08:00:00Z')) },
+  { name: 'it is a non-working day', prepare: () => vi.setSystemTime(new Date('2026-11-07T12:00:00Z')) },
+  { name: 'no question is due', prepare: () => raw.exec('UPDATE learner_item SET due = due + 864000000000') },
+  { name: 'every due question was pushed in the last 24 hours', prepare: () => {
+    for (const id of ['i-new', 'i-old']) raw.prepare('INSERT INTO push_log (id, user_id, subscription_id, outcome, item_id, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(`old-${id}`, 'learner', 'gone-sub', 'accepted', id, noon - 22 * 3_600_000)
+  } },
+])('sends nothing when $name', async ({ prepare }) => {
+  await seedLearner()
+  prepare()
+  const before = rows('SELECT COUNT(*) AS n FROM push_log')
+  expect(await sendDuePushes(Date.now(), holder.db as Db)).toBe(0)
+  expect(http).not.toHaveBeenCalled()
+  expect(rows('SELECT COUNT(*) AS n FROM push_log')).toEqual(before)
+})
+
+it('sends again once the 60-minute gap has passed', async () => {
+  await seedLearner()
+  seedPushes(1, 61)
+  expect(await sendDuePushes(Date.now(), holder.db as Db)).toBe(2)
+})
+
+it('keeps going when one learner fails', async () => {
+  await seedLearner()
+  raw.prepare('INSERT INTO user (id, name, email) VALUES (?, ?, ?)').run('other', 'other', 'other@example.test')
+  vi.mocked(getSessionUser).mockResolvedValue({ ...learner, id: 'other' } as never)
+  await subscribeExpo({ data: { token: 'ExponentPushToken[other-1]' } })
+  raw.prepare('INSERT INTO topics (id, learner_id, title, status, created_at) VALUES (?, ?, ?, ?, ?)').run('t2', 'other', 'Other', 'ready', noon)
+  raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run('i-other', 'c2', 't2', 'mcq', JSON.stringify({ format: 'mcq', stem: 'Other?' }), 'active', noon)
+  raw.prepare('INSERT INTO learner_item (learner_id, item_id, due, stability, difficulty, state) VALUES (?, ?, ?, ?, ?, ?)').run('other', 'i-other', noon - MIN, 1, 5, 2)
+  // An unusable stored timezone makes the first learner throw; the other still gets theirs.
+  raw.exec("UPDATE push_prefs SET timezone = 'Not/AZone' WHERE user_id = 'learner'")
+  expect(await sendDuePushes(Date.now(), holder.db as Db)).toBe(1)
+  expect(rows("SELECT user_id, item_id FROM push_log WHERE outcome = 'accepted'")).toEqual([{ user_id: 'other', item_id: 'i-other' }])
+})
+
+it.each([
+  { at: '2026-11-02T12:00:00Z', ttl: 3600 },
+  { at: '2026-11-02T16:00:00Z', ttl: 3600 },
+  { at: '2026-11-02T16:30:00Z', ttl: 1800 },
+  { at: '2026-11-02T16:59:30Z', ttl: 30 },
+])('caps the delivery ttl at the window end: $at gives $ttl seconds', async ({ at, ttl }) => {
+  await seedLearner()
+  vi.setSystemTime(new Date(at))
+  expect(await sendDuePushes(Date.now(), holder.db as Db)).toBe(2)
+  const webCall = http.mock.calls.find(([destination]) => String(destination) === endpoint)!
+  const expoCall = http.mock.calls.find(([destination]) => String(destination) === expoUrl)!
+  expect(new Headers(webCall[1]!.headers).get('TTL')).toBe(String(ttl))
+  expect(JSON.parse(expoCall[1]!.body as string).ttl).toBe(ttl)
+})
+
+it('measures the local day and window end in the learner timezone', async () => {
+  await seedLearner()
+  // 14:30Z is 09:30 in New York (UTC-5) and the local day began at 05:00Z; two of the three pushes were yesterday local time.
+  await savePushPreferences({ data: { ...preferences, timezone: 'America/New_York' } })
+  vi.setSystemTime(new Date('2026-11-02T14:30:00Z'))
+  seedPushes(3, 70)
+  raw.exec(`UPDATE push_log SET created_at = ${Date.parse('2026-11-02T04:00:00Z')} WHERE id IN ('old-0', 'old-1')`)
+  expect(await sendDuePushes(Date.now(), holder.db as Db)).toBe(2)
+  expect(JSON.parse(http.mock.calls.find(([d]) => String(d) === expoUrl)![1]!.body as string).ttl).toBe(3600)
+})
+
+it('delivers in the company window when the learner kept personal UTC hours from before joining', async () => {
+  await seedLearner()
+  raw.prepare('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, ?)').run('o1', 'Acme', 'acme', noon)
+  raw.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, ?)').run('m1', 'o1', 'learner', 'member', noon)
+  raw.prepare('INSERT INTO org_settings (org_id, company_name, timezone, working_hours_json) VALUES (?, ?, ?, ?)')
+    .run('o1', 'Acme', 'America/Los_Angeles', JSON.stringify({ days: [1, 2, 3, 4, 5], start: '09:00', end: '17:00' }))
+  // 17:00Z is after the saved 09:00-17:00 UTC hours but 09:00 in Los Angeles, inside the company window.
+  vi.setSystemTime(new Date('2026-11-02T17:00:00Z'))
+  expect(await sendDuePushes(Date.now(), holder.db as Db)).toBe(2)
+  expect(pushLogRows()).toEqual([{ item_id: 'i-old', outcome: 'accepted' }, { item_id: 'i-old', outcome: 'accepted' }])
+  expect(http).toHaveBeenCalledTimes(2)
+})
+
+it('does not send the question to a device that moved to another account during the run', async () => {
+  await seedLearner()
+  // The shared phone is registered by another account while the web push is in flight.
+  http.mockImplementation(async (input) => {
+    if (String(input) === expoUrl) return Response.json({ data: { status: 'ok' } })
+    raw.prepare('UPDATE push_subscriptions SET user_id = ? WHERE endpoint = ?').run('staff', token)
+    return new Response(null, { status: 201 })
+  })
+  expect(await sendDuePushes(Date.now(), holder.db as Db)).toBe(1)
+  expect(http.mock.calls.map(([destination]) => String(destination))).toEqual([endpoint])
+  expect(rows("SELECT user_id, item_id FROM push_log WHERE item_id = 'i-old'")).toEqual([{ user_id: 'learner', item_id: 'i-old' }])
 })

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { BackHandler, View, type Text as NativeText } from 'react-native'
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import * as Notifications from 'expo-notifications'
@@ -33,16 +33,26 @@ export default function SessionDone() {
   const [state, setState] = useState<State>({ status: 'loading' })
   const finished = useRef<Promise<unknown>>(Promise.resolve())
   const preparedId = useRef<string | null>(null)
+  const active = useRef(true)
+  const leaving = useRef(false)
 
-  const toToday = useCallback(() => router.dismissTo(TODAY), [router])
+  const toToday = useCallback(() => {
+    leaving.current = true
+    active.current = false
+    router.dismissTo(TODAY)
+  }, [router])
 
   // Android Back leaves the summary for Today instead of returning to the finished session.
   useFocusEffect(useCallback(() => {
+    active.current = true
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       toToday()
       return true
     })
-    return () => subscription.remove()
+    return () => {
+      active.current = false
+      subscription.remove()
+    }
   }, [toToday]))
 
   useEffect(() => {
@@ -52,7 +62,7 @@ export default function SessionDone() {
     // Ending is idempotent, so a remount or retry returns the same summary.
     api<SummaryView>(`/sessions/${encodeURIComponent(sessionId)}/end`, { method: 'POST', signal: controller.signal })
       .then((summary) => {
-        if (controller.signal.aborted) return
+        if (controller.signal.aborted || leaving.current) return
         if (summary.total === 0) {
           toToday()
           return
@@ -83,7 +93,7 @@ export default function SessionDone() {
     <>
       <Stack.Screen options={{ gestureEnabled: false }} />
       {state.status === 'ready' ? (
-        <Summary summary={state.summary} finished={finished.current} toToday={toToday} />
+        <Summary summary={state.summary} finished={finished.current} toToday={toToday} active={active} />
       ) : (
         <Screen
           contentContainerStyle={{ paddingTop: space[4], paddingBottom: space[6], gap: space[8] }}
@@ -120,7 +130,12 @@ function Skeleton() {
   )
 }
 
-function Summary({ summary, finished, toToday }: { summary: SummaryView; finished: Promise<unknown>; toToday: () => void }) {
+function Summary({ summary, finished, toToday, active }: {
+  summary: SummaryView
+  finished: Promise<unknown>
+  toToday: () => void
+  active: RefObject<boolean>
+}) {
   const router = useRouter()
   const { space } = useTheme()
   const heading = useRef<NativeText>(null)
@@ -132,11 +147,13 @@ function Summary({ summary, finished, toToday }: { summary: SummaryView; finishe
   const coach = placed && summary.levelLine ? summary.levelLine : summary.nextLine
 
   const onContinue = async () => {
-    if (pending) return
+    if (pending || !active.current) return
     setPending(true)
     try {
       await finished
+      if (!active.current) return
       const [counts, permission] = await Promise.all([readPromptCounts(), Notifications.getPermissionsAsync()])
+      if (!active.current) return
       const prompt = shouldPromptOptIn({
         ...counts,
         permission: permission.status as PushPermission,
@@ -145,7 +162,7 @@ function Summary({ summary, finished, toToday }: { summary: SummaryView; finishe
       if (prompt) router.replace('/opt-in')
       else toToday()
     } catch {
-      toToday()
+      if (active.current) toToday()
     }
   }
 
@@ -160,7 +177,7 @@ function Summary({ summary, finished, toToday }: { summary: SummaryView; finishe
       contentContainerStyle={{ paddingTop: space[4], paddingBottom: space[6], gap: space[8] }}
       dock={
         <View style={{ gap: space[1] }}>
-          <Button size="lg" busy={pending} onPress={onContinue}>Continue</Button>
+          <Button size="lg" busy={pending} onPress={() => { void onContinue() }}>Continue</Button>
           <LinkButton style={{ alignSelf: 'center' }} disabled={pending} onPress={onAnother}>Another session</LinkButton>
         </View>
       }

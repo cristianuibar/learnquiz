@@ -29,7 +29,7 @@ export type TopicPath = {
       visual: boolean
       grounded: boolean
       critical: boolean
-      itemCount: number
+      answeredCount: number
       pKnown: number
       measured: boolean
       status: ConceptStatus

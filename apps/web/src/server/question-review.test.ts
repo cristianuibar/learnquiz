@@ -128,6 +128,36 @@ it('rejects invalid payloads, invented quotes and removing grounding with a mess
   }
 })
 
+it('edits stored multi and order questions in their own format, keeping flags and order, and still validates them', async () => {
+  holder.userId = 'admin-a'
+  const opts = (ids: string[], correct: (i: number) => boolean) => ids.map((id, i) => ({ id, text: `Option ${id}`, is_correct: correct(i), feedback: `Why ${id}` }))
+  const multi: ItemPayload = { ...payload, format: 'multi', stem: 'Pick all valid steps.', accepted_answers: [], options: opts(['a', 'b', 'c', 'd'], (i) => i < 2) }
+  const order: ItemPayload = { ...payload, format: 'order', stem: 'Order the steps.', accepted_answers: [], options: opts(['a', 'b', 'c'], () => true) }
+  for (const [id, p] of [['a-multi', multi], ['a-order', order]] as const) {
+    raw.prepare("INSERT INTO items (id, concept_id, topic_id, format, payload_json, created_at) VALUES (?, 'concept-a', 'a', ?, ?, ?)").run(id, p.format, JSON.stringify(p), Date.now())
+  }
+  const stored = (id: string) => JSON.parse((row('SELECT payload_json FROM items WHERE id = ?', id) as { payload_json: string }).payload_json) as ItemPayload
+  const edit = (itemId: string, p: ItemPayload) => reviewQuestion({ data: { slug: 'alpha', itemId, action: 'edit', payload: p } })
+
+  const multiEdit = { ...multi, stem: 'Pick every valid step.', options: opts(['a', 'b', 'c', 'd'], (i) => i === 1 || i === 3) }
+  await edit('a-multi', multiEdit)
+  expect(stored('a-multi').options.map((o) => [o.id, o.is_correct])).toEqual([['a', false], ['b', true], ['c', false], ['d', true]])
+  const orderEdit = { ...order, options: order.options.map((o, i) => ({ ...o, text: ['Third', 'First', 'Second'][i] })) }
+  await edit('a-order', orderEdit)
+  expect(stored('a-order').options.map((o) => [o.id, o.text])).toEqual([['a', 'Third'], ['b', 'First'], ['c', 'Second']])
+  expect(row('SELECT format FROM items WHERE id = ?', 'a-order')).toEqual({ format: 'order' })
+
+  for (const [id, invalid] of [
+    ['a-multi', { ...multi, options: opts(['a', 'b', 'c', 'd'], (i) => i === 0) }],
+    ['a-multi', { ...multi, options: opts(['a', 'b', 'c', 'd'], () => true) }],
+    ['a-order', { ...order, options: opts(['b', 'a', 'c'], () => true) }],
+  ] as const) {
+    const before = row('SELECT * FROM items WHERE id = ?', id)
+    await expect(edit(id, invalid)).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/Invalid question/) })
+    expect(row('SELECT * FROM items WHERE id = ?', id)).toEqual(before)
+  }
+})
+
 it.each([null, 'member-a', 'owner-b'])('refuses review reads and writes for %s', async (userId) => {
   holder.userId = userId
   const status = userId === null ? 401 : 403

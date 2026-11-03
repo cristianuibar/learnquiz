@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { getDb } from '@/db'
 import { conceptEdges, concepts, items, learnerConcept, learnerItem, learnerTopic, learnerUnit, placements, sources, topics, units } from '@/db/schema'
 import { validateSkeleton, fallbackSkeleton } from '@/lib/curriculum/validate'
+import { streakShown } from '@/lib/learning/session'
 import { chatJson, jobModel, LlmError } from '@/lib/llm/client'
 import { curriculumPrompt } from '@/lib/llm/prompts'
 import { CurriculumSkeleton } from '@/lib/llm/schemas'
@@ -143,6 +144,7 @@ export const getTopicPath = createServerFn({ method: 'GET' })
       db
         .select({ conceptId: items.conceptId, n: count() })
         .from(items)
+        .innerJoin(learnerItem, and(eq(learnerItem.itemId, items.id), eq(learnerItem.learnerId, learnerId)))
         .where(and(eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId)))
         .groupBy(items.conceptId),
       db
@@ -151,7 +153,7 @@ export const getTopicPath = createServerFn({ method: 'GET' })
         .innerJoin(concepts, eq(concepts.id, learnerConcept.conceptId))
         .where(and(eq(learnerConcept.learnerId, learnerId), eq(concepts.topicId, topic.id))),
       db
-        .select({ level: learnerTopic.level, xp: learnerTopic.xp, streak: learnerTopic.streakCount })
+        .select({ level: learnerTopic.level, xp: learnerTopic.xp, streakCount: learnerTopic.streakCount, lastSessionAt: learnerTopic.lastSessionAt })
         .from(learnerTopic)
         .where(and(eq(learnerTopic.learnerId, learnerId), eq(learnerTopic.topicId, topic.id))),
       db
@@ -163,7 +165,7 @@ export const getTopicPath = createServerFn({ method: 'GET' })
     ])
     const pKnown = new Map(known.map((r) => [r.conceptId, r.pKnown]))
     const attempted = new Set(known.filter((r) => r.nAttempts > 0).map((r) => r.conceptId))
-    const itemCount = new Map(counts.map((c) => [c.conceptId, c.n]))
+    const answeredCount = new Map(counts.map((c) => [c.conceptId, c.n]))
     return {
       topic,
       preparing,
@@ -176,7 +178,7 @@ export const getTopicPath = createServerFn({ method: 'GET' })
         levelLineModel: placement ? ((JSON.parse(placement.logJson) as { levelLineModel?: string }).levelLineModel ?? null) : null,
         placed: Boolean(placement),
         xp: lt?.xp ?? 0,
-        streak: lt?.streak ?? 0,
+        streak: lt ? streakShown(lt, Date.now()) : 0,
       },
       units: unitRows.map((u) => {
         const unitConcepts = conceptRows
@@ -189,7 +191,7 @@ export const getTopicPath = createServerFn({ method: 'GET' })
             visual: c.visual,
             grounded: c.grounded,
             critical: c.critical,
-            itemCount: itemCount.get(c.id) ?? 0,
+            answeredCount: answeredCount.get(c.id) ?? 0,
             pKnown: pKnown.get(c.id) ?? 0,
           }))
         return {

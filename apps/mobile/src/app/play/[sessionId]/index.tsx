@@ -19,6 +19,7 @@ import { answerBody, answerError } from '@/lib/session/answer'
 import { deleteDraft, draftForView, writeDraft } from '@/lib/session/draft'
 import { sessionRefetchError, type SessionError } from '@/lib/session/error'
 import { canAdvance, canLoadSession, noticeFor, revealMarks, type ContinueRequest } from '@/lib/session/overlay'
+import { createReadyAnnouncement } from '@/lib/session/ready'
 import { useSession } from '@/lib/session-store'
 import { useTheme } from '@/theme/ThemeProvider'
 
@@ -27,16 +28,23 @@ const emptyDraft = (): Draft => ({ answer: {}, confidence: null })
 const emptyLocal = () => ({ reflection: '', readAloud: false })
 
 export default function SessionScreen() {
-  const params = useLocalSearchParams<{ sessionId: string | string[] }>()
+  const params = useLocalSearchParams<{ sessionId: string | string[]; announceReady?: string }>()
   const sessionId = Array.isArray(params.sessionId) ? params.sessionId[0] : params.sessionId
-  return <ActiveSession key={sessionId} sessionId={sessionId} />
+  return <ActiveSession key={sessionId} sessionId={sessionId} announceReady={params.announceReady === '1'} />
 }
 
-function ActiveSession({ sessionId }: { sessionId: string }) {
+function ActiveSession({ sessionId, announceReady }: { sessionId: string; announceReady: boolean }) {
   const router = useRouter()
   const { branding } = useSession()
   const { space } = useTheme()
   const [view, setView] = useState<SessionView | null>(null)
+  const [announceWhenRendered] = useState(() => createReadyAnnouncement(announceReady, {
+    frame: requestAnimationFrame,
+    cancelFrame: cancelAnimationFrame,
+    announce: (message) => AccessibilityInfo.announceForAccessibility(message),
+  }))
+  const itemRendered = Boolean(view?.item && !view.ended)
+  useEffect(() => announceWhenRendered(itemRendered), [announceWhenRendered, itemRendered])
   const [reveal, setReveal] = useState<Reveal | null>(null)
   const [draft, setDraft] = useState<Draft>(emptyDraft)
   const [local, setLocal] = useState(emptyLocal)

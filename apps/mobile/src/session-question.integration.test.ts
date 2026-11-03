@@ -1,5 +1,6 @@
 import { createElement as h, type ReactNode } from 'react'
-import { render, screen } from '@testing-library/react-native'
+import { act, render, screen } from '@testing-library/react-native'
+import { AccessibilityInfo } from 'react-native'
 import type { ItemView } from '@learnquiz/api'
 import SessionScreen from './app/play/[sessionId]/index'
 import { useHeadingFocus } from './components/ui/Screen'
@@ -9,7 +10,7 @@ import { ThemeProvider } from './theme/ThemeProvider'
 jest.mock('expo-router', () => {
   const router = { replace: jest.fn() }
   return {
-    useLocalSearchParams: () => ({ sessionId: 'session-337' }),
+    useLocalSearchParams: () => ({ sessionId: 'session-337', announceReady: '1' }),
     useRouter: () => router,
     useFocusEffect: jest.fn(),
   }
@@ -44,7 +45,41 @@ async function session(question: ItemView = item) {
   await render(h(ThemeProvider, { children: h(SessionScreen) }))
 }
 
-beforeEach(() => jest.clearAllMocks())
+beforeEach(() => { jest.clearAllMocks(); jest.mocked(useHeadingFocus).mockReset() })
+afterEach(() => jest.restoreAllMocks())
+
+test.each(['mcq', 'cloze'] as const)('ready waits for the delayed first %s item to render and focus', async (format) => {
+  const frames: FrameRequestCallback[] = []
+  const events: string[] = []
+  jest.spyOn(global, 'requestAnimationFrame').mockImplementation((callback) => { frames.push(callback); return frames.length })
+  jest.spyOn(global, 'cancelAnimationFrame').mockImplementation(() => {})
+  jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation((message) => { events.push(message) })
+  jest.mocked(useHeadingFocus).mockImplementation(() => {
+    require('react').useEffect(() => {
+      requestAnimationFrame(() => { events.push('stem focus') })
+    }, [])
+  })
+  let resolve!: (value: unknown) => void
+  jest.mocked(api).mockImplementation(() => new Promise((done) => { resolve = done }))
+  await render(h(ThemeProvider, { children: h(SessionScreen) }))
+  async function frame() {
+    const pending = frames.splice(0)
+    await act(() => { pending.forEach((callback) => callback(0)) })
+  }
+  await frame()
+  await frame()
+  expect(events).toEqual([])
+  const question = { ...item, format, options: format === 'mcq' ? [{ id: 'a', text: 'Receiving' }] : [] }
+  await act(async () => { resolve({ item: question, ended: false, progress: { position: 1, total: 20 } }) })
+  expect(format === 'cloze' ? screen.getByLabelText('Missing number') : screen.getByRole('header', { name: item.stem })).toBeOnTheScreen()
+  expect(events).toEqual([])
+  await frame()
+  expect(events).toEqual(format === 'mcq' ? ['stem focus'] : [])
+  await frame()
+  expect(events).toEqual(format === 'mcq' ? ['stem focus', 'Your session is ready.'] : ['Your session is ready.'])
+  await frame()
+  expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledTimes(1)
+})
 
 test('cloze has no duplicate stem heading and leaves focus with the blank', async () => {
   await session()

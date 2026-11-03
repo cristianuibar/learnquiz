@@ -39,7 +39,7 @@ export async function startPlay(params: StartPlayParams, signal?: AbortSignal): 
   const path = params.start === 'placement' ? `/topics/${topic}/placement` : `/topics/${topic}/sessions`
   const body = params.unitId === undefined ? {} : { unitId: params.unitId }
   try {
-    const data = await api<{ sessionId: string }>(path, {
+    const data = await api<{ sessionId?: unknown } | null>(path, {
       method: 'POST',
       body,
       timeoutMs: START_TIMEOUT_MS,
@@ -47,6 +47,9 @@ export async function startPlay(params: StartPlayParams, signal?: AbortSignal): 
     })
     // Aborted while the response was in flight: there is no session to land on.
     if (signal?.aborted) return undefined
+    if (typeof data?.sessionId !== 'string' || !data.sessionId.trim()) {
+      throw new ApiError(200, startFailed)
+    }
     return data.sessionId
   } catch (error) {
     if (signal?.aborted) return undefined
@@ -56,7 +59,9 @@ export async function startPlay(params: StartPlayParams, signal?: AbortSignal): 
 
 export function describeStartFailure(error: unknown): StartFailure {
   if (error instanceof ApiError && error.status !== null) {
-    if (error.status >= 500) return { message: startFailed, retry: true }
+    if (error.status >= 500 || (error.status >= 200 && error.status < 300)) {
+      return { message: startFailed, retry: true }
+    }
     return { message: error.message, retry: false }
   }
   return { title: offlineTitle, message: offlineBody, retry: true }
@@ -76,8 +81,8 @@ export function beginStartPlay(params: StartPlayParams, effects: StartPlayEffect
       closed = true
       clearTimeout(timer)
       if (sessionId === undefined) return
-      effects.onReady()
       effects.replace(`/play/${encodeURIComponent(sessionId)}`)
+      effects.onReady()
     },
     (error: unknown) => {
       if (closed) return
