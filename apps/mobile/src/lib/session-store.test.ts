@@ -147,3 +147,26 @@ test('signing out releases every hold on held-link replay', async () => {
   await act(async () => { event('signedOut') })
   expect(takeReplayTarget()).toBe('/unit/u1')
 })
+
+test('a render after the token moved, before the changed event, already hides the previous session', async () => {
+  jest.mocked(api).mockResolvedValueOnce({ user, needsDisclosure: false }).mockResolvedValueOnce(null)
+  await mount()
+  expect(screen.getByText('ready:Learner:false:-')).toBeOnTheScreen()
+  // auth stores the new bearer one microtask before it emits 'changed'.
+  jest.mocked(getToken).mockReturnValue('token-b')
+  await act(async () => { current.setDisclosed() })
+  expect(screen.getByText('loading:-:false:-')).toBeOnTheScreen()
+})
+
+test("a changed event leaves the ready session synchronously and returns only for that bearer's /session", async () => {
+  jest.mocked(api).mockResolvedValueOnce({ user, needsDisclosure: false }).mockResolvedValueOnce(null)
+  await mount()
+  let resolveSession!: (value: unknown) => void
+  jest.mocked(api).mockReturnValueOnce(new Promise((resolve) => { resolveSession = resolve })).mockResolvedValueOnce(null)
+  jest.mocked(getToken).mockReturnValue('token-b')
+  jest.mocked(loadToken).mockResolvedValue('token-b')
+  await act(async () => { event('changed') })
+  expect(screen.getByText('loading:-:false:-')).toBeOnTheScreen()
+  await act(async () => { resolveSession({ user: { ...user, id: 'u2', name: 'Bo' }, needsDisclosure: false }) })
+  expect(screen.getByText('ready:Bo:false:-')).toBeOnTheScreen()
+})

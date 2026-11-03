@@ -19,7 +19,11 @@ type State = {
   offline?: boolean
 }
 type Session = State & { refresh(): Promise<void>; setDisclosed(): void }
-const signedOut: State = { status: 'signedOut', user: null, needsDisclosure: false, branding: null }
+// Internal: the bearer each state was built for. A ready state is only ever
+// exposed while that bearer is still the live token.
+type Held = State & { bearer: string | null }
+const signedOut: Held = { status: 'signedOut', user: null, needsDisclosure: false, branding: null, bearer: null }
+const loading: Held = { ...signedOut, status: 'loading' }
 const SessionContext = createContext<Session | null>(null)
 
 // The last session the server confirmed, bound to the bearer it was confirmed
@@ -100,7 +104,7 @@ export async function endSession(waitMs = SIGN_OUT_WAIT_MS): Promise<void> {
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<State>({ ...signedOut, status: 'loading' })
+  const [state, setState] = useState<Held>(loading)
   const request = useRef(0)
   const stored = useRef<StoredSession | null>(null)
   const offline = useRef(false)
@@ -125,7 +129,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         stored.current = last
         offline.current = true
         setState({ status: 'ready', user: last?.user ?? null, needsDisclosure: last?.needsDisclosure ?? false,
-          branding: last?.branding ?? null, offline: true })
+          branding: last?.branding ?? null, offline: true, bearer: token })
         return
       }
       if (stale()) return
@@ -154,7 +158,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (stale()) return
       stored.current = saved
       offline.current = false
-      setState({ status: 'ready', ...next })
+      setState({ status: 'ready', ...next, bearer: token })
     } catch {
       // Local storage failed (clearing another learner's data, or a 401's cleanup).
       // Never show the shell over data that may not belong to this learner.
@@ -165,11 +169,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsubscribe = subscribeAuth((event) => {
       // Sign-out also ends every hold on held-link replay (an unfinished join).
-      if (event === 'signedOut') {
-        // The epoch moves before auth's cleanup runs: no older save can land after it.
-        sessionEpoch++
-        stored.current = null
-      }
+      // Sign-out, a 401, or a new bearer (sign-in, sign-up, join accept): the epoch
+      // moves before any cleanup or refresh, so no older save can land after it.
+      sessionEpoch++
+      stored.current = null
+      offline.current = false
+      // A new bearer leaves the previous session in this same tick, before any
+      // render: nothing shows until /session confirms who this token belongs to.
+      if (event !== 'signedOut') { request.current++; setState(loading) }
       if (event === 'signedOut') { request.current++; releaseReplayHolds(); setState(signedOut) }
       else void refresh()
     })
@@ -190,7 +197,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  return <SessionContext.Provider value={{ ...state, refresh, setDisclosed }}>{children}</SessionContext.Provider>
+  // Render-time half of the invariant. auth sets the new token one microtask
+  // before it emits 'changed', so a render in that gap must already hide the
+  // previous bearer's session. getToken() is a synchronous in-memory read.
+  const { bearer, ...view } = state.status === 'ready' && state.bearer !== getToken() ? loading : state
+  return <SessionContext.Provider value={{ ...view, refresh, setDisclosed }}>{children}</SessionContext.Provider>
 }
 
 export function useSession() {

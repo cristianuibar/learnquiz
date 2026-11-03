@@ -321,3 +321,17 @@ test('review mode from Profile shows the branded copy and Got it returns without
   expect(navigation.getPathname()).toBe('/profile')
   expect(screen.getByRole('header', { name: 'Training progress' })).toBeOnTheScreen()
 })
+
+test('the actual router keeps an open invitation mounted while the session reloads for a new bearer', async () => {
+  let snapshot: ReturnType<typeof useSession> = ready
+  const listeners = new Set<() => void>()
+  const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } }
+  jest.mocked(useSession).mockImplementation(() => useSyncExternalStore(subscribe, () => snapshot))
+  const navigation = renderRouter('src/app', { initialUrl: '/join/invitation-1' })
+  await navigation
+  expect(screen.getByText('Join')).toBeOnTheScreen()
+  // A sign-in or join accept: the store drops to loading until /session confirms the new bearer.
+  await act(async () => { snapshot = { ...signedOut, status: 'loading' }; listeners.forEach((listener) => listener()) })
+  expect(navigation.getPathname()).toBe('/join/invitation-1')
+  expect(screen.getByText('Join')).toBeOnTheScreen()
+})
