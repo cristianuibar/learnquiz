@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { RouteError, errorMessage, fieldErrors } from '@/components/inline-error'
+import { RouteError, errorMessage, fieldErrors, useFocusInvalid } from '@/components/inline-error'
 import { RoleDocumentForm } from '@/components/role-document-form'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,6 +20,7 @@ function Roles() {
   const create = useServerFn(createRole)
   const [error, setError] = useState('')
   const [fields, setFields] = useState<Record<string, string>>({})
+  const formRef = useFocusInvalid(fields)
   const [busy, setBusy] = useState(false)
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
@@ -70,7 +71,7 @@ function Roles() {
       )}
       <section className="mt-10">
         <h2 className="text-xl font-semibold">Create a job role</h2>
-        <form className="mt-6 flex flex-col gap-6" onSubmit={submit}>
+        <form ref={formRef} className="mt-6 flex flex-col gap-6" onSubmit={submit}>
           <div className="flex flex-col gap-2">
             <Label htmlFor="name">Role name</Label>
             <Input id="name" name="name" className="h-11" minLength={2} maxLength={80} required aria-invalid={!!fields.name || undefined} aria-describedby={fields.name ? 'name-error' : undefined} />

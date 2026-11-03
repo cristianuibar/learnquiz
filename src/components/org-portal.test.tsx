@@ -7,11 +7,12 @@ import { Route as appRootRoute } from '@/routes/__root'
 import { Route as orgRoute } from '@/routes/org.$slug'
 import { Route as peopleRoute } from '@/routes/org.$slug.people'
 import { Route as signInRoute } from '@/routes/sign-in'
+import { authClient } from '@/lib/auth-client'
 import { getPeople } from '@/server/org'
 import { getSessionFn } from '@/server/session-fn'
 
 vi.mock('@/server/org', () => ({ getPeople: vi.fn() }))
-vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
+vi.mock('@/lib/auth-client', () => ({ authClient: { organization: { inviteMember: vi.fn() } } }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => null }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
@@ -73,6 +74,50 @@ it('shows the company nav on portal pages, trimmed for Learn Quiz staff', async 
     role = 'admin'
     await act(async () => { await router.invalidate() })
     expect(links().map((a) => a.textContent)).toEqual(['Overview', 'People'])
+  } finally {
+    await act(async () => root.unmount())
+    container.remove()
+    delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT
+  }
+})
+
+it('focuses the invalid field on the invite form and ties its message to it', async () => {
+  vi.mocked(getPeople).mockResolvedValue({ id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles: [{ id: 'r1', name: 'Cashier' }], members: [], readOnly: false, invites: [] } as never)
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+  vi.mocked(getSessionFn).mockImplementation(async () => ({ user: { id: 'u', name: 'U', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] }))
+  const invite = vi.mocked(authClient.organization.inviteMember)
+  const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
+  const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, component: orgRoute.options.component })
+  const people = createRoute({ getParentRoute: () => org, path: '/people', loader: peopleRoute.options.loader as (ctx: { params: { slug: string } }) => ReturnType<typeof getPeople>, component: peopleRoute.options.component })
+  const router = createRouter({ routeTree: rootRoute.addChildren([org.addChildren([people])]), history: createMemoryHistory({ initialEntries: ['/org/x/people'] }) })
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  const field = (id: string) => container.querySelector<HTMLInputElement>('#' + id)!
+  const type = (id: string, value: string) => act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field(id), value)
+    field(id).dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  const submit = () => act(async () => { container.querySelector('form')!.requestSubmit() })
+  const message = (id: string) => document.getElementById(field(id).getAttribute('aria-describedby')!)?.textContent
+  try {
+    await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
+    await type('name', '   ')
+    await type('email', 'a@b.co')
+    await submit()
+    expect(field('name').getAttribute('aria-invalid')).toBe('true')
+    expect(message('name')).toBe('Enter a name')
+    expect(document.activeElement).toBe(field('name'))
+    expect(invite).not.toHaveBeenCalled()
+
+    invite.mockResolvedValue({ error: { code: 'USER_IS_ALREADY_INVITED_TO_THIS_ORGANIZATION', message: 'User is already invited to this organization' } } as never)
+    await type('name', 'Sam')
+    await submit()
+    expect(invite).toHaveBeenCalledTimes(1)
+    expect(field('name').getAttribute('aria-invalid')).toBeNull()
+    expect(field('email').getAttribute('aria-invalid')).toBe('true')
+    expect(message('email')).toBe('User is already invited to this organization')
+    expect(document.activeElement).toBe(field('email'))
   } finally {
     await act(async () => root.unmount())
     container.remove()

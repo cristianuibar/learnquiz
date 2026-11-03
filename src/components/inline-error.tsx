@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { useRouter } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 
@@ -25,6 +26,15 @@ export const errorMessage = (err: unknown) =>
   typeof navigator !== 'undefined' && navigator.onLine === false
     ? "You're offline"
     : issuesOf(err)?.[0].message || (err instanceof Error && err.message) || 'Something went wrong'
+
+// After a failed submit, moves focus to the form's first field marked aria-invalid.
+export function useFocusInvalid(fields: Record<string, string>) {
+  const ref = useRef<HTMLFormElement>(null)
+  useEffect(() => {
+    ref.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()
+  }, [fields])
+  return ref
+}
 
 export function InlineError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
