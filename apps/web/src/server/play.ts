@@ -498,14 +498,19 @@ async function stampProficiency(db: Db, learnerId: string, topicId: string, now:
     .where(and(eq(memberRoleAssignments.userId, learnerId), eq(memberRoleAssignments.orgId, role.orgId), isNull(memberRoleAssignments.proficientAt)))
 }
 
-type RevealFields = Pick<Reveal, 'correct' | 'score' | 'feedback' | 'missingPoints' | 'correctAnswer' | 'chosenFeedback' | 'returnsThisSession' | 'pKnownBefore' | 'pKnownAfter'> & {
+type RevealFields = Pick<Reveal, 'correct' | 'score' | 'feedback' | 'missingPoints' | 'correctAnswer' | 'chosenFeedback' | 'returnsThisSession' | 'pKnownBefore' | 'pKnownAfter' | 'detail'> & {
   attemptId: string
   confidence: Confidence
 }
 
+// A multi answer with some right picks but not all is state P whatever the confidence; it still counts as a miss.
+function answerState(correct: boolean, detail: Reveal['detail'], confidence: Confidence) {
+  return detail?.kind === 'multi' && detail.found > 0 && !correct ? 'P' : revealState(correct, confidence)
+}
+
 // The reveal of a graded answer, built the same way for the first answer and for its replay.
 function buildReveal(session: SessionRow, item: typeof items.$inferSelect, concept: typeof concepts.$inferSelect, payload: ItemPayload, sourceTitle: string | null, r: RevealFields): Reveal {
-  const state = revealState(r.correct, r.confidence)
+  const state = answerState(r.correct, r.detail, r.confidence)
   return {
     attemptId: r.attemptId,
     diagramConceptId: concept.visual ? concept.id : null,
@@ -515,7 +520,7 @@ function buildReveal(session: SessionRow, item: typeof items.$inferSelect, conce
     critical: concept.critical,
     correctOptionIds: payload.format === 'mcq' ? payload.options.filter((option) => option.is_correct).map((option) => option.id) : null,
     sourceVersion: item.sourceVersion,
-    detail: null,
+    detail: r.detail,
     score: r.score,
     feedback: r.feedback,
     missingPoints: r.missingPoints,
@@ -539,10 +544,10 @@ export const answerItem = createServerFn({ method: 'POST' })
       itemId: z.string().min(1),
       answer: z.object({
         optionId: z.string().max(8).optional(),
-        optionIds: z.array(z.string().max(8)).max(5).optional(),
-        order: z.array(z.string().max(8)).max(5).optional(),
+        optionIds: z.array(z.string().max(8)).min(1).max(5).optional(),
+        order: z.array(z.string().max(8)).min(3).max(5).optional(),
         text: z.string().max(1000).optional(),
-      }),
+      }).refine((a) => [a.optionId, a.optionIds, a.order, a.text].filter((v) => v !== undefined).length === 1, 'Send exactly one kind of answer.'),
       confidence: z.enum(['sure', 'unsure', 'guess']),
       responseMs: z.number().int().min(0),
     }),
@@ -559,6 +564,12 @@ export const answerItem = createServerFn({ method: 'POST' })
     if (plan.answered && !plan.lastAttemptId) throw alreadyAnswered()
 
     const { item, concept, payload } = await loadItem(db, session.topicId, data.itemId, true)
+    const optionIdSet = new Set(payload.options.map((o) => o.id))
+    const { optionIds, order } = data.answer
+    if (optionIds?.some((id) => !optionIdSet.has(id))) throw httpError('Choose from the listed answers.', 400)
+    if (order && (order.length !== optionIdSet.size || new Set(order).size !== order.length || order.some((id) => !optionIdSet.has(id)))) {
+      throw httpError('Put every step in order.', 400)
+    }
     const sourceId = item.sourceId ?? concept.sourceId
     const sourceTitle = payload.source_quote && sourceId
       ? (await db.select({ title: sources.title }).from(sources)
@@ -574,11 +585,12 @@ export const answerItem = createServerFn({ method: 'POST' })
         .get()
       if (!last || last.confidence !== data.confidence || last.answerJson !== answerJson) throw alreadyAnswered()
       const stored = JSON.parse(last.gradeJson ?? '{}') as { correctAnswer?: string } & Partial<Grade>
+      const replayed = gradeAnswer(payload, data.answer)
       return revealOf({
         attemptId: last.id, correct: last.correct, confidence: data.confidence, score: last.score,
         feedback: stored.feedback ?? null, missingPoints: stored.missing_points ?? [],
-        correctAnswer: stored.correctAnswer ?? '', chosenFeedback: gradeAnswer(payload, data.answer).chosenFeedback,
-        returnsThisSession: plan.lastReturns ?? false, pKnownBefore: last.pKnownBefore, pKnownAfter: last.pKnownAfter,
+        correctAnswer: stored.correctAnswer ?? '', chosenFeedback: replayed.chosenFeedback,
+        detail: replayed.detail ?? null, returnsThisSession: plan.lastReturns ?? false, pKnownBefore: last.pKnownBefore, pKnownAfter: last.pKnownAfter,
       })
     }
     if (item.status === 'retired') throw httpError('This question has been retired', 409)
@@ -656,7 +668,8 @@ export const answerItem = createServerFn({ method: 'POST' })
       }
     }
     const { correct } = grade
-    const state = revealState(correct, data.confidence)
+    const state = answerState(correct, grade.detail ?? null, data.confidence)
+    const score = shortGrade?.score ?? (state === 'P' ? grade.score ?? 0 : correct ? 1 : 0)
     const pKnownAfter = update(pKnownBefore, correct, guessFor(payload.format, payload.options.length, data.confidence))
     const { next, retrievabilityBefore } = review(li ?? null, correct, data.confidence, new Date(now))
     // A wrong-and-sure miss is flagged until the item is answered right again.
@@ -674,7 +687,7 @@ export const answerItem = createServerFn({ method: 'POST' })
     } else {
       // The closers stay last, so a missed closer is not re-asked.
       const body = ids.length - plan.reasons.closers
-      returnsThisSession = session.kind !== 'mini' && (state === 'C' || state === 'D') && !plan.reinserted.includes(item.id) && plan.position < body
+      returnsThisSession = session.kind !== 'mini' && (state === 'C' || state === 'D' || state === 'P') && !plan.reinserted.includes(item.id) && plan.position < body
       if (returnsThisSession) itemIds = [...reinsert(ids.slice(0, body), item.id, plan.position), ...ids.slice(body)]
       nextPlan = { ...plan, reinserted: returnsThisSession ? [...plan.reinserted, item.id] : plan.reinserted }
     }
@@ -704,7 +717,7 @@ export const answerItem = createServerFn({ method: 'POST' })
         at: now,
         answerJson: JSON.stringify(data.answer),
         correct,
-        score: shortGrade?.score ?? (correct ? 1 : 0),
+        score,
         confidence: data.confidence,
         responseMs: Math.min(data.responseMs, 600_000),
         gradeJson: JSON.stringify({ correctAnswer: grade.correctAnswer, ...shortGrade }),
@@ -735,9 +748,9 @@ export const answerItem = createServerFn({ method: 'POST' })
     await stampProficiency(db, learnerId, session.topicId, now)
 
     return revealOf({
-      attemptId, correct, confidence: data.confidence, score: shortGrade?.score ?? (correct ? 1 : 0),
+      attemptId, correct, confidence: data.confidence, score,
       feedback: shortGrade?.feedback ?? null, missingPoints: shortGrade?.missing_points ?? [],
-      correctAnswer: grade.correctAnswer, chosenFeedback: grade.chosenFeedback, returnsThisSession, pKnownBefore, pKnownAfter,
+      correctAnswer: grade.correctAnswer, chosenFeedback: grade.chosenFeedback, detail: grade.detail ?? null, returnsThisSession, pKnownBefore, pKnownAfter,
     })
   })
 
