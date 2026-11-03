@@ -129,6 +129,38 @@ it('uses the assigned role benchmark and recorded time to proficiency', async ()
   expect((await getProfile({ data: {} })).proficiency).toEqual({ achievedAt: start + 3 * DAY, days: 3, estimatedDays: null, projectedAt: null })
 })
 
+it.each(['recent attempts', 'older attempts', 'no attempts', 'later lapse'])('recognizes mastery at role start with %s', async (history) => {
+  seedWeek()
+  raw.exec("UPDATE learner_concept SET p_known = 0.9; UPDATE attempts SET p_known_after = 0.9 WHERE id IN ('a5', 'a6')")
+  const assignedAt = now - 3600_000
+  if (history === 'older attempts') {
+    raw.prepare('UPDATE topics SET created_at = created_at - ?').run(7 * DAY)
+    raw.prepare('UPDATE attempts SET at = at - ?').run(7 * DAY)
+  } else if (history === 'no attempts') {
+    raw.exec('DELETE FROM attempts')
+  } else if (history === 'later lapse') {
+    raw.prepare('INSERT INTO attempts (id, learner_id, item_id, concept_id, at, answer_json, correct, score, confidence, response_ms, rating, p_known_before, p_known_after) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run('lapse', 'learner-a', 'i2', 'c2', now, '"answer"', 0, 0, 'sure', 1000, 1, 0.9, 0.2)
+    raw.exec("UPDATE learner_concept SET p_known = 0.2 WHERE concept_id = 'c2'")
+  }
+  raw.prepare('INSERT INTO job_roles (id, org_id, name, benchmark, created_at) VALUES (?, ?, ?, ?, ?)').run('role', 'org-a', 'Safety officer', 0.85, start)
+  raw.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES (?, ?, ?, ?)').run('learner-a', 'org-a', 'role', start)
+  // A later invitation can move the assignment past existing mastery.
+  raw.prepare('UPDATE member_role_assignments SET assigned_at = ?').run(assignedAt)
+  expect((await getProfile({ data: {} })).proficiency).toEqual({ achievedAt: assignedAt, days: 0, estimatedDays: null, projectedAt: null })
+})
+
+it('requires proficiency at role start rather than an earlier mastery that was lost', async () => {
+  seedWeek()
+  raw.exec("UPDATE learner_concept SET p_known = 0.9; UPDATE attempts SET p_known_after = 0.9 WHERE id IN ('a5', 'a6')")
+  raw.prepare('INSERT INTO attempts (id, learner_id, item_id, concept_id, at, answer_json, correct, score, confidence, response_ms, rating, p_known_before, p_known_after) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run('lapse', 'learner-a', 'i2', 'c2', now - 3600_000, '"answer"', 0, 0, 'sure', 1000, 1, 0.9, 0.2)
+  raw.exec("UPDATE learner_concept SET p_known = 0.2 WHERE concept_id = 'c2'")
+  raw.prepare('INSERT INTO job_roles (id, org_id, name, benchmark, created_at) VALUES (?, ?, ?, ?, ?)').run('role', 'org-a', 'Safety officer', 0.85, start)
+  raw.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES (?, ?, ?, ?)').run('learner-a', 'org-a', 'role', now)
+  expect((await getProfile({ data: {} })).proficiency.achievedAt).toBeNull()
+})
+
 it('records proficiency only after every concept meets the benchmark, including unpracticed concepts', async () => {
   seedWeek()
   raw.exec("UPDATE learner_concept SET p_known = 0.9; UPDATE attempts SET p_known_after = 0.9 WHERE id IN ('a5', 'a6')")

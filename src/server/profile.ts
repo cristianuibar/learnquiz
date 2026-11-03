@@ -66,7 +66,14 @@ export const getProfile = createServerFn({ method: 'GET' })
       seen.add(attempt.conceptId)
     }
     const startedAt = role?.assignedAt ?? topic?.createdAt ?? now
-    let achievedAt = role?.proficientAt ?? null
+    // Replay up to role start: proficiency may already be met before any new attempts.
+    const knownAtStart = new Map(known)
+    for (const attempt of history) {
+      if (attempt.at >= startedAt) break
+      knownAtStart.set(attempt.conceptId, attempt.after)
+    }
+    const proficientAtStart = startedAt <= now && knownAtStart.size > 0 && [...knownAtStart.values()].every((p) => p >= benchmark)
+    let achievedAt = role?.proficientAt ?? (proficientAtStart ? startedAt : null)
     const errors = new Map<string, { id: string; conceptId: string; at: number; correctedAt: number | null }>()
     let cursor = 0
     const weekly = Array.from({ length: 7 }, (_, day) => {
