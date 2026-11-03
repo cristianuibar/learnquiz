@@ -40,6 +40,28 @@ function isAnswerConflict(err: unknown): boolean {
   )
 }
 
+// Unsent answers survive a reload; storage can be unavailable (private mode, quota), so failures are ignored.
+const draftKey = (sessionId: string, itemId: string) => `learnquiz:draft:${sessionId}:${itemId}`
+
+function readDraft(key: string): { choice: string; confidence: Confidence | null } | null {
+  try {
+    const draft = JSON.parse(sessionStorage.getItem(key) ?? 'null')
+    if (typeof draft?.choice !== 'string') return null
+    return { choice: draft.choice.slice(0, 1000), confidence: ['sure', 'unsure', 'guess'].includes(draft.confidence) ? draft.confidence : null }
+  } catch {
+    return null
+  }
+}
+
+function writeDraft(key: string, choice: string, confidence: Confidence | null) {
+  try {
+    if (choice === '' && confidence === null) sessionStorage.removeItem(key)
+    else sessionStorage.setItem(key, JSON.stringify({ choice, confidence }))
+  } catch {
+    // Keep answering without persistence.
+  }
+}
+
 function Play({ initial }: { initial: SessionView }) {
   const router = useRouter()
   const check = useServerFn(answerItem)
@@ -66,6 +88,19 @@ function Play({ initial }: { initial: SessionView }) {
   useEffect(() => {
     questionHeading.current?.focus()
   }, [item?.id, progress.position])
+
+  // Restored after mount so the server render and hydration match.
+  useEffect(() => {
+    if (!initial.item) return
+    const draft = readDraft(draftKey(initial.id, initial.item.id))
+    if (!draft) return
+    setChoice(draft.choice)
+    setConfidence(draft.confidence)
+  }, [initial])
+
+  useEffect(() => {
+    if (item && !reveal) writeDraft(draftKey(view.id, item.id), choice, confidence)
+  }, [view.id, item, reveal, choice, confidence])
 
   async function run(fn: () => Promise<void>) {
     setBusy(true)
@@ -103,6 +138,7 @@ function Play({ initial }: { initial: SessionView }) {
       const answer = item.format === 'mcq' ? { optionId: choice } : { text: choice.trim() }
       try {
         setReveal(await check({ data: { sessionId: view.id, itemId: item.id, answer, confidence, responseMs } }))
+        writeDraft(draftKey(view.id, item.id), '', null)
       } catch (err) {
         if (!isAnswerConflict(err)) throw err
         // The session changed or the answer already landed: resync instead of replaying it.

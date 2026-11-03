@@ -6,9 +6,9 @@ import { authClient } from '@/lib/auth-client'
 import { sitePath } from '@/lib/utils'
 
 export const Route = createFileRoute('/sign-in')({
-  validateSearch: (search: Record<string, unknown>): { redirect?: string; email?: string } => {
+  validateSearch: (search: Record<string, unknown>): { redirect?: string; email?: string; mode?: 'up' } => {
     const email = typeof search.email === 'string' ? search.email.trim() : ''
-    return { redirect: sitePath(search.redirect), email: email && email.length <= 254 ? email : undefined }
+    return { redirect: sitePath(search.redirect), email: email && email.length <= 254 ? email : undefined, mode: search.mode === 'up' ? 'up' : undefined }
   },
   beforeLoad: ({ context }) => {
     if (context.user && !context.user.isAnonymous) throw redirect({ to: '/' })
@@ -18,9 +18,9 @@ export const Route = createFileRoute('/sign-in')({
 
 function SignIn() {
   const { facebookEnabled } = Route.useRouteContext()
-  const { redirect: next = '/', email } = Route.useSearch()
+  const { redirect: next = '/', email, mode: initial = 'in' } = Route.useSearch()
   const router = useRouter()
-  const [mode, setMode] = useState<'up' | 'in'>('in')
+  const [mode, setMode] = useState<'up' | 'in'>(initial)
   const heading = mode === 'up' ? 'Create an account' : 'Sign in'
 
   useEffect(() => {
@@ -35,7 +35,7 @@ function SignIn() {
     <main className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pt-8 pb-16">
       <h1 className="text-3xl font-bold tracking-tight">{heading}</h1>
       <CredentialsForm
-        initial="in"
+        initial={initial}
         onModeChange={setMode}
         defaultEmail={email}
         onDone={async () => {

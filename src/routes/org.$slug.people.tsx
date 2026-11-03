@@ -16,6 +16,8 @@ export const Route = createFileRoute('/org/$slug/people')({
   component: People,
 })
 
+const date = (at: number) => new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+
 type Invite = ReturnType<typeof Route.useLoaderData>['invites'][number]
 
 function InviteRow({ invite, link, onRevoke }: { invite: Invite; link: string; onRevoke: () => Promise<void> }) {
@@ -186,12 +188,16 @@ function People() {
                 <span className="font-normal text-muted-foreground">{m.email}</span>
               </p>
               <p className="text-sm">{[m.role, m.jobRole].filter(Boolean).join(' · ')}</p>
+              <p className="mt-2 text-sm">
+                {m.training?.stage === 'proficient' ? 'Proficient' : 'Active'}
+                {m.training?.daysToProficiency != null && ` · ${plural(m.training.daysToProficiency, 'day', 'days')} to proficiency`}
+              </p>
               {m.training && (
                 <>
-                  <p className="mt-2 text-sm">
-                    {m.training.stage === 'proficient' ? 'Proficient' : 'Onboarding'}
-                    {m.training.daysToProficiency !== null && ` · ${plural(m.training.daysToProficiency, 'day', 'days')} to proficiency`}
-                  </p>
+                  <div className="mt-2 flex items-center gap-3 text-sm">
+                    <progress className="h-2 w-40" value={m.training.progress} max={1} aria-label="Progress toward benchmark" />
+                    <span>{Math.round(m.training.progress * 100)}% of benchmark</span>
+                  </div>
                   {m.training.criticalConfidentErrors > 0 && (
                     <p className="mt-1 text-sm font-medium text-wrong">
                       {plural(m.training.criticalConfidentErrors, 'confident error', 'confident errors')} on a critical step
@@ -199,6 +205,7 @@ function People() {
                   )}
                 </>
               )}
+              <p className="mt-1 text-sm text-muted-foreground">Last active: {m.lastActiveAt === null ? '-' : date(m.lastActiveAt)}</p>
             </li>
           ))}
         </ul>

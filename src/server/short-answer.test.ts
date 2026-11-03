@@ -149,6 +149,30 @@ it.each([
 })
 
 it.each([
+  { name: 'every item fails to grade, the last on the daily cap', graded: false, xp: 0 },
+  { name: 'items are graded', graded: true, xp: 40 },
+])('finishes a session where $name with $xp XP', async ({ graded, xp }) => {
+  // A guest one call below the cap: a failed first grade spends the last call, so the second hits the cap.
+  raw.prepare('INSERT INTO user (id, name, email, is_anonymous) VALUES (?, ?, ?, ?)').run('u1', 'Learner', 'u1@learnquiz.test', graded ? 0 : 1)
+  const insert = raw.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+  for (let i = 0; i < 19; i++) insert.run(`call-${i}`, 'u1', 'items', 'muse-spark-1.3', 0, 1, Date.now())
+  fetchModel.mockImplementation(() => graded ? completion({ score: 1, feedback: 'Correct.', missing_points: [] }) : new Response('Unavailable', { status: 503 }))
+  const topicBefore = row('SELECT * FROM learner_topic')
+
+  await answerItem(request)
+  await nextItem({ data: { sessionId: 's1' } })
+  const last = await answerItem({ data: { ...request.data, itemId: 'i2' } })
+  expect(last.state).toBe(graded ? 'A' : 'ungraded')
+  if (!graded) expect(last.feedback).toBe(`Daily grading limit reached; back tomorrow. ${PLAIN_FEEDBACK}`)
+  expect(await nextItem({ data: { sessionId: 's1' } })).toMatchObject({ ended: true })
+  await endSession({ data: { sessionId: 's1' } })
+
+  expect(row('SELECT xp FROM sessions').xp).toBe(xp)
+  expect(row('SELECT * FROM learner_topic')).toEqual({ ...topicBefore, xp })
+  expect(row('SELECT COUNT(*) AS n FROM learner_item').n).toBe(graded ? 2 : 0)
+})
+
+it.each([
   { name: 'another learner', status: 404, setup: () => { holder.learnerId = 'u2' } },
   { name: 'ended session', status: 409, setup: () => { raw.exec('UPDATE sessions SET ended_at = 2') } },
   { name: 'stale question', status: 409, setup: () => { raw.exec(`UPDATE sessions SET item_ids_json = '["i2"]'`) } },
