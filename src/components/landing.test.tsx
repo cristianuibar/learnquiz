@@ -25,9 +25,16 @@ vi.mock('@tanstack/react-start', () => ({
     return builder
   },
 }))
+vi.mock('@tanstack/react-start/server', () => ({ getRequestHeaders: () => new Headers() }))
 vi.mock('@/db', () => ({ getDb: () => holder.db }))
 vi.mock('@/server/env', () => ({ getEnv: () => ({}) }))
-vi.mock('@/server/auth', () => ({ facebookEnabled: () => false }))
+vi.mock('@/server/auth', () => ({
+  facebookEnabled: () => false,
+  getAuth: () => ({ api: { getSession: async () => {
+    const user = await getSessionUser()
+    return user && { user, session: { activeOrganizationId: null } }
+  } } }),
+}))
 vi.mock('@/server/session', () => ({ getSessionUser: vi.fn(), getLearnerId: async () => null }))
 vi.mock('@/lib/auth-client', () => ({
   authClient: { signOut: async () => {
@@ -125,10 +132,12 @@ it.each([
 })
 
 it('lets an owner leave the portal to train, return through Profile and sign out', async () => {
+  sqlite.prepare('INSERT INTO org_settings (org_id, company_name, working_hours_json, logo_key, accent) VALUES (?, ?, ?, ?, ?)').run('northwind', 'Northwind', JSON.stringify({ days: [1, 2, 3, 4, 5], start: '09:00', end: '17:00' }), 'northwind-logo', '#543189')
   vi.mocked(getSessionUser).mockResolvedValue({ id: 'owner', name: 'Owner', isAnonymous: false, role: 'admin' } as never)
   const { container, router, cleanup } = await renderApp('/')
   try {
     expect(router.state.location.pathname).toBe('/org/northwind')
+    expect(container.querySelector('header img')?.getAttribute('alt')).toBe('Northwind')
     expect(container.querySelector('h1')?.textContent).toBe('Northwind')
     await act(async () => { container.querySelector<HTMLAnchorElement>('header a')!.click(); await router.load() })
     expect(router.state.location.pathname).toBe('/start')

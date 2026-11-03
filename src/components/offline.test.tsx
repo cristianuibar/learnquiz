@@ -12,6 +12,7 @@ import { getSessionFn } from '@/server/session-fn'
 
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
+vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => 'topic' }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/curriculum', () => ({ getTopicPath: vi.fn(), getConceptItems: vi.fn() }))
