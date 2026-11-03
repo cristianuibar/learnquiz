@@ -7,6 +7,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, Di
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { authClient } from '@/lib/auth-client'
+import { plural } from '@/lib/utils'
 import { getPeople } from '@/server/org'
 
 export const Route = createFileRoute('/org/$slug/people')({
@@ -189,7 +190,7 @@ function People() {
               <p className="text-sm">{[m.role, m.jobRole].filter(Boolean).join(' · ')}</p>
               <p className="mt-2 text-sm">
                 {m.training?.stage === 'proficient' ? 'Proficient' : 'Active'}
-                {m.training?.daysToProficiency != null && ` · ${m.training.daysToProficiency} days to proficiency`}
+                {m.training?.daysToProficiency != null && ` · ${plural(m.training.daysToProficiency, 'day', 'days')} to proficiency`}
               </p>
               {m.training && (
                 <>
@@ -199,7 +200,7 @@ function People() {
                   </div>
                   {m.training.criticalConfidentErrors > 0 && (
                     <p className="mt-1 text-sm font-medium text-wrong">
-                      {m.training.criticalConfidentErrors} confident {m.training.criticalConfidentErrors === 1 ? 'error' : 'errors'} on a critical step
+                      {plural(m.training.criticalConfidentErrors, 'confident error', 'confident errors')} on a critical step
                     </p>
                   )}
                 </>

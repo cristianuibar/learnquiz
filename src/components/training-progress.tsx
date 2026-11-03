@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import { MasteryBar } from '@/components/mastery-bar'
 import { Badge } from '@/components/ui/badge'
+import { plural } from '@/lib/utils'
 import type { getProfile } from '@/server/profile'
 
 type Profile = Awaited<ReturnType<typeof getProfile>>
@@ -51,10 +52,10 @@ export function TrainingProgress({ profile, back }: { profile: Profile; back: Re
       <section aria-labelledby="proficiency-heading" className="rounded-lg border p-4">
         <h2 id="proficiency-heading" className="text-xl font-semibold">Time to proficiency</h2>
         {proficiency.achievedAt !== null ? (
-          <p className="mt-2">Benchmark reached in <strong>{proficiency.days} days</strong> · {date(proficiency.achievedAt)}</p>
+          <p className="mt-2">Benchmark reached in <strong>{plural(proficiency.days ?? 0, 'day', 'days')}</strong> · {date(proficiency.achievedAt)}</p>
         ) : proficiency.projectedAt !== null ? (
           <>
-            <p className="mt-2">About <strong>{proficiency.estimatedDays} more days</strong> · {date(proficiency.projectedAt)}</p>
+            <p className="mt-2">About <strong>{plural(proficiency.estimatedDays ?? 0, 'more day', 'more days')}</strong> · {date(proficiency.projectedAt)}</p>
             <p className="mt-1 text-sm text-muted-foreground">Estimate from your mastery gains this week. Your pace may change.</p>
           </>
         ) : <p className="mt-2 text-sm text-muted-foreground">Keep practicing across several days to see a projection.</p>}
@@ -78,7 +79,7 @@ export function TrainingProgress({ profile, back }: { profile: Profile; back: Re
 
       <section aria-labelledby="week-heading" className="space-y-3">
         <h2 id="week-heading" className="text-xl font-semibold">This week</h2>
-        <p className="text-sm">{sessionCounts.week} completed sessions this week · {sessionCounts.total} total</p>
+        <p className="text-sm">{plural(sessionCounts.week, 'completed session', 'completed sessions')} this week · {sessionCounts.total} total</p>
         <figure className="rounded-lg border p-4">
           <svg viewBox="0 0 288 112" role="img" aria-label="Daily average concept mastery over the last seven days" className="w-full text-primary">
             <line x1="12" y1="100" x2="276" y2="100" className="stroke-border" />

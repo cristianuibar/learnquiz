@@ -6,6 +6,7 @@ import { RoleDocumentForm } from '@/components/role-document-form'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { plural } from '@/lib/utils'
 import { createRole, listRoles } from '@/server/org'
 
 export const Route = createFileRoute('/org/$slug/roles')({
@@ -61,7 +62,7 @@ function Roles() {
               <Link to="/org/$slug/roles/$roleId" params={{ slug: org.slug, roleId: role.id }} className="inline-flex min-h-11 items-center font-medium underline outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
                 {role.name}
               </Link>
-              <p className="text-sm text-muted-foreground">Benchmark: {Math.round(role.benchmark * 100)}% · Onboarding: {role.onboardingDays} days · {role.topicStatus}</p>
+              <p className="text-sm text-muted-foreground">Benchmark: {Math.round(role.benchmark * 100)}% · Onboarding: {plural(role.onboardingDays, 'day', 'days')} · {role.topicStatus}</p>
               {(role.topicStatus === 'draft' || role.topicStatus === 'failed') && (
                 <RoleDocumentForm slug={org.slug} roleId={role.id} roleName={role.name} onUploaded={() => router.invalidate()} />
               )}
