@@ -1,5 +1,5 @@
-import type { Draft } from '@learnquiz/api'
-import { deleteDraft, readDraft, writeDraft } from './draft'
+import type { Draft, SessionView } from '@learnquiz/api'
+import { deleteDraft, draftForView, draftOnViewChange, readDraft, writeDraft } from './draft'
 
 jest.mock('expo-sqlite/kv-store', () => {
   const store = new Map<string, string>()
@@ -23,6 +23,62 @@ const { AsyncStorage } = jest.requireMock('expo-sqlite/kv-store') as {
 beforeEach(() => {
   AsyncStorage.__store.clear()
   jest.clearAllMocks()
+})
+
+const view: SessionView = {
+  id: 'session-a', kind: 'session', topicId: 'topic-a', topicTitle: 'Topic',
+  progress: { position: 1, total: 3 }, ended: false,
+  item: {
+    id: 'item-a', conceptId: 'concept-a', conceptName: 'Concept', format: 'mcq', stem: 'Question?',
+    options: [{ id: 'a', text: 'A' }, { id: 'b', text: 'B' }], blank: null, image: null, difficulty: 1,
+  },
+}
+const selected: Draft = { answer: { optionId: 'a' }, confidence: 'sure' }
+const reasked: SessionView = { ...view, progress: { position: 2, total: 3 } }
+const differentItem: SessionView = { ...reasked, item: { ...view.item!, id: 'item-b' } }
+
+test.each<[SessionView | null, SessionView, string | undefined, string]>([
+  [null, view, undefined, 'restore'],
+  [view, view, undefined, 'keep'],
+  [view, reasked, undefined, 'empty'],
+  [view, differentItem, undefined, 'restore'],
+  [view, view, 'item-a', 'empty'],
+  [view, reasked, 'item-a', 'empty'],
+])('chooses the draft action for the next session slot: %j -> %j, checked %s', (previous, next, checkedItemId, action) => {
+  expect(draftOnViewChange(previous, next, checkedItemId)).toBe(action)
+})
+
+test('a re-asked item clears the old selections, confidence and stored draft', async () => {
+  // A queued change must also be discarded before the re-ask can restore it.
+  const write = writeDraft('session-a', 'item-a', selected)
+  await expect(draftForView('session-a', view, reasked)).resolves.toEqual({ answer: {}, confidence: null })
+  await write
+  await expect(readDraft('session-a', 'item-a')).resolves.toBeNull()
+})
+
+test.each([view, reasked, differentItem])('a 409 resync discards the checked draft, including a same-item response: %j', async (next) => {
+  const otherDraft: Draft = { answer: { optionId: 'b' }, confidence: 'guess' }
+  await writeDraft('session-a', 'item-a', selected)
+  await writeDraft('session-a', 'item-b', otherDraft)
+
+  await expect(draftForView('session-a', view, next, 'item-a')).resolves.toEqual(
+    next.item?.id === 'item-a' ? { answer: {}, confidence: null } : otherDraft,
+  )
+  await expect(readDraft('session-a', 'item-a')).resolves.toBeNull()
+  await expect(readDraft('session-a', 'item-b')).resolves.toEqual(otherDraft)
+})
+
+test('an unchanged foreground view keeps the current selections and failed-check state', async () => {
+  await writeDraft('session-a', 'item-a', selected)
+  // null tells the container to keep its draft, error and stable retry request.
+  await expect(draftForView('session-a', view, view)).resolves.toBeNull()
+  await expect(readDraft('session-a', 'item-a')).resolves.toEqual(selected)
+})
+
+test.each([null, differentItem])('restores an unfinished draft on mount or when entering another item: %j', async (previous) => {
+  await writeDraft('session-a', 'item-a', selected)
+  await expect(draftForView('session-a', previous, view)).resolves.toEqual(selected)
+  await expect(readDraft('session-a', 'item-a')).resolves.toEqual(selected)
 })
 
 test.each<Draft>([
@@ -70,13 +126,13 @@ test('a delete after a slow change cannot leave the checked answer on disk', asy
   await expect(readDraft('session-a', 'item-a')).resolves.toBeNull()
 })
 
-test('reads wait for changes and queued values do not follow later caller mutations', async () => {
-  const draft: Draft = { answer: { optionIds: ['a'] }, confidence: 'unsure' }
+test.each(['optionIds', 'order'] as const)('reads wait for changes and queued %s values do not follow later caller mutations', async (field) => {
+  const draft: Draft = { answer: { [field]: ['a'] }, confidence: 'unsure' }
   const write = writeDraft('session-a', 'item-a', draft)
-  draft.answer.optionIds!.push('b')
+  draft.answer[field]!.push('b')
   draft.confidence = 'sure'
   await expect(readDraft('session-a', 'item-a')).resolves.toEqual({
-    answer: { optionIds: ['a'] }, confidence: 'unsure',
+    answer: { [field]: ['a'] }, confidence: 'unsure',
   })
   await write
 })

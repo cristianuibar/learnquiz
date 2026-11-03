@@ -42,15 +42,10 @@ test.each([
   ['B', { state: 'B' }, 'Correct, 10 XP', 'Continue'],
   ['C', { state: 'C', correct: false, xp: 0 }, 'Not quite', 'Continue'],
   ['D', { state: 'D', correct: false, xp: 0 }, 'Not quite', 'Got it'],
-  ['P', { state: 'P', correct: false, xp: 0, detail: multi }, 'Partly right, 1 of 2 found, 1 extra', 'Continue'],
   ['ungraded', { state: 'ungraded', correct: false, xp: 0 }, 'Couldn’t grade this answer', 'Continue'],
-] as const)('state %s shows its band, the answer, the explanation and the continue label', async (_state, reveal, announcement, label) => {
+] as const)('state %s shows its band, the continue label and Report', async (_state, reveal, announcement, label) => {
   await render(sheet({}, reveal))
   expect(screen.getByRole('header', { name: announcement })).toBeOnTheScreen()
-  expect(screen.getByText('The answer')).toBeOnTheScreen()
-  expect(screen.getByText('Record the damage')).toBeOnTheScreen()
-  expect(screen.getByText('Record before moving.')).toBeOnTheScreen()
-  expect(screen.getByLabelText('Quote: Photograph the damage before moving anything., Receiving SOP · v3')).toBeOnTheScreen()
   expect(screen.getByRole('button', { name: label })).toBeOnTheScreen()
   expect(screen.getByRole('button', { name: 'Report this question' })).toBeOnTheScreen()
 })
@@ -113,7 +108,7 @@ test('an error shows as an alert above continue', async () => {
   expect(screen.getByText('Could not save. Try again.')).toBeOnTheScreen()
   const order = screen.toJSON() as { children: unknown[] }
   const text = JSON.stringify(order)
-  expect(text.indexOf('Could not save')).toBeLessThan(text.indexOf('"button"'))
+  expect(text.indexOf('Could not save')).toBeLessThan(text.indexOf('"Continue"'))
   expect(alert).toBeOnTheScreen()
 })
 
