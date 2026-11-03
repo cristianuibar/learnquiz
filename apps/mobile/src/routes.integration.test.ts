@@ -4,6 +4,7 @@ import { api } from './lib/api'
 import { useSession } from './lib/session-store'
 import { holdTarget, takeHeldTarget } from './lib/held-target'
 
+jest.mock('./app/play/[sessionId]/index', () => ({ __esModule: true, default: () => null }))
 jest.mock('@expo-google-fonts/inter', () => ({ useFonts: () => [true, null] }))
 jest.mock('expo-splash-screen', () => ({ preventAutoHideAsync: jest.fn(), hideAsync: jest.fn() }))
 jest.mock('./lib/session-store', () => ({
