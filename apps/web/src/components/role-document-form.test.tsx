@@ -18,13 +18,13 @@ afterEach(async () => {
   vi.clearAllMocks()
 })
 
-async function mount(onUploaded: () => unknown) {
+async function mount(onUploaded: () => unknown, replaces?: { id: string; title: string }) {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
   roots.push({ unmount: () => root.unmount(), container })
-  await act(async () => root.render(<RoleDocumentForm slug="acme" roleId="r1" roleName="Cashier" onUploaded={onUploaded} />))
+  await act(async () => root.render(<RoleDocumentForm slug="acme" roleId="r1" roleName="Cashier" onUploaded={onUploaded} replaces={replaces} />))
   return container
 }
 
@@ -68,4 +68,15 @@ it('shows a server error and does not report an upload', async () => {
   expect(container.querySelector('[role="alert"]')?.textContent).toBe('Only company admins can do this')
   expect(container.textContent).not.toContain('Document added.')
   expect(onUploaded).not.toHaveBeenCalled()
+})
+
+it('sends the id of the document being replaced', async () => {
+  vi.mocked(uploadRoleDocument).mockResolvedValue(undefined as never)
+  const container = await mount(vi.fn(), { id: 'd1', title: 'Till handbook' })
+  expect(container.querySelector('summary')?.textContent).toBe('Replace Till handbook')
+  await choosePdf(container)
+  await submit(container)
+  const { data } = vi.mocked(uploadRoleDocument).mock.calls[0][0] as unknown as { data: FormData }
+  expect(data.get('replacesId')).toBe('d1')
+  expect((data.get('file') as File).name).toBe('handbook.pdf')
 })
