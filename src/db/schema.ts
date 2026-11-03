@@ -8,6 +8,7 @@ import type { WorkingHours } from '@/lib/company-settings'
 export const topics = sqliteTable('topics', {
   id: text('id').primaryKey(),
   learnerId: text('learner_id'), // Personal topics belong to a learner; company topics belong to a job role.
+  orgId: text('org_id'), // Null in the personal edition.
   jobRoleId: text('job_role_id').unique().references(() => jobRoles.id),
   title: text('title').notNull(),
   goal: text('goal'),
@@ -22,6 +23,12 @@ export const sources = sqliteTable('sources', {
   kind: text('kind', { enum: ['text', 'url', 'pdf', 'image'] }).notNull(),
   title: text('title').notNull(),
   bodyText: text('body_text').notNull(),
+  r2Key: text('r2_key'), // Uploaded original file, when there is one.
+  version: integer('version').notNull().default(1),
+  uploadedBy: text('uploaded_by'),
+  status: text('status', { enum: ['processing', 'ready', 'failed'] }).notNull().default('ready'),
+  error: text('error'),
+  retiredAt: integer('retired_at'),
   deletedAt: integer('deleted_at'),
   createdAt: integer('created_at').notNull(),
 })
@@ -52,6 +59,8 @@ export const concepts = sqliteTable('concepts', {
   imageKey: text('image_key'),
   imageAlt: text('image_alt'),
   imageGenerationStartedAt: integer('image_generation_started_at'),
+  genStatus: text('gen_status', { enum: ['pending', 'generating', 'ready', 'failed'] }).notNull().default('ready'),
+  genError: text('gen_error'),
 })
 
 export const conceptEdges = sqliteTable(
@@ -76,11 +85,23 @@ export const items = sqliteTable('items', {
   difficultyPrior: integer('difficulty_prior').notNull().default(3),
   eloDifficulty: real('elo_difficulty'),
   checkJson: text('check_json'),
+  sourceId: text('source_id'),
+  sourceVersion: integer('source_version'), // sources.version the item was generated from.
   status: text('status', { enum: ['active', 'rejected', 'reported', 'retired'] }).notNull().default('active'),
   reviewedBy: text('reviewed_by'),
   reviewedAt: integer('reviewed_at'),
   createdAt: integer('created_at').notNull(),
 })
+
+// Learner reports on a question; resolved_at is set when an admin handles the report.
+export const itemFlags = sqliteTable('item_flags', {
+  id: text('id').primaryKey(),
+  itemId: text('item_id').notNull(),
+  userId: text('user_id').notNull(),
+  reason: text('reason').notNull(),
+  createdAt: integer('created_at').notNull(),
+  resolvedAt: integer('resolved_at'),
+}, (t) => [index('item_flags_item_idx').on(t.itemId)])
 
 export const learnerTopic = sqliteTable(
   'learner_topic',
@@ -155,7 +176,7 @@ export const attempts = sqliteTable('attempts', {
   pKnownBefore: real('p_known_before').notNull(),
   pKnownAfter: real('p_known_after').notNull(),
   retrievabilityBefore: real('retrievability_before'),
-})
+}, (t) => [index('attempts_learner_at_idx').on(t.learnerId, t.at)])
 
 export const placements = sqliteTable('placements', {
   id: text('id').primaryKey(),
@@ -177,7 +198,7 @@ export const sessions = sqliteTable('sessions', {
   endedAt: integer('ended_at'),
   correctCount: integer('correct_count').notNull().default(0),
   xp: integer('xp').notNull().default(0),
-})
+}, (t) => [index('sessions_learner_idx').on(t.learnerId)])
 
 export const badges = sqliteTable(
   'badges',
@@ -205,7 +226,7 @@ export const modelCalls = sqliteTable('model_calls', {
   ok: integer('ok', { mode: 'boolean' }).notNull(),
   error: text('error'),
   createdAt: integer('created_at').notNull(),
-})
+}, (t) => [index('model_calls_created_at_idx').on(t.createdAt)])
 
 // Company training roles: the benchmark is the mastery threshold, onboarding_days the period it should be met in.
 export const jobRoles = sqliteTable('job_roles', {
