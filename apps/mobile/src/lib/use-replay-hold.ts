@@ -12,6 +12,10 @@ export function useReplayHold(): () => void {
     release.current = null
   }, []))
   return useCallback(() => {
-    release.current ??= deferReplay()
+    // Always take a fresh hold: sign-out may have dropped the previous one. Take
+    // the new hold before releasing the old so replay never opens in between.
+    const next = deferReplay()
+    release.current?.()
+    release.current = next
   }, [])
 }
