@@ -14,6 +14,7 @@ import { requireOrgAdmin } from '@/server/authz'
 import { requireLearnerId } from '@/server/session'
 import { drainConceptQueue } from '@/server/concept-gen'
 import { runInBackground } from '@/server/env'
+import { learnerCanAccess, rolePlayable, roleCompany, seedLearnerTopic } from '@/server/topic-access'
 import { buildRoleCurriculum, curriculumWrites } from '@/server/role-curriculum'
 
 export const createTopic = createServerFn({ method: 'POST' })
@@ -112,11 +113,17 @@ export const getTopicPath = createServerFn({ method: 'GET' })
   .handler(async ({ data }) => {
     const learnerId = await requireLearnerId()
     const db = getDb()
-    const [topic] = await db
-      .select({ id: topics.id, title: topics.title, goal: topics.goal, status: topics.status, generatedBy: topics.generatedBy })
+    const [row] = await db
+      .select({ id: topics.id, title: topics.title, goal: topics.goal, status: topics.status, generatedBy: topics.generatedBy, jobRoleId: topics.jobRoleId })
       .from(topics)
-      .where(and(eq(topics.id, data.topicId), eq(topics.learnerId, learnerId)))
-    if (!topic) throw httpError('Topic not found', 404)
+      .where(and(eq(topics.id, data.topicId), learnerCanAccess(db, learnerId)))
+    if (!row) throw httpError('Topic not found', 404)
+    const { jobRoleId, ...topic } = row
+    if (jobRoleId !== null && topic.status === 'ready') await seedLearnerTopic(db, learnerId, topic.id)
+    // Nothing to start until the topic is ready. A role topic without a playable stored question skips the placement.
+    const preparing = topic.status !== 'ready'
+    const placeable = jobRoleId !== null ? await rolePlayable(db, topic) : true
+    const company = jobRoleId !== null ? await roleCompany(db, jobRoleId) : null
 
     const [unitRows, conceptRows, edges, counts, known, [lt], [placement]] = await Promise.all([
       db
@@ -153,6 +160,9 @@ export const getTopicPath = createServerFn({ method: 'GET' })
     const itemCount = new Map(counts.map((c) => [c.conceptId, c.n]))
     return {
       topic,
+      preparing,
+      placeable,
+      company,
       // The reveal line lives in placements.log_json as { log, levelLine }.
       learner: {
         level: lt?.level ?? 3,
@@ -196,12 +206,13 @@ export const getConceptItems = createServerFn({ method: 'GET' })
   .validator(z.object({ conceptId: z.string().min(1) }))
   .handler(async ({ data }): Promise<{ items: StoredItem[] }> => {
     const learnerId = await requireLearnerId()
-    const rows = await getDb()
+    const db = getDb()
+    const rows = await db
       .select({ item: items })
       .from(items)
       .innerJoin(topics, eq(topics.id, items.topicId))
       .innerJoin(learnerItem, and(eq(learnerItem.itemId, items.id), eq(learnerItem.learnerId, learnerId)))
-      .where(and(eq(items.conceptId, data.conceptId), eq(items.status, 'active'), eq(topics.learnerId, learnerId)))
+      .where(and(eq(items.conceptId, data.conceptId), eq(items.status, 'active'), learnerCanAccess(db, learnerId)))
       .orderBy(desc(items.createdAt))
     return { items: rows.map((r) => asItem(r.item)) }
   })

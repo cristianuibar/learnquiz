@@ -19,8 +19,8 @@ import { validateVoiceWav } from '@/lib/voice'
 import { plural } from '@/lib/utils'
 import { asItem, chunks, ensureConceptItems, httpError, loadPKnown, mean, targetFor } from '@/server/helpers'
 import { requireLearnerId } from '@/server/session'
-import { learnerCanAccess } from '@/server/topic-access'
 import { assertWithinDailyCap } from '@/server/model-cap'
+import { learnerCanAccess, seedLearnerTopic } from '@/server/topic-access'
 
 // shortcut: 12 instead of the spec's 20 while generation is slow, raise it once items are generated ahead of play.
 export const SESSION_SIZE = 12
@@ -52,6 +52,7 @@ const readPlan = (s: SessionRow) => JSON.parse(s.planJson ?? '{}') as PlacementP
 const batch = (db: Db, stmts: Stmt[]) => db.batch(stmts as [Stmt, ...Stmt[]])
 // The longest grading call (the model client's 120 s timeout) plus slack.
 const CLAIM_TTL = 150_000
+const ROLE_UNGRADED = Symbol('role topic')
 
 // INSERT ... SELECT of one row that is written only while `when` holds. Every column must be set.
 function insertIf<T extends SQLiteTable>(db: Db, table: T, when: SQL, row: T['$inferInsert']) {
@@ -69,9 +70,16 @@ async function ownedTopic(db: Db, learnerId: string, topicId: string) {
     .where(and(eq(topics.id, topicId), learnerCanAccess(db, learnerId)))
   if (!topic) throw httpError('Topic not found', 404)
   if (topic.status !== 'ready') throw httpError('This topic is not ready yet', 409)
-  // A role topic has no learner_topic row until the member first plays it (defaults as in curriculum.ts).
-  if (topic.learnerId !== learnerId) await db.insert(learnerTopic).values({ learnerId, topicId: topic.id, level: 3, rating: 1500 }).onConflictDoNothing()
+  if (topic.jobRoleId !== null) await seedLearnerTopic(db, learnerId, topic.id)
   return topic
+}
+
+// Role topics play stored items graded without a model, so short answers stay out.
+async function storedItems(db: Db, topicId: string, conceptId: string) {
+  const rows = await db.select().from(items)
+    .where(and(eq(items.conceptId, conceptId), eq(items.topicId, topicId), eq(items.status, 'active'), ne(items.format, 'short')))
+    .orderBy(asc(items.createdAt), asc(items.id))
+  return rows.map(asItem)
 }
 
 async function loadSession(db: Db, learnerId: string, sessionId: string) {
@@ -155,7 +163,8 @@ async function viewOf(db: Db, session: SessionRow, topic: TopicRow, plan: Placem
     progress: { position: plan.position + 1, total: placement ? Math.max(PLACEMENT.max, plan.position + 1) : ids.length },
     item,
     ended,
-    voiceEnabled: isVoiceEnabled(),
+    // Role topics play without any model call, so transcription is off there.
+    voiceEnabled: topic.jobRoleId === null && isVoiceEnabled(),
   }
 }
 
@@ -177,10 +186,15 @@ export const startPlacement = createServerFn({ method: 'POST' })
     if (!picks.length) throw httpError('This topic has no concepts', 409)
 
     // A failed concept keeps the others' stored items, so a retry only regenerates what is missing.
-    const generated = await Promise.all(
-      picks.map((c) => ensureConceptItems(db, learnerId, c, topic, { targetDifficulty: PLACEMENT.start, spread: true, sessionId })),
-    )
-    const pool = generated.flatMap((list, i) => list.map((it) => ({ id: it.id, conceptId: picks[i].id, difficulty: it.difficultyPrior })))
+    // Role topics are never generated per learner: they place on the stored items of every concept.
+    const sources = topic.jobRoleId !== null ? conceptRows : picks
+    const generated = topic.jobRoleId !== null
+      ? await Promise.all(sources.map((c) => storedItems(db, topic.id, c.id)))
+      : await Promise.all(
+        picks.map((c) => ensureConceptItems(db, learnerId, c, topic, { targetDifficulty: PLACEMENT.start, spread: true, sessionId })),
+      )
+    const pool = generated.flatMap((list, i) => list.map((it) => ({ id: it.id, conceptId: sources[i].id, difficulty: it.difficultyPrior })))
+    if (!pool.length && topic.jobRoleId !== null) throw httpError('Your training is being prepared', 409)
     const first = pickNext(PLACEMENT.start, pool, [])
     if (!first) throw httpError('Could not generate placement questions', 502)
 
@@ -206,13 +220,24 @@ export const startSession = createServerFn({ method: 'POST' })
     const topic = await ownedTopic(db, learnerId, data.topicId)
     const sessionId = crypto.randomUUID()
     const now = new Date()
+    // An employee who never placed gets the minimum unlock, as finalise does.
+    if (topic.jobRoleId !== null) {
+      await db.insert(learnerUnit)
+        .select(db
+          .select({ learnerId: sql<string>`${learnerId}`.as('learner_id'), unitId: units.id, unlockedAt: sql<number>`${now.getTime()}`.as('unlocked_at') })
+          .from(units)
+          .where(and(eq(units.topicId, topic.id), lte(units.order, 1),
+            sql`NOT EXISTS (SELECT 1 FROM ${learnerUnit} lu JOIN ${units} u ON u.id = lu.unit_id WHERE lu.learner_id = ${learnerId} AND u.topic_id = ${topic.id})`)))
+        .onConflictDoNothing()
+    }
     const [lt, scheduled, frontier] = await Promise.all([
       loadLearnerTopic(db, learnerId, topic.id),
       db
         .select({ row: learnerItem, conceptId: items.conceptId })
         .from(learnerItem)
         .innerJoin(items, eq(items.id, learnerItem.itemId))
-        .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topic.id), eq(items.status, 'active'))),
+        .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topic.id), eq(items.status, 'active'),
+          topic.jobRoleId !== null ? ne(items.format, 'short') : undefined)),
       loadFrontier(db, learnerId, topic.id),
     ])
     const targetDifficulty = targetFor(lt.level)
@@ -230,12 +255,14 @@ export const startSession = createServerFn({ method: 'POST' })
     const top = frontier.slice(0, 4)
     // Anything practisable stored starts the session at once (a shorter one is fine); prepareNextSession tops up during play.
     const storedRows = top.length
-      ? await db.select().from(items).where(and(eq(items.topicId, topic.id), inArray(items.conceptId, top.map((f) => f.concept.id)), eq(items.status, 'active')))
+      ? await db.select().from(items).where(and(eq(items.topicId, topic.id), inArray(items.conceptId, top.map((f) => f.concept.id)), eq(items.status, 'active'),
+        topic.jobRoleId !== null ? ne(items.format, 'short') : undefined))
       : []
     const stored = top.map((f) => storedRows.filter((r) => r.conceptId === f.concept.id).map(asItem))
     const storedFresh = stored.flat().filter((it) => !seen.has(it.id)).length
-    // Generation runs only when nothing is due, so a daily-cap refusal has no stored reviews to fall back on.
-    const generated = due.length + storedFresh > 0 ? stored
+    // Role questions are built once per concept by the company queue; a role session only plays what is stored (#40).
+    // A personal topic generates only when nothing is due, so a daily-cap refusal has no stored reviews to fall back on.
+    const generated = topic.jobRoleId !== null || due.length + storedFresh > 0 ? stored
       : await Promise.all(top.map((f) => ensureConceptItems(db, learnerId, f.concept, topic, { targetDifficulty, unseen: seen, sessionId })))
     const frontierInput = top.map((f, i) => ({
       conceptId: f.concept.id,
@@ -250,14 +277,18 @@ export const startSession = createServerFn({ method: 'POST' })
       .select({ id: items.id, conceptId: items.conceptId })
       .from(items)
       .innerJoin(learnerConcept, and(eq(learnerConcept.conceptId, items.conceptId), eq(learnerConcept.learnerId, learnerId)))
-      .where(and(eq(items.topicId, topic.id), eq(items.status, 'active'), gte(learnerConcept.pKnown, CLOSER_MIN), lte(items.difficultyPrior, lt.level)))
+      .where(and(eq(items.topicId, topic.id), eq(items.status, 'active'), gte(learnerConcept.pKnown, CLOSER_MIN), lte(items.difficultyPrior, lt.level),
+        topic.jobRoleId !== null ? ne(items.format, 'short') : undefined))
     const closers = closerRows
       .filter((c) => !taken.has(c.id))
       .sort((a, b) => Number(seen.has(a.id)) - Number(seen.has(b.id)))
       .slice(0, 2)
 
     const rulesQueue = composeSession({ size: SESSION_SIZE, due, frontier: frontierInput, closers, targetDifficulty })
-    if (!rulesQueue.length) throw httpError('Nothing to practise yet', 409)
+    if (!rulesQueue.length) {
+      if (topic.jobRoleId !== null) throw httpError('Your training is being prepared. Try again in a few minutes.', 503)
+      throw httpError('Nothing to practise yet', 409)
+    }
 
     const dueIds = new Set(due.map((d) => d.id))
     const closerIds = new Set(closers.map((c) => c.id))
@@ -272,7 +303,7 @@ export const startSession = createServerFn({ method: 'POST' })
     }
     try {
       const selected = jobModel('plan')
-      if (selected.provider !== 'ollama') {
+      if (selected.provider !== 'ollama' && topic.jobRoleId === null) {
         await assertWithinDailyCap(db, learnerId)
         const candidates = await db
           .select({ itemId: items.id, concept: concepts.name, difficulty: items.difficultyPrior })
@@ -360,6 +391,8 @@ export const prepareNextSession = createServerFn({ method: 'POST' })
     const learnerId = await requireLearnerId()
     const db = getDb()
     const { session, topic } = await loadSession(db, learnerId, data.sessionId)
+    // Role questions are built by the company queue, never per learner (#40).
+    if (topic.jobRoleId !== null) return { ok: true as const }
     const reserved = session.kind === 'session' ? (JSON.parse(session.itemIdsJson) as string[]) : []
     await topUpFrontier(db, learnerId, topic, reserved, session.kind === 'placement' && session.endedAt === null)
     return { ok: true as const }
@@ -421,7 +454,8 @@ export const transcribeAnswer = createServerFn({ method: 'POST' })
     const learnerId = await requireLearnerId()
     if (!isVoiceEnabled()) throw httpError('Voice answers are unavailable.', 404)
     const db = getDb()
-    const { session } = await loadSession(db, learnerId, data.sessionId)
+    const { session, topic } = await loadSession(db, learnerId, data.sessionId)
+    if (topic.jobRoleId !== null) throw httpError('Voice answers are unavailable.', 404)
     const plan = readPlan(session)
     if (session.endedAt !== null || plan.answered || (JSON.parse(session.itemIdsJson) as string[])[plan.position] !== data.itemId) {
       throw httpError('That is not the current question', 409)
@@ -471,7 +505,7 @@ export const answerItem = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<Reveal> => {
     const learnerId = await requireLearnerId()
     const db = getDb()
-    const { session } = await loadSession(db, learnerId, data.sessionId)
+    const { session, topic } = await loadSession(db, learnerId, data.sessionId)
     if (session.endedAt !== null) throw httpError('This session has ended', 409)
     const plan = readPlan(session)
     const ids = JSON.parse(session.itemIdsJson) as string[]
@@ -526,6 +560,8 @@ export const answerItem = createServerFn({ method: 'POST' })
     let shortGrade: Grade | undefined
     if (payload.format === 'short') {
       try {
+        // Role topics play without any model call, so their short answers are revealed ungraded.
+        if (topic.jobRoleId !== null) throw ROLE_UNGRADED
         shortGrade = await chatJson({
           purpose: 'grade',
           schema: Grade,
@@ -539,7 +575,7 @@ export const answerItem = createServerFn({ method: 'POST' })
         grade.correct = shortGrade.score >= 0.8
       } catch (e) {
         const capped = e instanceof DailyCapError
-        if (!capped) console.error('short answer grading failed, revealing model answer', e instanceof Error ? e.message : e)
+        if (!capped && e !== ROLE_UNGRADED) console.error('short answer grading failed, revealing model answer', e instanceof Error ? e.message : e)
         // Advance without recording a wrong answer or changing mastery, scheduling or XP.
         const [kept] = await db
           .update(sessions)
@@ -738,7 +774,7 @@ export const reportItem = createServerFn({ method: 'POST' })
     const done = await db
       .update(items)
       .set({ status: 'reported' })
-      .where(and(eq(items.id, data.itemId), ne(items.status, 'retired'), inArray(items.topicId, db.select({ id: topics.id }).from(topics).where(eq(topics.learnerId, learnerId)))))
+      .where(and(eq(items.id, data.itemId), ne(items.status, 'retired'), inArray(items.topicId, db.select({ id: topics.id }).from(topics).where(learnerCanAccess(db, learnerId)))))
       .returning({ id: items.id })
     if (!done.length) throw httpError('Item not found', 404)
     return { ok: true }
@@ -753,6 +789,7 @@ const PlacementLine = z.object({ line: z.string().max(240) })
 async function placementLine(db: Db, learnerId: string, session: SessionRow, topic: TopicRow, log: PlacementPlan['log'], level: number) {
   const right = log.filter((l) => l.correct).length
   const fallback = `You got ${right} of ${log.length} right and landed at level ${level} of 5 on ${topic.title}. Your path starts there.`
+  if (topic.jobRoleId !== null) return { levelLine: fallback, levelLineModel: null }
   try {
     const names = await db
       .select({ id: items.id, concept: concepts.name })

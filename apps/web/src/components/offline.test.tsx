@@ -31,6 +31,9 @@ beforeEach(() => {
   vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'learner', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })
   vi.mocked(getTopicPath).mockResolvedValue({
     topic: { id: 'topic', title: 'Arithmetic', goal: null, status: 'ready', generatedBy: null },
+    preparing: false,
+    placeable: true,
+    company: null,
     learner: { level: 1, levelLine: null, levelLineModel: null, placed: false, xp: 0, streak: 0 }, units: [], edges: [],
   })
   vi.mocked(getSession).mockResolvedValue({
@@ -95,6 +98,9 @@ it.each(['session', 'path'] as const)('recovers an offline Path navigation when 
 it('shows the offline message for answered questions on Path and loads them with Try again online', async () => {
   vi.mocked(getTopicPath).mockResolvedValue({
     topic: { id: 'topic', title: 'Arithmetic', goal: null, status: 'ready', generatedBy: null },
+    preparing: false,
+    placeable: true,
+    company: null,
     learner: { level: 1, levelLine: null, levelLineModel: null, placed: false, xp: 0, streak: 0 },
     units: [{ id: 'unit', order: 0, name: 'Basics', summary: '', mastery: 0, measured: false, unlocked: true, concepts: [{ id: 'concept', order: 0, name: 'Addition', summary: '', visual: false, grounded: false, critical: false, itemCount: 1, pKnown: 0 }] }],
     edges: [],
@@ -122,6 +128,9 @@ it('shows the offline message for answered questions on Path and loads them with
 it('opens and closes the answered questions on Path from the same button', async () => {
   vi.mocked(getTopicPath).mockResolvedValue({
     topic: { id: 'topic', title: 'Arithmetic', goal: null, status: 'ready', generatedBy: null },
+    preparing: false,
+    placeable: true,
+    company: null,
     learner: { level: 1, levelLine: null, levelLineModel: null, placed: false, xp: 0, streak: 0 },
     units: [{ id: 'unit', order: 0, name: 'Basics', summary: '', mastery: 0, measured: false, unlocked: true, concepts: [{ id: 'concept', order: 0, name: 'Addition', summary: '', visual: false, grounded: false, critical: false, itemCount: 1, pKnown: 0 }] }],
     edges: [],

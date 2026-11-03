@@ -25,6 +25,9 @@ it.each(['topic', 'session'] as const)('opens the %s trace from its page and ret
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   vi.mocked(getTopicPath).mockResolvedValue({
     topic: { id: 't1', title: 'Algebra', goal: null, status: 'ready', generatedBy: 'muse-spark-1.3' },
+    preparing: false,
+    placeable: true,
+    company: null,
     learner: { level: 3, levelLine: null, levelLineModel: null, placed: false, xp: 0, streak: 0 }, units: [], edges: [],
   })
   vi.mocked(endSession).mockResolvedValue({

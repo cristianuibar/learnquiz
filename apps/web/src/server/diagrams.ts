@@ -7,15 +7,18 @@ import { generateImage, isImageEnabled } from '@/lib/llm/client'
 import { getEnv } from '@/server/env'
 import { httpError } from '@/server/helpers'
 import { getLearnerId, requireLearnerId } from '@/server/session'
+import { learnerCanAccess } from '@/server/topic-access'
 
 export type DiagramResult =
   | { status: 'ready'; image: { src: string; alt: string } }
-  | { status: 'pending' | 'disabled' }
+  | { status: 'pending' | 'disabled' | 'unavailable' }
 
-async function ownedConcept(db: Db, learnerId: string, conceptId: string) {
-  const [row] = await db.select({ concept: concepts, topic: topics.title })
+// One access rule for serving and generating: the learner's own topic, or the shared topic of their assigned role.
+// A role concept's diagram is stored once and shared, so its generation counts against the company cap.
+async function accessibleConcept(db: Db, learnerId: string, conceptId: string) {
+  const [row] = await db.select({ concept: concepts, topic: topics.title, orgId: topics.orgId, ownerId: topics.learnerId })
     .from(concepts).innerJoin(topics, eq(topics.id, concepts.topicId))
-    .where(and(eq(concepts.id, conceptId), eq(topics.learnerId, learnerId)))
+    .where(and(eq(concepts.id, conceptId), learnerCanAccess(db, learnerId)))
   return row
 }
 
@@ -24,11 +27,13 @@ export const generateConceptDiagram = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<DiagramResult> => {
     const learnerId = await requireLearnerId()
     const db = getDb()
-    const row = await ownedConcept(db, learnerId, data.conceptId)
+    const row = await accessibleConcept(db, learnerId, data.conceptId)
     if (!row) throw httpError('Concept not found', 404)
     const { concept } = row
     const ready = (alt: string): DiagramResult => ({ status: 'ready', image: { src: `/media/concepts/${encodeURIComponent(concept.id)}`, alt } })
     if (concept.imageKey) return ready(concept.imageAlt ?? `${concept.name}: ${concept.summary}`)
+    // Employees play a shared role topic from stored content only: no paid image call on the employee path (#40).
+    if (row.ownerId !== learnerId) return { status: concept.visual ? 'unavailable' : 'disabled' }
     const env = getEnv()
     if (!concept.visual || !isImageEnabled()) return { status: 'disabled' }
 
@@ -49,6 +54,7 @@ export const generateConceptDiagram = createServerFn({ method: 'POST' })
         const bytes = await generateImage({
           learnerId,
           topicId: concept.topicId,
+          orgId: row.orgId,
           prompt: `Draw a clear educational procedure diagram for ${concept.name} in ${row.topic}.\n${concept.summary}\n${concept.sourceQuote ? `Source material: ${concept.sourceQuote}\n` : ''}Use numbered steps, arrows and short readable labels on a plain background. Follow the supplied procedure accurately; do not invent steps or company policy.`,
         })
         await env.MEDIA.put(key, bytes, { httpMetadata: { contentType: 'image/png' }, onlyIf: { etagDoesNotMatch: '*' } })
@@ -65,7 +71,7 @@ export const generateConceptDiagram = createServerFn({ method: 'POST' })
 export const serveConceptDiagram = createServerOnlyFn(async (conceptId: string): Promise<Response> => {
   const learnerId = await getLearnerId()
   if (!learnerId) return new Response('Sign in first', { status: 401 })
-  const row = await ownedConcept(getDb(), learnerId, conceptId)
+  const row = await accessibleConcept(getDb(), learnerId, conceptId)
   if (!row?.concept.imageKey) return new Response('Diagram not found', { status: 404 })
   const object = await getEnv().MEDIA.get(row.concept.imageKey)
   if (!object) return new Response('Diagram not found', { status: 404 })

@@ -6,6 +6,7 @@ import { modelCalls, sessions, topics } from '@/db/schema'
 import type { SessionPlanning } from '@learnquiz/api'
 import { httpError } from '@/server/helpers'
 import { requireLearnerId } from '@/server/session'
+import { learnerCanAccess } from '@/server/topic-access'
 
 export const getModelTrace = createServerFn({ method: 'GET' })
   .validator(z.discriminatedUnion('scope', [
@@ -19,7 +20,7 @@ export const getModelTrace = createServerFn({ method: 'GET' })
     if (data.scope === 'session') {
       const [owned] = await db.select({ planJson: sessions.planJson }).from(sessions)
         .innerJoin(topics, eq(topics.id, sessions.topicId))
-        .where(and(eq(sessions.id, data.sessionId), eq(sessions.learnerId, learnerId), eq(topics.learnerId, learnerId)))
+        .where(and(eq(sessions.id, data.sessionId), eq(sessions.learnerId, learnerId), learnerCanAccess(db, learnerId)))
       if (!owned) throw httpError('Session not found', 404)
       const plan = JSON.parse(owned.planJson ?? '{}') as { planning?: SessionPlanning }
       if (plan.planning) {
@@ -28,7 +29,7 @@ export const getModelTrace = createServerFn({ method: 'GET' })
       }
     } else {
       const [owned] = await db.select({ id: topics.id }).from(topics)
-        .where(and(eq(topics.id, data.topicId), eq(topics.learnerId, learnerId)))
+        .where(and(eq(topics.id, data.topicId), learnerCanAccess(db, learnerId)))
       if (!owned) throw httpError('Topic not found', 404)
     }
     const calls = await db.select({
