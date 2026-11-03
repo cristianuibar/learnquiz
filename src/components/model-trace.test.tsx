@@ -14,9 +14,11 @@ vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
 vi.mock('@/server/curriculum', () => ({ getTopicPath: vi.fn(), getConceptItems: vi.fn() }))
 vi.mock('@/server/play', () => ({ endSession: vi.fn(), startSession: vi.fn(), startPlacement: vi.fn() }))
 vi.mock('@/server/model-trace', () => ({ getModelTrace: vi.fn() }))
+vi.mock('@/server/diagrams', () => ({ generateConceptDiagram: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
+vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => 't1' }))
-vi.mock('@/server/session-fn', () => ({ getSessionFn: async () => ({ user: { id: 'u1', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false }) }))
+vi.mock('@/server/session-fn', () => ({ getSessionFn: async () => ({ user: { id: 'u1', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] }) }))
 
 it.each(['topic', 'session'] as const)('opens the %s trace from its page and retries a failed load', async (scope) => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
@@ -29,7 +31,10 @@ it.each(['topic', 'session'] as const)('opens the %s trace from its page and ret
     level: 3, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], nextLine: 'Practise equations.',
   })
   vi.mocked(getModelTrace).mockReset().mockRejectedValueOnce(new Error('Trace unavailable')).mockResolvedValue({
-    calls: [{ id: 'call', purpose: 'items', model: 'muse-spark-1.3', latencyMs: 123, promptTokens: 100, completionTokens: 20, reasoningTokens: 5, costUsd: 0.00021, ok: true, createdAt: 1 }], totalCostUsd: 0.00021,
+    calls: [
+      { id: 'call', purpose: 'items', model: 'muse-spark-1.3', latencyMs: 123, promptTokens: 100, completionTokens: 20, reasoningTokens: 5, costUsd: 0.00021, ok: true, createdAt: 1 },
+      { id: 'unpriced', purpose: 'self_check', model: 'muse-wonder-1.0', latencyMs: 123, promptTokens: 100, completionTokens: 20, reasoningTokens: 5, costUsd: null, ok: true, createdAt: 2 },
+    ], totalCostUsd: 0.00021,
   })
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
   const path = createRoute({ getParentRoute: () => rootRoute, path: '/t/$topicId/path', loader: pathRoute.options.loader, component: pathRoute.options.component })
@@ -49,6 +54,7 @@ it.each(['topic', 'session'] as const)('opens the %s trace from its page and ret
     await act(async () => dialog.querySelector<HTMLButtonElement>('[role="alert"] button')!.click())
     expect(getModelTrace).toHaveBeenLastCalledWith({ data: scope === 'topic' ? { scope, topicId: 't1' } : { scope, sessionId: 's1' } })
     expect(dialog.textContent).toContain('muse-spark-1.3')
+    expect(dialog.textContent).toContain('Unknown')
     expect(dialog.textContent).toContain(`${scope === 'topic' ? 'Generation' : 'Session'} total: $0.00021`)
     await act(async () => dialog.querySelector<HTMLButtonElement>('[data-slot="dialog-close"]')!.click())
     expect(document.querySelector('[role="dialog"]')).toBeNull()

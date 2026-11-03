@@ -7,7 +7,7 @@ import { getModelTrace } from '@/server/model-trace'
 
 type Scope = { scope: 'session'; sessionId: string } | { scope: 'topic'; topicId: string }
 type Trace = Awaited<ReturnType<typeof getModelTrace>>
-const usd = (cost: number) => cost.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 8 })
+const usd = (cost: number | null) => cost === null ? 'Unknown' : cost.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 8 })
 
 export function ModelTrace({ scope }: { scope: Scope }) {
   const load = useServerFn(getModelTrace)
@@ -47,7 +47,7 @@ export function ModelTrace({ scope }: { scope: Scope }) {
             <p className="text-lg font-semibold tabular-nums">
               {scope.scope === 'session' ? 'Session total' : 'Generation total'}: {usd(trace.totalCostUsd)}
             </p>
-            <p className="text-sm text-muted-foreground">USD costs are the logged estimates. Output tokens include reasoning tokens.</p>
+            <p className="text-sm text-muted-foreground">USD costs are the logged estimates. Totals include priced calls only. Output tokens include reasoning tokens.</p>
             {trace.planning && (
               <section aria-label="Session plan">
                 <h2 className="font-semibold">{trace.planning.planner}</h2>

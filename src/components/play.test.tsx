@@ -7,18 +7,22 @@ import { Route as playRoute } from '@/routes/play.$sessionId'
 import { Route as appRootRoute } from '@/routes/__root'
 import { answerItem, getSession, nextItem, transcribeAnswer } from '@/server/play'
 import { getModelTrace } from '@/server/model-trace'
+import { generateConceptDiagram } from '@/server/diagrams'
 import type { Reveal, SessionView } from '@/lib/learning/types'
 
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
 vi.mock('@/server/play', () => ({ answerItem: vi.fn(), getSession: vi.fn(), transcribeAnswer: vi.fn(), nextItem: vi.fn(), endSession: vi.fn(), reportItem: vi.fn() }))
 vi.mock('@/server/model-trace', () => ({ getModelTrace: vi.fn() }))
+vi.mock('@/server/diagrams', () => ({ generateConceptDiagram: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
+vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => 't1' }))
-vi.mock('@/server/session-fn', () => ({ getSessionFn: async () => ({ user: { id: 'u1', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false }) }))
+vi.mock('@/server/session-fn', () => ({ getSessionFn: async () => ({ user: { id: 'u1', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] }) }))
 
 let stopTrack: ReturnType<typeof vi.fn>
 let finishPermission: ((stream: MediaStream) => void) | undefined
 beforeEach(() => {
+  vi.mocked(generateConceptDiagram).mockReset().mockResolvedValue({ status: 'ready', image: { src: '/media/concepts/c1', alt: 'Subtract equal amounts from both sides.' } })
   vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
     matches: query.includes('prefers-reduced-motion'), media: query, onchange: null,
     addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}, dispatchEvent: () => true,
@@ -97,7 +101,7 @@ it.each([
   }
   if (repeats) {
     const reveal = {
-      attemptId: 'a1', correct: false, correctAnswer: '1', state: 'C' as const, mixUps: [], explanation: 'Subtract one.',
+      attemptId: 'a1', diagramConceptId: null, correct: false, correctAnswer: '1', state: 'C' as const, mixUps: [], explanation: 'Subtract one.',
       score: 0, feedback: null, missingPoints: [],
       chosenFeedback: null, sourceQuote: null, returnsThisSession: true, pKnownBefore: 0.1, pKnownAfter: 0.05,
     }
@@ -243,7 +247,7 @@ it.each([false, true])('submits a short answer and shows its reveal (ungraded=%s
   const { container, initial, cleanup } = await renderPlay(false, false, 'short')
   try {
     vi.mocked(answerItem).mockResolvedValueOnce({
-      attemptId: ungraded ? null : 'a1', state: ungraded ? 'ungraded' : 'D', correct: false,
+      attemptId: ungraded ? null : 'a1', diagramConceptId: 'c1', state: ungraded ? 'ungraded' : 'D', correct: false,
       score: ungraded ? null : 0.5, feedback: ungraded ? 'Compare your answer with the model answer.' : 'Explain why both sides stay equal.',
       missingPoints: ungraded ? [] : ['Subtract the same amount from both sides.'],
       correctAnswer: 'Equal changes preserve equality.', explanation: 'Both sides change by the same amount.',
@@ -258,6 +262,7 @@ it.each([false, true])('submits a short answer and shows its reveal (ungraded=%s
     await act(async () => { button(container, 'Check').click() })
     expect(answerItem).toHaveBeenCalledWith({ data: expect.objectContaining({ answer: { text: 'Both sides get smaller.' } }) })
     const status = container.querySelector('[role="status"]')!
+    expect(status.querySelector('img')?.getAttribute('src')).toBe('/media/concepts/c1')
     if (ungraded) {
       expect(status.querySelector('h2')?.textContent).toBe('Could not grade this answer')
       expect(status.textContent).toContain('Equal changes preserve equality.')

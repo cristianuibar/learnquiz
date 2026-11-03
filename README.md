@@ -40,7 +40,7 @@ Built solo by Cristian Uibar for the Meta Global AI Developer Hackathon
 | Muse Spark 1.3 | Short-answer grading and placement result text | Shipped; placement text has a template fallback |
 | Muse Voice Transcribe 1.0 (`muse-voice-transcribe-1.0`) | Transcribe spoken text answers for editing before submission | Implemented, opt-in; disabled in the checked-in configuration |
 | Muse Wonder 1.0 | Session planning with tools (coach) | Planned; current sessions use the code-based planner |
-| Muse Image 1.0 | Diagrams and visual questions | Planned; setting `IMAGE_MODEL` does not enable image generation |
+| Muse Image 1.0 | Procedure diagrams | Shipped; generated once per visual concept and shown on answer reveals and Path |
 
 Every model call is logged to the `model_calls` table. Open **Model trace** on a
 session summary or the Path screen to see each call's purpose, model, latency,
@@ -48,11 +48,14 @@ tokens and estimated USD cost, plus the total. Generated paths, questions and pl
 feedback name the model that wrote them. Traces are private to the learner.
 Topic links and model labels are recorded for newly generated content.
 
-Cost estimates use the configured price table, currently populated for Spark 1.3
-only. Models without a price entry, including voice, log a zero cost rather than a
-provider billing total.
+Cost estimates use the configured token price table for Spark 1.3. Models without
+a known price, including Wonder, Image and voice, record `cost_usd = null` and show
+**Unknown** in the trace. Totals include priced calls only; unpriced calls add no
+monetary charge and still count toward the daily model-call cap. Billing rates and
+units for these models will be added separately.
 
-With `VOICE_ENABLED=true` and `LLM_PROFILE=meta`, text-answer questions offer a
+With `VOICE_ENABLED=true` and the voice job mapped to Meta's Muse Voice Transcribe
+1.0, text-answer questions offer a
 hold-to-talk button. Allow microphone access, hold to speak (up to one minute), then
 release. Edit the transcript before choosing confidence and pressing Check.
 Recordings are converted locally to mono 16-bit 24 kHz WAV and sent to
@@ -85,7 +88,7 @@ automatically distribute the learner's pasted handbook to other members.
 
 TanStack Start (React 19) on one Cloudflare Worker, D1 (SQLite) through Drizzle,
 Better Auth (guest login, email and password, organizations and invites, Facebook
-login when configured), shadcn/ui and Tailwind 4. R2 is bound for future media storage.
+login when configured), shadcn/ui and Tailwind 4. R2 stores generated procedure diagrams.
 
 ## Run locally
 
@@ -110,17 +113,40 @@ model configuration is in `wrangler.jsonc`. Local D1 data is separate from produ
 
 | Setting | Purpose |
 | --- | --- |
-| `LLM_PROFILE`, `LLM_BASE_URL`, `LLM_MODEL` | Provider profile (`meta`, `baseten`, `ollama`), API URL and model identifier |
-| `LLM_API_KEY` | Model API credential; store as a secret |
-| `VOICE_ENABLED` | Enable voice only with the `meta` profile; default `false` |
-| `IMAGE_MODEL` | Reserved for planned image generation |
+| `JOB_MODELS` | Provider and model for each model job |
+| `LLM_PROFILE`, `LLM_BASE_URL`, `LLM_MODEL` | Legacy defaults for unmapped jobs (`meta`, `baseten`, `fireworks`, `ollama`) |
+| `LLM_API_KEY`, `BASETEN_API_KEY`, `FIREWORKS_API_KEY` | Provider credentials; store as secrets |
+| `VOICE_ENABLED` | Enable the voice job with Meta's transcription model; default `false` |
+| `IMAGE_MODEL` | Legacy model for an unmapped image job |
 | `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET` | App origin and authentication secret |
 | `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET` | Optional Facebook login; both are required |
 
-For an alternative endpoint, set the profile, base URL and model together. The
-`baseten` and `ollama` profiles use OpenAI-compatible `/chat/completions` with JSON
-object output and the schema in the prompt. They require a separately hosted model;
-none is bundled. Voice requires the Meta profile.
+`JOB_MODELS` in `wrangler.jsonc` maps `curriculum`, `items`, `self_check`, `plan`,
+`grade`, `image`, `voice`, and the placement result's `placement_line` to a provider
+and model. For example, set `self_check` to
+`{ "provider": "baseten", "model": "muse-spark-open" }` and supply `BASETEN_API_KEY`
+to use a second model for checking questions. Session planning remains a reserved
+job for the planned coach feature. Only the Meta models listed in
+`src/lib/llm/models.ts` are accepted. Fireworks may prefix a model ID with
+`accounts/fireworks/models/`.
+
+| Provider | Base URL | Secret binding | JSON mode |
+| --- | --- | --- | --- |
+| `meta` | `https://api.meta.ai/v1` | `LLM_API_KEY` | Strict JSON Schema |
+| `baseten` | `https://inference.baseten.co/v1` | `BASETEN_API_KEY` | JSON object with schema in the prompt |
+| `fireworks` | `https://api.fireworks.ai/inference/v1` | `FIREWORKS_API_KEY` | JSON object with schema in the prompt |
+
+All JSON output is validated locally; invalid output gets one retry. Provider and
+network errors fail immediately. Requests, call logs and generated-content labels
+use the job's selected model, including failures and retries.
+
+`.dev.vars` can override `JOB_MODELS` with a JSON string. Unmapped jobs retain
+`LLM_PROFILE` and `LLM_MODEL` (or `IMAGE_MODEL` for images, Muse Voice Transcribe 1.0
+for voice). `LLM_BASE_URL` overrides the URL for `LLM_PROFILE`; that profile may
+also fall back to `LLM_API_KEY` for its secret. For the local edition, set
+`JOB_MODELS={}`, `LLM_PROFILE=ollama`, `LLM_MODEL=muse-glimmer` and point
+`LLM_BASE_URL` at an Ollama or llama.cpp server running Muse Glimmer. Voice and
+image generation switch off; no model server is bundled.
 
 For local staff access, sign up first, then grant that local account the staff role:
 
@@ -137,6 +163,30 @@ pnpm build
 ```
 
 `pnpm test` runs the full suite in CI. The production build is a separate local check.
+
+## Web Push
+
+Web Push uses `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (base64url P-256 keys) and
+`VAPID_SUBJECT` (a contact `mailto:` or HTTPS URL). The owner generates the key pair,
+stores it in Proton Pass, and sets these Worker secrets. Keep the same pair: browser
+subscriptions are bound to its public key. No Node `web-push` runtime is needed.
+To generate a pair in a private owner terminal with Node WebCrypto:
+
+```js
+const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify'])
+const publicKey = Buffer.from(await crypto.subtle.exportKey('raw', pair.publicKey)).toString('base64url')
+const { d: privateKey } = await crypto.subtle.exportKey('jwk', pair.privateKey)
+console.log({ publicKey, privateKey })
+```
+
+After applying local migrations, signed-in account users can enable or disable
+notifications in **Profile**. Staff (`role=admin`) also see **Send test push**, which
+sends only to their current browser. On Android Chrome, allow notifications, send
+a test, then check the device notification and tap it to return to the profile.
+A successful send means the push service accepted it; device delivery still depends on browser
+and OS notification settings. Delivery attempts are recorded in `push_log`; HTTP
+404/410 removes the expired subscription, while transient failures leave it intact.
+Supported services are Chrome/FCM, Mozilla Push, and Apple Web Push.
 
 ## Deploy
 
@@ -159,7 +209,8 @@ pnpm deploy
 Set `FACEBOOK_APP_ID` and `FACEBOOK_APP_SECRET` as well if using Facebook login.
 In the Cloudflare dashboard, add a WAF rate limiting rule for your zone: POST
 requests to the app hostname, 10 per minute per IP, block. The Worker also caps each
-learner at 20 model calls per UTC day, including retries and voice transcriptions.
+learner at 20 model calls per UTC day, including retries, voice transcriptions and
+image generations.
 
 `src/worker.ts` delegates HTTP requests to TanStack Start. Queue and scheduled
 handlers are empty; background processing and scheduled reminders are not shipped.

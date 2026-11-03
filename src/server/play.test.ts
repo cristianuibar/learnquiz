@@ -31,7 +31,8 @@ vi.mock('@/lib/llm/client', async (importOriginal) => {
   }
 })
 
-vi.mock('cloudflare:workers', () => ({ env: {} }))
+
+vi.mock('cloudflare:workers', () => ({ env: { LLM_PROFILE: 'ollama', LLM_MODEL: 'muse-spark-1.3', LLM_BASE_URL: 'https://llm.example/v1' } }))
 
 import { answerItem, endSession, getSession, nextItem, startPlacement, startSession } from './play'
 import { getEnv } from '@/server/env'
@@ -47,6 +48,7 @@ function makeDb() {
   }
 
   const runOne = (sqlText: string, params: unknown[], method: Method): { rows: unknown[] } => {
+    if (params.length > 100) throw new Error('D1 supports at most 100 bound parameters per statement')
     const stmt = raw.prepare(sqlText)
     ;(stmt as unknown as { setReturnArrays: (v: boolean) => void }).setReturnArrays(true)
     const args = params as (string | number | bigint | null)[]
@@ -115,7 +117,7 @@ describe('Wonder session planning', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))
-    Object.assign(getEnv(), { LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://llm.example/v1', LLM_MODEL: 'muse-spark-1.3' })
+    Object.assign(getEnv(), { LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://llm.example/v1', LLM_MODEL: 'muse-spark-1.3', JOB_MODELS: { plan: { provider: 'meta', model: 'muse-wonder-1.0' } } })
     seedTopicAndLearner(raw, 0)
     seedFrontier(raw, 3, true)
     raw.exec(`
@@ -128,6 +130,7 @@ describe('Wonder session planning', () => {
   })
   afterEach(() => {
     getEnv().LLM_PROFILE = 'ollama'
+    getEnv().JOB_MODELS = undefined
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
     vi.useRealTimers()
@@ -151,6 +154,25 @@ describe('Wonder session planning', () => {
     expect(trace.calls).toEqual([expect.objectContaining({ purpose: 'plan', model: 'muse-wonder-1.0', ok: true })])
     vi.mocked(requireLearnerId).mockResolvedValueOnce('u2')
     await expect(getModelTrace({ data: { scope: 'session', sessionId } })).rejects.toMatchObject({ status: 404 })
+  })
+
+  it.each([
+    { profile: 'ollama', provider: 'meta', model: 'muse-wonder-1.0', url: 'https://api.meta.ai/v1/chat/completions' },
+    { profile: 'meta', provider: 'baseten', model: 'muse-spark-open', url: 'https://inference.baseten.co/v1/chat/completions' },
+  ] as const)('uses the configured $provider planner when the global profile is $profile', async ({ profile, provider, model, url }) => {
+    getEnv().LLM_PROFILE = profile
+    getEnv().JOB_MODELS = { plan: { provider, model } }
+
+    const { sessionId } = await startSession({ data: { topicId: 't1' } })
+
+    expect(JSON.parse(scalar(raw, 'SELECT item_ids_json FROM sessions').item_ids_json as string)).toEqual(['i2', 'i1', 'i3'])
+    expect(fetchModel).toHaveBeenCalledTimes(1)
+    const [calledUrl, request] = fetchModel.mock.calls[0] as [string, RequestInit]
+    expect(calledUrl).toBe(url)
+    expect(JSON.parse(request.body as string).model).toBe(model)
+    const trace = await getModelTrace({ data: { scope: 'session', sessionId } })
+    expect(trace.planning?.planner).toBe(model)
+    expect(trace.calls).toEqual([expect.objectContaining({ purpose: 'plan', model, ok: true, costUsd: null })])
   })
 
   it.each([
@@ -202,11 +224,47 @@ describe('Wonder session planning', () => {
     if (skip === 'daily cap') {
       const log = raw.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
       for (let i = 0; i < 20; i++) log.run(`cap-${i}`, 'u1', 'items', 'muse-spark-1.3', 0, 1, Date.now())
-    } else getEnv().LLM_PROFILE = 'ollama'
+    } else { getEnv().LLM_PROFILE = 'ollama'; getEnv().JOB_MODELS = undefined }
     const { sessionId } = await startSession({ data: { topicId: 't1' } })
     expect(await getModelTrace({ data: { scope: 'session', sessionId } })).toMatchObject({ planning: { planner: 'planned by rules' }, calls: [] })
     expect(fetchModel).not.toHaveBeenCalled()
   })
+})
+
+it.each(['session', 'placement'])('skips retired questions in a queued %s, including reloads', async (kind) => {
+  seedTopicAndLearner(raw, 0)
+  seedFrontier(raw, 3, false)
+  raw.prepare("UPDATE items SET status = 'retired' WHERE id IN ('i1', 'i2')").run()
+  const plan = {
+    position: 0, answered: false,
+    ...(kind === 'placement'
+      ? { workingLevel: 1, log: [], pool: ['i1', 'i2', 'i3'].map((id) => ({ id, conceptId: 'c1', difficulty: 1 })) }
+      : { queue: ['i1', 'i2', 'i3'], reinserted: [], reasons: { due: 3, frontier: 0, closers: 0 }, unitStart: {} }),
+  }
+  raw.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, item_ids_json, plan_json, started_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run('queued', 'u1', 't1', kind, JSON.stringify(kind === 'placement' ? ['i1'] : ['i1', 'i2', 'i3']), JSON.stringify(plan), 1)
+  expect((await getSession({ data: { sessionId: 'queued' } })).item?.id).toBe('i3')
+  expect(scalar(raw, 'SELECT COUNT(*) AS n FROM attempts').n).toBe(0)
+  raw.prepare("UPDATE items SET status = 'retired' WHERE id = 'i3'").run()
+  await expect(answerItem({ data: { sessionId: 'queued', itemId: 'i3', answer: { text: '1' }, confidence: 'sure', responseMs: 100 } }))
+    .rejects.toMatchObject({ status: 409, message: 'This question has been retired' })
+  expect(scalar(raw, 'SELECT COUNT(*) AS n FROM attempts').n).toBe(0)
+  expect((await getSession({ data: { sessionId: 'queued' } })).ended).toBe(true)
+  expect((await nextItem({ data: { sessionId: 'queued' } })).item).toBeNull()
+})
+
+it.each(['session', 'placement'])('excludes retired questions from a new %s', async (kind) => {
+  seedTopicAndLearner(raw, 0)
+  seedFrontier(raw, 7, true)
+  raw.prepare("UPDATE items SET status = 'retired' WHERE id = 'i1'").run()
+  raw.prepare("DELETE FROM learner_item WHERE item_id <> 'i1'").run()
+  const result = await (kind === 'placement' ? startPlacement : startSession)({ data: { topicId: 't1' } })
+  const stored = scalar(raw, 'SELECT item_ids_json, plan_json FROM sessions WHERE id = ?', result.sessionId)
+  const plan = JSON.parse(stored.plan_json as string)
+  expect(JSON.parse(stored.item_ids_json as string)).toEqual(kind === 'placement' ? ['i2'] : ['i2', 'i3', 'i4', 'i5', 'i6', 'i7'])
+  if (kind === 'placement') expect(plan.pool.map((i: { id: string }) => i.id)).toEqual(['i2', 'i3', 'i4', 'i5', 'i6', 'i7'])
+  expect((await getSession({ data: result })).item?.id).toBe('i2')
+
 })
 
 function seedFrontier(raw: DatabaseSync, itemCount: number, hasDue: boolean) {
@@ -234,6 +292,20 @@ describe('learner practice and unit unlocks', () => {
   })
   afterEach(() => {
     vi.useRealTimers()
+  })
+
+  it('continues a large placement pool within the D1 parameter limit and skips retired questions', async () => {
+    seedFrontier(raw, 205, false)
+    const { sessionId } = await startPlacement({ data: { topicId: 't1' } })
+    expect((await getSession({ data: { sessionId } })).item?.id).toBe('i1')
+    await answerItem({ data: { sessionId, itemId: 'i1', answer: { text: '1' }, confidence: 'sure', responseMs: 1000 } })
+    // The original pool spans several statements; only its last question remains available.
+    raw.prepare("UPDATE items SET status = 'retired' WHERE id NOT IN ('i1', 'i205')").run()
+
+    await expect(nextItem({ data: { sessionId } })).resolves.toMatchObject({ ended: false, item: { id: 'i205' } })
+    expect(scalar(raw, 'SELECT item_ids_json, correct_count FROM sessions WHERE id = ?', sessionId))
+      .toEqual({ item_ids_json: JSON.stringify(['i1', 'i205']), correct_count: 1 })
+    expect(scalar(raw, 'SELECT COUNT(*) AS n FROM attempts').n).toBe(1)
   })
 
   it('only exposes the learner\'s answered active questions in Path after placement', async () => {

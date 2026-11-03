@@ -20,6 +20,7 @@ export type Answer = { optionId?: string; text?: string }
 export type RevealState = 'A' | 'B' | 'C' | 'D' | 'ungraded'
 
 export type Reveal = {
+  diagramConceptId: string | null
   attemptId: string | null // no scored attempt when grading is unavailable
   state: RevealState
   correct: boolean
@@ -39,7 +40,7 @@ export type Reveal = {
 export type Progress = { position: number; total: number } // 1-based position of the current item
 
 export type SessionPlanning = {
-  planner: 'muse-wonder-1.0' | 'planned by rules'
+  planner: string
   steps: { itemId: string; reason: string }[]
 }
 
