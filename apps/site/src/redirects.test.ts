@@ -21,7 +21,7 @@ function redirect(path: string) {
 
 describe('app redirects', () => {
   it.each(redirects)('preserves the prefix and nested path for $source', ({ source }) => {
-    const path = source.replace('*', 'abc/nested')
+    const path = source.replaceAll('*', 'abc/nested')
     expect(redirect(path)).toEqual({ target: `https://app.learnquiz.com${path}`, status: 308 })
   })
 
