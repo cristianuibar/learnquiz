@@ -613,6 +613,21 @@ it('credits the session bonus once when two finishing nextItem calls race (pract
   expect(summary.xp).toBe(20)
 })
 
+it('lists only units whose rounded mastery changed under Mastery moved', async () => {
+  seedTopicAndLearner(raw, 0)
+  seedFrontier(raw, 1, false)
+  raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un2', 't1', 1, 'Next')
+  raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)').run('c2', 't1', 'un2', 0, 'Equations', '')
+  const known = raw.prepare('INSERT INTO learner_concept (learner_id, concept_id, p_known, updated_at) VALUES (?, ?, ?, ?)')
+  known.run('u1', 'c1', 0.682, 1)
+  known.run('u1', 'c2', 0.7, 1)
+  const plan = { queue: ['i1'], position: 1, answered: true, reinserted: [], reasons: { due: 0, frontier: 1, closers: 0 }, unitStart: { un1: 0.678, un2: 0.5 } }
+  raw.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, item_ids_json, plan_json, started_at, ended_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .run('s1', 'u1', 't1', 'session', JSON.stringify(['i1']), JSON.stringify(plan), 1, 2)
+
+  expect((await endSession({ data: { sessionId: 's1' } })).masteryMoved).toEqual([{ unitId: 'un2', unitName: 'Next', before: 0.5, after: 0.7 }])
+})
+
 it('writes exactly one placement when two finishing nextItem calls race (placement)', async () => {
   seedTopicAndLearner(raw, 0)
   raw.prepare('INSERT INTO units (id, topic_id, "order", name, summary, unlocked_at) VALUES (?, ?, ?, ?, ?, ?)').run('un1', 't1', 0, 'Basics', '', null)
