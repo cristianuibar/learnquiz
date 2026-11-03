@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { createFileRoute, Link, redirect, useRouter } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { authClient } from '@/lib/auth-client'
@@ -20,8 +21,18 @@ function Me() {
   const { push, today } = Route.useLoaderData()
   const router = useRouter()
 
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
   async function signOut() {
-    await authClient.signOut()
+    setBusy(true)
+    setError('')
+    const { error } = await authClient.signOut().catch(() => ({ error: { message: 'Could not sign out' } }))
+    if (error) {
+      setError(error.message ?? 'Could not sign out')
+      setBusy(false)
+      return
+    }
     await router.invalidate()
     await router.navigate({ to: '/' })
   }
@@ -60,9 +71,12 @@ function Me() {
       {user.role === 'admin' && <Link to="/admin" className="inline-flex min-h-11 items-center rounded-md underline focus-visible:ring-[3px] focus-visible:ring-ring/50">Staff area</Link>}
       {push && <PushSettings {...push} />}
       {!user.isAnonymous && (
-        <Button variant="outline" className="h-12 w-full px-6 sm:w-auto sm:self-start" onClick={signOut}>
-          Sign out
-        </Button>
+        <>
+          <Button variant="outline" className="h-12 w-full px-6 sm:w-auto sm:self-start" onClick={signOut} disabled={busy}>
+            Sign out
+          </Button>
+          {error && <p role="alert" className="text-sm font-medium text-wrong">{error}</p>}
+        </>
       )}
     </main>
   )
