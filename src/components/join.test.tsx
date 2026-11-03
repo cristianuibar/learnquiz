@@ -2,7 +2,7 @@
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createMemoryHistory, createRootRoute, createRoute, createRouter, RouterProvider } from '@tanstack/react-router'
-import { expect, it, vi } from 'vitest'
+import { beforeEach, expect, it, vi } from 'vitest'
 import { Route as appRootRoute } from '@/routes/__root'
 import { Route as joinRoute } from '@/routes/join.$invitationId'
 import { getSessionFn } from '@/server/session-fn'
@@ -14,6 +14,8 @@ vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => null }))
 vi.mock('@/server/org', () => ({ getInvite }))
+
+beforeEach(() => vi.clearAllMocks())
 
 const invite = { company: 'Acme', email: 'learner@example.test', name: 'Learner', status: 'pending', otherAccount: false }
 
