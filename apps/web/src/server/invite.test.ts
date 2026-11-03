@@ -4,8 +4,9 @@ import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { getSessionUser } from '@/server/session'
 import { getInvite } from './org'
+import { serveInviteLogo } from './org-logo'
 
-const holder = vi.hoisted(() => ({ db: null as unknown }))
+const holder = vi.hoisted(() => ({ db: null as unknown, media: { get: vi.fn() } }))
 
 // Fake the request/auth boundaries; keep validation, authorization and SQL real.
 vi.mock('@tanstack/react-start', () => ({
@@ -19,7 +20,7 @@ vi.mock('@tanstack/react-start/server', () => ({ getRequestHeaders: () => new He
 vi.mock('@/db', () => ({ getDb: () => holder.db }))
 vi.mock('@/server/session', () => ({ getSessionUser: vi.fn() }))
 vi.mock('@/server/auth', () => ({ getAuth: () => ({}) }))
-vi.mock('@/server/env', () => ({ getEnv: () => ({ BETTER_AUTH_URL: 'http://127.0.0.1:8800' }) }))
+vi.mock('@/server/env', () => ({ getEnv: () => ({ BETTER_AUTH_URL: 'http://127.0.0.1:8800', MEDIA: holder.media }) }))
 
 let sqlite: DatabaseSync
 
@@ -96,4 +97,34 @@ it('does not flag the same email in a different case', async () => {
 
 it('returns null for an unknown id', async () => {
   await expect(getInvite({ data: { id: 'missing' } })).resolves.toBeNull()
+})
+
+const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47])
+
+function seedLogo(logoKey: string | null) {
+  sqlite.prepare('INSERT INTO org_settings (org_id, company_name, working_hours_json, logo_key) VALUES (?, ?, ?, ?)').run('org-n', 'Northwind Logistics', '{}', logoKey)
+  holder.media.get.mockImplementation(async (key: string) => (key === logoKey ? { body: png, httpMetadata: { contentType: 'image/png' } } : null))
+}
+
+it('serves the company logo for an invite of any status before sign-in', async () => {
+  seedLogo('org-logos/org-n/a.png')
+  await expect(getInvite({ data: { id: 'inv-1' } })).resolves.toEqual({ ...base, logoUrl: '/api/invites/inv-1/logo?v=org-logos%2Forg-n%2Fa.png' })
+  for (const status of ['pending', 'canceled']) {
+    sqlite.prepare('UPDATE invitation SET status = ?').run(status)
+    const response = await serveInviteLogo('inv-1')
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Content-Type')).toBe('image/png')
+    expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff')
+    expect(response.headers.get('Content-Security-Policy')).toBe("default-src 'none'; sandbox")
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(png)
+  }
+})
+
+it('returns 404 for a company without a logo and for an unknown invite', async () => {
+  seedLogo(null)
+  await expect(getInvite({ data: { id: 'inv-1' } })).resolves.toEqual(base)
+  expect((await serveInviteLogo('inv-1')).status).toBe(404)
+  sqlite.prepare('UPDATE org_settings SET logo_key = ?').run('org-logos/org-n/a.png')
+  holder.media.get.mockResolvedValue({ body: png, httpMetadata: { contentType: 'image/png' } })
+  expect((await serveInviteLogo('missing')).status).toBe(404)
 })

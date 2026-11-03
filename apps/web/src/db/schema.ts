@@ -83,7 +83,7 @@ export const items = sqliteTable('items', {
   id: text('id').primaryKey(),
   conceptId: text('concept_id').notNull(),
   topicId: text('topic_id').notNull(),
-  format: text('format', { enum: ['mcq', 'cloze', 'short', 'image', 'order'] }).notNull(),
+  format: text('format', { enum: ['mcq', 'multi', 'cloze', 'short', 'image', 'order'] }).notNull(),
   payloadJson: text('payload_json').notNull(), // ItemPayload from src/lib/llm/schemas.ts
   generatedBy: text('generated_by'),
   difficultyPrior: integer('difficulty_prior').notNull().default(3),
