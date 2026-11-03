@@ -19,6 +19,7 @@ import { Route as AdminCompaniesRouteImport } from './routes/admin.companies'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as JoinInvitationIdRouteImport } from './routes/join.$invitationId'
 import { Route as MeIndexRouteImport } from './routes/me.index'
+import { Route as MeProfileRouteImport } from './routes/me.profile'
 import { Route as OrgNewRouteImport } from './routes/org.new'
 import { Route as PlaySessionIdRouteImport } from './routes/play.$sessionId'
 import { Route as AdminCompaniesSlugRouteImport } from './routes/admin.companies_.$slug'
@@ -80,6 +81,11 @@ const JoinInvitationIdRoute = JoinInvitationIdRouteImport.update({
 const MeIndexRoute = MeIndexRouteImport.update({
   id: '/me/',
   path: '/me/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MeProfileRoute = MeProfileRouteImport.update({
+  id: '/me/profile',
+  path: '/me/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrgNewRoute = OrgNewRouteImport.update({
@@ -152,6 +158,7 @@ export interface FileRoutesByFullPath {
   '/admin/companies': typeof AdminCompaniesRoute
   '/admin/users': typeof AdminUsersRoute
   '/join/$invitationId': typeof JoinInvitationIdRoute
+  '/me/profile': typeof MeProfileRoute
   '/org/new': typeof OrgNewRoute
   '/play/$sessionId': typeof PlaySessionIdRoute
   '/admin/': typeof AdminIndexRoute
@@ -175,6 +182,7 @@ export interface FileRoutesByTo {
   '/admin/companies': typeof AdminCompaniesRoute
   '/admin/users': typeof AdminUsersRoute
   '/join/$invitationId': typeof JoinInvitationIdRoute
+  '/me/profile': typeof MeProfileRoute
   '/org/new': typeof OrgNewRoute
   '/play/$sessionId': typeof PlaySessionIdRoute
   '/admin': typeof AdminIndexRoute
@@ -200,6 +208,7 @@ export interface FileRoutesById {
   '/admin/companies': typeof AdminCompaniesRoute
   '/admin/users': typeof AdminUsersRoute
   '/join/$invitationId': typeof JoinInvitationIdRoute
+  '/me/profile': typeof MeProfileRoute
   '/org/new': typeof OrgNewRoute
   '/play/$sessionId': typeof PlaySessionIdRoute
   '/admin/': typeof AdminIndexRoute
@@ -226,6 +235,7 @@ export interface FileRouteTypes {
     | '/admin/companies'
     | '/admin/users'
     | '/join/$invitationId'
+    | '/me/profile'
     | '/org/new'
     | '/play/$sessionId'
     | '/admin/'
@@ -249,6 +259,7 @@ export interface FileRouteTypes {
     | '/admin/companies'
     | '/admin/users'
     | '/join/$invitationId'
+    | '/me/profile'
     | '/org/new'
     | '/play/$sessionId'
     | '/admin'
@@ -273,6 +284,7 @@ export interface FileRouteTypes {
     | '/admin/companies'
     | '/admin/users'
     | '/join/$invitationId'
+    | '/me/profile'
     | '/org/new'
     | '/play/$sessionId'
     | '/admin/'
@@ -296,6 +308,7 @@ export interface RootRouteChildren {
   StartRoute: typeof StartRoute
   WelcomeRoute: typeof WelcomeRoute
   JoinInvitationIdRoute: typeof JoinInvitationIdRoute
+  MeProfileRoute: typeof MeProfileRoute
   OrgNewRoute: typeof OrgNewRoute
   PlaySessionIdRoute: typeof PlaySessionIdRoute
   MeIndexRoute: typeof MeIndexRoute
@@ -380,6 +393,13 @@ declare module '@tanstack/react-router' {
       path: '/me'
       fullPath: '/me/'
       preLoaderRoute: typeof MeIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/me/profile': {
+      id: '/me/profile'
+      path: '/me/profile'
+      fullPath: '/me/profile'
+      preLoaderRoute: typeof MeProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/org/new': {
@@ -492,6 +512,7 @@ const rootRouteChildren: RootRouteChildren = {
   StartRoute: StartRoute,
   WelcomeRoute: WelcomeRoute,
   JoinInvitationIdRoute: JoinInvitationIdRoute,
+  MeProfileRoute: MeProfileRoute,
   OrgNewRoute: OrgNewRoute,
   PlaySessionIdRoute: PlaySessionIdRoute,
   MeIndexRoute: MeIndexRoute,
