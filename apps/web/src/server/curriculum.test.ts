@@ -2,15 +2,18 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
-import { concepts } from '@/db/schema'
+import { concepts, learnerTopic } from '@/db/schema'
 import { ACCOUNT_DAILY_MODEL_CALL_CAP, COMPANY_DAILY_MODEL_CALL_CAP } from '@/lib/limits'
 import * as curriculum from './curriculum'
+import { getLatestTopicIdFn } from './latest-topic'
+import { getToday } from './today'
 
 // Keep the handlers, validation, authorization, model client and database real.
 // Only the transport, session provider, Worker bindings and model HTTP are faked.
 const holder = vi.hoisted(() => ({ db: null as unknown, userId: 'owner' as string | null }))
 vi.mock('@tanstack/react-start', () => ({
   createServerFn: () => ({
+    handler: (fn: () => unknown) => () => fn(),
     validator: (schema: { parse: (data: unknown) => unknown }) => ({
       handler: (fn: (args: { data: unknown }) => unknown) => (args: { data: unknown }) => fn({ data: schema.parse(args.data) }),
     }),
@@ -312,4 +315,57 @@ it('does not let a stale build mark another build\'s ready topic failed', async 
   })
   await expect(generate()).rejects.toMatchObject({ status: 422 })
   expect(topicState()).toEqual({ status: 'ready' })
+})
+
+// An employee trains on the role's shared curriculum; the topic has no personal owner.
+const seedRoleCurriculum = (withItem: boolean) => {
+  raw.exec("UPDATE topics SET status = 'ready' WHERE id = 'picker-topic'")
+  raw.exec("INSERT INTO units (id, topic_id, \"order\", name) VALUES ('u1', 'picker-topic', 0, 'Receiving')")
+  raw.exec("INSERT INTO concepts (id, topic_id, unit_id, \"order\", name, summary) VALUES ('c1', 'picker-topic', 'u1', 0, 'Scan the SKU', 'Scan every SKU.')")
+  if (withItem) {
+    raw.exec(`INSERT INTO items (id, concept_id, topic_id, format, payload_json, status, created_at)
+      VALUES ('i1', 'c1', 'picker-topic', 'mcq', '{}', 'active', 1)`)
+  }
+}
+
+it.each([
+  ['an assigned employee', 'employee', false, 200],
+  ['an employee of another company', 'other-owner', false, 404],
+  ['a member who left the company', 'employee', true, 404],
+])('role curriculum for %s', async (_label, userId, left, status) => {
+  seedRoleCurriculum(true)
+  holder.userId = userId
+  raw.exec("INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES ('employee', 'northwind', 'picker', 1)")
+  if (left) raw.exec("DELETE FROM member WHERE user_id = 'employee'")
+  const open = curriculum.getTopicPath({ data: { topicId: 'picker-topic' } })
+  if (status === 404) {
+    await expect(open).rejects.toMatchObject({ status: 404, message: 'Topic not found' })
+    expect(await db.select().from(learnerTopic)).toHaveLength(0)
+    return
+  }
+  expect((await open).topic.title).toBe('Warehouse picker')
+  expect(await db.select().from(learnerTopic)).toMatchObject([{ learnerId: 'employee', topicId: 'picker-topic' }])
+  await expect(curriculum.getConceptItems({ data: { conceptId: 'c1' } })).resolves.toEqual({ items: [] })
+})
+
+it.each([
+  ['mcq', 'ready', 'northwind', false, true, 'northwind'],
+  [null, 'ready', 'northwind', false, false, 'northwind'],
+  ['short', 'ready', 'northwind', false, false, 'northwind'],
+  [null, 'draft', 'northwind', true, false, 'northwind'],
+  ['mcq', 'ready', 'Northwind Logistics', false, true, 'Northwind Logistics'],
+] as const)('opens Today and the Path tab on the role topic (item %s, %s, settings name %s)', async (format, topicStatus, settingsName, preparing, placeable, company) => {
+  seedRoleCurriculum(format !== null)
+  if (format) raw.exec(`UPDATE items SET format = '${format}' WHERE id = 'i1'`)
+  raw.exec(`UPDATE topics SET status = '${topicStatus}' WHERE id = 'picker-topic'`)
+  if (settingsName !== 'northwind') raw.exec(`INSERT INTO org_settings (org_id, company_name, working_hours_json) VALUES ('northwind', '${settingsName}', '{}')`)
+  holder.userId = 'employee'
+  raw.exec("INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES ('employee', 'northwind', 'picker', 1)")
+  const today = await getToday()
+  expect(today.role).toEqual({ name: 'Warehouse picker', company, topicTitle: 'Warehouse picker', preparing })
+  expect(today.topic?.id).toBe(preparing ? undefined : 'picker-topic')
+  if (!preparing) expect(today.topic?.placeable).toBe(placeable)
+  expect(await getLatestTopicIdFn()).toBe('picker-topic')
+  const path = await curriculum.getTopicPath({ data: { topicId: 'picker-topic' } })
+  expect(path).toMatchObject({ preparing, placeable, company })
 })
