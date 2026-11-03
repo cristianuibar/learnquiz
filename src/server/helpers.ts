@@ -51,7 +51,7 @@ export async function ensureConceptItems(
   const existing = await db
     .select()
     .from(items)
-    .where(and(eq(items.conceptId, concept.id), eq(items.status, 'active')))
+    .where(and(eq(items.conceptId, concept.id), eq(items.topicId, topic.id), eq(items.status, 'active')))
     .orderBy(desc(items.createdAt))
   // Six stored items are enough unless the learner has already seen them all.
   const fresh = opts.unseen ? existing.filter((r) => !opts.unseen!.has(r.id)).length : existing.length

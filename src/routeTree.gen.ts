@@ -27,6 +27,7 @@ import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as MediaConceptsConceptIdRouteImport } from './routes/media/concepts/$conceptId'
 import { Route as OrgSlugIndexRouteImport } from './routes/org.$slug.index'
 import { Route as OrgSlugPeopleRouteImport } from './routes/org.$slug.people'
+import { Route as OrgSlugQuestionsRouteImport } from './routes/org.$slug.questions'
 import { Route as OrgSlugRolesRouteImport } from './routes/org.$slug.roles'
 import { Route as OrgSlugSettingsRouteImport } from './routes/org.$slug.settings'
 import { Route as PlaySessionIdDoneRouteImport } from './routes/play.$sessionId_.done'
@@ -123,6 +124,11 @@ const OrgSlugPeopleRoute = OrgSlugPeopleRouteImport.update({
   path: '/org/$slug/people',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OrgSlugQuestionsRoute = OrgSlugQuestionsRouteImport.update({
+  id: '/org/$slug/questions',
+  path: '/org/$slug/questions',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OrgSlugRolesRoute = OrgSlugRolesRouteImport.update({
   id: '/org/$slug/roles',
   path: '/org/$slug/roles',
@@ -167,6 +173,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/media/concepts/$conceptId': typeof MediaConceptsConceptIdRoute
   '/org/$slug/people': typeof OrgSlugPeopleRoute
+  '/org/$slug/questions': typeof OrgSlugQuestionsRoute
   '/org/$slug/roles': typeof OrgSlugRolesRoute
   '/org/$slug/settings': typeof OrgSlugSettingsRoute
   '/play/$sessionId/done': typeof PlaySessionIdDoneRoute
@@ -191,6 +198,7 @@ export interface FileRoutesByTo {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/media/concepts/$conceptId': typeof MediaConceptsConceptIdRoute
   '/org/$slug/people': typeof OrgSlugPeopleRoute
+  '/org/$slug/questions': typeof OrgSlugQuestionsRoute
   '/org/$slug/roles': typeof OrgSlugRolesRoute
   '/org/$slug/settings': typeof OrgSlugSettingsRoute
   '/play/$sessionId/done': typeof PlaySessionIdDoneRoute
@@ -217,6 +225,7 @@ export interface FileRoutesById {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/media/concepts/$conceptId': typeof MediaConceptsConceptIdRoute
   '/org/$slug/people': typeof OrgSlugPeopleRoute
+  '/org/$slug/questions': typeof OrgSlugQuestionsRoute
   '/org/$slug/roles': typeof OrgSlugRolesRoute
   '/org/$slug/settings': typeof OrgSlugSettingsRoute
   '/play/$sessionId_/done': typeof PlaySessionIdDoneRoute
@@ -244,6 +253,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/media/concepts/$conceptId'
     | '/org/$slug/people'
+    | '/org/$slug/questions'
     | '/org/$slug/roles'
     | '/org/$slug/settings'
     | '/play/$sessionId/done'
@@ -268,6 +278,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/media/concepts/$conceptId'
     | '/org/$slug/people'
+    | '/org/$slug/questions'
     | '/org/$slug/roles'
     | '/org/$slug/settings'
     | '/play/$sessionId/done'
@@ -293,6 +304,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/media/concepts/$conceptId'
     | '/org/$slug/people'
+    | '/org/$slug/questions'
     | '/org/$slug/roles'
     | '/org/$slug/settings'
     | '/play/$sessionId_/done'
@@ -315,6 +327,7 @@ export interface RootRouteChildren {
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   MediaConceptsConceptIdRoute: typeof MediaConceptsConceptIdRoute
   OrgSlugPeopleRoute: typeof OrgSlugPeopleRoute
+  OrgSlugQuestionsRoute: typeof OrgSlugQuestionsRoute
   OrgSlugRolesRoute: typeof OrgSlugRolesRoute
   OrgSlugSettingsRoute: typeof OrgSlugSettingsRoute
   PlaySessionIdDoneRoute: typeof PlaySessionIdDoneRoute
@@ -451,6 +464,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrgSlugPeopleRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/org/$slug/questions': {
+      id: '/org/$slug/questions'
+      path: '/org/$slug/questions'
+      fullPath: '/org/$slug/questions'
+      preLoaderRoute: typeof OrgSlugQuestionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/org/$slug/roles': {
       id: '/org/$slug/roles'
       path: '/org/$slug/roles'
@@ -519,6 +539,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   MediaConceptsConceptIdRoute: MediaConceptsConceptIdRoute,
   OrgSlugPeopleRoute: OrgSlugPeopleRoute,
+  OrgSlugQuestionsRoute: OrgSlugQuestionsRoute,
   OrgSlugRolesRoute: OrgSlugRolesRoute,
   OrgSlugSettingsRoute: OrgSlugSettingsRoute,
   PlaySessionIdDoneRoute: PlaySessionIdDoneRoute,
