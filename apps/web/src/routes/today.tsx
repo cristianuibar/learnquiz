@@ -1,7 +1,14 @@
-import { createFileRoute, Link, redirect } from '@tanstack/react-router'
+import { useEffect, useId } from 'react'
+import { createFileRoute, Link, redirect, useRouter, useRouterState } from '@tanstack/react-router'
+import { todayView } from '@learnquiz/api/today'
 import { RouteError } from '@/components/inline-error'
-import { StartButton } from '@/components/start-button'
-import { plural } from '@/lib/utils'
+import { buttonVariants } from '@/components/ui/button'
+import { DoneCard } from '@/components/today/done-card'
+import { Hero } from '@/components/today/hero'
+import { OfflineNotice, useOnline } from '@/components/today/offline-notice'
+import { QuestCard } from '@/components/today/quest-card'
+import { RoleCard } from '@/components/today/role-card'
+import { TodayBar } from '@/components/today/today-bar'
 import { getToday } from '@/server/today'
 
 export const Route = createFileRoute('/today')({
@@ -17,39 +24,51 @@ export const Route = createFileRoute('/today')({
   component: Today,
 })
 
+type Branding = { name: string; logoUrl: string | null } | null
+
 function Today() {
-  const { topic, role } = Route.useLoaderData()
+  const today = Route.useLoaderData()
+  const router = useRouter()
+  const view = todayView(today, new Date())
+  const branding = useRouterState({
+    select: (s) => (s.matches[0]?.loaderData as { branding?: Branding } | undefined)?.branding ?? null,
+  })
+  const org = branding
+    ? { name: branding.name, logoUrl: branding.logoUrl }
+    : today.role ? { name: today.role.company, logoUrl: null } : null
+  const online = useOnline()
+  const noticeId = useId()
+  const building = view.hero.kind === 'building'
+
+  useEffect(() => {
+    if (!building) return
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') void router.invalidate()
+    }, 15000)
+    return () => clearInterval(timer)
+  }, [building, router])
+
+  const topicId = today.topic?.id ?? null
+  const placement = today.plan ? today.plan.start === 'placement' : !today.topic?.placed && !!today.topic?.placeable
+  const { hero } = view
+
   return (
-    <main className="mx-auto w-full max-w-xl px-4 pt-8 pb-16">
-      <h1 className="text-3xl font-bold tracking-tight">{topic?.title ?? role?.topicTitle}</h1>
-      {topic && (
-        <div className="mt-4 flex flex-col gap-6">
-          <div className="flex flex-col gap-1">
-            <p className="text-lg font-medium">
-              {topic.due > 0 ? `${plural(topic.due, 'item', 'items')} due` : 'Nothing due, fresh questions await'}
-            </p>
-            <p className="text-sm text-muted-foreground">Streak {topic.streak} · {topic.xp} XP</p>
-          </div>
-          <StartButton topicId={topic.id} placement={!topic.placed && topic.placeable}>
-            {!topic.placed && topic.placeable ? 'Find my level' : 'Start session'}
-          </StartButton>
-        </div>
-      )}
-      {role && (
-        <section className="mt-8 flex flex-col gap-2">
-          <h2 className="text-xl font-semibold tracking-tight">Your role training at {role.company}</h2>
-          <p>{role.name}: {role.topicTitle}</p>
-          {role.preparing && <p role="status" className="text-muted-foreground">Your training at {role.company} is being prepared</p>}
-          <Link to="/me/profile" className="inline-flex min-h-11 items-center self-start rounded-md font-medium text-primary underline focus-visible:ring-[3px] focus-visible:ring-ring/50">
-            Training progress
-          </Link>
-        </section>
-      )}
-      {!role && (
-        <Link to="/start" className="mt-6 inline-flex min-h-12 items-center rounded-md underline focus-visible:ring-[3px] focus-visible:ring-ring/50">
-          Learn something new
-        </Link>
-      )}
+    <main className="mx-auto w-full max-w-xl px-4 pb-16">
+      <TodayBar org={org} streak={view.streak} streakVariant={hero.kind === 'done' ? 'reward' : 'quiet'} />
+      <div className="flex flex-col gap-6">
+        {!online && <OfflineNotice id={noticeId} />}
+        {hero.kind === 'done' ? (
+          <DoneCard hero={hero} topicId={topicId} placement={placement} offline={!online} noticeId={noticeId} />
+        ) : hero.kind === 'empty' ? null : (
+          <Hero hero={hero} topicId={topicId} placement={placement} offline={!online} noticeId={noticeId} />
+        )}
+        <QuestCard quests={view.quests} />
+        {view.role ? (
+          <RoleCard role={view.role} />
+        ) : (
+          <Link to="/start" className={buttonVariants({ variant: 'secondary' })}>Learn something new</Link>
+        )}
+      </div>
     </main>
   )
 }
