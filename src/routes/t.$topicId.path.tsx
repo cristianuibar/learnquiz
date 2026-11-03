@@ -96,7 +96,7 @@ function Path() {
           </li>
         ))}
       </ol>
-      <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] -mx-4 mt-8 border-t bg-background px-4 py-4">
+      <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 -mx-4 mt-8 border-t bg-background px-4 py-4">
         <StartButton topicId={topic.id} placement={!learner.placed}>
           {learner.placed ? 'Start session' : 'Find my level'}
         </StartButton>
