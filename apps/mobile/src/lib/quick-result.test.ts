@@ -35,7 +35,7 @@ function revealWith(state: RevealState, correct: boolean, overrides: Partial<Rev
   return Object.assign(reveal, overrides)
 }
 
-function setup() {
+function setup(onState?: (state: QuickSessionState) => void) {
   const calls: { path: string; options: ApiOptions | undefined }[] = []
   const request = jest.fn((path: string, options?: ApiOptions): Promise<never> => {
     calls.push({ path, options })
@@ -52,7 +52,7 @@ function setup() {
   const handle = createQuickSession({
     itemId: 'item-1',
     request: request as <T>(path: string, options?: ApiOptions) => Promise<T>,
-    onChange: (state) => { states.push(state) },
+    onChange: (state) => { states.push(state); onState?.(state) },
     onReveal,
   })
   return { handle, request, calls, states, onReveal, onRequest }
@@ -341,7 +341,11 @@ test('a second check while checking sends no duplicate answer', async () => {
 })
 
 test('a correct check publishes done at once, fires once, then fills the counter from end', async () => {
-  const { handle, request, calls, states, onReveal , onRequest} = await loadQuestion(setup())
+  let counterUpdated!: () => void
+  const completed = new Promise<void>((resolve) => { counterUpdated = resolve })
+  const { handle, request, calls, states, onReveal , onRequest} = await loadQuestion(setup((state) => {
+    if (state.status === 'done' && state.reviewsLeft === 3) counterUpdated()
+  }))
   const reveal = revealWith('B', true, { xp: 5 })
   let finish!: (summary: { reviewsLeft: number }) => void
   onRequest(async (path: string) => {
@@ -358,7 +362,7 @@ test('a correct check publishes done at once, fires once, then fills the counter
   await Promise.resolve()
   expect(handle.getState()).toMatchObject({ status: 'done', reviewsLeft: null })
   finish({ reviewsLeft: 3 })
-  await pending
+  await Promise.all([pending, completed])
   const answerCall = calls.find((call) => call.path.endsWith('/answer'))!
   expect(answerCall.path).toBe('/sessions/session-1/answer')
   expect(answerCall.options?.body).toEqual({
@@ -447,20 +451,72 @@ test('a failed check keeps the selection and replays the exact submission on Try
   expect(last(states, 'done').reviewsLeft).toBe(2)
 })
 
-test('check maps a missing session to unavailable and a conflict to answered', async () => {
-  for (const [error, status] of [
-    [new ApiError(404, 'Not found'), 'unavailable'],
-    [new ApiError(409, 'Already answered'), 'answered'],
-  ] as const) {
-    const { handle, request, states , onRequest} = await loadQuestion(setup())
-    onRequest(async (path: string) => {
-      if (path.endsWith('/answer')) throw error
-      throw new Error(`unexpected ${path}`)
-    })
-    handle.changeDraft({ answer: { optionId: 'a' }, confidence: 'sure' })
-    await handle.check()
-    expect(last(states, status).status).toBe(status)
-  }
+test('check maps a missing session to unavailable', async () => {
+  const { handle, states, onRequest } = await loadQuestion(setup())
+  onRequest(async () => { throw new ApiError(404, 'Not found') })
+  handle.changeDraft({ answer: { optionId: 'a' }, confidence: 'sure' })
+  await handle.check()
+  expect(last(states, 'unavailable').status).toBe('unavailable')
+})
+
+test('an answer conflict resyncs the active question and preserves its selection', async () => {
+  const { handle, calls, onRequest } = await loadQuestion(setup())
+  const draft: Draft = { answer: { optionId: 'b' }, confidence: 'sure' }
+  const view = { ...sessionWith(mcqItem), topicTitle: 'Updated title' }
+  onRequest(async (path) => {
+    if (path.endsWith('/answer')) throw new ApiError(409, 'Please resync')
+    return view
+  })
+  handle.changeDraft(draft)
+  await handle.check()
+  expect(calls.map((call) => call.path)).toEqual([
+    '/sessions/quick', '/sessions/session-1', '/sessions/session-1/answer', '/sessions/session-1',
+  ])
+  expect(handle.getState()).toEqual({ status: 'question', session: view, draft, error: null })
+})
+
+test('an answer conflict renders the resynced question with a fresh draft when its item changes', async () => {
+  const { handle, onRequest } = await loadQuestion(setup())
+  const view = sessionWith({ ...mcqItem, id: 'replacement-item', stem: 'Updated question' })
+  onRequest(async (path) => {
+    if (path.endsWith('/answer')) throw new ApiError(409, 'Not the current question')
+    return view
+  })
+  handle.changeDraft({ answer: { optionId: 'b' }, confidence: 'sure' })
+  await handle.check()
+  expect(handle.getState()).toEqual({
+    status: 'question', session: view, draft: { answer: {}, confidence: null }, error: null,
+  })
+})
+
+test.each([
+  { name: 'ended', view: sessionWith(mcqItem, true) },
+  { name: 'without an item', view: sessionWith(null) },
+])('an answer conflict is answered only after resync returns a session $name', async ({ view }) => {
+  const { handle, calls, onRequest } = await loadQuestion(setup())
+  onRequest(async (path) => {
+    if (path.endsWith('/answer')) throw new ApiError(409, 'Already answered')
+    return view
+  })
+  handle.changeDraft({ answer: { optionId: 'a' }, confidence: 'sure' })
+  await handle.check()
+  expect(calls[calls.length - 1].path).toBe('/sessions/session-1')
+  expect(handle.getState()).toEqual({ status: 'answered' })
+})
+
+test.each([
+  { status: null, expected: 'error' },
+  { status: 409, expected: 'error' },
+  { status: 404, expected: 'unavailable' },
+])('a resync failure with status $status renders $expected instead of assuming answered', async ({ status, expected }) => {
+  const { handle, onRequest } = await loadQuestion(setup())
+  onRequest(async (path) => {
+    if (path.endsWith('/answer')) throw new ApiError(409, 'Please resync')
+    throw new ApiError(status, 'Could not resync')
+  })
+  handle.changeDraft({ answer: { optionId: 'a' }, confidence: 'sure' })
+  await handle.check()
+  expect(handle.getState()).toEqual({ status: expected })
 })
 
 test('check does nothing once done', async () => {
@@ -502,12 +558,16 @@ test('dispose aborts the in-flight check and suppresses its late publish', async
   expect(handle.getState().status).toBe('checking')
 })
 
-test('dispose aborts the end call and suppresses its late counter', async () => {
+test('dispose lets the end call finish and suppresses its late counter', async () => {
   const { handle, request, states , onRequest} = await loadQuestion(setup())
   let releaseEnd!: (summary: { reviewsLeft: number }) => void
-  onRequest((path: string) => {
+  let endSignal: AbortSignal | undefined
+  onRequest((path: string, options?: ApiOptions) => {
     if (path.endsWith('/answer')) return Promise.resolve(revealWith('A', true))
-    if (path.endsWith('/end')) return new Promise<{ reviewsLeft: number }>((resolve) => { releaseEnd = resolve })
+    if (path.endsWith('/end')) {
+      endSignal = options?.signal
+      return new Promise<{ reviewsLeft: number }>((resolve) => { releaseEnd = resolve })
+    }
     throw new Error(`unexpected ${path}`)
   })
   handle.changeDraft({ answer: { optionId: 'a' }, confidence: 'sure' })
@@ -517,8 +577,10 @@ test('dispose aborts the end call and suppresses its late counter', async () => 
   expect(handle.getState().status).toBe('done')
   const emitted = states.length
   handle.dispose()
-  releaseEnd({ reviewsLeft: 3 })
+  expect(endSignal?.aborted).not.toBe(true)
+  expect(endSignal).toBeUndefined()
   await pending
+  releaseEnd({ reviewsLeft: 3 })
   await Promise.resolve()
   expect(states.length).toBe(emitted)
   expect(handle.getState()).toMatchObject({ status: 'done', reviewsLeft: null })

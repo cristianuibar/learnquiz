@@ -23,11 +23,16 @@ export type QuickResultProps = {
 
 /** Inline result for the one-question quick session. The route owns the frame, dock and report sheet. */
 export function QuickResult({ reveal, chosenText, reviewsLeft, hasCompany = false }: QuickResultProps) {
-  const { space } = useTheme()
+  const { colors, space } = useTheme()
   const headingRef = useRef<NativeText>(null)
   useHeadingFocus(headingRef)
   const result = quickResult(reveal, chosenText, reviewsLeft)
-  const model = revealModel(reveal, { hasCompany })
+  const revealView = revealModel(reveal, { hasCompany })
+  const model = {
+    ...revealView,
+    xpText: null,
+    announcement: revealView.tone === 'correct' ? revealView.heading : revealView.announcement,
+  }
   const graded = reveal.state !== 'ungraded'
   const miss = graded && !reveal.correct
   const partial = model.variant === 'partial'
@@ -39,7 +44,7 @@ export function QuickResult({ reveal, chosenText, reviewsLeft, hasCompany = fals
       <Text
         ref={headingRef}
         header
-        style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}
+        style={{ position: 'absolute', left: 0, top: 0, width: 1, height: 1, overflow: 'hidden', color: colors.surfacePage }}
       >
         Quick question done
       </Text>

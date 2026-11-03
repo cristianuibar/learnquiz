@@ -136,6 +136,22 @@ export function createQuickSession(options: QuickSessionOptions): QuickSessionHa
     return disposed || controller.signal.aborted
   }
 
+  function applySession(view: SessionView, previous: QuickSessionState): void {
+    if (view.ended || view.item === null) {
+      sessionId = null
+      submission = null
+      emit({ status: 'answered' })
+      return
+    }
+    const keep = (previous.status === 'question' || previous.status === 'checking')
+      && previous.session.item?.id === view.item.id ? previous.draft : null
+    if (!keep) {
+      startedAt = Date.now()
+      submission = null
+    }
+    emit({ status: 'question', session: view, draft: keep ?? { answer: {}, confidence: null }, error: null })
+  }
+
   async function load(): Promise<void> {
     if (disposed || busy) return
     if (state.status === 'checking' || state.status === 'done') return
@@ -157,19 +173,7 @@ export function createQuickSession(options: QuickSessionOptions): QuickSessionHa
         signal: controller.signal,
       })
       if (aborted(controller)) return
-      if (view.ended || view.item === null) {
-        sessionId = null
-        submission = null
-        emit({ status: 'answered' })
-        return
-      }
-      // A reload over the same question keeps the learner's selection.
-      const keep = previous.status === 'question' && previous.session.item?.id === view.item.id ? previous.draft : null
-      if (!keep) {
-        startedAt = Date.now()
-        submission = null
-      }
-      emit({ status: 'question', session: view, draft: keep ?? { answer: {}, confidence: null }, error: null })
+      applySession(view, previous)
     } catch (error) {
       if (aborted(controller)) return
       const status = statusOf(error)
@@ -186,6 +190,17 @@ export function createQuickSession(options: QuickSessionOptions): QuickSessionHa
     if (disposed || state.status !== 'question') return
     submission = null
     emit({ ...state, draft, error: null })
+  }
+
+  async function finishSession(session: SessionView, reveal: Reveal, text: string): Promise<void> {
+    try {
+      // Ending persists the session even when navigation disposes this UI.
+      const summary = await request<SummaryView>(`/sessions/${encodeURIComponent(session.id)}/end`, { method: 'POST' })
+      if (disposed) return
+      emit({ status: 'done', session, reveal, chosenText: text, reviewsLeft: summary.reviewsLeft })
+    } catch {
+      // The counter line stays hidden when the end call fails.
+    }
   }
 
   async function check(): Promise<void> {
@@ -212,20 +227,7 @@ export function createQuickSession(options: QuickSessionOptions): QuickSessionHa
         revealed = true
         onReveal?.(reveal)
       }
-      const endController = new AbortController()
-      current = endController
-      try {
-        const summary = await request<SummaryView>(`/sessions/${encodeURIComponent(sessionId)}/end`, {
-          method: 'POST',
-          signal: endController.signal,
-        })
-        if (aborted(endController)) return
-        emit({ status: 'done', session, reveal, chosenText: text, reviewsLeft: summary.reviewsLeft })
-      } catch {
-        // The counter line stays hidden when the end call fails.
-      } finally {
-        if (current === endController) current = null
-      }
+      void finishSession(session, reveal, text)
     } catch (error) {
       if (aborted(controller)) return
       const status = statusOf(error)
@@ -234,7 +236,14 @@ export function createQuickSession(options: QuickSessionOptions): QuickSessionHa
         emit({ status: 'unavailable' })
       } else if (status === 409) {
         submission = null
-        emit({ status: 'answered' })
+        try {
+          const view = await request<SessionView>(`/sessions/${encodeURIComponent(sessionId)}`, { signal: controller.signal })
+          if (aborted(controller)) return
+          applySession(view, { status: 'checking', session, draft, error: null })
+        } catch (failure) {
+          if (aborted(controller)) return
+          emit({ status: statusOf(failure) === 404 ? 'unavailable' : 'error' })
+        }
       } else {
         emit({ status: 'question', session, draft, error: checkFailedMessage(false, 'phone') })
       }
