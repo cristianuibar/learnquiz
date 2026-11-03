@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { errorMessage } from '@/components/inline-error'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -36,7 +37,7 @@ export function CredentialsForm({ email, defaultEmail, name, initial = 'up', onM
     try {
       await onDone()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong')
+      setError(errorMessage(err))
     }
     setBusy(false)
   }

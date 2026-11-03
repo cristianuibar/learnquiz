@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
-import { RouteError } from '@/components/inline-error'
+import { RouteError, errorMessage } from '@/components/inline-error'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -33,7 +33,7 @@ function Settings() {
       if (remove) remove.checked = false
       setSaved(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save settings. Please try again.')
+      setError(errorMessage(err, 'Could not save settings. Please try again.'))
     } finally {
       setBusy(false)
     }
