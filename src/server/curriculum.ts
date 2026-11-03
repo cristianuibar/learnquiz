@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, count, desc, eq } from 'drizzle-orm'
+import { and, asc, count, desc, eq, inArray } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '@/db'
 import { conceptEdges, concepts, items, learnerItem, learnerTopic, learnerUnit, placements, sources, topics, units } from '@/db/schema'
@@ -12,6 +12,8 @@ import { asItem, httpError, loadPKnown, mean, type StoredItem } from '@/server/h
 import { assertWithinDailyCap } from '@/server/model-cap'
 import { requireOrgAdmin } from '@/server/authz'
 import { requireLearnerId } from '@/server/session'
+import { drainConceptQueue } from '@/server/concept-gen'
+import { runInBackground } from '@/server/env'
 import { buildRoleCurriculum, curriculumWrites } from '@/server/role-curriculum'
 
 export const createTopic = createServerFn({ method: 'POST' })
@@ -87,6 +89,22 @@ export const generateRoleCurriculum = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<{ topicId: string }> => {
     const { user, org } = await requireOrgAdmin(data.slug)
     return buildRoleCurriculum({ orgId: org.id, ownerId: user.id, roleId: data.roleId })
+  })
+
+export const retryConceptGeneration = createServerFn({ method: 'POST' })
+  .validator(z.object({ slug: z.string().min(1).max(100), conceptId: z.string().min(1).max(100) }))
+  .handler(async ({ data }): Promise<{ ok: true }> => {
+    const { org } = await requireOrgAdmin(data.slug)
+    const db = getDb()
+    const reset = await db.update(concepts).set({ genStatus: 'pending', genError: null, genStartedAt: null })
+      .where(and(
+        eq(concepts.id, data.conceptId), eq(concepts.genStatus, 'failed'),
+        inArray(concepts.topicId, db.select({ id: topics.id }).from(topics).where(eq(topics.orgId, org.id))),
+      ))
+      .returning({ id: concepts.id })
+    if (!reset.length) throw httpError('Failed concept not found', 404)
+    runInBackground(drainConceptQueue())
+    return { ok: true }
   })
 
 export const getTopicPath = createServerFn({ method: 'GET' })
