@@ -22,10 +22,10 @@ export function fieldErrors(err: unknown): Record<string, string> {
   return out
 }
 
-export const errorMessage = (err: unknown) =>
+export const errorMessage = (err: unknown, fallback = 'Something went wrong') =>
   typeof navigator !== 'undefined' && navigator.onLine === false
     ? "You're offline"
-    : issuesOf(err)?.[0].message || (err instanceof Error && err.message) || 'Something went wrong'
+    : issuesOf(err)?.[0].message || (err instanceof Error && err.message) || fallback
 
 // After a failed submit, moves focus to the form's first field marked aria-invalid.
 export function useFocusInvalid(fields: Record<string, string>) {
