@@ -59,7 +59,7 @@ const skeleton = () => ({ units: procedures.map((u) => ({
   name: u.name,
   summary: `${u.name} procedure.`,
   concepts: u.steps.map(([name, quote, critical], i) => ({
-    name, summary: quote, critical, source_quote: quote,
+    name, summary: quote, critical, visual: i === 0, source_quote: quote,
     prerequisites: i ? [u.steps[i - 1][0]] : [],
     misconceptions: ['Skipping the required check.'],
   })),
@@ -134,7 +134,7 @@ it('retains critical safety and scanning concepts when creating a personal topic
   const { topicId } = await curriculum.createTopic({ data: { topic: 'Warehouse picker', sourceText } })
   expect((await curriculum.getTopicPath({ data: { topicId } })).topic.generatedBy).toBe('muse-spark-1.3')
   const rows = await db.select().from(concepts)
-  expect(rows.find((c) => c.name === 'Wear safety boots')).toMatchObject({ critical: true })
+  expect(rows.find((c) => c.name === 'Wear safety boots')).toMatchObject({ critical: true, visual: true })
   expect(rows.find((c) => c.name === 'Scan the SKU')).toMatchObject({ critical: true })
   expect(rows.find((c) => c.name === 'Read the pick ticket')).toMatchObject({ critical: false })
 })
@@ -152,11 +152,11 @@ it('builds one ready role topic from every live document with grounded critical 
   expect(topicState()).toEqual({ status: 'ready' })
   expect(raw.prepare("SELECT generated_by FROM topics WHERE id = 'picker-topic'").get()).toEqual({ generated_by: 'muse-spark-1.3' })
   expect(storedPath()).toEqual({ units: { n: 4 }, concepts: { n: 16 }, edges: { n: 12 } })
-  const rows = raw.prepare(`SELECT c.name, c.source_id, c.source_quote, c.critical, c.grounded, s.body_text
+  const rows = raw.prepare(`SELECT c.name, c.source_id, c.source_quote, c.critical, c.visual, c.grounded, s.body_text
     FROM concepts c JOIN units u ON u.id = c.unit_id LEFT JOIN sources s ON s.id = c.source_id
     WHERE c.topic_id = 'picker-topic' ORDER BY u."order", c."order"`).all()
-  expect(rows.map((c) => [c.name, c.source_id, c.critical])).toEqual(procedures.flatMap((u, i) =>
-    u.steps.map(([name, , critical]) => [name, i < 2 ? 'receiving' : 'packing', Number(critical)]),
+  expect(rows.map((c) => [c.name, c.source_id, c.critical, c.visual])).toEqual(procedures.flatMap((u, i) =>
+    u.steps.map(([name, , critical], step) => [name, i < 2 ? 'receiving' : 'packing', Number(critical), Number(step === 0)]),
   ))
   for (const c of rows) {
     expect(c.grounded).toBe(1)

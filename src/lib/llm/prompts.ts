@@ -24,6 +24,7 @@ Rules:
 - 4 to 10 units. 4 to 8 concepts per unit. When documents are supplied, preserve their procedure order in the units and concepts, including prerequisites. Otherwise order from foundations to advanced.
 - A concept is the smallest teachable idea, testable with 1 to 3 questions. Names are short and unique across the whole curriculum.
 - summary: one or two sentences, at most 300 characters. misconceptions: 1 or 2 common mistakes learners make on that concept, each under 200 characters.
+- visual: true for procedures that benefit from a step-by-step diagram or flowchart; false for other concepts.
 - prerequisites: exact names of other concepts in this curriculum that must be learned first. Direct prerequisites only, no transitive ones, no cycles. Use [] for foundations.
 - source_quote: when source text is given, a short verbatim passage (at most 200 characters) from it that supports the concept, copied exactly; null when none fits. Always null when no source text is given.
 - critical: true for concepts where a mistake affects safety, compliance or money. Required safety precautions and barcode scanning or verification steps are critical. Otherwise false.

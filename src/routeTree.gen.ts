@@ -23,6 +23,7 @@ import { Route as OrgNewRouteImport } from './routes/org.new'
 import { Route as PlaySessionIdRouteImport } from './routes/play.$sessionId'
 import { Route as AdminCompaniesSlugRouteImport } from './routes/admin.companies_.$slug'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as MediaConceptsConceptIdRouteImport } from './routes/media/concepts/$conceptId'
 import { Route as OrgSlugIndexRouteImport } from './routes/org.$slug.index'
 import { Route as OrgSlugPeopleRouteImport } from './routes/org.$slug.people'
 import { Route as OrgSlugRolesRouteImport } from './routes/org.$slug.roles'
@@ -101,6 +102,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MediaConceptsConceptIdRoute = MediaConceptsConceptIdRouteImport.update({
+  id: '/media/concepts/$conceptId',
+  path: '/media/concepts/$conceptId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OrgSlugIndexRoute = OrgSlugIndexRouteImport.update({
   id: '/org/$slug/',
   path: '/org/$slug/',
@@ -152,6 +158,7 @@ export interface FileRoutesByFullPath {
   '/me/': typeof MeIndexRoute
   '/admin/companies/$slug': typeof AdminCompaniesSlugRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/media/concepts/$conceptId': typeof MediaConceptsConceptIdRoute
   '/org/$slug/people': typeof OrgSlugPeopleRoute
   '/org/$slug/roles': typeof OrgSlugRolesRoute
   '/org/$slug/settings': typeof OrgSlugSettingsRoute
@@ -174,6 +181,7 @@ export interface FileRoutesByTo {
   '/me': typeof MeIndexRoute
   '/admin/companies/$slug': typeof AdminCompaniesSlugRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/media/concepts/$conceptId': typeof MediaConceptsConceptIdRoute
   '/org/$slug/people': typeof OrgSlugPeopleRoute
   '/org/$slug/roles': typeof OrgSlugRolesRoute
   '/org/$slug/settings': typeof OrgSlugSettingsRoute
@@ -198,6 +206,7 @@ export interface FileRoutesById {
   '/me/': typeof MeIndexRoute
   '/admin/companies_/$slug': typeof AdminCompaniesSlugRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/media/concepts/$conceptId': typeof MediaConceptsConceptIdRoute
   '/org/$slug/people': typeof OrgSlugPeopleRoute
   '/org/$slug/roles': typeof OrgSlugRolesRoute
   '/org/$slug/settings': typeof OrgSlugSettingsRoute
@@ -223,6 +232,7 @@ export interface FileRouteTypes {
     | '/me/'
     | '/admin/companies/$slug'
     | '/api/auth/$'
+    | '/media/concepts/$conceptId'
     | '/org/$slug/people'
     | '/org/$slug/roles'
     | '/org/$slug/settings'
@@ -245,6 +255,7 @@ export interface FileRouteTypes {
     | '/me'
     | '/admin/companies/$slug'
     | '/api/auth/$'
+    | '/media/concepts/$conceptId'
     | '/org/$slug/people'
     | '/org/$slug/roles'
     | '/org/$slug/settings'
@@ -268,6 +279,7 @@ export interface FileRouteTypes {
     | '/me/'
     | '/admin/companies_/$slug'
     | '/api/auth/$'
+    | '/media/concepts/$conceptId'
     | '/org/$slug/people'
     | '/org/$slug/roles'
     | '/org/$slug/settings'
@@ -288,6 +300,7 @@ export interface RootRouteChildren {
   PlaySessionIdRoute: typeof PlaySessionIdRoute
   MeIndexRoute: typeof MeIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  MediaConceptsConceptIdRoute: typeof MediaConceptsConceptIdRoute
   OrgSlugPeopleRoute: typeof OrgSlugPeopleRoute
   OrgSlugRolesRoute: typeof OrgSlugRolesRoute
   OrgSlugSettingsRoute: typeof OrgSlugSettingsRoute
@@ -397,6 +410,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/media/concepts/$conceptId': {
+      id: '/media/concepts/$conceptId'
+      path: '/media/concepts/$conceptId'
+      fullPath: '/media/concepts/$conceptId'
+      preLoaderRoute: typeof MediaConceptsConceptIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/org/$slug/': {
       id: '/org/$slug/'
       path: '/org/$slug'
@@ -476,6 +496,7 @@ const rootRouteChildren: RootRouteChildren = {
   PlaySessionIdRoute: PlaySessionIdRoute,
   MeIndexRoute: MeIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  MediaConceptsConceptIdRoute: MediaConceptsConceptIdRoute,
   OrgSlugPeopleRoute: OrgSlugPeopleRoute,
   OrgSlugRolesRoute: OrgSlugRolesRoute,
   OrgSlugSettingsRoute: OrgSlugSettingsRoute,

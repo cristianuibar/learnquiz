@@ -19,7 +19,7 @@ function curriculumWrites(db: Db, topicId: string, valid: ValidatedSkeleton, gen
   const conceptRows = valid.units.flatMap((u) =>
     u.concepts.map((c, order) => ({
       id: c.id, topicId, unitId: u.id, order, name: c.name, summary: c.summary, level: 3,
-      sourceId: c.sourceId, sourceQuote: c.sourceQuote, grounded: c.grounded, critical: c.critical,
+      sourceId: c.sourceId, sourceQuote: c.sourceQuote, grounded: c.grounded, critical: c.critical, visual: c.visual,
       misconceptionsJson: JSON.stringify(c.misconceptions),
     })),
   )
@@ -208,6 +208,7 @@ export const getTopicPath = createServerFn({ method: 'GET' })
             order: c.order,
             name: c.name,
             summary: c.summary,
+            visual: c.visual,
             grounded: c.grounded,
             critical: c.critical,
             itemCount: itemCount.get(c.id) ?? 0,
