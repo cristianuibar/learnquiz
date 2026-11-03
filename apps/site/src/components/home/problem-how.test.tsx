@@ -31,6 +31,7 @@ it('presents the training process as three ordered steps with level-three headin
   expect(heading).toBeDefined()
   const section = heading.closest('section')!
   expect(section.getAttribute('aria-labelledby')).toBe(heading.id)
+  expect(section.querySelector('ol')?.getAttribute('role')).toBe('list')
   const steps = [...section.querySelectorAll('ol > li')]
   expect(steps).toHaveLength(3)
   expect(steps.map((step) => step.querySelector('h3')?.textContent)).toEqual([

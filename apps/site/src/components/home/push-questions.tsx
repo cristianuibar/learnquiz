@@ -73,7 +73,7 @@ export function PushQuestions() {
                 <p className="t-title2">Your pick slot is empty. What do you do first?</p>
                 <div className="opt-list gap-2">
                   {options.map((option, index) => (
-                    <div key={option} className={`opt min-h-12 cursor-default px-3 py-2 text-[15px] leading-[22px]${index === 0 ? ' is-selected' : ''}`}>
+                    <div key={option} className={`opt min-h-12 cursor-default text-[15px] leading-[22px] ${index === 0 ? 'is-selected' : ''}`}>
                       <span className="radio" />
                       <span className="opt-text">{option}</span>
                     </div>

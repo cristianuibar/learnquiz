@@ -7,7 +7,7 @@ export function HowItWorks() {
         <div className="how-grid">
           <div className="stack gap-8">
             <h2 id="lqs-how" className="h-section">Your SOPs become the training.</h2>
-            <ol className="steps">
+            <ol className="steps" role="list">
               <li className="step">
                 <span className="step-n" aria-hidden="true">1</span>
                 <div className="stack gap-1">
