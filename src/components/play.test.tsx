@@ -28,7 +28,7 @@ beforeEach(() => {
     addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}, dispatchEvent: () => true,
   }))
 })
-afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); finishPermission = undefined })
+afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); finishPermission = undefined; sessionStorage.clear() })
 
 async function renderPlay(voiceEnabled: boolean | null = true, permissionPending = false, format: 'cloze' | 'short' = 'cloze') {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
@@ -87,6 +87,31 @@ async function key(container: HTMLElement, type: 'keydown' | 'keyup') {
     .dispatchEvent(new KeyboardEvent(type, { key: ' ', bubbles: true, cancelable: true })))
 }
 
+it('keeps an unsent answer and confidence across a reload and clears them after Check', async () => {
+  const typeAndRate = async (container: HTMLElement) => act(async () => {
+    const input = container.querySelector<HTMLInputElement>('#answer')!
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'one more')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    container.querySelector<HTMLInputElement>('input[value="unsure"]')!.click()
+  })
+  const first = await renderPlay(false, false, 'short')
+  await typeAndRate(first.container)
+  await first.cleanup()
+
+  const reloaded = await renderPlay(false, false, 'short')
+  try {
+    expect(reloaded.container.querySelector<HTMLInputElement>('#answer')!.value).toBe('one more')
+    expect(reloaded.container.querySelector<HTMLInputElement>('input[value="unsure"]')!.checked).toBe(true)
+    vi.mocked(nextItem).mockResolvedValue({ ...reloaded.initial, progress: { position: 2, total: 2 }, item: { ...reloaded.initial.item!, id: 'i2', stem: 'Why subtract from both sides?' } })
+    await act(async () => { button(reloaded.container, 'Check').click() })
+    expect(answerItem).toHaveBeenCalledWith({ data: expect.objectContaining({ itemId: 'i1', answer: { text: 'one more' }, confidence: 'unsure' }) })
+    expect(sessionStorage.length).toBe(0)
+    await act(async () => { button(reloaded.container, 'Continue').click() })
+    expect(reloaded.container.querySelector<HTMLInputElement>('#answer')!.value).toBe('')
+    expect(reloaded.container.querySelector<HTMLInputElement>('input[value="unsure"]')!.checked).toBe(false)
+  } finally { await reloaded.cleanup() }
+})
+
 it.each([
   { format: 'mcq', repeats: false },
   { format: 'cloze', repeats: false },
@@ -116,7 +141,10 @@ it.each([
       container.querySelector<HTMLInputElement>(`input[value="${repeats ? 'unsure' : 'sure'}"]`)!.click()
     })
     await act(async () => { button(container, 'Check').click() })
-    if (repeats) expect(container.querySelector('[role="status"]')!.textContent).toContain('No source: written by gpt-test from general knowledge')
+    if (repeats) {
+      expect(container.querySelector('[role="status"]')!.textContent).toContain('No source: written by gpt-test from general knowledge')
+      expect(container.querySelector('label[for="why"]')!.textContent).toBe('In one line, why? (optional)')
+    }
     await act(async () => {
       const next = button(container, 'Continue')
       next.focus()

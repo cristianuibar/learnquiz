@@ -810,8 +810,8 @@ async function finalise(db: Db, learnerId: string, session: SessionRow, topic: T
       db.select({ answered: count() }).from(attempts).where(eq(attempts.sessionId, session.id)),
     ])
     const ids = JSON.parse(session.itemIdsJson) as string[]
-    // The bonus is for finishing the queue, not for leaving early.
-    bonus = plan.answered && plan.position >= ids.length - 1 ? SESSION_BONUS : 0
+    // The bonus is for finishing the queue with at least one scored answer, not for leaving early or for ungraded items.
+    bonus = answered > 0 && plan.answered && plan.position >= ids.length - 1 ? SESSION_BONUS : 0
     const { streakCount, lastSessionAt } = streakAfter(lt, new Date(now), answered)
     stmts.push(
       db
