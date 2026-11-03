@@ -3,6 +3,7 @@ import themeCss from '../theme.css?raw'
 import { brandCss, brandProblem, contrast, deriveBrand } from './brand.ts'
 import { renderThemeCss } from './css.ts'
 import { colors } from './tokens.ts'
+import { shadows } from './native.ts'
 
 const surfaces = [
   'surface-page', 'surface-card', 'surface-sunken', 'brand-tint', 'accent-tint',
@@ -57,4 +58,13 @@ describe('deriveBrand', () => {
 
 it('keeps the shipped theme CSS in sync with its renderer', () => {
   expect(themeCss).toBe(renderThemeCss())
+})
+
+it.each(['light', 'dark'] as const)('derives the native %s raised shadow from the token', (theme) => {
+  expect(shadows[theme].raised).toEqual({
+    shadowColor: theme === 'light' ? 'rgba(20,24,31,0.12)' : 'rgba(0,0,0,0.5)',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 1,
+    shadowRadius: 12,
+  })
 })

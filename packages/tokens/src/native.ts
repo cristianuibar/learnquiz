@@ -1,4 +1,4 @@
-import { colors, typography as styles } from './tokens.ts'
+import { colors, shadow, typography as styles } from './tokens.ts'
 
 export { space, radius, sizes, duration } from './tokens.ts'
 export const easing = [0.2, 0, 0, 1] as const
@@ -20,6 +20,32 @@ function theme(index: 0 | 1): Theme {
 }
 
 export const themes: { light: Theme; dark: Theme } = { light: theme(0), dark: theme(1) }
+
+export type NativeShadow = {
+  shadowColor: string
+  shadowOffset: { width: number; height: number }
+  shadowOpacity: number
+  shadowRadius: number
+}
+
+function nativeShadow(css: string): NativeShadow {
+  const match = /^(-?\d+)(?:px)? (-?\d+)(?:px)? (\d+)(?:px)? (rgba\(.+\))$/.exec(css)
+  if (!match) throw new Error(`Unsupported shadow: ${css}`)
+  return {
+    shadowColor: match[4],
+    shadowOffset: { width: Number(match[1]), height: Number(match[2]) },
+    shadowOpacity: 1,
+    shadowRadius: Number(match[3]) / 2,
+  }
+}
+
+function shadowTheme(index: 0 | 1): { [Key in keyof typeof shadow]: NativeShadow } {
+  return Object.fromEntries(
+    Object.entries(shadow).map(([name, values]) => [name, nativeShadow(values[index])]),
+  ) as { [Key in keyof typeof shadow]: NativeShadow }
+}
+
+export const shadows = { light: shadowTheme(0), dark: shadowTheme(1) }
 
 const fonts = {
   400: 'Inter_400Regular',

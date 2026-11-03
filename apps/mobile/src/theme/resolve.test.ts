@@ -1,5 +1,5 @@
 import { brandProblem, contrast, deriveBrand } from '@learnquiz/tokens'
-import { themes, typography, space, radius, sizes } from '@learnquiz/tokens/native'
+import { themes, shadows, typography, space, radius, sizes } from '@learnquiz/tokens/native'
 import { resolveTheme } from './resolve'
 
 describe('resolveTheme', () => {
@@ -7,7 +7,7 @@ describe('resolveTheme', () => {
     const theme = resolveTheme({ scheme, systemScheme: scheme === 'light' ? 'dark' : 'light' })
     expect(theme.scheme).toBe(scheme)
     expect(theme.colors).toEqual(themes[scheme])
-    expect(theme).toMatchObject({ typography, space, radius, sizes })
+    expect(theme).toMatchObject({ typography, space, radius, sizes, shadow: shadows[scheme] })
   })
 
   test.each(['light', 'dark'] as const)('follows the %s OS scheme in system mode', (systemScheme) => {
