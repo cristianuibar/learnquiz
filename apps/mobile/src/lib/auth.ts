@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store'
 import { authCall } from './api'
 import * as kv from './kv'
+import { clearPushLocal, observePushForeground, unregisterPush } from './push'
 
 const TOKEN_KEY = 'lq.token'
 let token: string | null = null
@@ -11,6 +12,7 @@ let storageWrites: Promise<unknown> = Promise.resolve()
 let unauthorized: Promise<void> | undefined
 type AuthEvent = 'changed' | 'signedOut'
 const listeners = new Set<(event: AuthEvent) => void>()
+observePushForeground()
 
 export function getToken() { return token }
 
@@ -60,7 +62,7 @@ async function clearLocalSession() {
   // Includes drafts, cached Today data, prompts and the locally stored push token.
   await Promise.all([
     persist(() => SecureStore.deleteItemAsync(TOKEN_KEY)),
-    kv.clearPrefix('lq:'),
+    clearPushLocal().then(() => kv.clearPrefix('lq:')),
   ])
 }
 
@@ -97,6 +99,11 @@ export async function acceptInvitation(invitationId: string) {
 }
 
 export async function signOut() {
+  const current = ++revision
+  // Unregister while the current bearer still owns this device's subscription.
+  const unregistering = unregisterPush()
+  if (unregistering) await unregistering
+  if (revision !== current) return
   // Start the revocation with the current bearer, but never make local logout wait
   // for the network. Failed revocation does not leave private data on this phone.
   if (token) void authCall('/sign-out', {}, { authenticated: true, timeoutMs: 5_000 }).catch(() => {})
