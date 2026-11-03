@@ -100,6 +100,7 @@ async function renderApp(initialEntry = '/sign-in') {
   const routes = [
     createRoute({ getParentRoute: () => rootRoute, path: '/', beforeLoad: indexRoute.options.beforeLoad, component: indexRoute.options.component }),
     createRoute({ getParentRoute: () => rootRoute, path: '/sign-in', beforeLoad: signInRoute.options.beforeLoad, validateSearch: signInRoute.options.validateSearch, component: signInRoute.options.component }),
+    createRoute({ getParentRoute: () => rootRoute, path: '/join/$token', component: () => <h1>Join</h1> }),
     createRoute({ getParentRoute: () => rootRoute, path: '/start', validateSearch: startRoute.options.validateSearch, component: startRoute.options.component }),
     createRoute({ getParentRoute: () => rootRoute, path: '/today', beforeLoad: todayRoute.options.beforeLoad, loader: todayRoute.options.loader, errorComponent: todayRoute.options.errorComponent, component: todayRoute.options.component }),
     createRoute({ getParentRoute: () => rootRoute, path: '/me', beforeLoad: meRoute.options.beforeLoad, loader: meRoute.options.loader, component: meRoute.options.component }),
@@ -140,6 +141,21 @@ it.each([
       await act(async () => { await router.navigate({ to: '/me' }) })
       expect(container.querySelectorAll('a[href^="/org/"]')).toHaveLength(0)
     }
+  } finally { await cleanup() }
+})
+
+it('prefills an editable email from the sign-in link and returns to the redirect', async () => {
+  const { container, router, cleanup } = await renderApp('/sign-in?email=learner%40example.test&redirect=%2Fjoin%2Finvite')
+  try {
+    const email = container.querySelector<HTMLInputElement>('#email')!
+    expect(email.value).toBe('learner@example.test')
+    expect(email.readOnly).toBe(false)
+    container.querySelector<HTMLInputElement>('#password')!.value = 'test-password'
+    await act(async () => {
+      container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+      await vi.waitFor(() => expect(router.state.location.pathname).toBe('/join/invite'))
+    })
+    expect(container.querySelector('h1')?.textContent).toBe('Join')
   } finally { await cleanup() }
 })
 

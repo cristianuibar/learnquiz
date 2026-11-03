@@ -59,22 +59,43 @@ function Join() {
                 {error}
               </p>
             )}
-            <Button
-              className="h-12 self-end px-6"
-              disabled={busy}
-              onClick={async () => {
-                setBusy(true)
-                setError('')
-                try {
-                  await accept()
-                } catch (err) {
-                  setError(err instanceof Error ? err.message : 'Could not join')
-                  setBusy(false)
-                }
-              }}
-            >
-              Join {invite.company}
-            </Button>
+            {invite.otherAccount ? (
+              <Button
+                className="h-12 self-end px-6"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true)
+                  setError('')
+                  const { error } = await authClient.signOut()
+                  if (error) {
+                    setError(error.message ?? 'Could not sign out')
+                    setBusy(false)
+                    return
+                  }
+                  await router.invalidate()
+                  await router.navigate({ to: '/sign-in', search: { redirect: `/join/${invitationId}`, email: invite.email } })
+                }}
+              >
+                Sign in as {invite.email}
+              </Button>
+            ) : (
+              <Button
+                className="h-12 self-end px-6"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true)
+                  setError('')
+                  try {
+                    await accept()
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : 'Could not join')
+                    setBusy(false)
+                  }
+                }}
+              >
+                Join {invite.company}
+              </Button>
+            )}
           </div>
         ) : (
           <CredentialsForm email={invite.email} name={invite.name} onDone={accept} />
