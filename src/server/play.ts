@@ -3,10 +3,12 @@ import { and, asc, count, eq, getTableColumns, gte, inArray, isNull, lte, ne, sq
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core'
 import { z } from 'zod'
 import { getDb, type Db } from '@/db'
-import { attempts, concepts, items, learnerConcept, learnerItem, learnerTopic, learnerUnit, placements, pushLog, sessions, topics, units } from '@/db/schema'
+import { member } from '@/db/auth-schema'
+import { attempts, concepts, items, jobRoles, learnerConcept, learnerItem, learnerTopic, learnerUnit, memberRoleAssignments, placements, pushLog, sessions, topics, units } from '@/db/schema'
 import { BKT, guessFor, MASTERY, placementPrior, update } from '@/lib/learning/bkt'
 import { ratingFor, retrievability, review } from '@/lib/learning/fsrs'
 import { gradeAnswer, revealState, toItemView } from '@/lib/learning/grade'
+import { benchmarkMet } from '@/lib/learning/profile'
 import { levelResult, nextLevel, pickNext, PLACEMENT, shouldStop } from '@/lib/learning/placement'
 import { composeSession, reinsert, SESSION_BONUS, streakAfter, xpFor } from '@/lib/learning/session'
 import type { Confidence, ItemView, Reveal, SessionView, SummaryView } from '@/lib/learning/types'
@@ -352,6 +354,28 @@ export const transcribeAnswer = createServerFn({ method: 'POST' })
     return transcribeAudio({ audio: data.audio, learnerId, sessionId: session.id, topicId: session.topicId })
   })
 
+// Sticky: a role topic's assignment gets proficient_at once the benchmark is met, and it is never cleared.
+async function stampProficiency(db: Db, learnerId: string, topicId: string, now: number) {
+  const [role] = await db
+    .select({ orgId: memberRoleAssignments.orgId, benchmark: jobRoles.benchmark })
+    .from(memberRoleAssignments)
+    .innerJoin(member, and(eq(member.userId, memberRoleAssignments.userId), eq(member.organizationId, memberRoleAssignments.orgId)))
+    .innerJoin(jobRoles, and(eq(jobRoles.id, memberRoleAssignments.jobRoleId), eq(jobRoles.orgId, memberRoleAssignments.orgId), eq(jobRoles.status, 'active')))
+    .innerJoin(topics, and(eq(topics.jobRoleId, jobRoles.id), eq(topics.id, topicId)))
+    .where(and(eq(memberRoleAssignments.userId, learnerId), isNull(memberRoleAssignments.proficientAt)))
+  if (!role) return
+  const rows = await db
+    .select({ id: concepts.id, critical: concepts.critical, pKnown: learnerConcept.pKnown })
+    .from(concepts)
+    .leftJoin(learnerConcept, and(eq(learnerConcept.conceptId, concepts.id), eq(learnerConcept.learnerId, learnerId)))
+    .where(eq(concepts.topicId, topicId))
+  if (!benchmarkMet(rows.map((r) => ({ id: r.id, critical: r.critical, pKnown: r.pKnown ?? 0 })), role.benchmark)) return
+  await db
+    .update(memberRoleAssignments)
+    .set({ proficientAt: now })
+    .where(and(eq(memberRoleAssignments.userId, learnerId), eq(memberRoleAssignments.orgId, role.orgId), isNull(memberRoleAssignments.proficientAt)))
+}
+
 export const answerItem = createServerFn({ method: 'POST' })
   .validator(
     z.object({
@@ -521,6 +545,7 @@ export const answerItem = createServerFn({ method: 'POST' })
     }
     const [kept] = (await batch(db, stmts)) as unknown as [unknown[]]
     if (!kept.length) throw await dropped()
+    await stampProficiency(db, learnerId, session.topicId, now)
 
     // State D only, read from the concept; no model call. chosenFeedback is shown on its own, so it is not repeated here.
     const mixUps = state === 'D' ? (JSON.parse(concept.misconceptionsJson) as string[]) : []
