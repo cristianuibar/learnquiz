@@ -112,7 +112,7 @@ export function RevealCard({
           )}
           {wrong && (
             <div className="mt-4 flex flex-col gap-2">
-              <Label htmlFor="why">In one line, why?</Label>
+              <Label htmlFor="why">In one line, why? (optional)</Label>
               <Input id="why" className="h-12 bg-background" value={why} maxLength={300} onChange={(e) => onWhy(e.target.value)} />
             </div>
           )}
