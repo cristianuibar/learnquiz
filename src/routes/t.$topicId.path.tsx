@@ -30,6 +30,8 @@ export const Route = createFileRoute('/t/$topicId/path')({
 function Path() {
   const { topic, units, learner } = Route.useLoaderData()
   const [expandedUnits, setExpandedUnits] = useState<Set<string>>(() => new Set())
+  // Unlocked units with no answers yet only carry the placement prior.
+  const estimated = (unit: (typeof units)[number]) => learner.placed && unit.unlocked && !unit.measured
   return (
     <main className="mx-auto w-full max-w-2xl px-4 pt-8 pb-4">
       <h1 className="text-3xl font-bold tracking-tight">{topic.title}</h1>
@@ -38,8 +40,9 @@ function Path() {
       {learner.placed ? (
         <>
           <p className="mt-2 text-lg font-medium">
-            Level {learner.level} of 5 · {LEVELS[learner.level - 1]}
+            Starting level {learner.level} of 5 · {LEVELS[learner.level - 1]}
           </p>
+          <p className="mt-1 text-sm text-muted-foreground">Your placement sets where questions start. Mastery grows as you answer.</p>
           {learner.levelLine && (
             <div>
               <blockquote className="mt-2 border-l-2 border-learning pl-3 text-muted-foreground">{learner.levelLine}</blockquote>
@@ -69,9 +72,13 @@ function Path() {
               <h2 className={cn('text-xl font-semibold', !unit.unlocked && 'text-muted-foreground')}>{unit.name}</h2>
               <p className="mt-1 text-muted-foreground">{unit.summary}</p>
               <div className="mt-3 flex items-center gap-3">
-                <MasteryBar className="flex-1" label={`${unit.name} mastery`} value={unit.unlocked ? unit.mastery : 0} />
-                <span className="w-14 text-right text-sm font-medium tabular-nums text-muted-foreground">
-                  {unit.unlocked ? `${Math.round(unit.mastery * 100)}%` : 'locked'}
+                <MasteryBar
+                  className="flex-1"
+                  label={`${unit.name} ${estimated(unit) ? 'estimated mastery' : 'mastery'}`}
+                  value={unit.unlocked ? unit.mastery : 0}
+                />
+                <span className={cn('text-right text-sm font-medium tabular-nums text-muted-foreground', estimated(unit) ? 'max-w-28 leading-tight' : 'w-14')}>
+                  {!unit.unlocked ? 'locked' : estimated(unit) ? 'Estimated from placement' : `${Math.round(unit.mastery * 100)}%`}
                 </span>
               </div>
               <details className="mt-2" onToggle={(event) => {
