@@ -8,13 +8,13 @@ import {
 import { useURL } from 'expo-linking'
 import { Stack, useRouter, type Href } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { ThemeProvider } from '@/theme/ThemeProvider'
 import { SessionProvider, useSession } from '@/lib/session-store'
-import { holdTarget, takeReplayTarget } from '@/lib/held-target'
+import { holdTarget, replayVersion, subscribeReplay, takeReplayTarget } from '@/lib/held-target'
 import { canOpenTarget, targetFromURL } from '@/lib/route-gates'
 import { useNotificationObserver } from '@/lib/notification-observer'
 
@@ -53,6 +53,8 @@ function SessionRoutes({ fontsLoaded }: { fontsLoaded: boolean }) {
   const mounted = useRef(false)
   const resolved = fontsLoaded && session.status !== 'loading'
   useNotificationObserver(resolved && session.status === 'ready' && !session.needsDisclosure)
+  // Re-runs the replay below when the last hold on it ends.
+  const replays = useSyncExternalStore(subscribeReplay, replayVersion)
 
   useEffect(() => {
     if (url && url !== lastURL.current) {
@@ -67,7 +69,7 @@ function SessionRoutes({ fontsLoaded }: { fontsLoaded: boolean }) {
       if (canOpenTarget(target, session)) router.replace(target as Href)
       else holdTarget(target)
     }
-  }, [url, session.status, session.needsDisclosure, resolved, router])
+  }, [url, session.status, session.needsDisclosure, resolved, router, replays])
 
   useEffect(() => {
     if (resolved && !mounted.current) {

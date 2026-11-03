@@ -14,6 +14,7 @@ import { Text } from '@/components/ui/Text'
 import { api, mediaSource } from '@/lib/api'
 import { acceptInvitation, signIn, signOut, signUp } from '@/lib/auth'
 import { deferReplay, takeHeldTarget } from '@/lib/held-target'
+import { useReplayHold } from '@/lib/use-replay-hold'
 import {
   createJoinFlow,
   invalidScreen,
@@ -100,10 +101,9 @@ function Invite({ invitationId, invite }: { invitationId: string; invite: Invite
   // While a submit runs the session changes underneath; keep the screen it started on.
   const [frozen, setFrozen] = useState<{ viewer: Viewer } | null>(null)
   const [target, setTarget] = useState<string | null>(null)
-  // From the first submit until this screen goes away, only the join flow navigates:
+  // From the first submit while this screen is in front, only the join flow navigates:
   // a session refresh that lands after a failed accept must not replay a held link.
-  const replayHold = useRef<(() => void) | null>(null)
-  useEffect(() => () => replayHold.current?.(), [])
+  const holdReplay = useReplayHold()
 
   const user = session.status === 'ready' && session.user && !session.user.isAnonymous ? session.user : null
   const viewer: Viewer = frozen ? frozen.viewer : user && { name: user.name }
@@ -127,7 +127,7 @@ function Invite({ invitationId, invite }: { invitationId: string; invite: Invite
   async function run(input: JoinInput) {
     if (busyRef.current) return
     busyRef.current = true
-    replayHold.current ??= deferReplay()
+    holdReplay()
     setBusy(true)
     setError(null)
     setFrozen({ viewer })

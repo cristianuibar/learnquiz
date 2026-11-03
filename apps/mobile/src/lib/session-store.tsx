@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { api } from './api'
 import { getToken, handleUnauthorized, loadToken, subscribeAuth } from './auth'
+import { releaseReplayHolds } from './held-target'
 
 export type SessionUser = { id: string; name: string; isAnonymous: boolean; role?: string | null }
 export type Branding = { name: string; logoUrl: string | null; accent: string | null }
@@ -37,7 +38,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = subscribeAuth((event) => {
-      if (event === 'signedOut') { request.current++; setState(signedOut) }
+      // Sign-out also ends every hold on held-link replay (an unfinished join).
+      if (event === 'signedOut') { request.current++; releaseReplayHolds(); setState(signedOut) }
       else void refresh()
     })
     void refresh()
