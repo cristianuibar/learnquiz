@@ -3,6 +3,7 @@ import { getDb, type Db } from '@/db'
 import { concepts, items, topics, units } from '@/db/schema'
 import { utcDayStart } from '@/lib/limits'
 import { generateConceptItems } from '@/server/helpers'
+import { liveConcept } from '@/server/live-concept'
 import { assertWithinCompanyCap, COMPANY_CAP_MESSAGE } from '@/server/model-cap'
 
 export const ITEMS_PER_CONCEPT = 6
@@ -19,13 +20,16 @@ export async function processConcept(db: Db, conceptId: string): Promise<void> {
   const claimed = await db.update(concepts).set({ genStatus: 'generating', genStartedAt: now })
     .where(and(
       eq(concepts.id, conceptId),
+      liveConcept(),
       or(eq(concepts.genStatus, 'pending'), and(eq(concepts.genStatus, 'generating'), lt(concepts.genStartedAt, now - STALE_CLAIM_MS))),
     ))
     .returning({ id: concepts.id })
   if (!claimed.length) return
-  // A status write must not mask the original handling.
+  // A status write must not mask the original handling. It only lands while this invocation still holds its claim:
+  // a reset (a replaced document) or a newer claim since then owns the concept, and must not be overwritten.
   const settle = (set: Partial<typeof concepts.$inferInsert>) =>
-    db.update(concepts).set(set).where(eq(concepts.id, conceptId)).then(() => {}, (e) => console.error('concept status write failed', e))
+    db.update(concepts).set(set)
+      .where(and(eq(concepts.id, conceptId), eq(concepts.genStatus, 'generating'), eq(concepts.genStartedAt, now))).then(() => {}, (e) => console.error('concept status write failed', e))
   try {
     const [row] = await db.select({ concept: concepts, topic: topics }).from(concepts)
       .innerJoin(topics, eq(topics.id, concepts.topicId)).where(eq(concepts.id, conceptId))
@@ -69,6 +73,7 @@ export async function drainConceptQueue(opts: { limit: number; concurrency: numb
     .innerJoin(units, eq(units.id, concepts.unitId))
     .where(and(
       isNotNull(topics.orgId),
+      liveConcept(),
       or(
         and(eq(concepts.genStatus, 'pending'), or(isNull(concepts.genStartedAt), lt(concepts.genStartedAt, utcDayStart(now)))),
         and(eq(concepts.genStatus, 'generating'), lt(concepts.genStartedAt, now - STALE_CLAIM_MS)),
