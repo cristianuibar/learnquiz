@@ -14,6 +14,8 @@ export const topics = sqliteTable('topics', {
   goal: text('goal'),
   generatedBy: text('generated_by'),
   status: text('status', { enum: ['draft', 'generating', 'ready', 'failed'] }).notNull().default('generating'),
+  // Claim time of a role curriculum build; a stale claim may be taken again.
+  genStartedAt: integer('gen_started_at'),
   createdAt: integer('created_at').notNull(),
 })
 

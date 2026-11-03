@@ -312,6 +312,23 @@ it.each(['session', 'placement'])('skips retired questions in a queued %s, inclu
   expect((await nextItem({ data: { sessionId: 'queued' } })).item).toBeNull()
 })
 
+it.each([[1, 2], [10, 12]])('credits the session bonus when the questions after answer %i of %i are retired', async (answered, count) => {
+  seedTopicAndLearner(raw, 0)
+  seedFrontier(raw, count, false)
+  const queue = Array.from({ length: count }, (_, i) => `i${i + 1}`)
+  const plan = { queue, position: answered - 1, answered: false, reinserted: [], reasons: { due: count, frontier: 0, closers: 0 }, unitStart: {} }
+  raw.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, item_ids_json, plan_json, started_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run('queued', 'u1', 't1', 'session', JSON.stringify(queue), JSON.stringify(plan), 1)
+  const asked = queue[answered - 1]
+  await answerItem({ data: { sessionId: 'queued', itemId: asked, answer: { text: '1' }, confidence: 'sure', responseMs: 100 } })
+  const xp = scalar(raw, 'SELECT xp FROM sessions WHERE id = ?', 'queued').xp as number
+  // Retire the remaining questions while the learner reads the reveal.
+  for (const id of queue.slice(answered)) raw.prepare('UPDATE items SET status = ? WHERE id = ?').run('retired', id)
+  expect((await nextItem({ data: { sessionId: 'queued' } })).ended).toBe(true)
+  expect((await endSession({ data: { sessionId: 'queued' } })).xp).toBe(xp + 20)
+  expect(scalar(raw, 'SELECT xp FROM learner_topic WHERE learner_id = ? AND topic_id = ?', 'u1', 't1').xp).toBe(xp + 20)
+})
+
 it.each(['session', 'placement'])('excludes retired questions from a new %s', async (kind) => {
   // Items are ordered by creation time; a frozen clock keeps their seeded order.
   vi.useFakeTimers({ toFake: ['Date'] })
@@ -611,6 +628,21 @@ it('credits the session bonus once when two finishing nextItem calls race (pract
   expect(scalar(raw, 'SELECT ended_at AS endedAt FROM sessions WHERE id = ?', 's1').endedAt).not.toBeNull()
   const summary = await endSession({ data: { sessionId: 's1' } })
   expect(summary.xp).toBe(20)
+})
+
+it('lists only units whose rounded mastery changed under Mastery moved', async () => {
+  seedTopicAndLearner(raw, 0)
+  seedFrontier(raw, 1, false)
+  raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un2', 't1', 1, 'Next')
+  raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)').run('c2', 't1', 'un2', 0, 'Equations', '')
+  const known = raw.prepare('INSERT INTO learner_concept (learner_id, concept_id, p_known, updated_at) VALUES (?, ?, ?, ?)')
+  known.run('u1', 'c1', 0.682, 1)
+  known.run('u1', 'c2', 0.7, 1)
+  const plan = { queue: ['i1'], position: 1, answered: true, reinserted: [], reasons: { due: 0, frontier: 1, closers: 0 }, unitStart: { un1: 0.678, un2: 0.5 } }
+  raw.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, item_ids_json, plan_json, started_at, ended_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .run('s1', 'u1', 't1', 'session', JSON.stringify(['i1']), JSON.stringify(plan), 1, 2)
+
+  expect((await endSession({ data: { sessionId: 's1' } })).masteryMoved).toEqual([{ unitId: 'un2', unitName: 'Next', before: 0.5, after: 0.7 }])
 })
 
 it('writes exactly one placement when two finishing nextItem calls race (placement)', async () => {
