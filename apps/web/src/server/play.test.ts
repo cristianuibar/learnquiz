@@ -712,6 +712,50 @@ describe('learner practice and unit unlocks', () => {
     expect(scalar(raw, 'SELECT COUNT(*) AS n FROM sessions WHERE learner_id = ?', 'u2').n).toBe(0)
   })
 
+  it('scopes a unit session to that unit and refuses locked or foreign units', async () => {
+    const payload = JSON.stringify({
+      format: 'cloze', stem: 'Solve x + 1 = 2: x = ____.', options: [], accepted_answers: ['1'], model_answer: '1',
+      explanation: 'Subtract 1 from both sides.', difficulty: 1, source_quote: null, grounded: false, bloom: 'apply',
+    })
+    for (const order of [0, 1]) {
+      raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run(`un${order + 1}`, 't1', order, `Unit ${order + 1}`)
+      raw.prepare('INSERT INTO learner_unit (learner_id, unit_id, unlocked_at) VALUES (?, ?, ?)').run('u1', `un${order + 1}`, 1)
+      raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(`c${order + 1}`, 't1', `un${order + 1}`, 0, `Concept ${order + 1}`, '')
+      for (let i = 0; i < 6; i++) {
+        raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+          .run(`c${order + 1}-i${i}`, `c${order + 1}`, 't1', 'cloze', payload, 1, Date.now())
+      }
+    }
+    // Unit 2 has due reviews and a known concept (closer-eligible), so an unscoped session would reach into it.
+    for (let i = 0; i < 3; i++) {
+      raw.prepare('INSERT INTO learner_item (learner_id, item_id, due, stability, difficulty, state) VALUES (?, ?, ?, ?, ?, ?)')
+        .run('u1', `c2-i${i}`, Date.now() - 86_400_000, 1, 5, 2)
+    }
+    raw.prepare('INSERT INTO learner_concept (learner_id, concept_id, p_known, n_attempts, updated_at) VALUES (?, ?, ?, ?, ?)').run('u1', 'c2', 0.95, 5, 1)
+    const queueConcepts = async (data: { topicId: string; unitId?: string }) => {
+      const { sessionId } = await startSession({ data })
+      const ids = JSON.parse(scalar(raw, 'SELECT item_ids_json FROM sessions WHERE id = ?', sessionId).item_ids_json as string) as string[]
+      return ids.map((id) => scalar(raw, 'SELECT concept_id FROM items WHERE id = ?', id).concept_id as string)
+    }
+
+    expect(await queueConcepts({ topicId: 't1' })).toContain('c2')
+    const scoped = await queueConcepts({ topicId: 't1', unitId: 'un1' })
+    expect(scoped.length).toBeGreaterThan(0)
+    expect(new Set(scoped)).toEqual(new Set(['c1']))
+
+    // Refusals write no session.
+    const before = scalar(raw, 'SELECT COUNT(*) AS n FROM sessions').n
+    raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un3', 't1', 2, 'Unit 3')
+    await expect(startSession({ data: { topicId: 't1', unitId: 'un3' } })).rejects.toMatchObject({ status: 409, message: 'Unit is locked' })
+    raw.prepare('INSERT INTO topics (id, learner_id, title, goal, status, created_at) VALUES (?, ?, ?, ?, ?, ?)').run('t2', 'u1', 'Geometry', null, 'ready', 1)
+    raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('ux1', 't2', 0, 'Shapes')
+    raw.prepare('INSERT INTO learner_unit (learner_id, unit_id, unlocked_at) VALUES (?, ?, ?)').run('u1', 'ux1', 1)
+    await expect(startSession({ data: { topicId: 't1', unitId: 'ux1' } })).rejects.toMatchObject({ status: 404, message: 'Unit not found' })
+    await expect(startSession({ data: { topicId: 't1', unitId: 'missing' } })).rejects.toMatchObject({ status: 404, message: 'Unit not found' })
+    expect(scalar(raw, 'SELECT COUNT(*) AS n FROM sessions').n).toBe(before)
+  })
+
   it.each([
     { frontier: 'underfilled', itemCount: 1, hasDue: true },
     { frontier: 'seen-out', itemCount: 6, hasDue: true },

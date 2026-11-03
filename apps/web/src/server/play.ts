@@ -222,7 +222,7 @@ export const startPlacement = createServerFn({ method: 'POST' })
   })
 
 export const startSession = createServerFn({ method: 'POST' })
-  .validator(z.object({ topicId: z.string().min(1) }))
+  .validator(z.object({ topicId: z.string().min(1), unitId: z.string().min(1).optional() }))
   .handler(async ({ data }): Promise<{ sessionId: string }> => {
     const learnerId = await requireLearnerId()
     const db = getDb()
@@ -239,13 +239,24 @@ export const startSession = createServerFn({ method: 'POST' })
             sql`NOT EXISTS (SELECT 1 FROM ${learnerUnit} lu JOIN ${units} u ON u.id = lu.unit_id WHERE lu.learner_id = ${learnerId} AND u.topic_id = ${topic.id})`)))
         .onConflictDoNothing()
     }
+    // A unit-scoped session must name a unit of this topic that the learner has unlocked.
+    let unitId: string | undefined
+    if (data.unitId) {
+      const [unit] = await db.select({ id: units.id, unlockedAt: learnerUnit.unlockedAt }).from(units)
+        .leftJoin(learnerUnit, and(eq(learnerUnit.unitId, units.id), eq(learnerUnit.learnerId, learnerId)))
+        .where(and(eq(units.id, data.unitId), eq(units.topicId, topic.id)))
+      if (!unit) throw httpError('Unit not found', 404)
+      if (unit.unlockedAt === null) throw httpError('Unit is locked', 409)
+      unitId = unit.id
+    }
+    const inUnit = unitId ? inArray(items.conceptId, db.select({ id: concepts.id }).from(concepts).where(eq(concepts.unitId, unitId))) : undefined
     const [lt, scheduled, frontier] = await Promise.all([
       loadLearnerTopic(db, learnerId, topic.id),
       db
         .select({ row: learnerItem, conceptId: items.conceptId })
         .from(learnerItem)
         .innerJoin(items, eq(items.id, learnerItem.itemId))
-        .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId),
+        .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId), inUnit,
           topic.jobRoleId !== null ? ne(items.format, 'short') : undefined)),
       loadFrontier(db, learnerId, topic.id),
     ])
@@ -261,7 +272,7 @@ export const startSession = createServerFn({ method: 'POST' })
       }))
 
     // Seen items come back through the due list, not as fresh frontier questions.
-    const top = frontier.slice(0, 4)
+    const top = frontier.filter((f) => !unitId || f.concept.unitId === unitId).slice(0, 4)
     // Anything practisable stored starts the session at once (a shorter one is fine); prepareNextSession tops up during play.
     const storedRows = top.length
       ? await db.select().from(items).where(and(eq(items.topicId, topic.id), inArray(items.conceptId, top.map((f) => f.concept.id)), eq(items.status, 'active'), notFlaggedBy(db, learnerId),
@@ -288,7 +299,7 @@ export const startSession = createServerFn({ method: 'POST' })
       .select({ id: items.id, conceptId: items.conceptId })
       .from(items)
       .innerJoin(learnerConcept, and(eq(learnerConcept.conceptId, items.conceptId), eq(learnerConcept.learnerId, learnerId)))
-      .where(and(eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId), gte(learnerConcept.pKnown, CLOSER_MIN), lte(items.difficultyPrior, lt.level),
+      .where(and(eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId), gte(learnerConcept.pKnown, CLOSER_MIN), lte(items.difficultyPrior, lt.level), inUnit,
         topic.jobRoleId !== null ? ne(items.format, 'short') : undefined))
     const closers = closerRows
       .filter((c) => !taken.has(c.id))
