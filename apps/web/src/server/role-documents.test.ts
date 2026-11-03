@@ -30,6 +30,8 @@ import { MAX_ROLE_DOCUMENT_CHARS } from '@/lib/limits'
 import { retireRoleDocument, uploadRoleDocument } from './role-documents'
 
 let sqlite: DatabaseSync
+// One-shot hook: runs just before the next SQL statement that starts with the given prefix.
+let beforeSql: { prefix: string; fn: () => void } | null = null
 beforeAll(() => {
   sqlite = new DatabaseSync(':memory:')
   for (const file of readdirSync('drizzle').filter((f) => f.endsWith('.sql')).sort()) {
@@ -49,6 +51,8 @@ beforeAll(() => {
     sqlite.prepare("INSERT INTO topics (id, org_id, job_role_id, title, status, created_at) VALUES (?, ?, ?, ?, 'draft', ?)").run(`topic-${role}`, org, role, role, 1)
   }
   const run = (sql: string, params: unknown[], method: string) => {
+    if (params.length > 100) throw new Error(`D1_ERROR: too many SQL variables (${params.length} > 100)`)
+    if (beforeSql && sql.startsWith(beforeSql.prefix)) { const { fn } = beforeSql; beforeSql = null; fn() }
     const statement = sqlite.prepare(sql)
     statement.setReturnArrays(true)
     const args = params as (string | number | null)[]
@@ -74,6 +78,7 @@ beforeEach(() => {
   state.bucket.delete.mockResolvedValue(undefined)
   drain.mockResolvedValue(undefined)
   state.background = []
+  beforeSql = null
 })
 afterEach(() => sqlite.exec('ROLLBACK'))
 afterAll(() => sqlite.close())
@@ -183,6 +188,41 @@ it('refuses a replacement while the curriculum is generating', async () => {
   expect(sqlite.prepare('SELECT count(*) AS n FROM sources').get()).toEqual({ n: 1 })
   expect(itemStatus()['item-1']).toBe('active')
   expect(drain).not.toHaveBeenCalled()
+})
+
+it('refuses a replacement when a build claims the topic after the check, leaving everything untouched', async () => {
+  seedV1()
+  state.bucket.put.mockImplementation(async () => { sqlite.prepare("UPDATE topics SET status = 'generating' WHERE id = 'topic-role-a'").run(); return {} })
+  await expect(uploadRoleDocument({ data: form({ replacesId: 'src-1', file: textPdf() }) })).rejects.toMatchObject({ status: 409 })
+  expect(sqlite.prepare('SELECT id, retired_at FROM sources').all()).toEqual([{ id: 'src-1', retired_at: null }])
+  expect(itemStatus()).toEqual({ 'item-1': 'active', 'item-2': 'active', 'item-other': 'active' })
+  expect(sqlite.prepare("SELECT source_id, source_quote, gen_status FROM concepts WHERE id = 'con-1'").get()).toEqual({ source_id: 'src-1', source_quote: 'wear a vest', gen_status: 'ready' })
+  expect(state.bucket.delete).toHaveBeenCalledWith(state.bucket.put.mock.calls[0][0])
+  expect(drain).not.toHaveBeenCalled()
+  expect(state.background).toHaveLength(0)
+})
+
+it('repoints a concept published after the concept read but before the replacement is written', async () => {
+  seedV1()
+  beforeSql = {
+    prefix: 'insert into "sources"',
+    fn: () => sqlite.prepare("INSERT INTO concepts (id, topic_id, unit_id, `order`, name, summary, source_id, source_quote, gen_status) VALUES ('con-late', 'topic-role-a', 'unit-1', 1, 'Late', 'Late', 'src-1', 'late quote', 'ready')").run(),
+  }
+  const result = await uploadRoleDocument({ data: form({ replacesId: 'src-1', text: 'Always wear a vest on the dock.' }) })
+  expect(beforeSql).toBeNull()
+  expect(sqlite.prepare("SELECT id, source_id, gen_status, gen_started_at, gen_error FROM concepts ORDER BY id").all()).toEqual([
+    { id: 'con-1', source_id: result.sourceId, gen_status: 'pending', gen_started_at: null, gen_error: null },
+    { id: 'con-late', source_id: result.sourceId, gen_status: 'pending', gen_started_at: null, gen_error: null },
+  ])
+  expect(drain).toHaveBeenCalledTimes(1)
+})
+
+it('refuses retiring a document when a build claims the topic after the check', async () => {
+  seedV1()
+  beforeSql = { prefix: 'update "sources"', fn: () => sqlite.prepare("UPDATE topics SET status = 'generating' WHERE id = 'topic-role-a'").run() }
+  await expect(retireRoleDocument({ data: { slug: 'acme', roleId: 'role-a', sourceId: 'src-1' } })).rejects.toMatchObject({ status: 409 })
+  expect(sqlite.prepare("SELECT retired_at FROM sources WHERE id = 'src-1'").get()).toEqual({ retired_at: null })
+  expect(itemStatus()['item-1']).toBe('active')
 })
 
 it('refuses to replace a document that is already retired', async () => {

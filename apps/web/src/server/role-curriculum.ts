@@ -51,12 +51,12 @@ export async function buildRoleCurriculum({ orgId, ownerId, roleId }: { orgId: s
     .where(and(eq(jobRoles.id, roleId), eq(jobRoles.orgId, orgId), eq(jobRoles.status, 'active')))
   if (!row) throw httpError('Role topic not found', 404)
   const topicId = row.topic.id
-  const documents = await db.select().from(sources)
+  const liveDocuments = () => db.select().from(sources)
     .where(and(eq(sources.topicId, topicId), isNull(sources.deletedAt), isNull(sources.retiredAt)))
     .orderBy(asc(sources.createdAt), asc(sources.id))
-  if (!documents.length || documents.some((d) => !d.bodyText.trim())) {
-    throw httpError('Add documents with extracted text before building the curriculum.', 422)
-  }
+  const missingDocuments = () => httpError('Add documents with extracted text before building the curriculum.', 422)
+  const unusable = (docs: { bodyText: string }[]) => !docs.length || docs.some((d) => !d.bodyText.trim())
+  if (unusable(await liveDocuments())) throw missingDocuments()
   await assertWithinDailyCap(db, ownerId)
   await assertWithinCompanyCap(db, orgId)
   // Claim once; a repeat request must not duplicate the path or overwrite learner progress.
@@ -66,6 +66,9 @@ export async function buildRoleCurriculum({ orgId, ownerId, roleId }: { orgId: s
     .returning({ id: topics.id })
   if (!claimed.length) throw httpError('The curriculum is already generating or ready.', 409)
   try {
+    // Read after the claim: a replacement committed before it is seen here, and one after it is refused while generating.
+    const documents = await liveDocuments()
+    if (unusable(documents)) throw missingDocuments()
     let skeleton: CurriculumSkeleton
     try {
       skeleton = await chatJson({

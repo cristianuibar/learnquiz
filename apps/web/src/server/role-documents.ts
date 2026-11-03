@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, eq, inArray, isNull } from 'drizzle-orm'
+import { and, eq, exists, inArray, isNull, ne, sql } from 'drizzle-orm'
 import { extractText, getDocumentProxy } from 'unpdf'
 import { z } from 'zod'
 import { getDb } from '@/db'
@@ -96,30 +96,53 @@ export const uploadRoleDocument = createServerFn({ method: 'POST' })
     const now = Date.now()
     const version = old ? old.version + 1 : 1
     const newSource = { id, topicId, kind, title, bodyText, r2Key, version, uploadedBy: user.id, status: 'ready' as const, createdAt: now }
-    let requeued = 0
     try {
       if (!old) {
         await db.insert(sources).values(newSource)
       } else {
         const cited = await db.select().from(concepts).where(and(eq(concepts.sourceId, old.id), eq(concepts.topicId, topicId)))
-        requeued = cited.length
-        await db.batch([
-          db.insert(sources).values(newSource),
-          db.update(sources).set({ retiredAt: now }).where(eq(sources.id, old.id)),
+        // Every statement is conditional at write time: a build may claim the topic, or the old document may be
+        // retired, after the checks above. Only the first statement can insert the new source (fresh id), and the
+        // rest run only if it did.
+        const inserted = exists(db.select({ one: sql`1` }).from(sources).where(eq(sources.id, id)))
+        const requeue = { sourceId: id, genStatus: 'pending' as const, genStartedAt: null, genError: null }
+        const [created] = await db.batch([
+          db.insert(sources).select(
+            db.select({
+              id: sql<string>`${id}`.as('id'), topicId: sql<string>`${topicId}`.as('topicId'), kind: sql<typeof kind>`${kind}`.as('kind'), title: sql<string>`${title}`.as('title'),
+              bodyText: sql<string>`${bodyText}`.as('bodyText'), r2Key: sql<string | null>`${r2Key}`.as('r2Key'), version: sql<number>`${version}`.as('version'),
+              uploadedBy: sql<string>`${user.id}`.as('uploadedBy'), status: sql<'ready'>`${'ready'}`.as('status'), error: sql<string | null>`${null}`.as('error'),
+              retiredAt: sql<number | null>`${null}`.as('retiredAt'), deletedAt: sql<number | null>`${null}`.as('deletedAt'), createdAt: sql<number>`${now}`.as('createdAt'),
+            }).from(topics).where(and(
+              eq(topics.id, topicId), ne(topics.status, 'generating'),
+              exists(db.select({ one: sql`1` }).from(sources).where(liveSource(old.id, topicId))),
+            )),
+          ).returning({ id: sources.id }),
+          db.update(sources).set({ retiredAt: now }).where(and(eq(sources.id, old.id), inserted)),
           db.update(items).set({ status: 'retired' })
-            .where(and(eq(items.sourceId, old.id), eq(items.sourceVersion, old.version), inArray(items.status, LIVE))),
-          ...cited.map((concept) => db.update(concepts).set({
-            sourceId: id, sourceQuote: findSourceQuote(concept.sourceQuote, bodyText), genStatus: 'pending', genStartedAt: null, genError: null,
-          }).where(eq(concepts.id, concept.id))),
+            .where(and(eq(items.sourceId, old.id), eq(items.sourceVersion, old.version), inArray(items.status, LIVE), inserted)),
+          ...cited.map((concept) => db.update(concepts).set({ ...requeue, sourceQuote: findSourceQuote(concept.sourceQuote, bodyText) })
+            .where(and(eq(concepts.id, concept.id), inserted))),
+          // Concepts published after the read above still cite the old version.
+          db.update(concepts).set(requeue).where(and(eq(concepts.sourceId, old.id), inserted)),
         ])
+        if (!created.length) {
+          throw await refusal(topicId)
+        }
       }
     } catch (error) {
       if (r2Key) await bucket.delete(r2Key).catch(() => {})
       throw error
     }
-    if (requeued) runInBackground(drainConceptQueue())
+    if (old) runInBackground(drainConceptQueue())
     return { sourceId: id, topicId, r2Key, chars: bodyText.length, version }
   })
+
+// Why a conditional write changed nothing: a build claimed the topic, or the document is gone.
+const refusal = async (topicId: string) => {
+  const topic = await getDb().select({ status: topics.status }).from(topics).where(eq(topics.id, topicId)).get()
+  return topic?.status === 'generating' ? httpError('The curriculum is generating. Try again when it finishes.', 409) : httpError('Document not found', 404)
+}
 
 const liveSource = (sourceId: string, topicId: string) =>
   and(eq(sources.id, sourceId), eq(sources.topicId, topicId), isNull(sources.deletedAt), isNull(sources.retiredAt))
@@ -136,9 +159,20 @@ export const retireRoleDocument = createServerFn({ method: 'POST' })
     if (row.topic.status === 'generating') throw httpError('The curriculum is generating. Try again when it finishes.', 409)
     const source = await db.select().from(sources).where(liveSource(data.sourceId, row.topic.id)).get()
     if (!source) throw httpError('Document not found', 404)
-    await db.batch([
-      db.update(sources).set({ retiredAt: Date.now() }).where(eq(sources.id, source.id)),
-      db.update(items).set({ status: 'retired' }).where(and(eq(items.sourceId, source.id), inArray(items.status, LIVE))),
+    // Conditional at write time: a build may claim the topic after the check above.
+    const retiredAt = Date.now()
+    const [retired] = await db.batch([
+      db.update(sources).set({ retiredAt }).where(and(
+        liveSource(source.id, row.topic.id),
+        exists(db.select({ one: sql`1` }).from(topics).where(and(eq(topics.id, row.topic.id), ne(topics.status, 'generating')))),
+      )).returning({ id: sources.id }),
+      db.update(items).set({ status: 'retired' }).where(and(
+        eq(items.sourceId, source.id), inArray(items.status, LIVE),
+        exists(db.select({ one: sql`1` }).from(sources).where(and(eq(sources.id, source.id), eq(sources.retiredAt, retiredAt)))),
+      )),
     ])
+    if (!retired.length) {
+      throw await refusal(row.topic.id)
+    }
     return { ok: true }
   })

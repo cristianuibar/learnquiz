@@ -69,6 +69,7 @@ const skeleton = () => ({ units: procedures.map((u) => ({
 const modelReply = (value: unknown) => Response.json({ choices: [{ message: { content: JSON.stringify(value) }, finish_reason: 'stop' }] })
 const fetchModel = vi.fn<typeof fetch>()
 let raw: DatabaseSync
+const beforeClaim: { hook: (() => void) | null } = { hook: null }
 let db: ReturnType<typeof drizzle>
 
 beforeAll(() => {
@@ -77,6 +78,7 @@ beforeAll(() => {
     raw.exec(readFileSync(`drizzle/${file}`, 'utf8').replaceAll('--> statement-breakpoint', ''))
   }
   const run = (sql: string, params: unknown[], method: string) => {
+    if (beforeClaim.hook && sql.startsWith('update "topics"')) { const hook = beforeClaim.hook; beforeClaim.hook = null; hook() }
     // Match D1's prepared-statement limit, which node:sqlite does not enforce.
     if (params.length > 100) throw new Error(`D1_ERROR: too many SQL variables (${params.length} > 100)`)
     const stmt = raw.prepare(sql)
@@ -120,6 +122,7 @@ afterAll(() => raw.close())
 beforeEach(() => {
   raw.exec('SAVEPOINT test')
   holder.userId = 'owner'
+  beforeClaim.hook = null
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))
   fetchModel.mockReset().mockImplementation(async () => modelReply(skeleton()))
@@ -264,4 +267,18 @@ it('refuses roles with no live document text before calling the model', async ()
   await expect(generate()).rejects.toMatchObject({ status: 422 })
   expect(topicState()).toEqual({ status: 'draft' })
   expect(fetchModel).not.toHaveBeenCalled()
+})
+
+it('builds from a document replaced between the first read and the claim, never from the retired one', async () => {
+  const revised = documents[0].replace('Preparation notes.', 'Revised preparation notes.')
+  beforeClaim.hook = () => {
+    raw.exec("UPDATE sources SET retired_at = 1 WHERE id = 'receiving'")
+    raw.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, created_at) VALUES ('receiving-v2', 'picker-topic', 'text', 'Receiving and picking', ?, 1)").run(revised)
+  }
+  await expect(generate()).resolves.toEqual({ topicId: 'picker-topic' })
+  const prompt = JSON.parse(fetchModel.mock.calls[0][1]!.body as string).messages[1].content as string
+  expect(prompt).toContain(revised)
+  expect(prompt).not.toContain(documents[0])
+  expect(raw.prepare("SELECT DISTINCT source_id FROM concepts WHERE topic_id = 'picker-topic' ORDER BY source_id").all())
+    .toEqual([{ source_id: 'packing' }, { source_id: 'receiving-v2' }])
 })
