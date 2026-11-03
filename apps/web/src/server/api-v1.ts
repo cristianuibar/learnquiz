@@ -3,7 +3,7 @@ import { generateConceptDiagram } from '@/server/diagrams'
 import { flagResult } from '@/server/flags'
 import { getInvite } from '@/server/org'
 import { getCompanyBranding } from '@/server/org-settings'
-import { answerItem, endSession, getSession, nextItem, prepareNextSession, reportItem, startMiniSession, startPlacement, startSession } from '@/server/play'
+import { answerItem, endSession, getSession, nextItem, prepareNextSession, reportItem, startMiniSession, startPlacement, startSession, transcribeAnswer } from '@/server/play'
 import { getProfile } from '@/server/profile'
 import { getPushSettings, savePushPreferences, subscribeExpo, unsubscribe } from '@/server/push'
 import { acceptDisclosure, getSessionFn } from '@/server/session-fn'
@@ -12,7 +12,7 @@ import { getToday } from '@/server/today'
 // JSON API for native clients over the app's server functions, authenticated with Authorization: Bearer (the bearer plugin in auth-core).
 
 type ServerFn = (options: { data: never }) => Promise<unknown>
-type V1Route = { method: 'GET' | 'POST' | 'PUT' | 'DELETE'; pattern: string; fn: ServerFn; public?: boolean }
+type V1Route = { method: 'GET' | 'POST' | 'PUT' | 'DELETE'; pattern: string; fn: ServerFn; public?: boolean; multipart?: boolean }
 
 export const V1_PREFIX = '/api/v1'
 
@@ -31,6 +31,8 @@ export const v1Routes: V1Route[] = [
   { method: 'POST', pattern: '/sessions/:sessionId/next', fn: nextItem },
   { method: 'POST', pattern: '/sessions/:sessionId/end', fn: endSession },
   { method: 'POST', pattern: '/sessions/:sessionId/prepare-next', fn: prepareNextSession },
+  // A recorded answer as multipart/form-data (itemId, audio); the path's sessionId is set on the form.
+  { method: 'POST', pattern: '/sessions/:sessionId/transcribe', fn: transcribeAnswer, multipart: true },
   { method: 'POST', pattern: '/items/:itemId/report', fn: reportItem },
   { method: 'POST', pattern: '/concepts/:conceptId/diagram', fn: generateConceptDiagram },
   { method: 'GET', pattern: '/topics/:topicId/path', fn: getTopicPath },
@@ -91,8 +93,16 @@ export async function handleV1(request: Request): Promise<Response> {
   if (!route || !params) return json({ error: 'Not found' }, 404)
   if (!route.public && !/^bearer\s+\S/i.test(request.headers.get('authorization') ?? '')) return json({ error: 'Unauthorized' }, 401)
 
-  let input: Record<string, unknown>
-  if (request.method === 'GET') input = Object.fromEntries(url.searchParams)
+  let data: Record<string, unknown> | FormData
+  if (route.multipart) {
+    if (!/^multipart\/form-data\s*;/i.test(request.headers.get('content-type') ?? '')) return json({ error: 'Body must be multipart/form-data' }, 400)
+    try {
+      data = await request.formData()
+    } catch {
+      return json({ error: 'Invalid form body' }, 400)
+    }
+    for (const [key, value] of Object.entries(params)) data.set(key, value)
+  } else if (request.method === 'GET') data = { ...Object.fromEntries(url.searchParams), ...params }
   else {
     const text = await request.text()
     let body: unknown
@@ -102,11 +112,11 @@ export async function handleV1(request: Request): Promise<Response> {
       return json({ error: 'Invalid JSON body' }, 400)
     }
     if (typeof body !== 'object' || body === null || Array.isArray(body)) return json({ error: 'Body must be a JSON object' }, 400)
-    input = body as Record<string, unknown>
+    data = { ...(body as Record<string, unknown>), ...params }
   }
 
   try {
-    return json(await route.fn({ data: { ...input, ...params } as never }))
+    return json(await route.fn({ data: data as never }))
   } catch (e) {
     const err = e as { status?: number; issues?: unknown; message?: string }
     const status = typeof err?.status === 'number' ? err.status : isValidationError(err) ? 400 : 500
