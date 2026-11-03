@@ -3,8 +3,9 @@
 	"packageManager": "pnpm@12.14.0",
 	"scripts": {
 		"dev": "pnpm --filter @learnquiz/web dev",
-		"build": "pnpm --filter @learnquiz/web build",
+		"build": "pnpm --filter @learnquiz/web --filter @learnquiz/site build",
 		"deploy:web": "pnpm --filter @learnquiz/web run deploy",
+		"deploy:site": "pnpm --filter @learnquiz/site run deploy",
 		"typecheck": "pnpm -r typecheck",
 		"test": "pnpm -r --if-present test",
 		"db:migrate:local": "pnpm --filter @learnquiz/web db:migrate:local",

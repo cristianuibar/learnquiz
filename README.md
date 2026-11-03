@@ -16,7 +16,7 @@ document libraries and automatic role-to-curriculum assignment are not yet
 shipped.
 
 Built solo by Cristian Uibar for the Meta Global AI Developer Hackathon
-(Oct 27 to Nov 4, 2026), Indie Developer track. Live at https://learnquiz.com.
+(Oct 27 to Nov 4, 2026), Indie Developer track. The web app and API are live at https://app.learnquiz.com; the marketing site is at https://learnquiz.com.
 
 ## What works today
 
@@ -40,7 +40,8 @@ Built solo by Cristian Uibar for the Meta Global AI Developer Hackathon
 | Model | Job | Status |
 | --- | --- | --- |
 | Muse Spark 1.3 (`muse-spark-1.3`) | Curriculum skeleton, question generation and item self-check | Shipped; default Meta Model API model with JSON-schema output |
-| Muse Spark 1.3 | Short-answer grading and placement result text | Shipped; placement text has a template fallback |
+| Muse Spark 1.3 | Short-answer grading | Shipped |
+| Muse Spark Open on Fireworks (`accounts/fireworks/models/muse-spark-open`) | Placement result text (`placement_line`) | Shipped; falls back to Muse Spark 1.3 when Fireworks fails or times out, then to a template |
 | Muse Voice Transcribe 1.0 (`muse-voice-transcribe-1.0`) | Transcribe spoken text answers for editing before submission | Implemented, opt-in; disabled in the checked-in configuration |
 | Muse Wonder 1.0 | Session planning with tools (coach) | Planned; current sessions use the code-based planner |
 | Muse Image 1.0 | Procedure diagrams | Shipped; generated once per visual concept and shown on answer reveals and Path |
@@ -146,8 +147,9 @@ job for the planned coach feature. Only the Meta models listed in
 | `fireworks` | `https://api.fireworks.ai/inference/v1` | `FIREWORKS_API_KEY` | JSON object with schema in the prompt |
 
 All JSON output is validated locally; invalid output gets one retry. Provider and
-network errors fail immediately. Requests, call logs and generated-content labels
-use the job's selected model, including failures and retries.
+network errors fail immediately. A failed Fireworks call is repeated once on the Meta
+API with `muse-spark-1.3`. Requests, call logs and generated-content labels use the
+model that made each attempt, including failures, retries and fallbacks.
 
 `apps/web/.dev.vars` can override `JOB_MODELS` with a JSON string. Unmapped jobs retain
 `LLM_PROFILE` and `LLM_MODEL` (or `IMAGE_MODEL` for images, Muse Voice Transcribe 1.0
@@ -208,7 +210,7 @@ the link; opening it records `push_log.opened_at` and resumes a single-question
 ## Deploy
 
 The checked-in Worker, database ID, bucket and custom domain target the live
-`learnquiz.com` service; its owner handles production deployments. For your own
+`app.learnquiz.com` service; its owner handles production deployments. For your own
 deployment, use your Cloudflare account, create a D1 database and R2 bucket, and
 update `apps/web/wrangler.jsonc` with your Worker name, database ID, bucket name and domain.
 Set `BETTER_AUTH_URL` to that domain's HTTPS origin and check the model configuration.

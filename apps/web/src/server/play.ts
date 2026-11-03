@@ -11,8 +11,8 @@ import { gradeAnswer, revealState, toItemView } from '@/lib/learning/grade'
 import { benchmarkMet } from '@/lib/learning/profile'
 import { levelResult, nextLevel, pickNext, PLACEMENT, shouldStop } from '@/lib/learning/placement'
 import { composeSession, reinsert, SESSION_BONUS, streakAfter, xpFor } from '@/lib/learning/session'
-import type { Confidence, ItemView, Reveal, SessionPlanning, SessionView, SummaryView } from '@/lib/learning/types'
-import { chatJson, DailyCapError, isVoiceEnabled, jobModel, transcribeAudio } from '@/lib/llm/client'
+import type { Confidence, ItemView, Reveal, SessionPlanning, SessionView, SummaryView } from '@learnquiz/api'
+import { chatJson, chatJsonWithModel, DailyCapError, isVoiceEnabled, jobModel, transcribeAudio } from '@/lib/llm/client'
 import { gradePrompt } from '@/lib/llm/prompts'
 import { Grade, type ItemPayload } from '@/lib/llm/schemas'
 import { validateVoiceWav } from '@/lib/voice'
@@ -22,7 +22,7 @@ import { requireLearnerId } from '@/server/session'
 import { assertWithinDailyCap } from '@/server/model-cap'
 
 // shortcut: 12 instead of the spec's 20 while generation is slow, raise it once items are generated ahead of play.
-const SESSION_SIZE = 12
+export const SESSION_SIZE = 12
 const CLOSER_MIN = 0.7
 const DAY = 86_400_000
 
@@ -119,7 +119,7 @@ async function loadItem(db: Db, topicId: string, itemId: string, includeRetired 
 
 // Unlocked-unit concepts the learner has not mastered, in play order. A concept never met counts as BKT.L0.
 // shortcut: prerequisite edges are ignored, only unit unlocks gate the frontier; add the 0.6 prerequisite rule when units unlock during play.
-async function loadFrontier(db: Db, learnerId: string, topicId: string) {
+export async function loadFrontier(db: Db, learnerId: string, topicId: string) {
   const rows = await db
     .select({ concept: concepts, unitOrder: units.order, pKnown: learnerConcept.pKnown })
     .from(concepts)
@@ -532,6 +532,7 @@ export const answerItem = createServerFn({ method: 'POST' })
         if (!kept) throw await dropped()
         return {
           attemptId: null, diagramConceptId: concept.visual ? concept.id : null, state: 'ungraded', correct: false, score: null,
+          xp: 0, critical: concept.critical, correctOptionIds: null, sourceVersion: item.sourceVersion, detail: null,
           feedback: `${capped ? 'Daily grading limit reached; back tomorrow. ' : ''}Compare your answer with the model answer. Your learning progress has not changed.`,
           missingPoints: [], correctAnswer: payload.model_answer, chosenFeedback: null,
           explanation: payload.explanation, sourceQuote: payload.source_quote, sourceTitle, mixUps: [], returnsThisSession: false,
@@ -624,6 +625,11 @@ export const answerItem = createServerFn({ method: 'POST' })
       diagramConceptId: concept.visual ? concept.id : null,
       state,
       correct,
+      xp,
+      critical: concept.critical,
+      correctOptionIds: payload.format === 'mcq' ? payload.options.filter((option) => option.is_correct).map((option) => option.id) : null,
+      sourceVersion: item.sourceVersion,
+      detail: null,
       score: shortGrade?.score ?? (correct ? 1 : 0),
       feedback: shortGrade?.feedback ?? null,
       missingPoints: shortGrade?.missing_points ?? [],
@@ -737,7 +743,7 @@ async function placementLine(db: Db, learnerId: string, session: SessionRow, top
       .innerJoin(concepts, eq(concepts.id, items.conceptId))
       .where(inArray(items.id, log.map((l) => l.itemId)))
     const concept = new Map(names.map((n) => [n.id, n.concept]))
-    const { line } = await chatJson({
+    const { data: { line }, model } = await chatJsonWithModel({
       purpose: 'placement_line',
       schema: PlacementLine,
       schemaName: 'placement_line',
@@ -753,7 +759,7 @@ ${log.map((l) => `- ${concept.get(l.itemId) ?? 'unknown'}: ${l.correct ? 'right'
       sessionId: session.id,
       topicId: topic.id,
     })
-    return { levelLine: line, levelLineModel: jobModel('placement_line').model }
+    return { levelLine: line, levelLineModel: model }
   } catch (e) {
     console.error('placement line failed, using template', e instanceof Error ? e.message : e)
     return { levelLine: fallback, levelLineModel: null }
