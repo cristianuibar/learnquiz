@@ -532,6 +532,7 @@ export const answerItem = createServerFn({ method: 'POST' })
         if (!kept) throw await dropped()
         return {
           attemptId: null, diagramConceptId: concept.visual ? concept.id : null, state: 'ungraded', correct: false, score: null,
+          xp: 0, critical: concept.critical, correctOptionIds: null, sourceVersion: item.sourceVersion, detail: null,
           feedback: `${capped ? 'Daily grading limit reached; back tomorrow. ' : ''}Compare your answer with the model answer. Your learning progress has not changed.`,
           missingPoints: [], correctAnswer: payload.model_answer, chosenFeedback: null,
           explanation: payload.explanation, sourceQuote: payload.source_quote, sourceTitle, mixUps: [], returnsThisSession: false,
@@ -624,6 +625,11 @@ export const answerItem = createServerFn({ method: 'POST' })
       diagramConceptId: concept.visual ? concept.id : null,
       state,
       correct,
+      xp,
+      critical: concept.critical,
+      correctOptionIds: payload.format === 'mcq' ? payload.options.filter((option) => option.is_correct).map((option) => option.id) : null,
+      sourceVersion: item.sourceVersion,
+      detail: null,
       score: shortGrade?.score ?? (correct ? 1 : 0),
       feedback: shortGrade?.feedback ?? null,
       missingPoints: shortGrade?.missing_points ?? [],

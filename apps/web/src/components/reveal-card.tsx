@@ -11,6 +11,7 @@ const HEADING = {
   B: "Correct, but you weren't sure",
   C: 'Not quite, the answer is ',
   D: "You were sure, and it's wrong",
+  P: 'Partly right',
   ungraded: 'Could not grade this answer',
 }
 

@@ -1,8 +1,6 @@
-// Meta's file endpoint accepts mono 16-bit WAV at 16 or 24 kHz:
-// https://github.com/meta-models/meta-model-cookbook/tree/main/06_muse_voice/01_voice_api_fundamentals
-export const VOICE_SAMPLE_RATE = 24_000
-export const MAX_VOICE_SECONDS = 60
-export const MAX_VOICE_BYTES = 44 + VOICE_SAMPLE_RATE * 2 * MAX_VOICE_SECONDS
+import { MAX_VOICE_BYTES, MAX_VOICE_SECONDS, VOICE_SAMPLE_RATE } from '@learnquiz/api/voice'
+
+export { MAX_VOICE_BYTES, MAX_VOICE_SECONDS, VOICE_SAMPLE_RATE } from '@learnquiz/api/voice'
 
 // MediaRecorder produces WebM on Android Chrome. Decode it locally, downmix and
 // resample before uploading; the Worker needs no audio codec or stored recording.

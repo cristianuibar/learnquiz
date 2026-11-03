@@ -2,28 +2,52 @@
 
 export type Confidence = 'sure' | 'unsure' | 'guess'
 
+export type ItemFormat = 'mcq' | 'multi' | 'cloze' | 'short' | 'order'
+
 export type ItemView = {
   id: string
   conceptId: string
   conceptName: string
-  format: 'mcq' | 'cloze' | 'short'
+  format: ItemFormat
   stem: string
   options: { id: string; text: string }[] // mcq only, shuffled server-side
+  blank: { numeric: boolean } | null
+  image: { src: string; alt: string; width: number; height: number } | null
   difficulty: number
   generatedBy?: string | null
 }
 
 // Learner answer: mcq sends the option id, cloze and short send text.
-export type Answer = { optionId?: string; text?: string }
+export type Answer = { optionId?: string; optionIds?: string[]; order?: string[]; text?: string }
+
+export type Draft = { answer: Answer; confidence: Confidence | null }
+
+export function isAnswerReady(format: ItemFormat, answer: Answer, optionCount: number): boolean {
+  switch (format) {
+    case 'mcq': return !!answer.optionId
+    case 'multi': return !!answer.optionIds?.length
+    case 'cloze':
+    case 'short': return !!answer.text?.trim()
+    case 'order': return answer.order?.length === optionCount
+  }
+}
 
 // (correct, confidence) decides the reveal state: A correct+sure, B correct+unsure/guess, C wrong+unsure/guess, D wrong+sure.
-export type RevealState = 'A' | 'B' | 'C' | 'D' | 'ungraded'
+export type RevealState = 'A' | 'B' | 'C' | 'D' | 'P' | 'ungraded'
+
+export type RevealDetail =
+  | { kind: 'multi'; found: number; total: number; extra: number; options: { id: string; text: string; correct: boolean; chosen: boolean; note: string }[] }
+  | { kind: 'order'; rightPositions: number; steps: { id: string; text: string; note: string; yourPosition: number }[] }
 
 export type Reveal = {
   diagramConceptId: string | null
   attemptId: string | null // no scored attempt when grading is unavailable
   state: RevealState
   correct: boolean
+  xp: number
+  critical: boolean
+  correctOptionIds: string[] | null
+  detail: RevealDetail | null
   score: number | null // 0..1; null when grading is unavailable
   feedback: string | null
   missingPoints: string[]
@@ -32,6 +56,7 @@ export type Reveal = {
   explanation: string
   sourceQuote: string | null
   sourceTitle: string | null // title of the source document the quote is from
+  sourceVersion: number | null
   mixUps: string[] // state D only: the concept's common mistakes
   returnsThisSession: boolean // states C and D: the item re-enters later
   pKnownBefore: number

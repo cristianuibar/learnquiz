@@ -80,7 +80,7 @@ it.each([0.5, 0.8, 1])('returns and stores a short-answer score of %s with feedb
 
   const reveal = await answerItem(request)
 
-  expect(reveal).toMatchObject({ score, feedback: grade.feedback, missingPoints: grade.missing_points, correct: score >= 0.8, state: score >= 0.8 ? 'A' : 'D', correctAnswer: payload.model_answer })
+  expect(reveal).toMatchObject({ score, feedback: grade.feedback, missingPoints: grade.missing_points, correct: score >= 0.8, state: score >= 0.8 ? 'A' : 'D', correctAnswer: payload.model_answer, xp: score >= 0.8 ? 10 : 0, critical: false, correctOptionIds: null, sourceVersion: null, detail: null })
   expect(row('SELECT score, correct, answer_json, grade_json FROM attempts')).toEqual({
     score, correct: score >= 0.8 ? 1 : 0, answer_json: JSON.stringify(request.data.answer),
     grade_json: JSON.stringify({ correctAnswer: payload.model_answer, ...grade }),
@@ -105,6 +105,8 @@ it.each([
   { name: 'network failure', response: () => { throw new TypeError('Failed to fetch') }, calls: 1 },
 ])('reveals neutrally after $name without changing learning progress and allows Continue', async ({ response, calls }) => {
   fetchModel.mockImplementation(response)
+  raw.prepare('UPDATE concepts SET critical = 1 WHERE id = ?').run('c1')
+  raw.prepare('UPDATE items SET source_version = 3 WHERE id = ?').run('i1')
   raw.prepare('INSERT INTO learner_item (learner_id, item_id, due, stability, difficulty, state, reps, last_wrong_confident_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
     .run('u1', 'i1', Date.now(), 5, 4, 2, 3, 1)
   const before = row('SELECT * FROM learner_concept')
@@ -113,7 +115,7 @@ it.each([
   const reveal = await answerItem(request)
 
   expect(reveal.feedback).toBe(PLAIN_FEEDBACK)
-  expect(reveal).toMatchObject({ state: 'ungraded', score: null, attemptId: null, correctAnswer: payload.model_answer, missingPoints: [], mixUps: [], returnsThisSession: false, pKnownBefore: 0.6, pKnownAfter: 0.6 })
+  expect(reveal).toMatchObject({ state: 'ungraded', score: null, attemptId: null, correctAnswer: payload.model_answer, missingPoints: [], mixUps: [], returnsThisSession: false, pKnownBefore: 0.6, pKnownAfter: 0.6, xp: 0, critical: true, correctOptionIds: null, sourceVersion: 3, detail: null })
   expect(row('SELECT * FROM learner_concept')).toEqual(before)
   expect(row('SELECT * FROM learner_item')).toEqual(scheduleBefore)
   expect(row('SELECT COUNT(*) AS n FROM attempts').n).toBe(0)

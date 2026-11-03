@@ -45,3 +45,20 @@ it('cloze rejects an answer that drops negation', () => {
   const payload: ItemPayload = { ...base, format: 'cloze', accepted_answers: ['does not dissolve'] }
   expect(gradeAnswer(payload, { text: 'does dissolve' }).correct).toBe(false)
 })
+
+it.each<[ItemPayload['format'], string[], { numeric: boolean } | null]>([
+  ['cloze', ['7'], { numeric: true }],
+  ['cloze', ['0', '999'], { numeric: true }],
+  ['cloze', ['seven'], { numeric: false }],
+  ['cloze', ['7', 'seven'], { numeric: false }],
+  ['cloze', ['1000'], { numeric: false }],
+  ['cloze', ['-7'], { numeric: false }],
+  ['cloze', ['7.5'], { numeric: false }],
+  ['cloze', [' 7 '], { numeric: false }],
+  ['mcq', ['7'], null],
+  ['short', ['7'], null],
+])('serves %s with accepted answers %j and blank %j', (format, accepted_answers, blank) => {
+  const view = toItemView({ id: 'i', conceptId: 'c', conceptName: 'C', format, difficultyPrior: 3, payload: { ...base, format, accepted_answers } }, 'seed')
+  expect(view.blank).toEqual(blank)
+  expect(view.image).toBeNull()
+})

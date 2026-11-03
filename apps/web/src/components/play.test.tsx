@@ -62,11 +62,11 @@ async function renderPlay(voiceEnabled: boolean | null = true, permissionPending
   const initial: SessionView = {
     id: 's1', kind: 'session', topicId: 't1', topicTitle: 'Algebra', progress: { position: 1, total: 1 }, ended: false,
     ...(voiceEnabled === null ? {} : { voiceEnabled }),
-    item: { id: 'i1', conceptId: 'c1', conceptName: 'Variables', format, stem: format === 'short' ? 'Explain why subtracting one preserves equality.' : 'x + 1 = 2; x = ____', options: [], difficulty: 1, generatedBy: 'gpt-test' },
+    item: { id: 'i1', conceptId: 'c1', conceptName: 'Variables', format, stem: format === 'short' ? 'Explain why subtracting one preserves equality.' : 'x + 1 = 2; x = ____', options: [], blank: format === 'cloze' ? { numeric: true } : null, image: null, difficulty: 1, generatedBy: 'gpt-test' },
   }
   vi.mocked(getSession).mockResolvedValue(initial)
   vi.mocked(transcribeAnswer).mockReset().mockResolvedValue('one')
-  vi.mocked(answerItem).mockReset().mockResolvedValue({ correct: true, correctAnswer: '1', state: 'A', mixUps: [], explanation: 'Subtract one.' } as unknown as Reveal)
+  vi.mocked(answerItem).mockReset().mockResolvedValue({ correct: true, correctAnswer: '1', state: 'A', mixUps: [], explanation: 'Subtract one.', xp: 10, critical: false, correctOptionIds: null, sourceVersion: null, detail: null } as unknown as Reveal)
   vi.mocked(nextItem).mockReset()
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
   const play = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId', loader: playRoute.options.loader, gcTime: playRoute.options.gcTime, component: playRoute.options.component })
@@ -134,6 +134,7 @@ it.each([
     const reveal = {
       attemptId: 'a1', diagramConceptId: null, correct: false, correctAnswer: '1', state: 'C' as const, mixUps: [], explanation: 'Subtract one.',
       score: 0, feedback: null, missingPoints: [],
+      xp: 0, critical: false, correctOptionIds: null, sourceVersion: null, detail: null,
       chosenFeedback: null, sourceQuote: null, sourceTitle: null, returnsThisSession: true, pKnownBefore: 0.1, pKnownAfter: 0.05,
     }
     vi.mocked(answerItem).mockResolvedValueOnce(reveal)
@@ -283,6 +284,7 @@ it.each([false, true])('submits a short answer and shows its reveal (ungraded=%s
   try {
     vi.mocked(answerItem).mockResolvedValueOnce({
       attemptId: ungraded ? null : 'a1', diagramConceptId: 'c1', state: ungraded ? 'ungraded' : 'D', correct: false,
+      xp: 0, critical: false, correctOptionIds: null, sourceVersion: null, detail: null,
       score: ungraded ? null : 0.5, feedback: ungraded ? 'Compare your answer with the model answer.' : 'Explain why both sides stay equal.',
       missingPoints: ungraded ? [] : ['Subtract the same amount from both sides.'],
       correctAnswer: 'Equal changes preserve equality.', explanation: 'Both sides change by the same amount.',
