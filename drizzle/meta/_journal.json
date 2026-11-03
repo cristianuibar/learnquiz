@@ -47,8 +47,29 @@
     {
       "idx": 6,
       "version": "6",
-      "when": 1793659303181,
-      "tag": "0006_push",
+      "when": 1793658631551,
+      "tag": "0006_role_curriculum",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1793665586819,
+      "tag": "0007_org_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1793667934512,
+      "tag": "0008_concept_diagram_claim",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1793673259033,
+      "tag": "0009_push",
       "breakpoints": true
     }
   ]

@@ -13,6 +13,7 @@ vi.mock('@/server/push', () => ({ getPushSettings: vi.fn(), subscribe: vi.fn(), 
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => null }))
+vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
 afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
@@ -46,6 +47,7 @@ it('keeps staff navigation while enabling, testing and disabling notifications f
     await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
     expect(container.querySelector('a[href="/admin"]')?.textContent).toBe('Staff area')
     expect(container.querySelector('a[href="/org/acme"]')?.textContent).toBe('Acme portal')
+    expect(container.querySelector('a[href="/me/profile"]')?.textContent).toBe('Training progress')
     expect(container.querySelector('h2')?.textContent).toBe('Notifications')
     expect(requestPermission).not.toHaveBeenCalled()
     expect(button('Send test push').disabled).toBe(true)

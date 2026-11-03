@@ -39,7 +39,7 @@ export const getModelTrace = createServerFn({ method: 'GET' })
       eq(modelCalls.learnerId, learnerId),
       data.scope === 'session'
         ? eq(modelCalls.sessionId, data.sessionId)
-        : and(eq(modelCalls.topicId, data.topicId), inArray(modelCalls.purpose, ['curriculum', 'items', 'self_check'])),
+        : and(eq(modelCalls.topicId, data.topicId), inArray(modelCalls.purpose, ['curriculum', 'items', 'self_check', 'diagram'])),
     )).orderBy(asc(modelCalls.createdAt), asc(modelCalls.id))
     return { calls, totalCostUsd: calls.reduce((total, call) => total + call.costUsd, 0) }
   })
