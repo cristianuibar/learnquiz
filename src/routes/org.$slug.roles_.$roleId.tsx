@@ -6,6 +6,7 @@ import { RoleDocumentForm } from '@/components/role-document-form'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { TRAINING_STATUS } from '@/lib/training-status'
 import { plural } from '@/lib/utils'
 import { generateRoleCurriculum, retryConceptGeneration } from '@/server/curriculum'
 import { getRoleDetail, updateRoleConcept } from '@/server/role-detail'
@@ -62,7 +63,7 @@ function RoleDetail() {
       </Link>
       <h1 className="mt-4 text-3xl font-bold tracking-tight">{role.name}</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        Benchmark: {Math.round(role.benchmark * 100)}% · Onboarding: {plural(role.onboardingDays, 'day', 'days')} · Curriculum: {role.topicStatus}
+        Benchmark: {Math.round(role.benchmark * 100)}% · Onboarding: {plural(role.onboardingDays, 'day', 'days')} · Training: {TRAINING_STATUS[role.topicStatus]}
       </p>
       <div className="mt-8 flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-8">
         <section aria-labelledby="curriculum-heading" className="lg:order-1">
