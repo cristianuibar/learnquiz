@@ -1,5 +1,5 @@
 {
-	"name": "learnquiz",
+	"name": "@learnquiz/web",
 	"private": true,
 	"type": "module",
 	"imports": {
@@ -12,7 +12,9 @@
 		"preview": "pnpm run build && vite preview",
 		"deploy": "pnpm run build && wrangler deploy",
 		"cf-typegen": "wrangler types",
+		"typecheck": "tsc --noEmit",
 		"test": "vitest run",
+		"db:migrate:local": "wrangler d1 migrations apply learnquiz --local",
 		"seed:northwind": "node seed/run-northwind.mjs"
 	},
 	"dependencies": {
@@ -54,13 +56,5 @@
 		"vite": "^8.0.0",
 		"vitest": "^5.0.5",
 		"wrangler": "^4.153.0"
-	},
-	"pnpm": {
-		"onlyBuiltDependencies": [
-			"esbuild",
-			"lightningcss",
-			"sharp",
-			"workerd"
-		]
 	}
 }
