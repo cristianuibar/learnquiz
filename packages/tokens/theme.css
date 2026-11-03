@@ -1,0 +1,213 @@
+@theme inline {
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-on-brand: var(--on-brand);
+  --color-brand-tint: var(--brand-tint);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-on-accent: var(--on-accent);
+  --color-accent-tint: var(--accent-tint);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-surface-page: var(--surface-page);
+  --color-surface-card: var(--surface-card);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-feedback-correct: var(--feedback-correct);
+  --color-feedback-correct-tint: var(--feedback-correct-tint);
+  --color-feedback-wrong: var(--feedback-wrong);
+  --color-feedback-wrong-tint: var(--feedback-wrong-tint);
+  --color-feedback-learning: var(--feedback-learning);
+  --color-feedback-learning-tint: var(--feedback-learning-tint);
+  --color-on-feedback: var(--on-feedback);
+  --color-scrim: var(--scrim);
+  --color-os-ground: var(--os-ground);
+  --color-os-card: var(--os-card);
+  --color-os-ink: var(--os-ink);
+  --color-os-ink-muted: var(--os-ink-muted);
+  --font-sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --text-display: 40px;
+  --text-display--line-height: 44px;
+  --text-display--font-weight: 700;
+  --text-display--letter-spacing: -0.02em;
+  --text-title-1: 28px;
+  --text-title-1--line-height: 34px;
+  --text-title-1--font-weight: 700;
+  --text-title-1--letter-spacing: -0.01em;
+  --text-title-2: 20px;
+  --text-title-2--line-height: 28px;
+  --text-title-2--font-weight: 600;
+  --text-title-2--letter-spacing: 0em;
+  --text-title-3: 17px;
+  --text-title-3--line-height: 24px;
+  --text-title-3--font-weight: 700;
+  --text-title-3--letter-spacing: 0em;
+  --text-body-lg: 17px;
+  --text-body-lg--line-height: 26px;
+  --text-body-lg--font-weight: 400;
+  --text-body-lg--letter-spacing: 0em;
+  --text-body: 15px;
+  --text-body--line-height: 22px;
+  --text-body--font-weight: 400;
+  --text-body--letter-spacing: 0em;
+  --text-label-lg: 17px;
+  --text-label-lg--line-height: 24px;
+  --text-label-lg--font-weight: 600;
+  --text-label-lg--letter-spacing: 0em;
+  --text-label: 14px;
+  --text-label--line-height: 20px;
+  --text-label--font-weight: 600;
+  --text-label--letter-spacing: 0em;
+  --text-caption: 13px;
+  --text-caption--line-height: 18px;
+  --text-caption--font-weight: 500;
+  --text-caption--letter-spacing: 0em;
+  --text-overline: 12px;
+  --text-overline--line-height: 16px;
+  --text-overline--font-weight: 600;
+  --text-overline--letter-spacing: 0.02em;
+  --text-chip: 13px;
+  --text-chip--line-height: 18px;
+  --text-chip--font-weight: 600;
+  --text-chip--letter-spacing: 0em;
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+  --spacing-12: 48px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+  --spacing-target: var(--target);
+  --spacing-topbar: var(--topbar-h);
+  --spacing-nav: var(--nav-h);
+  --shadow-raised: var(--shadow-raised-value);
+  --transition-duration-fast: var(--duration-fast);
+  --transition-duration-reveal: var(--duration-reveal);
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --breakpoint-md: 640px;
+  --breakpoint-lg: 1024px;
+}
+
+:root {
+  color-scheme: light dark;
+  --brand: #0E5A73;
+  --brand-hover: #0A4759;
+  --on-brand: #FFFFFF;
+  --brand-tint: #E3EFF3;
+  --accent: #F2A900;
+  --accent-hover: #D99700;
+  --on-accent: #14181F;
+  --accent-tint: #FDF3D9;
+  --ink: #14181F;
+  --ink-muted: #5B6472;
+  --surface-page: #F7F6F2;
+  --surface-card: #FFFFFF;
+  --surface-sunken: #EFEDE7;
+  --border: #DEDBD2;
+  --border-strong: #7E8591;
+  --feedback-correct: #1E7F4F;
+  --feedback-correct-tint: #F0F8F3;
+  --feedback-wrong: #C4352B;
+  --feedback-wrong-tint: #FBE9E7;
+  --feedback-learning: #9A5B00;
+  --feedback-learning-tint: #FAF0DF;
+  --on-feedback: #FFFFFF;
+  --scrim: rgba(20,24,31,0.48);
+  --os-ground: #1A1C1F;
+  --os-card: #2B2E33;
+  --os-ink: #F1F2F4;
+  --os-ink-muted: #B9BEC6;
+  --shadow-raised-value: 0 8px 24px rgba(20,24,31,0.12);
+  --target: 48px;
+  --topbar-h: 56px;
+  --nav-h: 64px;
+  --duration-fast: 150ms;
+  --duration-reveal: 300ms;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --brand: #6FC3DC;
+    --brand-hover: #94D4E7;
+    --on-brand: #121417;
+    --brand-tint: #163240;
+    --accent: #F2A900;
+    --accent-hover: #FFBE2E;
+    --on-accent: #14181F;
+    --accent-tint: #2E2610;
+    --ink: #ECEEF1;
+    --ink-muted: #A0A8B4;
+    --surface-page: #121417;
+    --surface-card: #1B1F24;
+    --surface-sunken: #0D0F11;
+    --border: #2E333B;
+    --border-strong: #6B7380;
+    --feedback-correct: #5CCB93;
+    --feedback-correct-tint: #14291F;
+    --feedback-wrong: #F2786E;
+    --feedback-wrong-tint: #301816;
+    --feedback-learning: #E6A84A;
+    --feedback-learning-tint: #2C2112;
+    --on-feedback: #121417;
+    --scrim: rgba(0,0,0,0.6);
+    --os-ground: #1A1C1F;
+    --os-card: #2B2E33;
+    --os-ink: #F1F2F4;
+    --os-ink-muted: #B9BEC6;
+    --shadow-raised-value: 0 8px 24px rgba(0,0,0,0.5);
+  }
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --brand: #6FC3DC;
+  --brand-hover: #94D4E7;
+  --on-brand: #121417;
+  --brand-tint: #163240;
+  --accent: #F2A900;
+  --accent-hover: #FFBE2E;
+  --on-accent: #14181F;
+  --accent-tint: #2E2610;
+  --ink: #ECEEF1;
+  --ink-muted: #A0A8B4;
+  --surface-page: #121417;
+  --surface-card: #1B1F24;
+  --surface-sunken: #0D0F11;
+  --border: #2E333B;
+  --border-strong: #6B7380;
+  --feedback-correct: #5CCB93;
+  --feedback-correct-tint: #14291F;
+  --feedback-wrong: #F2786E;
+  --feedback-wrong-tint: #301816;
+  --feedback-learning: #E6A84A;
+  --feedback-learning-tint: #2C2112;
+  --on-feedback: #121417;
+  --scrim: rgba(0,0,0,0.6);
+  --os-ground: #1A1C1F;
+  --os-card: #2B2E33;
+  --os-ink: #F1F2F4;
+  --os-ink-muted: #B9BEC6;
+  --shadow-raised-value: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-reveal: 0ms;
+  }
+}
+
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+  }
+}
