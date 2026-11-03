@@ -43,6 +43,8 @@ const answerModel = async (_url: unknown, init?: RequestInit) => {
   return modelReply({ results: Array.from({ length: 6 }, (_, index) => ({ index, keep: true, reasons: [] })) })
 }
 let raw: DatabaseSync
+// One-shot hook: runs just before the next SQL statement that starts with the given prefix.
+let beforeSql: { prefix: string; fn: () => void } | null = null
 const one = (sql: string, ...args: (string | number)[]) => raw.prepare(sql).get(...args) as Record<string, unknown>
 const states = () => raw.prepare('SELECT id, gen_status, gen_error FROM concepts WHERE topic_id = ? ORDER BY id').all('co-topic') as { id: string; gen_status: string; gen_error: string | null }[]
 const drainAll = async () => { while (await drainConceptQueue()) { /* until idle */ } }
@@ -54,6 +56,7 @@ beforeAll(() => {
   }
   const run = (sql: string, params: unknown[], method: string) => {
     if (params.length > 100) throw new Error(`D1_ERROR: too many SQL variables (${params.length} > 100)`)
+    if (beforeSql && sql.startsWith(beforeSql.prefix)) { const { fn } = beforeSql; beforeSql = null; fn() }
     const stmt = raw.prepare(sql)
     stmt.setReturnArrays(true)
     const args = params as (string | number | null)[]
@@ -91,6 +94,7 @@ beforeEach(() => {
   raw.exec('SAVEPOINT test')
   holder.userId = 'owner'
   holder.background = []
+  beforeSql = null
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))
   fetchModel.mockReset().mockImplementation(answerModel)
@@ -189,4 +193,29 @@ it('retries a provider rate limit on the next drain instead of parking it as the
   fetchModel.mockImplementation(answerModel)
   expect(await drainConceptQueue()).toBe(1)
   expect(states()).toEqual([{ id: 'c00', gen_status: 'ready', gen_error: null }])
+})
+
+it('retires questions when the document is replaced after generation read it but before they are stored', async () => {
+  raw.exec("DELETE FROM concepts WHERE id <> 'c00'")
+  beforeSql = { prefix: 'insert into "items"', fn: () => raw.exec("UPDATE sources SET retired_at = 1 WHERE id = 'co-topic-src'") }
+  await drainConceptQueue()
+  expect(beforeSql).toBeNull()
+  expect(raw.prepare("SELECT status, COUNT(*) AS n FROM items WHERE source_id = 'co-topic-src' GROUP BY status").all()).toEqual([{ status: 'retired', n: 6 }])
+})
+
+it('sends the source document only when the concept has lost its quote', async () => {
+  raw.exec("DELETE FROM concepts WHERE id <> 'c00'")
+  raw.exec("UPDATE sources SET body_text = 'Scan the bin twice.' WHERE id = 'co-topic-src'")
+  const userMessages = () => fetchModel.mock.calls
+    .map(([, init]) => JSON.parse(init!.body as string))
+    .filter((b) => b.response_format.json_schema.name === 'item_batch')
+    .map((b) => b.messages.find((m: { role: string }) => m.role === 'user').content as string)
+
+  await drainConceptQueue()
+  expect(userMessages().map((m) => m.includes('Scan the bin twice.'))).toEqual([false])
+
+  raw.exec("DELETE FROM items; UPDATE concepts SET source_quote = NULL, gen_status = 'pending', gen_started_at = NULL WHERE id = 'c00'")
+  fetchModel.mockClear()
+  await drainConceptQueue()
+  expect(userMessages().map((m) => m.includes('Scan the bin twice.'))).toEqual([true])
 })

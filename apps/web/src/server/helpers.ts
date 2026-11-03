@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm'
 import type { Db } from '@/db'
 import { concepts, items, learnerConcept, sources, topics } from '@/db/schema'
 import { chatJson, jobModel, LlmError } from '@/lib/llm/client'
@@ -74,6 +74,8 @@ export async function generateConceptItems(
   const { learnerId, orgId, avoidStems } = opts
   const misconceptions = JSON.parse(concept.misconceptionsJson) as string[]
 
+  // One read of the source serves both the prompt and the version stamp.
+  const [source] = concept.sourceId ? await db.select({ version: sources.version, bodyText: sources.bodyText }).from(sources).where(eq(sources.id, concept.sourceId)) : []
   const kept: { payload: ItemPayload; check: unknown }[] = []
   for (let round = 0; round < opts.maxRounds && kept.length < opts.want; round++) {
     try {
@@ -90,6 +92,7 @@ export async function generateConceptItems(
           spread: opts.spread,
           formats: ['mcq', 'cloze', 'short'],
           sourceQuote: concept.sourceQuote,
+          sourceText: concept.sourceQuote ? null : source?.bodyText ?? null,
           avoidStems,
         }),
         maxTokens: 16000,
@@ -135,8 +138,6 @@ export async function generateConceptItems(
   }
   if (!kept.length) throw httpError('Could not generate items for this concept', 502)
 
-  // A document replaced or retired mid-generation must not gain live items citing it.
-  const [source] = concept.sourceId ? await db.select({ version: sources.version, retiredAt: sources.retiredAt }).from(sources).where(eq(sources.id, concept.sourceId)) : []
   const now = Date.now()
   const rows = kept.map(({ payload, check }) => ({
     id: crypto.randomUUID(),
@@ -149,11 +150,22 @@ export async function generateConceptItems(
     checkJson: check === null ? null : JSON.stringify(check),
     sourceId: concept.sourceId ?? null,
     sourceVersion: source?.version ?? null,
-    status: source?.retiredAt ? 'retired' as const : 'active' as const,
     createdAt: now,
   }))
   // Each item binds 12 parameters including defaults; eight rows stay below D1's 100-parameter limit.
-  const [first, ...rest] = chunks(rows, 8).map((r) => db.insert(items).values(r))
-  await db.batch([first, ...rest])
-  return rows.flatMap((r, i) => r.status === 'active' ? [{ id: r.id, format: r.format, difficultyPrior: r.difficultyPrior, payload: kept[i].payload, generatedBy: r.generatedBy }] : [])
+  const inserts = chunks(rows, 8).map((r) => db.insert(items).values(r))
+  // A document replaced or retired mid-generation must not gain live items citing it. The retirement check runs in the
+  // same atomic batch as the insert, so a replacement committing at any earlier moment is seen here; a read beforehand could go stale.
+  const retire = concept.sourceId
+    ? chunks(rows.map((r) => r.id), 50).map((ids) =>
+        db.update(items).set({ status: 'retired' }).where(and(
+          inArray(items.id, ids),
+          inArray(items.sourceId, db.select({ id: sources.id }).from(sources).where(and(eq(sources.id, concept.sourceId!), isNotNull(sources.retiredAt)))),
+        )).returning({ id: items.id }),
+      )
+    : []
+  const [first, ...rest] = [...inserts, ...retire]
+  const results = (await db.batch([first, ...rest])) as unknown[]
+  const retired = new Set(results.slice(inserts.length).flatMap((r) => (r as { id: string }[]).map((x) => x.id)))
+  return rows.flatMap((r, i) => retired.has(r.id) ? [] : [{ id: r.id, format: r.format, difficultyPrior: r.difficultyPrior, payload: kept[i].payload, generatedBy: r.generatedBy }])
 }
