@@ -14,8 +14,9 @@ import { Route as orgRoute } from '@/routes/org.$slug.index'
 import { Route as rolesRoute } from '@/routes/org.$slug.roles'
 import { Route as signInRoute } from '@/routes/sign-in'
 import { Route as startRoute } from '@/routes/start'
+import { Route as todayRoute } from '@/routes/today'
 import { Route as welcomeRoute } from '@/routes/welcome'
-import { getSessionUser } from '@/server/session'
+import { getLearnerId, getSessionUser } from '@/server/session'
 
 const holder = vi.hoisted(() => ({ db: null as unknown }))
 
@@ -37,7 +38,7 @@ vi.mock('@/server/auth', () => ({
     return user && { user, session: { activeOrganizationId: null } }
   } } }),
 }))
-vi.mock('@/server/session', () => ({ getSessionUser: vi.fn(), getLearnerId: async () => null }))
+vi.mock('@/server/session', () => ({ getSessionUser: vi.fn(), getLearnerId: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({
   authClient: { signOut: async () => {
     vi.mocked(getSessionUser).mockResolvedValue(null)
@@ -45,6 +46,9 @@ vi.mock('@/lib/auth-client', () => ({
   }, signIn: { email: async ({ email }: { email: string }) => {
     const id = email.split('@')[0]
     vi.mocked(getSessionUser).mockResolvedValue({ id, name: id, isAnonymous: false } as never)
+    return { error: null }
+  } }, signUp: { email: async () => {
+    vi.mocked(getSessionUser).mockResolvedValue({ id: 'guest', name: 'Gina', isAnonymous: false } as never)
     return { error: null }
   } } },
 }))
@@ -57,7 +61,7 @@ beforeAll(() => {
   for (const file of readdirSync('drizzle').filter((f) => f.endsWith('.sql')).sort()) {
     sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8').replaceAll('--> statement-breakpoint', ''))
   }
-  for (const id of ['owner', 'admin', 'combined', 'employee', 'standalone']) {
+  for (const id of ['owner', 'admin', 'combined', 'employee', 'standalone', 'learner', 'guest', 'newguest']) {
     sqlite.prepare('INSERT INTO user (id, name, email) VALUES (?, ?, ?)').run(id, id, `${id}@example.test`)
     sqlite.prepare('INSERT INTO consents (user_id, kind, accepted_at) VALUES (?, ?, ?)').run(id, 'disclosure-v1', 1)
   }
@@ -81,6 +85,7 @@ beforeAll(() => {
 beforeEach(() => {
   sqlite.exec('BEGIN')
   vi.mocked(getSessionUser).mockResolvedValue(null)
+  vi.mocked(getLearnerId).mockImplementation(async () => (await getSessionUser())?.id ?? null)
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
 })
 afterEach(() => {
@@ -96,6 +101,7 @@ async function renderApp(initialEntry = '/sign-in') {
     createRoute({ getParentRoute: () => rootRoute, path: '/', beforeLoad: indexRoute.options.beforeLoad, component: indexRoute.options.component }),
     createRoute({ getParentRoute: () => rootRoute, path: '/sign-in', beforeLoad: signInRoute.options.beforeLoad, validateSearch: signInRoute.options.validateSearch, component: signInRoute.options.component }),
     createRoute({ getParentRoute: () => rootRoute, path: '/start', validateSearch: startRoute.options.validateSearch, component: startRoute.options.component }),
+    createRoute({ getParentRoute: () => rootRoute, path: '/today', beforeLoad: todayRoute.options.beforeLoad, loader: todayRoute.options.loader, errorComponent: todayRoute.options.errorComponent, component: todayRoute.options.component }),
     createRoute({ getParentRoute: () => rootRoute, path: '/me', beforeLoad: meRoute.options.beforeLoad, loader: meRoute.options.loader, component: meRoute.options.component }),
     orgLayout.addChildren([
       createRoute({ getParentRoute: () => orgLayout, path: '/', loader: orgRoute.options.loader as (ctx: { params: { slug: string } }) => unknown, errorComponent: orgRoute.options.errorComponent, component: orgRoute.options.component }),
@@ -177,6 +183,63 @@ it('requires disclosure before sending an owner to the portal', async () => {
       await vi.waitFor(() => expect(router.state.location.pathname).toBe('/org/northwind'))
     })
     expect(container.querySelector('h1')?.textContent).toBe('Northwind')
+  } finally { await cleanup() }
+})
+
+function seedTopic(learnerId: string) {
+  const now = Date.now()
+  sqlite.prepare("INSERT INTO topics (id, learner_id, title, status, created_at) VALUES ('t1', ?, 'Spanish verbs', 'ready', 1)").run(learnerId)
+  sqlite.prepare("INSERT INTO units (id, topic_id, \"order\", name) VALUES ('u1', 't1', 0, 'Unit')").run()
+  sqlite.prepare("INSERT INTO concepts (id, topic_id, unit_id, \"order\", name, summary) VALUES ('c1', 't1', 'u1', 0, 'Concept', 'Summary')").run()
+  for (const [id, due] of [['i1', now - 1000], ['i2', now + 86_400_000]] as const) {
+    sqlite.prepare("INSERT INTO items (id, concept_id, topic_id, format, payload_json, created_at) VALUES (?, 'c1', 't1', 'mcq', '{}', 1)").run(id)
+    sqlite.prepare('INSERT INTO learner_item (learner_id, item_id, due, stability, difficulty, state) VALUES (?, ?, ?, 1, 5, 2)').run(learnerId, id, due)
+  }
+  sqlite.prepare("INSERT INTO learner_topic (learner_id, topic_id, streak_count, xp) VALUES (?, 't1', 4, 120)").run(learnerId)
+  sqlite.prepare("INSERT INTO placements (id, learner_id, topic_id, log_json, created_at) VALUES ('p1', ?, 't1', '{}', 1)").run(learnerId)
+}
+
+it('signs in a learner with a ready topic and lands on Today', async () => {
+  seedTopic('learner')
+  const { container, router, cleanup } = await renderApp()
+  try {
+    container.querySelector<HTMLInputElement>('#email')!.value = 'learner@example.test'
+    container.querySelector<HTMLInputElement>('#password')!.value = 'test-password'
+    await act(async () => {
+      container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+      await vi.waitFor(() => expect(router.state.location.pathname).toBe('/today'))
+    })
+    expect(container.querySelector('h1')?.textContent).toBe('Spanish verbs')
+    expect(container.querySelector('main')?.textContent).toContain('1 item due')
+    expect(container.querySelector('main')?.textContent).toContain('Streak 4 · 120 XP')
+    expect([...container.querySelectorAll('main button')].map((b) => b.textContent)).toEqual(['Start session'])
+    expect(container.querySelector('a[href="/start"]')?.textContent).toBe('Learn something new')
+  } finally { await cleanup() }
+})
+
+it('sends a guest who creates an account to Today with their topic', async () => {
+  seedTopic('guest')
+  vi.mocked(getSessionUser).mockResolvedValue({ id: 'guest', name: 'Guest', isAnonymous: true } as never)
+  const { container, router, cleanup } = await renderApp()
+  try {
+    await act(async () => { container.querySelector<HTMLButtonElement>('form button[type="button"]')!.click() })
+    container.querySelector<HTMLInputElement>('#name')!.value = 'Gina'
+    container.querySelector<HTMLInputElement>('#email')!.value = 'gina@example.test'
+    container.querySelector<HTMLInputElement>('#password')!.value = 'test-password'
+    await act(async () => {
+      container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+      await vi.waitFor(() => expect(router.state.location.pathname).toBe('/today'))
+    })
+    expect(container.querySelector('h1')?.textContent).toBe('Spanish verbs')
+  } finally { await cleanup() }
+})
+
+it('sends a new guest without a topic from Today to Start', async () => {
+  vi.mocked(getSessionUser).mockResolvedValue({ id: 'newguest', name: 'Guest', isAnonymous: true } as never)
+  const { container, router, cleanup } = await renderApp('/today')
+  try {
+    expect(router.state.location.pathname).toBe('/start')
+    expect(container.querySelector('h1')?.textContent).toBe('What do you want to learn?')
   } finally { await cleanup() }
 })
 

@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as StartRouteImport } from './routes/start'
+import { Route as TodayRouteImport } from './routes/today'
 import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminCompaniesRouteImport } from './routes/admin.companies'
@@ -55,6 +56,11 @@ const SignInRoute = SignInRouteImport.update({
 const StartRoute = StartRouteImport.update({
   id: '/start',
   path: '/start',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TodayRoute = TodayRouteImport.update({
+  id: '/today',
+  path: '/today',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WelcomeRoute = WelcomeRouteImport.update({
@@ -178,6 +184,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/sign-in': typeof SignInRoute
   '/start': typeof StartRoute
+  '/today': typeof TodayRoute
   '/welcome': typeof WelcomeRoute
   '/admin/companies': typeof AdminCompaniesRoute
   '/admin/users': typeof AdminUsersRoute
@@ -206,6 +213,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/sign-in': typeof SignInRoute
   '/start': typeof StartRoute
+  '/today': typeof TodayRoute
   '/welcome': typeof WelcomeRoute
   '/admin/companies': typeof AdminCompaniesRoute
   '/admin/users': typeof AdminUsersRoute
@@ -235,6 +243,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/sign-in': typeof SignInRoute
   '/start': typeof StartRoute
+  '/today': typeof TodayRoute
   '/welcome': typeof WelcomeRoute
   '/admin/companies': typeof AdminCompaniesRoute
   '/admin/users': typeof AdminUsersRoute
@@ -266,6 +275,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/sign-in'
     | '/start'
+    | '/today'
     | '/welcome'
     | '/admin/companies'
     | '/admin/users'
@@ -294,6 +304,7 @@ export interface FileRouteTypes {
     | '/'
     | '/sign-in'
     | '/start'
+    | '/today'
     | '/welcome'
     | '/admin/companies'
     | '/admin/users'
@@ -322,6 +333,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/sign-in'
     | '/start'
+    | '/today'
     | '/welcome'
     | '/admin/companies'
     | '/admin/users'
@@ -352,6 +364,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   SignInRoute: typeof SignInRoute
   StartRoute: typeof StartRoute
+  TodayRoute: typeof TodayRoute
   WelcomeRoute: typeof WelcomeRoute
   JoinInvitationIdRoute: typeof JoinInvitationIdRoute
   MeProfileRoute: typeof MeProfileRoute
@@ -395,6 +408,13 @@ declare module '@tanstack/react-router' {
       path: '/start'
       fullPath: '/start'
       preLoaderRoute: typeof StartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/today': {
+      id: '/today'
+      path: '/today'
+      fullPath: '/today'
+      preLoaderRoute: typeof TodayRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/welcome': {
@@ -603,6 +623,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   SignInRoute: SignInRoute,
   StartRoute: StartRoute,
+  TodayRoute: TodayRoute,
   WelcomeRoute: WelcomeRoute,
   JoinInvitationIdRoute: JoinInvitationIdRoute,
   MeProfileRoute: MeProfileRoute,
