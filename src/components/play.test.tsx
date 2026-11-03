@@ -30,7 +30,7 @@ beforeEach(() => {
 })
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); finishPermission = undefined; sessionStorage.clear() })
 
-async function renderPlay(voiceEnabled: boolean | null = true, permissionPending = false, format: 'cloze' | 'short' = 'cloze') {
+async function renderPlay(voiceEnabled: boolean | null = true, permissionPending = false, format: 'cloze' | 'short' = 'cloze', fromToday = false) {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   stopTrack = vi.fn()
   const mic = { getTracks: () => [{ stop: stopTrack }] } as unknown as MediaStream
@@ -69,18 +69,24 @@ async function renderPlay(voiceEnabled: boolean | null = true, permissionPending
   vi.mocked(answerItem).mockReset().mockResolvedValue({ correct: true, correctAnswer: '1', state: 'A', mixUps: [], explanation: 'Subtract one.' } as unknown as Reveal)
   vi.mocked(nextItem).mockReset()
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
-  const play = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId', loader: playRoute.options.loader, component: playRoute.options.component })
-  const router = createRouter({ routeTree: rootRoute.addChildren([play]), history: createMemoryHistory({ initialEntries: ['/play/s1'] }) })
+  const play = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId', loader: playRoute.options.loader, gcTime: playRoute.options.gcTime, component: playRoute.options.component })
+  const today = createRoute({ getParentRoute: () => rootRoute, path: '/today', component: () => <p>Today page</p> })
+  const router = createRouter({
+    routeTree: rootRoute.addChildren([play, today]),
+    history: createMemoryHistory(fromToday ? { initialEntries: ['/today', '/play/s1'], initialIndex: 1 } : { initialEntries: ['/play/s1'] }),
+  })
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
   await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
-  return { container, mic, initial, async cleanup() {
+  return { container, mic, initial, router, async cleanup() {
     await act(async () => root.unmount())
     container.remove()
     delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT
   } }
 }
+// happy-dom's :disabled ignores a disabled ancestor fieldset, which browsers honour.
+const locked = (el: HTMLElement) => (el as HTMLInputElement).disabled || Boolean(el.closest('fieldset')?.disabled)
 const button = (container: HTMLElement, label: string) => [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === label)!
 async function key(container: HTMLElement, type: 'keydown' | 'keyup') {
   await act(async () => button(container, type === 'keydown' ? 'Hold to answer by voice' : 'Release to transcribe')
@@ -308,5 +314,42 @@ it.each([false, true])('submits a short answer and shows its reveal (ungraded=%s
     await act(async () => { button(container, ungraded ? 'Continue' : 'Got it').click() })
     expect(nextItem).toHaveBeenCalledWith({ data: { sessionId: 's1', why: undefined } })
     expect(container.textContent).toContain('Next question')
+  } finally { await cleanup() }
+})
+
+it('shows the current question, with controls disabled until it loads, after Back then Forward', async () => {
+  const { container, initial, router, cleanup } = await renderPlay(false, false, 'short', true)
+  try {
+    expect(container.textContent).toContain('Explain why subtracting one preserves equality.')
+    await act(async () => { router.history.back() })
+    expect(container.textContent).toContain('Today page')
+    let loaded!: (view: SessionView) => void
+    vi.mocked(getSession).mockReturnValue(new Promise<SessionView>((resolve) => { loaded = resolve }))
+    await act(async () => { router.history.forward() })
+    // Nothing may offer the first-visit question as answerable while the current one is loading.
+    const stale = container.querySelector<HTMLInputElement>('#answer')
+    expect(stale === null || locked(stale)).toBe(true)
+    expect(container.textContent).not.toContain('Explain why subtracting one preserves equality.')
+    await act(async () => { loaded({ ...initial, progress: { position: 4, total: 4 }, item: { ...initial.item!, id: 'i4', stem: 'Fourth question' } }) })
+    expect(container.querySelector('h1')!.textContent).toBe('Fourth question')
+    expect(locked(container.querySelector<HTMLInputElement>('#answer')!)).toBe(false)
+  } finally { await cleanup() }
+})
+
+it('disables the answer controls while a page restored from the browser cache reloads the session', async () => {
+  const { container, initial, cleanup } = await renderPlay(false, false, 'short')
+  try {
+    const input = () => container.querySelector<HTMLInputElement>('#answer')!
+    expect(locked(input())).toBe(false)
+    let loaded!: (view: SessionView) => void
+    vi.mocked(getSession).mockReturnValue(new Promise<SessionView>((resolve) => { loaded = resolve }))
+    const restore = Object.assign(new Event('pageshow'), { persisted: true })
+    await act(async () => { window.dispatchEvent(restore) })
+    expect(getSession).toHaveBeenLastCalledWith({ data: { sessionId: 's1' } })
+    expect(locked(input())).toBe(true)
+    expect(button(container, 'Check').disabled).toBe(true)
+    await act(async () => { loaded({ ...initial, progress: { position: 3, total: 3 }, item: { ...initial.item!, id: 'i3', stem: 'Third question' } }) })
+    expect(container.querySelector('h1')!.textContent).toBe('Third question')
+    expect(locked(input())).toBe(false)
   } finally { await cleanup() }
 })
