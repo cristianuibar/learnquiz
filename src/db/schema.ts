@@ -51,6 +51,7 @@ export const concepts = sqliteTable('concepts', {
   visual: integer('visual', { mode: 'boolean' }).notNull().default(false),
   imageKey: text('image_key'),
   imageAlt: text('image_alt'),
+  imageGenerationStartedAt: integer('image_generation_started_at'),
 })
 
 export const conceptEdges = sqliteTable(

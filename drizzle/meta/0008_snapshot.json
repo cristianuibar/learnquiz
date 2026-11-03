@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "03c55a07-9c0f-48fc-b4f2-620b658ca024",
+  "id": "37ca7034-45c0-4341-b239-097e5e15cb7b",
   "prevId": "74ccf520-7b2f-48e0-9930-9db2ef8c5a52",
   "tables": {
     "attempts": {
@@ -331,6 +331,13 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "image_generation_started_at": {
+          "name": "image_generation_started_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {},
@@ -452,20 +459,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'active'"
-        },
-        "reviewed_by": {
-          "name": "reviewed_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "reviewed_at": {
-          "name": "reviewed_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         },
         "created_at": {
           "name": "created_at",

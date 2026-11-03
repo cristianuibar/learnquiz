@@ -97,7 +97,7 @@ it('returns every owned session call and exact costs, with generation scoped to 
 it.each(['placement', 'session'] as const)('traces real %s startup generation, retries and persisted model attribution', async (kind) => {
   const skeleton = { units: Array.from({ length: 4 }, (_, u) => ({
     name: `Unit ${u}`, summary: 'Basics', concepts: Array.from({ length: 4 }, (_, c) => ({
-      name: `Concept ${u}-${c}`, summary: 'Variables', prerequisites: [], source_quote: null, critical: false, misconceptions: [],
+      name: `Concept ${u}-${c}`, summary: 'Variables', visual: false, prerequisites: [], source_quote: null, critical: false, misconceptions: [],
     })),
   })) }
   const items = Array.from({ length: 6 }, (_, i) => ({

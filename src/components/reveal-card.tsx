@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from 'motion/react'
 import { Check, X } from 'lucide-react'
+import { ConceptDiagram } from '@/components/concept-diagram'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
@@ -49,6 +50,7 @@ export function RevealCard({
         {!ungraded && (wrong ? <X className="size-5 shrink-0" aria-hidden /> : <Check className="size-5 shrink-0" aria-hidden />)}
         {HEADING[state] + (state === 'C' ? reveal.correctAnswer : '')}
       </h2>
+      {reveal.diagramConceptId && <ConceptDiagram conceptId={reveal.diagramConceptId} />}
       {reveal.feedback && (
         <div className="mt-2">
           {reveal.score !== null && <p className="font-medium">Score: {Math.round(reveal.score * 100)}%</p>}

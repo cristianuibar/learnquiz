@@ -4,6 +4,7 @@ export type ValidatedConcept = {
   id: string
   name: string
   summary: string
+  visual: boolean
   sourceId: string | null
   sourceQuote: string | null
   grounded: boolean
@@ -54,7 +55,7 @@ export function validateSkeleton(
         if (kept) { sourceId = source.id; break }
       }
       if (quote && sources.length && !kept) notes.push(`dropped quote not found in source: ${c.name}`)
-      return { id, name: c.name, summary: c.summary, sourceId, sourceQuote: kept, grounded: kept !== null, critical: c.critical, misconceptions: c.misconceptions }
+      return { id, name: c.name, summary: c.summary, visual: c.visual, sourceId, sourceQuote: kept, grounded: kept !== null, critical: c.critical, misconceptions: c.misconceptions }
     }),
   }))
 
@@ -107,6 +108,7 @@ export function fallbackSkeleton(topic: string): CurriculumSkeleton {
         const concept = {
           name: `${n}: ${topic}`,
           summary: `${n} for ${topic}.`,
+          visual: false,
           prerequisites: previous ? [previous] : [],
           source_quote: null,
           critical: false,

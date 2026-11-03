@@ -357,7 +357,7 @@ export const answerItem = createServerFn({ method: 'POST' })
         // Advance without recording a wrong answer or changing mastery, scheduling or XP.
         await db.update(sessions).set({ planJson: JSON.stringify({ ...plan, answered: true, lastAttemptId: undefined }) }).where(eq(sessions.id, session.id))
         return {
-          attemptId: null, state: 'ungraded', correct: false, score: null,
+          attemptId: null, diagramConceptId: concept.visual ? concept.id : null, state: 'ungraded', correct: false, score: null,
           feedback: 'Compare your answer with the model answer. Your learning progress has not changed.',
           missingPoints: [], correctAnswer: payload.model_answer, chosenFeedback: null,
           explanation: payload.explanation, sourceQuote: payload.source_quote, mixUps: [], returnsThisSession: false,
@@ -446,6 +446,7 @@ export const answerItem = createServerFn({ method: 'POST' })
     const mixUps = state === 'D' ? (JSON.parse(concept.misconceptionsJson) as string[]) : []
     return {
       attemptId,
+      diagramConceptId: concept.visual ? concept.id : null,
       state,
       correct,
       score: shortGrade?.score ?? (correct ? 1 : 0),
