@@ -1,7 +1,7 @@
-import { and, desc, eq, inArray, or, type SQL } from 'drizzle-orm'
+import { and, desc, eq, inArray, ne, or, type SQL } from 'drizzle-orm'
 import type { Db } from '@/db'
 import { member } from '@/db/auth-schema'
-import { jobRoles, learnerTopic, memberRoleAssignments, topics } from '@/db/schema'
+import { items, jobRoles, learnerTopic, memberRoleAssignments, topics } from '@/db/schema'
 
 // The active job roles the learner is assigned to as a current company member.
 const assignedRoleIds = (db: Db, learnerId: string) =>
@@ -30,4 +30,12 @@ export async function assignedRoleTopic(db: Db, learnerId: string) {
 // Role content is shared; the learner's own progress row is created on first access.
 export async function seedLearnerTopic(db: Db, learnerId: string, topicId: string) {
   await db.insert(learnerTopic).values({ learnerId, topicId, level: 3, rating: 1500 }).onConflictDoNothing()
+}
+
+// A role topic can be played once it is ready and holds a stored question graded without a model (short answers are not).
+export async function rolePlayable(db: Db, topic: { id: string; status: string }) {
+  if (topic.status !== 'ready') return false
+  const row = await db.select({ id: items.id }).from(items)
+    .where(and(eq(items.topicId, topic.id), eq(items.status, 'active'), ne(items.format, 'short'))).limit(1).get()
+  return Boolean(row)
 }

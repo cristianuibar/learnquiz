@@ -14,7 +14,7 @@ import { requireOrgAdmin } from '@/server/authz'
 import { requireLearnerId } from '@/server/session'
 import { drainConceptQueue } from '@/server/concept-gen'
 import { runInBackground } from '@/server/env'
-import { learnerCanAccess, seedLearnerTopic } from '@/server/topic-access'
+import { learnerCanAccess, rolePlayable, seedLearnerTopic } from '@/server/topic-access'
 import { buildRoleCurriculum, curriculumWrites } from '@/server/role-curriculum'
 
 export const createTopic = createServerFn({ method: 'POST' })
@@ -120,6 +120,8 @@ export const getTopicPath = createServerFn({ method: 'GET' })
     if (!row) throw httpError('Topic not found', 404)
     const { jobRoleId, ...topic } = row
     if (jobRoleId !== null && topic.status === 'ready') await seedLearnerTopic(db, learnerId, topic.id)
+    // Nothing to start until the topic is ready; a role topic also needs a stored question it can play.
+    const preparing = jobRoleId !== null ? !(await rolePlayable(db, topic)) : topic.status !== 'ready'
 
     const [unitRows, conceptRows, edges, counts, known, [lt], [placement]] = await Promise.all([
       db
@@ -156,6 +158,7 @@ export const getTopicPath = createServerFn({ method: 'GET' })
     const itemCount = new Map(counts.map((c) => [c.conceptId, c.n]))
     return {
       topic,
+      preparing,
       // The reveal line lives in placements.log_json as { log, levelLine }.
       learner: {
         level: lt?.level ?? 3,

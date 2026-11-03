@@ -28,7 +28,7 @@ export const Route = createFileRoute('/t/$topicId/path')({
 })
 
 function Path() {
-  const { topic, units, learner } = Route.useLoaderData()
+  const { topic, units, learner, preparing } = Route.useLoaderData()
   const [expandedUnits, setExpandedUnits] = useState<Set<string>>(() => new Set())
   // Unlocked units with no answers yet only carry the placement prior.
   const estimated = (unit: (typeof units)[number]) => learner.placed && unit.unlocked && !unit.measured
@@ -104,7 +104,7 @@ function Path() {
         ))}
       </ol>
       <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 -mx-4 mt-8 border-t bg-background px-4 py-4">
-        {topic.status === 'ready' ? (
+        {!preparing ? (
           <StartButton topicId={topic.id} placement={!learner.placed}>
             {learner.placed ? 'Start session' : 'Find my level'}
           </StartButton>

@@ -3,7 +3,7 @@ import { and, count, desc, eq, lte } from 'drizzle-orm'
 import { getDb } from '@/db'
 import { items, learnerItem, learnerTopic, placements, topics } from '@/db/schema'
 import { getLearnerId } from '@/server/session'
-import { assignedRoleTopic } from '@/server/topic-access'
+import { assignedRoleTopic, rolePlayable } from '@/server/topic-access'
 
 export type Today = {
   topic: { id: string; title: string; placed: boolean; due: number; xp: number; streak: number } | null
@@ -20,9 +20,7 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
   let topic: { id: string; title: string } | undefined
   let role: Today['role'] = null
   if (assigned) {
-    const active = assigned.topic.status === 'ready'
-      ? await db.select({ id: items.id }).from(items).where(and(eq(items.topicId, assigned.topic.id), eq(items.status, 'active'))).limit(1).get()
-      : undefined
+    const active = await rolePlayable(db, assigned.topic)
     role = { name: assigned.roleName, topicTitle: assigned.topic.title, preparing: !active }
     if (active) topic = { id: assigned.topic.id, title: assigned.topic.title }
   } else {

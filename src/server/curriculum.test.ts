@@ -284,8 +284,11 @@ it.each([
   await expect(curriculum.getConceptItems({ data: { conceptId: 'c1' } })).resolves.toEqual({ items: [] })
 })
 
-it.each([[true, 'ready', false], [false, 'ready', true], [false, 'draft', true]])('opens Today and the Path tab on the role topic (items %s, %s, preparing %s)', async (withItem, topicStatus, preparing) => {
-  seedRoleCurriculum(withItem)
+it.each([
+  ['mcq', 'ready', false], [null, 'ready', true], ['short', 'ready', true], [null, 'draft', true],
+] as const)('opens Today and the Path tab on the role topic (item %s, %s, preparing %s)', async (format, topicStatus, preparing) => {
+  seedRoleCurriculum(format !== null)
+  if (format) raw.exec(`UPDATE items SET format = '${format}' WHERE id = 'i1'`)
   raw.exec(`UPDATE topics SET status = '${topicStatus}' WHERE id = 'picker-topic'`)
   holder.userId = 'employee'
   raw.exec("INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES ('employee', 'northwind', 'picker', 1)")
@@ -293,4 +296,5 @@ it.each([[true, 'ready', false], [false, 'ready', true], [false, 'draft', true]]
   expect(today.role).toEqual({ name: 'Warehouse picker', topicTitle: 'Warehouse picker', preparing })
   expect(today.topic?.id).toBe(preparing ? undefined : 'picker-topic')
   expect(await getLatestTopicIdFn()).toBe('picker-topic')
+  expect((await curriculum.getTopicPath({ data: { topicId: 'picker-topic' } })).preparing).toBe(preparing)
 })
