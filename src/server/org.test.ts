@@ -177,8 +177,13 @@ it('reports assigned training stages, unresolved critical errors and company pro
     expect.objectContaining({ name: 'member', training: { stage: 'onboarding', progress: expect.closeTo(0.4 / 3 / 0.85, 10), daysToProficiency: null, criticalConfidentErrors: 2 }, lastActiveAt: now - day }),
   ])
   expect(people.invites).toEqual([expect.objectContaining({ name: 'Waiting', expired: false })])
-  expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { employees: 2, proficientEmployees: 1, daysToProficiency: 4, criticalErrorsThisWeek: 1, documentsToReview: null } })
+  expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { employees: 3, proficientEmployees: 1, daysToProficiency: 4, criticalErrorsThisWeek: 1, documentsToReview: null } })
 
+  // Expired and accepted invitations are not employees waiting to join.
+  sqlite.prepare('INSERT INTO invitation (id, organization_id, email, status, expires_at, inviter_id, job_role_id, invitee_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .run('lapsed', 'org-a', 'lapsed@x.test', 'pending', Date.now() - day, 'owner', 'legacy-role', 'Lapsed')
+  sqlite.prepare('INSERT INTO invitation (id, organization_id, email, status, expires_at, inviter_id, job_role_id, invitee_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .run('joined', 'org-a', 'joined@x.test', 'accepted', Date.now() + day, 'owner', 'legacy-role', 'Joined')
   attempt.run('corrected', 'member', 'scan-item', 'scan', start + 2 * day, '"scan"', 1, 1, 'sure')
   // Mean 0.86 clears the 0.85 benchmark, but the critical concept at 0.60 does not, so progress stays at 0.60 / 0.85.
   sqlite.prepare("UPDATE learner_concept SET p_known = CASE concept_id WHEN 'scan' THEN 0.6 ELSE 0.99 END WHERE learner_id = ?").run('admin')
@@ -187,7 +192,7 @@ it('reports assigned training stages, unresolved critical errors and company pro
     expect.objectContaining({ name: 'admin', training: { stage: 'onboarding', progress: expect.closeTo(0.6 / 0.85, 10), daysToProficiency: null, criticalConfidentErrors: 0 } }),
     expect.objectContaining({ name: 'member', training: { stage: 'onboarding', progress: expect.closeTo(0.4 / 3 / 0.85, 10), daysToProficiency: null, criticalConfidentErrors: 1 } }),
   ])
-  expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { employees: 2, proficientEmployees: 0, daysToProficiency: null, criticalErrorsThisWeek: 1, documentsToReview: null } })
+  expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { employees: 3, proficientEmployees: 0, daysToProficiency: null, criticalErrorsThisWeek: 1, documentsToReview: null } })
 })
 
 it('rolls back the role when its draft topic cannot be stored', async () => {
