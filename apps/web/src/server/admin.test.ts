@@ -7,9 +7,9 @@ import { dbSchema } from '@/db'
 import { getAuth } from '@/server/auth'
 import { getSessionUser } from '@/server/session'
 import { createRole, getPeople, getOrgOverview, listRoles } from '@/server/org'
-import { getCompanies, getCompany, getStaffSession, listUsers, setUserBan } from './admin'
+import { getCompanies, getCompany, getContentFlags, getGenerationJobs, getStaffSession, listUsers, resolveFlag, retryJobConcept, setUserBan } from './admin'
 
-const boundary = vi.hoisted(() => ({ db: null as unknown, headers: new Headers(), status: 200 }))
+const boundary = vi.hoisted(() => ({ db: null as unknown, headers: new Headers(), status: 200, background: [] as unknown[] }))
 
 // Only the request transport and database binding are replaced. Authorization,
 // validation, queries, Better Auth and its admin plugin execute for real.
@@ -26,7 +26,11 @@ vi.mock('@tanstack/react-start', () => ({
 }))
 vi.mock('@tanstack/react-start/server', () => ({ getRequestHeaders: () => boundary.headers, setCookie: () => {}, setResponseStatus: (status: number) => { boundary.status = status } }))
 vi.mock('@/db', async (original) => ({ ...await original<typeof import('@/db')>(), getDb: () => boundary.db }))
-vi.mock('@/server/env', () => ({ getEnv: () => ({ BETTER_AUTH_URL: 'http://localhost:3000', BETTER_AUTH_SECRET: 'staff-tests-only-secret-at-least-32-characters' }) }))
+vi.mock('@/server/env', () => ({ getEnv: () => ({ BETTER_AUTH_URL: 'http://localhost:3000', BETTER_AUTH_SECRET: 'staff-tests-only-secret-at-least-32-characters' }),
+  runInBackground: (task: unknown) => { boundary.background.push(task) },
+}))
+// The queue itself is covered by concept-gen.test.ts; here only the wake-up is observed.
+vi.mock('@/server/concept-gen', () => ({ drainConceptQueue: async () => 'drained' }))
 
 let sqlite: DatabaseSync
 const accounts = new Map<string, { id: string; cookie: string; password: string }>()
@@ -88,6 +92,7 @@ beforeEach(() => {
   boundary.headers = new Headers({ cookie: accounts.get('staff')!.cookie })
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(NOW)
+  boundary.background = []
 })
 afterEach(() => { sqlite.exec('ROLLBACK'); vi.useRealTimers() })
 afterAll(() => sqlite.close())
@@ -101,6 +106,10 @@ it('refuses every admin function for non-staff, including a company owner', asyn
     () => listUsers({ data: { search: '', field: 'email', offset: 0 } }),
     () => setUserBan({ data: { userId: accounts.get('outsider')!.id, banned: true } }),
     () => setUserBan({ data: { userId: accounts.get('outsider')!.id, banned: false } }),
+    () => getGenerationJobs(),
+    () => retryJobConcept({ data: { conceptId: 'x' } }),
+    () => getContentFlags(),
+    () => resolveFlag({ data: { flagId: 'x' } }),
   ]) {
     boundary.status = 200
     await expect(call()).rejects.toMatchObject({ status: 403, message: 'Staff only' })
@@ -175,4 +184,47 @@ it('searches users through the admin plugin and bans, revokes sessions, blocks s
   const allowed = await authRequest('sign-in/email', { email: 'learner@staff.test', password: learner.password })
   expect(allowed.status).toBe(200)
   expect(sqlite.prepare('SELECT banned, ban_reason FROM user WHERE id = ?').get(learner.id)).toEqual({ banned: 0, ban_reason: null })
+})
+
+// Company topics in beta: a role curriculum that is building, a failed and a ready concept, flagged and retired questions.
+function seedContent() {
+  sqlite.prepare('INSERT INTO job_roles (id, org_id, name, created_at) VALUES (?, ?, ?, ?)').run('gen-role', 'beta', 'Picker', NOW)
+  sqlite.prepare('INSERT INTO topics (id, org_id, job_role_id, title, status, gen_started_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run('gen-topic', 'beta', 'gen-role', 'Picker', 'generating', NOW - 5, NOW)
+  sqlite.prepare('INSERT INTO units (id, topic_id, "order", name, summary) VALUES (?, ?, 0, ?, ?)').run('gen-unit', 'gen-topic', 'Unit', 'Unit')
+  const concept = sqlite.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary, gen_status, gen_error, gen_started_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+  concept.run('c-failed', 'gen-topic', 'gen-unit', 0, 'Scan the SKU', 'Scan.', 'failed', 'Only 1 of 4 questions passed the self-check.', NOW - 9)
+  concept.run('c-ready', 'gen-topic', 'gen-unit', 1, 'Seal the box', 'Seal.', 'ready', null, null)
+  const item = sqlite.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, status, reviewed_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+  item.run('i-flagged', 'c-ready', 'gen-topic', 'short', JSON.stringify({ format: 'short', stem: 'What do you scan first?' }), 'active', null, NOW)
+  item.run('i-retired', 'c-ready', 'gen-topic', 'short', JSON.stringify({ format: 'short', stem: 'Which tape seals a box?' }), 'retired', NOW, NOW)
+  sqlite.prepare('INSERT INTO item_flags (id, item_id, user_id, reason, note, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .run('flag-1', 'i-flagged', accounts.get('outsider')!.id, 'wrong', 'Answer is off', NOW - 1000)
+}
+
+it('lists unfinished company generation for staff and retries a failed concept once', async () => {
+  seedContent()
+  await expect(getGenerationJobs()).resolves.toEqual({
+    concepts: [{ id: 'c-failed', company: 'beta', role: 'Picker', concept: 'Scan the SKU', status: 'failed', error: 'Only 1 of 4 questions passed the self-check.', startedAt: NOW - 9 }],
+    roles: [{ id: 'gen-topic', company: 'beta', role: 'Picker', status: 'generating', startedAt: NOW - 5 }],
+  })
+  await expect(retryJobConcept({ data: { conceptId: 'c-failed' } })).resolves.toEqual({ ok: true })
+  expect(sqlite.prepare('SELECT gen_status, gen_error, gen_started_at FROM concepts WHERE id = ?').get('c-failed')).toEqual({ gen_status: 'pending', gen_error: null, gen_started_at: null })
+  expect(boundary.background).toHaveLength(1)
+  await expect(retryJobConcept({ data: { conceptId: 'c-failed' } })).rejects.toMatchObject({ status: 404, message: 'Failed concept not found' })
+  await expect(getGenerationJobs()).resolves.toMatchObject({ concepts: [{ id: 'c-failed', status: 'pending', error: null, startedAt: null }] })
+})
+
+it('lists open question reports, resolves them once and lists retired questions', async () => {
+  seedContent()
+  await expect(getContentFlags()).resolves.toEqual({
+    flags: [{ id: 'flag-1', stem: 'What do you scan first?', concept: 'Seal the box', company: 'beta', reason: 'wrong', note: 'Answer is off', createdAt: NOW - 1000 }],
+    retired: [{ id: 'i-retired', stem: 'Which tape seals a box?', concept: 'Seal the box', company: 'beta', role: 'Picker' }],
+  })
+  await expect(resolveFlag({ data: { flagId: 'flag-1' } })).resolves.toEqual({ ok: true })
+  expect(sqlite.prepare('SELECT resolved_at FROM item_flags WHERE id = ?').get('flag-1')).toEqual({ resolved_at: NOW })
+  await expect(getContentFlags()).resolves.toMatchObject({ flags: [] })
+  vi.setSystemTime(NOW + 60_000)
+  await expect(resolveFlag({ data: { flagId: 'flag-1' } })).resolves.toEqual({ ok: true })
+  expect(sqlite.prepare('SELECT resolved_at FROM item_flags WHERE id = ?').get('flag-1')).toEqual({ resolved_at: NOW })
+  await expect(resolveFlag({ data: { flagId: 'missing' } })).rejects.toMatchObject({ status: 404, message: 'Flag not found' })
 })
