@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Marketing additions to Petrol &amp; Saffron</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body { margin: 0; }
+.ds-grp { display: flex; flex-direction: column; gap: 16px; }
+.ds-grp-head { display: flex; flex-direction: column; gap: 4px; padding-bottom: 8px; }
+.ds-tbl { display: flex; flex-direction: column; min-width: 0; }
+.ds-tr { display: grid; gap: 24px; padding: 12px 0; border-top: 1px solid var(--border); align-items: baseline; font-size: 14px; line-height: 20px; }
+.ds-tbl > .ds-tr:last-child { border-bottom: 1px solid var(--border); }
+.ds-th { padding: 0 0 8px; border-top: 0; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em; color: var(--ink-muted); }
+.ds-tk { font-weight: 600; color: var(--ink); }
+.ds-v { font-variant-numeric: tabular-nums; }
+.ds-m { color: var(--ink-muted); }
+.ds-c-type { grid-template-columns: 112px minmax(0, 1fr) 96px 64px 80px 280px; align-items: center; }
+.ds-c-step { grid-template-columns: 112px repeat(3, minmax(0, 1fr)); }
+.ds-c-3 { grid-template-columns: 168px 200px minmax(0, 1fr); }
+.ds-c-2 { grid-template-columns: 168px minmax(0, 1fr); }
+.ds-c-sw { grid-template-columns: 168px 160px 160px minmax(0, 1fr); align-items: center; }
+.ds-sw { display: inline-flex; align-items: center; gap: 8px; }
+.ds-chip { width: 20px; height: 20px; border-radius: 4px; border: 1px solid var(--border); flex: none; }
+.ds-split { display: grid; gap: 48px; align-items: start; }
+.ds-cap { font-size: 13px; line-height: 18px; font-weight: 500; color: var(--ink-muted); }
+.ds-spec-box { display: flex; flex-direction: column; gap: 8px; }
+.ds-bar { height: 16px; background: var(--brand-tint); border-radius: 4px; }
+</style>
+</helmet>
+<div class="lq" data-theme="light" style="width: 1280px; padding: 48px 64px; display: flex; flex-direction: column; gap: 32px; background: var(--surface-page); color: var(--ink);">
+
+  <!-- Title -->
+  <div class="stack" style="gap: 12px; max-width: 760px;">
+    <h1 class="t-display">Marketing additions to Petrol &amp; Saffron</h1>
+    <p class="t-body-lg muted">Everything learnquiz.com adds on top of the system and the learner-app additions. Values are copied from site.css. Anything not listed here is the system as shipped.</p>
+  </div>
+
+  <!-- ===================== Type ===================== -->
+  <section class="ds-grp" aria-labelledby="ds-type">
+    <div class="ds-grp-head">
+      <h2 id="ds-type" class="t-title2">Type</h2>
+      <p class="t-body muted">Four new styles. Inter, the same family. Marketing headings step up at each breakpoint through three classes: .h-hero, .h-section and .lead.</p>
+    </div>
+
+    <div class="ds-tbl">
+      <div class="ds-tr ds-c-type ds-th"><span>Style</span><span>Specimen</span><span>Size / line</span><span>Weight</span><span>Tracking</span><span>Used for</span></div>
+      <div class="ds-tr ds-c-type">
+        <span class="ds-tk">display-lg</span>
+        <p style="font-size: 48px; line-height: 52px; font-weight: 700; letter-spacing: -0.02em;">New hires learn the job</p>
+        <span class="ds-v">48 / 52</span><span class="ds-v">700</span><span class="ds-v">−0.02em</span>
+        <span class="ds-m">.h-hero from 640 to 1023: hero h1 and the close h2</span>
+      </div>
+      <div class="ds-tr ds-c-type">
+        <span class="ds-tk">display-xl</span>
+        <p style="font-size: 56px; line-height: 60px; font-weight: 700; letter-spacing: -0.025em;">New hires learn the job</p>
+        <span class="ds-v">56 / 60</span><span class="ds-v">700</span><span class="ds-v">−0.025em</span>
+        <span class="ds-m">.h-hero at 1024 and up: hero h1 and the close h2</span>
+      </div>
+      <div class="ds-tr ds-c-type">
+        <span class="ds-tk">headline</span>
+        <p style="font-size: 36px; line-height: 42px; font-weight: 700; letter-spacing: -0.015em;">Your SOPs become the training.</p>
+        <span class="ds-v">36 / 42</span><span class="ds-v">700</span><span class="ds-v">−0.015em</span>
+        <span class="ds-m">.h-section at 1024 and up: every section h2</span>
+      </div>
+      <div class="ds-tr ds-c-type">
+        <span class="ds-tk">lead</span>
+        <p style="font-size: 20px; line-height: 30px; font-weight: 400;">Upload the procedures for a role. New hires practice them on their phone in five-minute sessions.</p>
+        <span class="ds-v">20 / 30</span><span class="ds-v">400</span><span class="ds-v">0</span>
+        <span class="ds-m">.lead at 1024 and up: hero and section intros</span>
+      </div>
+    </div>
+
+    <div class="ds-tbl" style="margin-top: 16px;">
+      <div class="ds-tr ds-c-step ds-th"><span>Class</span><span>Below 640</span><span>640 to 1023</span><span>1024 and up</span></div>
+      <div class="ds-tr ds-c-step">
+        <span class="ds-tk">.h-hero</span>
+        <span class="ds-v">display 40 / 44, 700, −0.02em</span>
+        <span class="ds-v">display-lg 48 / 52, 700, −0.02em</span>
+        <span class="ds-v">display-xl 56 / 60, 700, −0.025em</span>
+      </div>
+      <div class="ds-tr ds-c-step">
+        <span class="ds-tk">.h-section</span>
+        <span class="ds-v">title-1 28 / 34, 700, −0.01em</span>
+        <span class="ds-v">title-1 28 / 34, 700, −0.01em</span>
+        <span class="ds-v">headline 36 / 42, 700, −0.015em</span>
+      </div>
+      <div class="ds-tr ds-c-step">
+        <span class="ds-tk">.lead</span>
+        <span class="ds-v">body-lg 17 / 26, 400</span>
+        <span class="ds-v">body-lg 17 / 26, 400</span>
+        <span class="ds-v">lead 20 / 30, 400</span>
+      </div>
+    </div>
+
+    <div class="ds-tbl" style="margin-top: 16px;">
+      <div class="ds-tr ds-c-step ds-th"><span>Also in site.css</span><span>Below 1024</span><span>1024 and up</span><span>Note</span></div>
+      <div class="ds-tr ds-c-step">
+        <span class="ds-tk">.founder-quote</span>
+        <span class="ds-v">24 / 32, 600, −0.01em</span>
+        <span class="ds-v">28 / 36, 600, −0.01em</span>
+        <span class="ds-m">One-off size, not a token yet</span>
+      </div>
+      <div class="ds-tr ds-c-step">
+        <span class="ds-tk">.closer</span>
+        <span class="ds-v">24 / 32, 700, −0.01em</span>
+        <span class="ds-v">28 / 36, 700, −0.01em</span>
+        <span class="ds-m">One-off size, not a token yet</span>
+      </div>
+      <div class="ds-tr ds-c-step">
+        <span class="ds-tk">.wordmark</span>
+        <span class="ds-v">18 / 24, 600, −0.01em</span>
+        <span class="ds-v">Same</span>
+        <span class="ds-m">Typeset stand-in for the outlined lockup</span>
+      </div>
+      <div class="ds-tr ds-c-step">
+        <span class="ds-tk">.legal p, li</span>
+        <span class="ds-v">17 / 28, 400</span>
+        <span class="ds-v">Same</span>
+        <span class="ds-m">body-lg size with a taller line for long reading</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Spacing and layout ===================== -->
+  <section class="ds-grp" aria-labelledby="ds-space">
+    <div class="ds-grp-head">
+      <h2 id="ds-space" class="t-title2">Spacing and layout</h2>
+      <p class="t-body muted">Two spacing steps above space-12, plus page constants. Breakpoints are container queries on the page root (.site). In production use @media at the same values.</p>
+    </div>
+    <div class="ds-tbl">
+      <div class="ds-tr ds-c-3 ds-th"><span>Token</span><span>Value</span><span>Use</span></div>
+      <div class="ds-tr ds-c-3">
+        <span class="ds-tk">space-16</span>
+        <span class="ds-sw ds-v"><span class="ds-bar" style="width: 64px;"></span>64px</span>
+        <span class="ds-m">Hero padding (bottom below 640, top and bottom from 640). Close padding below 1024. Two-column gaps at 1024 and up: hero, problem, how it works, science, models, answer moment (column gap).</span>
+      </div>
+      <div class="ds-tr ds-c-3">
+        <span class="ds-tk">space-20</span>
+        <span class="ds-sw ds-v"><span class="ds-bar" style="width: 80px;"></span>80px</span>
+        <span class="ds-m">.section and .close vertical padding at 1024 and up.</span>
+      </div>
+      <div class="ds-tr ds-c-3">
+        <span class="ds-tk">section-y</span>
+        <span class="ds-v">64px → 80px at 1024</span>
+        <span class="ds-m">.section uses section-y (64) below 1024. At 1024 and up the rule switches to space-20 (80). .close uses space-16, then space-20.</span>
+      </div>
+      <div class="ds-tr ds-c-3">
+        <span class="ds-tk">hero padding</span>
+        <span class="ds-v">48 / 64 → 64 / 64 at 640</span>
+        <span class="ds-m">Top / bottom. space-12 and space-16 below 640, space-16 both ways from 640 up. No change at 1024.</span>
+      </div>
+      <div class="ds-tr ds-c-3">
+        <span class="ds-tk">gutter</span>
+        <span class="ds-v">16px → 32px at 640</span>
+        <span class="ds-m">.wrap side padding. Set on .wrap at 640. The push scroller bleeds out by one gutter on each side.</span>
+      </div>
+      <div class="ds-tr ds-c-3">
+        <span class="ds-tk">content-max</span>
+        <span class="ds-v">1120px</span>
+        <span class="ds-m">.wrap max-width is content-max + 2 × gutter, so 1184px from 640. Content never runs wider than 1120.</span>
+      </div>
+      <div class="ds-tr ds-c-3">
+        <span class="ds-tk">header-h</span>
+        <span class="ds-v">64px</span>
+        <span class="ds-m">Header bar height. Also the top inset (−64px rootMargin) for the header button swap.</span>
+      </div>
+      <div class="ds-tr ds-c-3">
+        <span class="ds-tk">breakpoint-md</span>
+        <span class="ds-v">640px</span>
+        <span class="ds-m">@container site (min-width: 640px). Production: @media (min-width: 640px).</span>
+      </div>
+      <div class="ds-tr ds-c-3">
+        <span class="ds-tk">breakpoint-lg</span>
+        <span class="ds-v">1024px</span>
+        <span class="ds-m">@container site (min-width: 1024px). Production: @media (min-width: 1024px).</span>
+      </div>
+      <div class="ds-tr ds-c-3">
+        <span class="ds-tk">small phones</span>
+        <span class="ds-v">max-width 639.98px</span>
+        <span class="ds-m">Hero, demo and manager phones grow to the column width.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Device frames ===================== -->
+  <section class="ds-grp" aria-labelledby="ds-dev">
+    <div class="ds-grp-head">
+      <h2 id="ds-dev" class="t-title2">Device frames</h2>
+      <p class="t-body muted">A phone frame for the app screens and a desktop frame for the company portal. Both draw real system components inside.</p>
+    </div>
+
+    <div class="ds-split" style="grid-template-columns: minmax(0, 1fr) 376px;">
+      <div class="ds-tbl">
+        <div class="ds-tr ds-c-2 ds-th" style="grid-template-columns: 200px minmax(0, 1fr);"><span>Phone frame</span><span>Value</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">phone-w × phone-h</span><span class="ds-v">360 × 740 screen, the app's artboard size. Default everywhere unless listed below.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">phone-bezel</span><span class="ds-v">8px padding around the screen. Outer width 376px, max-width 100%.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">phone-radius</span><span class="ds-v">44px outer. Screen radius is phone-radius − phone-bezel, so 36px.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Edge</span><span class="ds-v">1px outline in device-edge, offset −1px. No shadow.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Screen</span><span class="ds-v">surface-page ground, overflow hidden. The lock screen uses the os tokens (.os).</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">.phone-sm</span><span class="ds-v">320 × 660, radius 40. Compact class, not used in the home page markup.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Manager phone, 1024 and up</span><span class="ds-v">320 × 660, radius 40.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Push phones, below 1024</span><span class="ds-v">280 × 560, radius 36, in a 296px scroller column.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Push phones, 1024 and up</span><span class="ds-v">320 × 580, radius 40, in a 3-column grid (gap 32). max-width 100% lets the frame narrow when a column is under 336.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Below 640</span><span class="ds-v">Hero, demo and manager phones take the column width (100cqi − 2 × gutter − 2 × bezel), radius 36. Heights: hero 720, demo 700, manager 600.</span></div>
+      </div>
+
+      <figure class="stack" style="gap: 12px; align-items: center;">
+        <div class="phone">
+          <div class="phone-screen" style="align-items: center; justify-content: center; gap: 4px; text-align: center;">
+            <span class="t-label ds-v">Screen 360 × 740</span>
+            <span class="t-caption muted ds-v">Bezel 8 · outer radius 44 · screen radius 36</span>
+          </div>
+        </div>
+        <figcaption class="ds-cap">Live .phone at the default size</figcaption>
+      </figure>
+    </div>
+
+    <div class="ds-tbl" style="margin-top: 16px;">
+      <div class="ds-tr ds-c-sw ds-th"><span>Token</span><span>Light</span><span>Dark</span><span>Use</span></div>
+      <div class="ds-tr ds-c-sw">
+        <span class="ds-tk">device-bezel</span>
+        <span class="ds-sw ds-v"><span class="ds-chip" style="background: #14181F;"></span>#14181F</span>
+        <span class="ds-sw ds-v"><span class="ds-chip" style="background: #0D0F11;"></span>#0D0F11</span>
+        <span class="ds-m">Phone body around the screen</span>
+      </div>
+      <div class="ds-tr ds-c-sw">
+        <span class="ds-tk">device-edge</span>
+        <span class="ds-sw ds-v"><span class="ds-chip" style="background: #14181F;"></span>#14181F</span>
+        <span class="ds-sw ds-v"><span class="ds-chip" style="background: #6B7380;"></span>#6B7380</span>
+        <span class="ds-m">1px edge, so the phone keeps its outline on a dark page</span>
+      </div>
+    </div>
+
+    <div class="ds-tbl" style="margin-top: 16px;">
+      <div class="ds-tr ds-th" style="grid-template-columns: 200px minmax(0, 1fr);"><span>Desktop frame</span><span>Value</span></div>
+      <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Frame</span><span class="ds-v">1px border, radius-lg (16), surface-page, overflow hidden. Its own container (desk), so it reflows by frame width, not page width.</span></div>
+      <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Browser bar</span><span class="ds-v">40px tall, surface-sunken, 1px bottom border. URL pill: radius-full, max 360 wide, centered, surface-card with 1px border, 12 / 18 ink-muted, ellipsis.</span></div>
+      <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Portal nav</span><span class="ds-v">The portal sidebar is drawn as a top bar (.desk-side) at every frame width: org logo 32 × 32, then nav pills (min-height 36, 14 / 20 600, active = brand-tint with ink).</span></div>
+      <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Frame ≥ 440</span><span class="ds-v">The org name appears beside the logo.</span></div>
+      <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Frame ≥ 600</span><span class="ds-v">Main padding 16 → 24, gap 16 → 24. Source and curriculum cards sit in two columns. The people list becomes a table.</span></div>
+      <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Org logo</span><span class="ds-v">32 × 32, radius-md, 13px 700. Light: #14181F ground, #F7F6F2 letters. Dark: #ECEEF1 ground, #14181F letters. Stands in for a customer logo.</span></div>
+    </div>
+  </section>
+
+  <!-- ===================== People list ===================== -->
+  <section class="ds-grp" aria-labelledby="ds-people">
+    <div class="ds-grp-head">
+      <h2 id="ds-people" class="t-title2">People list in the portal</h2>
+      <p class="t-body muted">Stacked rows in a narrow frame, a four-column table from a 600px frame. Both specimens below are live .desk frames.</p>
+    </div>
+    <div class="ds-tbl">
+      <div class="ds-tr ds-th" style="grid-template-columns: 200px minmax(0, 1fr);"><span>Part</span><span>Value</span></div>
+      <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Frame below 600</span><span class="ds-v">Each row is a grid: name, then the status chip on the right. Progress and note span the full row below. No head row.</span></div>
+      <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Frame 600 and up</span><span class="ds-v">Head row shows. Columns 128px / 136px / 1fr / 1.3fr: Name, Status, Progress, Note. Gap 12.</span></div>
+      <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Row</span><span class="ds-v">Padding 12 / 0, 1px top border, 14 / 20.</span></div>
+      <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Head</span><span class="ds-v">12 / 16, 600, 0.02em, ink-muted.</span></div>
+      <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Progress</span><span class="ds-v">System bar: 8px track, brand fill, 2px ink benchmark tick. The value is printed as text in tabular numbers.</span></div>
+      <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Status chips</span><span class="ds-v">Neutral icons, 14px, never feedback colors: Invited = envelope (chip-none), Onboarding = timer (chip-neutral), Proficient = target in brand (chip-neutral). The word is always printed.</span></div>
+    </div>
+
+    <div style="display: flex; gap: 32px; align-items: flex-start; margin-top: 16px;">
+      <figure class="stack" style="gap: 12px; width: 400px; flex: none;">
+        <div class="desk">
+          <div class="desk-bar"><span class="desk-url">app.learnquiz.com/roles/warehouse-picker</span></div>
+          <div class="desk-body">
+            <div class="desk-side">
+              <span style="display: flex; align-items: center; gap: 8px; min-width: 0;"><span class="org-logo">NW</span><span class="t-label desk-org-name" style="white-space: nowrap;">Northwind Logistics</span></span>
+              <span class="desk-nav"><span class="is-on">Roles</span><span>People</span><span>Settings</span></span>
+            </div>
+            <div class="desk-main">
+              <div class="card stack" style="gap: 8px;">
+                <p class="t-overline muted">People · 2</p>
+                <div class="people">
+                  <div class="people-head"><span>Name</span><span>Status</span><span>Progress</span><span>Note</span></div>
+                  <div class="people-row">
+                    <span class="t-label">Morgan Chen</span>
+                    <span><span class="chip chip-neutral"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2.5 2.5M10 2h4"></path></svg>Onboarding</span></span>
+                    <span class="people-prog"><span class="bar" style="flex: 1; min-width: 48px;"><span class="bar-fill" style="width: 66%;"></span><span class="bar-bench" style="left: 85%;"></span></span><span class="t-caption num">66%</span></span>
+                    <span class="people-note t-caption muted">1 confident error, critical step</span>
+                  </div>
+                  <div class="people-row">
+                    <span class="t-label">Sam Patel</span>
+                    <span><span class="chip chip-neutral"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--brand);"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="5"></circle><circle cx="12" cy="12" r="1.5" fill="currentColor"></circle></svg>Proficient</span></span>
+                    <span class="people-prog"><span class="bar" style="flex: 1; min-width: 48px;"><span class="bar-fill" style="width: 88%;"></span><span class="bar-bench" style="left: 85%;"></span></span><span class="t-caption num">88%</span></span>
+                    <span class="people-note t-caption muted">Reached the benchmark Oct 28</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption class="ds-cap">Frame 400 wide: org name hidden, rows stacked</figcaption>
+      </figure>
+
+      <figure class="stack" style="gap: 12px; flex: 1; min-width: 0;">
+        <div class="desk">
+          <div class="desk-bar"><span class="desk-url">app.learnquiz.com/roles/warehouse-picker</span></div>
+          <div class="desk-body">
+            <div class="desk-side">
+              <span style="display: flex; align-items: center; gap: 8px; min-width: 0;"><span class="org-logo">NW</span><span class="t-label desk-org-name" style="white-space: nowrap;">Northwind Logistics</span></span>
+              <span class="desk-nav"><span class="is-on">Roles</span><span>People</span><span>Settings</span></span>
+            </div>
+            <div class="desk-main">
+              <div class="card stack" style="gap: 8px;">
+                <p class="t-overline muted">People · 2</p>
+                <div class="people">
+                  <div class="people-head"><span>Name</span><span>Status</span><span>Progress</span><span>Note</span></div>
+                  <div class="people-row">
+                    <span class="t-label">Morgan Chen</span>
+                    <span><span class="chip chip-neutral"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2.5 2.5M10 2h4"></path></svg>Onboarding</span></span>
+                    <span class="people-prog"><span class="bar" style="flex: 1; min-width: 48px;"><span class="bar-fill" style="width: 66%;"></span><span class="bar-bench" style="left: 85%;"></span></span><span class="t-caption num">66%</span></span>
+                    <span class="people-note t-caption muted">1 confident error, critical step</span>
+                  </div>
+                  <div class="people-row">
+                    <span class="t-label">Sam Patel</span>
+                    <span><span class="chip chip-neutral"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--brand);"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="5"></circle><circle cx="12" cy="12" r="1.5" fill="currentColor"></circle></svg>Proficient</span></span>
+                    <span class="people-prog"><span class="bar" style="flex: 1; min-width: 48px;"><span class="bar-fill" style="width: 88%;"></span><span class="bar-bench" style="left: 85%;"></span></span><span class="t-caption num">88%</span></span>
+                    <span class="people-note t-caption muted">Reached the benchmark Oct 28</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption class="ds-cap">Frame 720 wide: org name shown, four-column table</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ===================== Citation ===================== -->
+  <section class="ds-grp" aria-labelledby="ds-cite">
+    <div class="ds-grp-head">
+      <h2 id="ds-cite" class="t-title2">Citation</h2>
+      <p class="t-body muted">The source line under each learning-science claim.</p>
+    </div>
+    <div class="ds-split" style="grid-template-columns: minmax(0, 1fr) 480px;">
+      <div class="ds-tbl">
+        <div class="ds-tr ds-th" style="grid-template-columns: 200px minmax(0, 1fr);"><span>.cite</span><span>Value</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Element</span><span>A cite element under the claim's body text.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Type</span><span class="ds-v">13 / 18, 500, ink-muted, font-style normal (caption).</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Journal</span><span>In an i element, italic.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Pattern</span><span>Authors, year, Journal. Two sources are joined with “ · ”.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Spacing</span><span class="ds-v">8px below the body text (claim gap, space-2).</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">SOP quotes</span><span class="ds-v">Not .cite. Product quotes keep the system source line and always read “Warehouse picker SOPs v3 · §x”.</span></div>
+      </div>
+      <figure class="card stack" style="gap: 8px;">
+        <h3 class="t-title2">Trying to recall beats rereading.</h3>
+        <p class="t-body-lg">Pulling an answer from memory makes it last longer than reading the page again.</p>
+        <cite class="cite">Roediger &amp; Karpicke, 2006, <i>Psychological Science</i> · Dunlosky et al., 2013, <i>Psychological Science in the Public Interest</i></cite>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ===================== Model list ===================== -->
+  <section class="ds-grp" aria-labelledby="ds-models">
+    <div class="ds-grp-head">
+      <h2 id="ds-models" class="t-title2">Model list</h2>
+      <p class="t-body muted">A definition list: model name, then what it does.</p>
+    </div>
+    <div class="ds-split" style="grid-template-columns: minmax(0, 1fr) 640px;">
+      <div class="ds-tbl">
+        <div class="ds-tr ds-th" style="grid-template-columns: 200px minmax(0, 1fr);"><span>dl.models</span><span>Value</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Row</span><span class="ds-v">A div per model. Padding 16 / 0, 1px top border; the last row also has a bottom border.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">dt</span><span class="ds-v">17 / 24, 700, ink.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">dd</span><span class="ds-v">15 / 22, 400, ink.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Below 640</span><span class="ds-v">Name above description, gap 4.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">640 and up</span><span class="ds-v">160px name column, description beside it, gap 24.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">dl.oss-list</span><span class="ds-v">The small Hosted / Local list beside it: 64px term column (label), 15 / 22 text, gap 12, rows 12 apart. No icons.</span></div>
+      </div>
+      <div class="stack" style="gap: 24px;">
+        <figure class="stack" style="gap: 8px;">
+          <div class="site" style="width: 640px;">
+            <dl class="models">
+              <div>
+                <dt>Muse Spark</dt>
+                <dd>Writes the curriculum and questions from your SOPs, checks each one against the source, and grades written answers.</dd>
+              </div>
+            </dl>
+          </div>
+          <figcaption class="ds-cap">Live row at 640 and up</figcaption>
+        </figure>
+        <figure class="stack" style="gap: 8px;">
+          <div class="site" style="width: 328px;">
+            <dl class="models">
+              <div>
+                <dt>Muse Spark</dt>
+                <dd>Writes the curriculum and questions from your SOPs, checks each one against the source, and grades written answers.</dd>
+              </div>
+            </dl>
+          </div>
+          <figcaption class="ds-cap">Live row below 640</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Forgetting curve ===================== -->
+  <section class="ds-grp" aria-labelledby="ds-curve">
+    <div class="ds-grp-head">
+      <h2 id="ds-curve" class="t-title2">Forgetting-curve chart</h2>
+      <p class="t-body muted">Follows the weekly trend chart rules: lines in brand and ink-muted, dashes carry the difference, never saffron.</p>
+    </div>
+    <div class="ds-split" style="grid-template-columns: minmax(0, 1fr) 520px;">
+      <div class="ds-tbl">
+        <div class="ds-tr ds-th" style="grid-template-columns: 200px minmax(0, 1fr);"><span>Mark</span><span>Value</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Reviewed line</span><span class="ds-v">2.5px, brand, solid, round caps and joins.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Read-once line</span><span class="ds-v">2px, ink-muted, dash 6 / 6, round caps.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Review dots</span><span class="ds-v">r 5, brand fill, on days 1, 3 and 7.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Axis</span><span class="ds-v">Baseline 1px border-strong. Top gridline 1px border.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Labels</span><span class="ds-v">14px, 500, ink-muted, Inter (at viewBox scale). Key: 24 × 8 line samples, 13 / 18 500 ink-muted.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Frame</span><span class="ds-v">Card: surface-card, 1px border, radius-md, padding 16, gap 12. viewBox 0 −22 360 248, width 100%. Plot from x 32 to 352.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Saffron</span><span>Never.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">duration-draw</span><span class="ds-v">1200ms. New motion token, used only for this draw.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Draw-in</span><span class="ds-v">Once, when half the figure is on screen, and only if it started below the fold. Reviewed line: stroke-dashoffset 1200 → 0 over duration-draw, ease-out. Dots fade in over duration-reveal (300ms) after a duration-draw delay. A Replay link-button runs it again.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Reduced motion</span><span>Drawn static. No Replay button.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Accessibility</span><span>The svg is role=img with one sentence that states both lines. The key is aria-hidden.</span></div>
+      </div>
+      <figure class="curve-fig">
+        <figcaption class="t-title2">One procedure, two ways to learn it (illustration)</figcaption>
+        <svg class="curve-svg" viewBox="0 -22 360 248" role="img" aria-label="Specimen of the forgetting-curve chart: a dashed read-once line falling steeply, and a solid reviewed line that returns to the top on days 1, 3 and 7.">
+          <line x1="32" y1="20" x2="352" y2="20" stroke="var(--border)" stroke-width="1"></line>
+          <line x1="32" y1="190" x2="352" y2="190" stroke="var(--border-strong)" stroke-width="1"></line>
+          <text x="0" y="-6">Recall</text>
+          <text x="32" y="214" text-anchor="middle">0</text>
+          <text x="54.9" y="214" text-anchor="middle">1</text>
+          <text x="100.6" y="214" text-anchor="middle">3</text>
+          <text x="192" y="214" text-anchor="middle">7</text>
+          <text x="352" y="214" text-anchor="end">14 days</text>
+          <polyline points="32,20 43.4,51 54.9,76 66.3,97 77.7,114 100.6,139 123.4,156 146.3,167 169.1,175 192,180 214.9,183 260.6,187 306.3,189 352,189" fill="none" stroke="var(--ink-muted)" stroke-width="2" stroke-dasharray="6 6" stroke-linecap="round" stroke-linejoin="round"></polyline>
+          <polyline points="32,20 43.4,51 54.9,76 54.9,20 66.3,34 77.7,46 89.1,58 100.6,68 100.6,20 123.4,31 146.3,41 169.1,51 192,60 192,20 214.9,24 260.6,32 306.3,40 352,47" fill="none" stroke="var(--brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></polyline>
+          <circle cx="54.9" cy="20" r="5" fill="var(--brand)"></circle>
+          <circle cx="100.6" cy="20" r="5" fill="var(--brand)"></circle>
+          <circle cx="192" cy="20" r="5" fill="var(--brand)"></circle>
+        </svg>
+        <div class="curve-key" aria-hidden="true">
+          <span><svg width="24" height="8" viewBox="0 0 24 8"><line x1="0" y1="4" x2="24" y2="4" stroke="var(--brand)" stroke-width="2.5"></line></svg>Reviewed on days 1, 3 and 7</span>
+          <span><svg width="24" height="8" viewBox="0 0 24 8"><line x1="0" y1="4" x2="24" y2="4" stroke="var(--ink-muted)" stroke-width="2" stroke-dasharray="6 6"></line></svg>Read once</span>
+        </div>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ===================== Header behavior ===================== -->
+  <section class="ds-grp" aria-labelledby="ds-hdr">
+    <div class="ds-grp-head">
+      <h2 id="ds-hdr" class="t-title2">Header behavior</h2>
+      <p class="t-body muted">Saffron marks one action per view. The header's sign-up button stays quiet while another saffron button is on screen.</p>
+    </div>
+    <div class="ds-tbl">
+      <div class="ds-tr ds-th" style="grid-template-columns: 200px minmax(0, 1fr);"><span>Part</span><span>Value</span></div>
+      <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Bar</span><span class="ds-v">position sticky, top 0, z-index 20. surface-page, 1px bottom border, header-h 64.</span></div>
+      <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Quiet</span><span>Button secondary while the hero or close “Create a company account” button is on screen. This is the state on load.</span></div>
+      <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Saffron</span><span>Button accent once neither of those buttons is on screen.</span></div>
+      <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Detection</span><span class="ds-v">IntersectionObserver on #lqs-hero-cta and #lqs-close-cta, rootMargin −64px at the top, so a button under the header counts as hidden.</span></div>
+      <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Transition</span><span class="ds-v">Background, color and border, 150ms ease-out (duration-fast). 0ms under reduced motion.</span></div>
+      <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Legal pages</span><span>No saffron action and no menu button. GitHub and Sign in links show at every width.</span></div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; margin-top: 16px;">
+      <figure class="stack" style="gap: 8px;">
+        <div style="border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-page); padding: 0 16px;">
+          <div class="hdr-in">
+            <span class="logo">
+              <svg viewBox="0 0 24 24" width="32" height="32" aria-hidden="true"><mask id="ds-lqm-1" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"></rect><circle cx="18" cy="18" r="6" fill="#000"></circle></mask><path fill="var(--brand)" fill-rule="evenodd" mask="url(#ds-lqm-1)" d="M11 1a10 10 0 1 0 0 20a10 10 0 1 0 0-20zm0 5a5 5 0 1 1 0 10a5 5 0 1 1 0-10z"></path><circle cx="18" cy="18" r="4" fill="var(--accent)"></circle></svg>
+              <span class="wordmark">Learn Quiz</span>
+            </span>
+            <span style="display: flex; align-items: center; gap: 4px; margin-left: auto;"><span class="link-btn">Sign in</span><span class="link-btn">GitHub</span></span>
+            <span class="btn btn-secondary" style="margin-left: 8px;">Create a company account</span>
+          </div>
+        </div>
+        <figcaption class="ds-cap">Quiet: the hero or close button is on screen</figcaption>
+      </figure>
+      <figure class="stack" style="gap: 8px;">
+        <div style="border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-page); padding: 0 16px;">
+          <div class="hdr-in">
+            <span class="logo">
+              <svg viewBox="0 0 24 24" width="32" height="32" aria-hidden="true"><mask id="ds-lqm-2" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"></rect><circle cx="18" cy="18" r="6" fill="#000"></circle></mask><path fill="var(--brand)" fill-rule="evenodd" mask="url(#ds-lqm-2)" d="M11 1a10 10 0 1 0 0 20a10 10 0 1 0 0-20zm0 5a5 5 0 1 1 0 10a5 5 0 1 1 0-10z"></path><circle cx="18" cy="18" r="4" fill="var(--accent)"></circle></svg>
+              <span class="wordmark">Learn Quiz</span>
+            </span>
+            <span style="display: flex; align-items: center; gap: 4px; margin-left: auto;"><span class="link-btn">Sign in</span><span class="link-btn">GitHub</span></span>
+            <span class="btn btn-accent" style="margin-left: 8px;">Create a company account</span>
+          </div>
+        </div>
+        <figcaption class="ds-cap">Saffron: both are off screen</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ===================== Skip link ===================== -->
+  <section class="ds-grp" aria-labelledby="ds-skip">
+    <div class="ds-grp-head">
+      <h2 id="ds-skip" class="t-title2">Skip link</h2>
+      <p class="t-body muted">The first tab stop on every page. Hidden until focused, then a visible chip over the header.</p>
+    </div>
+    <div class="ds-split" style="grid-template-columns: minmax(0, 1fr) 320px;">
+      <div class="ds-tbl">
+        <div class="ds-tr ds-th" style="grid-template-columns: 200px minmax(0, 1fr);"><span>.skip</span><span>Value</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Position</span><span class="ds-v">Absolute, left 16 (space-4), top 8 (space-2), z-index 40, above the sticky header (20).</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Hidden</span><span class="ds-v">translateY(−200%) until focused. On focus, transform none.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Look</span><span class="ds-v">min-height 44, padding 0 16, radius-md, brand fill, on-brand text, 14 / 20 600, no underline.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Target</span><span class="ds-v">href="#main", the main landmark.</span></div>
+      </div>
+      <figure class="stack" style="gap: 8px;">
+        <div style="position: relative; height: 64px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-page); overflow: hidden;">
+          <span class="skip" style="transform: none;">Skip to content</span>
+        </div>
+        <figcaption class="ds-cap">Live .skip in its focused state</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ===================== Video dialog ===================== -->
+  <section class="ds-grp" aria-labelledby="ds-video">
+    <div class="ds-grp-head">
+      <h2 id="ds-video" class="t-title2">Video dialog</h2>
+      <p class="t-body muted">“Watch the demo” opens a native dialog with showModal. Escape and the Close button close it, and focus returns to the button.</p>
+    </div>
+    <div class="ds-split" style="grid-template-columns: minmax(0, 1fr) 560px;">
+      <div class="ds-tbl">
+        <div class="ds-tr ds-th" style="grid-template-columns: 200px minmax(0, 1fr);"><span>.video-dlg</span><span>Value</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Dialog</span><span class="ds-v">width min(880px, 100vw − 32px), no padding, no border, radius-lg, surface-card, shadow-raised.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Backdrop</span><span class="ds-v">scrim token (light #14181F at 48%, dark #000 at 60%).</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Head</span><span class="ds-v">Title in title-2, 48px Close icon button. Padding 8 8 8 24, 1px bottom border.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Frame</span><span class="ds-v">16 : 9, surface-sunken, ink-muted, centered, padding 24. Holds the embed.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Foot</span><span class="ds-v">Padding 16 / 24, caption: captions note and transcript link.</span></div>
+        <div class="ds-tr" style="grid-template-columns: 200px minmax(0, 1fr);"><span class="ds-tk">Accessibility</span><span>aria-labelledby the title. The opener has aria-haspopup="dialog".</span></div>
+      </div>
+      <figure class="stack" style="gap: 8px;">
+        <div class="video-dlg" style="width: 100%;">
+          <div class="video-head">
+            <p class="t-title2" style="flex: 1;">Learn Quiz demo, 3 minutes</p>
+            <span class="icon-btn" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+          </div>
+          <div class="video-frame">
+            <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"></path></svg>
+            <p class="t-label">[DEMO VIDEO EMBED]</p>
+          </div>
+          <p class="video-foot t-caption muted">Captions on by default. [TRANSCRIPT LINK]</p>
+        </div>
+        <figcaption class="ds-cap">Live .video-dlg parts, drawn in place without the backdrop</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ===================== Never rules ===================== -->
+  <section class="ds-grp" aria-labelledby="ds-never">
+    <div class="ds-grp-head">
+      <h2 id="ds-never" class="t-title2">Never rules kept</h2>
+      <p class="t-body muted">The marketing site adds no exceptions to the system's rules.</p>
+    </div>
+    <div class="ds-tbl">
+      <div class="ds-tr ds-th" style="grid-template-columns: 280px minmax(0, 1fr);"><span>Rule</span><span>How the site keeps it</span></div>
+      <div class="ds-tr" style="grid-template-columns: 280px minmax(0, 1fr);"><span class="ds-tk">No gradients</span><span>Flat fills only. Device frames are a solid bezel color.</span></div>
+      <div class="ds-tr" style="grid-template-columns: 280px minmax(0, 1fr);"><span class="ds-tk">No shadows on cards</span><span>Cards, the desktop frame and phones use a 1px border or outline. shadow-raised appears only on things that float: the demo's result sheet and the video dialog.</span></div>
+      <div class="ds-tr" style="grid-template-columns: 280px minmax(0, 1fr);"><span class="ds-tk">Saffron is never text or lines</span><span>Saffron appears only as a button fill and as the logo's dot. Chart lines use brand and ink-muted.</span></div>
+      <div class="ds-tr" style="grid-template-columns: 280px minmax(0, 1fr);"><span class="ds-tk">One saffron button per view</span><span>Hero and close buttons are saffron. The header button stays quiet while either is on screen.</span></div>
+      <div class="ds-tr" style="grid-template-columns: 280px minmax(0, 1fr);"><span class="ds-tk">Feedback colors only in the answer section</span><span>Green and red appear only in section 5: the outcome icons, the demo's answer states and the result band. Critical markers stay in ink.</span></div>
+    </div>
+  </section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":7830}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

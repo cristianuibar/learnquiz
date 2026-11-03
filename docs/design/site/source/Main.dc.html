@@ -1,0 +1,1077 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Learn Quiz: onboarding from your own SOPs</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="site.css">
+<meta name="description" content="Upload a role’s SOPs. New hires practice them on their phone in five-minute sessions until they reach your benchmark. Every explanation quotes your document.">
+<meta property="og:title" content="Learn Quiz: new hires learn the job from your own SOPs">
+<meta property="og:description" content="Five-minute quiz sessions on the phone. Every explanation quotes your document.">
+<meta property="og:image" content="https://learnquiz.com/og.png">
+<meta name="twitter:card" content="summary_large_image">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq site" data-theme="{{theme}}">
+
+  <a class="skip" href="#main">Skip to content</a>
+
+  <!-- 1 · Header -->
+  <header class="hdr">
+    <div class="wrap">
+      <div class="hdr-in">
+        <a class="logo" href="#top" aria-label="Learn Quiz home">
+          <svg viewBox="0 0 24 24" width="32" height="32" aria-hidden="true"><mask id="lqm-h" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"></rect><circle cx="18" cy="18" r="6" fill="#000"></circle></mask><path fill="var(--brand)" fill-rule="evenodd" mask="url(#lqm-h)" d="M11 1a10 10 0 1 0 0 20a10 10 0 1 0 0-20zm0 5a5 5 0 1 1 0 10a5 5 0 1 1 0-10z"></path><circle cx="18" cy="18" r="4" fill="var(--accent)"></circle></svg>
+          <span class="wordmark" aria-hidden="true">Learn Quiz</span>
+        </a>
+        <nav class="hdr-links" aria-label="Site">
+          <a class="link-btn" href="https://app.learnquiz.com/sign-in">Sign in</a>
+          <a class="link-btn" href="https://github.com/">GitHub</a>
+        </nav>
+        <a class="{{hdrCtaCls}}" href="https://app.learnquiz.com/sign-up">Create a company account</a>
+        <button id="lqs-menu-btn" class="icon-btn hdr-menu-btn" type="button" aria-label="Menu" aria-expanded="{{menuExpanded}}" aria-controls="lqs-menu" onClick="{{toggleMenu}}" onKeyDown="{{menuKey}}">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+        </button>
+      </div>
+      <sc-if value="{{menuOpen}}" hint-placeholder-val="{{ false }}">
+        <nav id="lqs-menu" class="hdr-menu" aria-label="Site menu" onKeyDown="{{menuKey}}">
+          <a href="https://app.learnquiz.com/sign-in">Sign in</a>
+          <a href="https://github.com/">GitHub</a>
+        </nav>
+      </sc-if>
+    </div>
+  </header>
+
+  <main id="main">
+
+    <!-- 2 · Hero -->
+    <section class="hero" aria-labelledby="lqs-h1" id="top">
+      <div class="wrap">
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <h1 id="lqs-h1" class="h-hero">New hires learn the job from your own SOPs.</h1>
+            <p class="lead" style="max-width: 34em;">Upload the procedures for a role. New hires practice them on their phone in five-minute sessions until they reach your benchmark. Every explanation quotes your document.</p>
+            <div class="hero-actions" id="lqs-hero-cta">
+              <a class="btn btn-accent btn-lg" href="https://app.learnquiz.com/sign-up">Create a company account</a>
+              <button id="lqs-video-btn" class="btn btn-secondary btn-lg" type="button" aria-haspopup="dialog" onClick="{{openVideo}}">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"></path></svg>
+                Watch the demo <span class="muted" style="font-weight: 500;">3 min</span>
+              </button>
+            </div>
+          </div>
+
+          <figure class="hero-phone">
+            <div class="phone" role="img" aria-label="Learn Quiz on a phone. Question 7 of 20: A pallet’s shrink wrap is torn on arrival. What do you do first? Four answers, then: How sure are you? Sure, Unsure or Guessing.">
+              <div class="phone-screen" aria-hidden="true">
+                <div class="p-topbar">
+                  <span class="p-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+                  <div style="flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px;">
+                    <div class="bar" style="flex: 1;"><div class="bar-fill" style="width: 35%;"></div></div>
+                    <span class="t-overline num muted">7 of 20</span>
+                  </div>
+                  <span class="p-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"></path><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"></path></svg></span>
+                </div>
+                <div class="p-scroll">
+                  <p class="t-title2">A pallet’s shrink wrap is torn on arrival. What do you do first?</p>
+                  <div class="opt-list">
+                    <div class="opt"><span class="radio"></span><span class="opt-text">Re-wrap it and put it away as normal</span></div>
+                    <div class="opt is-selected"><span class="radio"></span><span class="opt-text">Photograph the damage and note it on the delivery receipt</span></div>
+                    <div class="opt"><span class="radio"></span><span class="opt-text">Move it straight to Quarantine bay Q1</span></div>
+                    <div class="opt"><span class="radio"></span><span class="opt-text">Sign the receipt, then tell your lead</span></div>
+                  </div>
+                </div>
+                <div class="p-dock">
+                  <div>
+                    <span class="conf-legend">How sure are you?</span>
+                    <div class="conf">
+                      <span class="conf-btn">Sure</span>
+                      <span class="conf-btn is-selected"><span class="conf-tick"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></span>Unsure</span>
+                      <span class="conf-btn">Guessing</span>
+                    </div>
+                  </div>
+                  <span class="p-btn p-btn-primary">Check</span>
+                </div>
+              </div>
+            </div>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3 · The problem -->
+    <section class="section" aria-labelledby="lqs-problem">
+      <div class="wrap">
+        <div class="problem-grid">
+          <div class="stack" style="gap: 24px;">
+            <h2 id="lqs-problem" class="h-section">Your best people teach the same things to every new hire.</h2>
+            <p class="lead">Shadowing takes a senior picker off the floor for days, and the new hire still learns by watching. The manual gets read once, if at all. Reading it is not the same as knowing it.</p>
+          </div>
+          <figure class="founder">
+            <blockquote class="founder-quote">You can control what you tell people, but not what they understand.</blockquote>
+            <figcaption class="stack" style="gap: 4px;">
+              <span class="t-label">Cristian, founder of Learn Quiz</span>
+              <span class="t-body muted">He passed the Romanian driving exam by taking the practice quizzes over and over. They taught him more than the law book did.</span>
+            </figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4 · How it works -->
+    <section class="section" aria-labelledby="lqs-how">
+      <div class="wrap">
+        <div class="how-grid">
+          <div class="stack" style="gap: 32px;">
+            <h2 id="lqs-how" class="h-section">Your SOPs become the training.</h2>
+            <ol class="steps">
+              <li class="step">
+                <span class="step-n" aria-hidden="true">1</span>
+                <div class="stack" style="gap: 4px;">
+                  <h3 class="t-title2">Upload the role’s SOPs</h3>
+                  <p class="t-body muted">A PDF or pasted text, one role at a time.</p>
+                </div>
+              </li>
+              <li class="step">
+                <span class="step-n" aria-hidden="true">2</span>
+                <div class="stack" style="gap: 4px;">
+                  <h3 class="t-title2">Learn Quiz builds the curriculum and questions</h3>
+                  <p class="t-body muted">Units, concepts and questions, each explanation quoting your document. Safety, money and compliance steps are marked critical.</p>
+                </div>
+              </li>
+              <li class="step">
+                <span class="step-n" aria-hidden="true">3</span>
+                <div class="stack" style="gap: 4px;">
+                  <h3 class="t-title2">New hires practice until they reach the benchmark</h3>
+                  <p class="t-body muted">Invite them with a link or QR code. A placement quiz of 8 to 12 answers skips what they already know. Five-minute sessions cover the rest.</p>
+                </div>
+              </li>
+            </ol>
+          </div>
+
+          <figure class="stack" style="gap: 12px;">
+            <div class="transform">
+              <div class="doc">
+                <div class="doc-head">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--ink-muted);"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5M9 13h6M9 17h4"></path></svg>
+                  <span class="t-label" style="flex: 1;">Warehouse picker SOPs.pdf</span>
+                  <span class="t-caption muted">Page 9</span>
+                </div>
+                <div class="doc-line" style="width: 92%;" aria-hidden="true"></div>
+                <div class="doc-line" style="width: 70%;" aria-hidden="true"></div>
+                <div class="doc-mark">
+                  <p class="t-caption muted">§3.4</p>
+                  <p class="t-body"><strong style="font-weight: 700;">Critical: resolve a scan mismatch.</strong> If the scanner reports the wrong location or item, stop the pick and notify the shift lead. Do not override the warning, scan a nearby item’s label, or type the expected code to force a match.</p>
+                </div>
+                <div class="doc-line" style="width: 84%;" aria-hidden="true"></div>
+                <div class="doc-line" style="width: 58%;" aria-hidden="true"></div>
+              </div>
+
+              <div class="arrow">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+                <span class="sr-only">becomes</span>
+              </div>
+
+              <div class="gen">
+                <div class="crumbs">
+                  <span class="t-caption muted">Scanning</span>
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--ink-muted);"><path d="M9 6l6 6-6 6"></path></svg>
+                  <span class="t-caption">Resolve a scan mismatch</span>
+                  <span class="chip chip-critical">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>
+                    Critical
+                  </span>
+                </div>
+                <p class="t-title2" style="font-size: 17px; line-height: 24px;">Your scanner says the item doesn’t match the pick. What do you do first?</p>
+                <ul class="opt-list" style="gap: 8px;">
+                  <li class="opt"><span class="radio" aria-hidden="true"></span><span class="opt-text">Scan the item next to it</span></li>
+                  <li class="opt"><span class="radio" aria-hidden="true"></span><span class="opt-text">Stop the pick and tell the shift lead</span></li>
+                  <li class="opt"><span class="radio" aria-hidden="true"></span><span class="opt-text">Type the expected code</span></li>
+                  <li class="opt"><span class="radio" aria-hidden="true"></span><span class="opt-text">Override and continue</span></li>
+                </ul>
+                <p class="quote-src">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5M9 13h6M9 17h4"></path></svg>
+                  The explanation quotes Warehouse picker SOPs v3 · §3.4
+                </p>
+              </div>
+            </div>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5 · The answer moment (interactive) -->
+    <section class="section section-band" aria-labelledby="lqs-answer" id="try">
+      <div class="wrap">
+        <div class="answer-grid">
+          <div class="answer-intro">
+            <h2 id="lqs-answer" class="h-section">Being right and being sure are different things.</h2>
+            <p class="lead">Every answer comes with how sure you were. What you see next depends on both.</p>
+          </div>
+
+          <div class="demo-phone">
+            <div class="phone">
+              <div class="phone-screen">
+                <div class="p-topbar" aria-hidden="true">
+                  <span class="p-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+                  <div style="flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px;">
+                    <div class="bar" style="flex: 1;"><div class="bar-fill" style="width: 40%;"></div></div>
+                    <span class="t-overline num muted">8 of 20</span>
+                  </div>
+                  <span class="p-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"></path><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"></path></svg></span>
+                </div>
+
+                <!-- Asking -->
+                <sc-if value="{{asking}}" hint-placeholder-val="{{ true }}">
+                  <div class="stack" style="flex: 1 1 auto; min-height: 0;" role="group" aria-label="Try a question">
+                    <div class="p-scroll" style="overflow-y: auto;">
+                      <p id="lqs-q" class="t-title2">Your scanner says the item doesn’t match the pick. What do you do first?</p>
+                      <div class="opt-list" role="radiogroup" aria-labelledby="lqs-q">
+                        <sc-for list="{{answers}}" as="o" hint-placeholder-count="4">
+                          <button id="{{o.domId}}" class="{{o.cls}}" type="button" role="radio" aria-checked="{{o.ariaChecked}}" tabindex="{{o.tab}}" onClick="{{o.pick}}" onKeyDown="{{o.key}}">
+                            <span class="radio" aria-hidden="true"></span>
+                            <span class="opt-text">{{o.text}}</span>
+                          </button>
+                        </sc-for>
+                      </div>
+                    </div>
+                    <div class="p-dock">
+                      <div>
+                        <p id="lqs-conf-l" class="conf-legend">How sure are you?</p>
+                        <div class="conf" role="radiogroup" aria-labelledby="lqs-conf-l">
+                          <sc-for list="{{confs}}" as="c" hint-placeholder-count="3">
+                            <button id="{{c.domId}}" class="{{c.cls}}" type="button" role="radio" aria-checked="{{c.ariaChecked}}" tabindex="{{c.tab}}" onClick="{{c.pick}}" onKeyDown="{{c.key}}">
+                              <span class="conf-tick" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></span>
+                              {{c.label}}
+                            </button>
+                          </sc-for>
+                        </div>
+                      </div>
+                      <button class="btn btn-primary btn-lg btn-block" type="button" disabled="{{notReady}}" onClick="{{submit}}">Check</button>
+                    </div>
+                  </div>
+                </sc-if>
+
+                <!-- Revealed -->
+                <sc-if value="{{revealed}}" hint-placeholder-val="{{ false }}">
+                  <div class="p-scroll" aria-hidden="true" style="padding-top: 8px;">
+                    <p class="t-title2">Your scanner says the item doesn’t match the pick. What do you do first?</p>
+                    <div class="opt-list">
+                      <sc-for list="{{results}}" as="o" hint-placeholder-count="4">
+                        <div class="{{o.cls}}">
+                          <sc-if value="{{o.isCorrect}}" hint-placeholder-val="{{ false }}">
+                            <span class="fb-mark" style="display: inline-flex;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></span>
+                          </sc-if>
+                          <sc-if value="{{o.isWrong}}" hint-placeholder-val="{{ false }}">
+                            <span class="fb-mark" style="display: inline-flex;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+                          </sc-if>
+                          <sc-if value="{{o.isRest}}" hint-placeholder-val="{{ true }}">
+                            <span class="radio"></span>
+                          </sc-if>
+                          <span class="opt-text">{{o.text}}</span>
+                          <sc-if value="{{o.isCorrect}}" hint-placeholder-val="{{ false }}">
+                            <span class="fb-word">Correct</span>
+                          </sc-if>
+                          <sc-if value="{{o.isWrong}}" hint-placeholder-val="{{ false }}">
+                            <span class="fb-word">Not quite</span>
+                          </sc-if>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <div class="scrim" aria-hidden="true"></div>
+                  <section class="sheet" aria-labelledby="lqs-result">
+                    <div class="grabber" aria-hidden="true" style="position: absolute; top: 0; left: 0; right: 0;"></div>
+                    <div class="{{bandCls}}" style="padding: 24px 16px 16px; border-radius: 16px 16px 0 0;">
+                      <span class="band-dot" aria-hidden="true">
+                        <sc-if value="{{isRight}}" hint-placeholder-val="{{ true }}">
+                          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"></path></svg>
+                        </sc-if>
+                        <sc-if value="{{isMiss}}" hint-placeholder-val="{{ false }}">
+                          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+                        </sc-if>
+                      </span>
+                      <h3 id="lqs-result" class="t-title2" tabindex="-1" style="flex: 1; outline-offset: 4px;">{{bandLabel}}<span class="sr-only">{{bandSr}}</span></h3>
+                      <sc-if value="{{isRight}}" hint-placeholder-val="{{ true }}">
+                        <span class="xp-quiet">+10 XP</span>
+                      </sc-if>
+                    </div>
+
+                    <div class="sheet-body" tabindex="0" role="region" aria-label="Answer details">
+                      <sc-if value="{{isRight}}" hint-placeholder-val="{{ true }}">
+                        <p class="t-body-lg">Stop the pick and tell the shift lead.</p>
+                      </sc-if>
+
+                      <sc-if value="{{isCS}}" hint-placeholder-val="{{ true }}">
+                        <button class="link-btn" type="button" aria-expanded="{{whyExpanded}}" onClick="{{toggleWhy}}" style="align-self: flex-start; margin: -12px 0 0 -8px;">
+                          Why
+                          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform: {{chevron}}; transition: transform 150ms cubic-bezier(0.2, 0, 0, 1);"><path d="M6 9l6 6 6-6"></path></svg>
+                        </button>
+                      </sc-if>
+
+                      <sc-if value="{{showWhy}}" hint-placeholder-val="{{ false }}">
+                        <p class="t-body">The mismatch warning is the check. Stopping keeps the wrong item off the order, and the shift lead sorts out the slot.</p>
+                        <figure class="quote">
+                          <blockquote class="quote-text">“If the scanner reports the wrong location or item, stop the pick and notify the shift lead. Do not override the warning, scan a nearby item’s label, or type the expected code to force a match.”</blockquote>
+                          <figcaption class="quote-src">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5M9 13h6M9 17h4"></path></svg>
+                            Warehouse picker SOPs v3 · §3.4
+                          </figcaption>
+                        </figure>
+                      </sc-if>
+
+                      <sc-if value="{{isMiss}}" hint-placeholder-val="{{ false }}">
+                        <div class="pair">
+                          <span class="pair-mark ic-correct" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></span>
+                          <div class="stack" style="flex: 1; min-width: 0; gap: 2px;">
+                            <p class="t-caption muted">The answer</p>
+                            <p class="t-body-lg">Stop the pick and tell the shift lead</p>
+                          </div>
+                        </div>
+                        <div class="pair">
+                          <span class="pair-mark ic-wrong" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+                          <div class="stack" style="flex: 1; min-width: 0; gap: 2px;">
+                            <p class="t-caption muted">You chose</p>
+                            <p class="t-body-lg">{{chosenText}}</p>
+                            <p class="t-body" style="margin-top: 4px;">{{chosenWhy}}</p>
+                          </div>
+                        </div>
+                      </sc-if>
+
+                      <sc-if value="{{isSW}}" hint-placeholder-val="{{ false }}">
+                        <p class="critical-row">
+                          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>
+                          <span><strong style="font-weight: 700;">You were sure, on a critical step.</strong> It comes back first next session.</span>
+                        </p>
+                        <div class="stack" style="gap: 4px;">
+                          <h4 class="t-label">Why it felt right</h4>
+                          <p class="t-body">{{chosenFelt}}</p>
+                        </div>
+                        <div class="stack" style="gap: 4px;">
+                          <h4 class="t-label">What actually matters</h4>
+                          <p class="t-body">A mismatch means stop. The shift lead checks the slot before anything moves.</p>
+                        </div>
+                      </sc-if>
+
+                      <sc-if value="{{isMiss}}" hint-placeholder-val="{{ false }}">
+                        <figure class="quote">
+                          <blockquote class="quote-text">“If the scanner reports the wrong location or item, stop the pick and notify the shift lead. Do not override the warning, scan a nearby item’s label, or type the expected code to force a match.”</blockquote>
+                          <figcaption class="quote-src">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5M9 13h6M9 17h4"></path></svg>
+                            Warehouse picker SOPs v3 · §3.4
+                          </figcaption>
+                        </figure>
+                      </sc-if>
+
+                      <sc-if value="{{isNQ}}" hint-placeholder-val="{{ false }}">
+                        <p class="t-body muted" style="display: flex; align-items: center; gap: 8px;">
+                          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"></path></svg>
+                          This comes back later this session.
+                        </p>
+                      </sc-if>
+                    </div>
+
+                    <div class="sheet-foot">
+                      <button class="btn btn-primary btn-lg btn-block" type="button" onClick="{{reset}}">Try another answer</button>
+                    </div>
+                  </section>
+                </sc-if>
+              </div>
+            </div>
+          </div>
+
+          <div class="answer-list">
+            <h3 id="lqs-outcomes" class="t-label muted" style="margin-bottom: 12px;">Or jump to an outcome</h3>
+            <ul class="reveals" aria-labelledby="lqs-outcomes">
+              <sc-for list="{{reveals}}" as="r" hint-placeholder-count="4">
+                <li>
+                  <button class="rv-item" type="button" aria-pressed="{{r.pressed}}" onClick="{{r.show}}">
+                    <span class="rv-icons">
+                      <sc-if value="{{r.right}}" hint-placeholder-val="{{ true }}">
+                        <svg class="ic-correct" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12.5l5 5L19.5 7"></path></svg>
+                      </sc-if>
+                      <sc-if value="{{r.miss}}" hint-placeholder-val="{{ false }}">
+                        <svg class="ic-wrong" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+                      </sc-if>
+                    </span>
+                    <span class="rv-title">{{r.title}} <span class="rv-showing" aria-hidden="true">Showing</span></span>
+                    <span class="rv-desc">{{r.desc}}</span>
+                  </button>
+                </li>
+              </sc-for>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6 · Questions that come to you -->
+    <section class="section" aria-labelledby="lqs-push">
+      <div class="wrap">
+        <div class="push-head">
+          <h2 id="lqs-push" class="h-section">Between tasks, one question at a time.</h2>
+        </div>
+
+        <ol id="lqs-push-row" class="push-row" tabindex="{{pushTab}}" aria-label="From push to done, three screens">
+          <li class="push-step">
+            <div class="phone" role="img" aria-label="Lock screen at 9:41 with a Learn Quiz notification: Your pick slot is empty. What do you do first?">
+              <div class="phone-screen os" aria-hidden="true" style="padding: 72px 12px 8px;">
+                <div class="stack" style="align-items: center; gap: 4px; margin-bottom: 40px;">
+                  <p class="num" style="font-size: 56px; line-height: 64px; font-weight: 400; letter-spacing: -0.02em; color: var(--os-ink);">9:41</p>
+                  <p class="t-body" style="color: var(--os-ink-muted);">Tuesday, November 3</p>
+                </div>
+                <div class="stack" style="gap: 8px; background: var(--os-card); border-radius: 16px; padding: 14px;">
+                  <span style="display: flex; align-items: center; gap: 8px; color: var(--os-ink-muted);">
+                    <span style="width: 20px; height: 20px; border-radius: 9999px; background: var(--brand); display: inline-flex; align-items: center; justify-content: center;">
+                      <svg viewBox="0 0 24 24" width="16" height="16"><mask id="lqn-p" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"></rect><circle cx="18" cy="18" r="6" fill="#000"></circle></mask><path fill="var(--on-brand)" fill-rule="evenodd" mask="url(#lqn-p)" d="M11 1a10 10 0 1 0 0 20a10 10 0 1 0 0-20zm0 5a5 5 0 1 1 0 10a5 5 0 1 1 0-10z"></path><circle cx="18" cy="18" r="4" fill="var(--on-brand)"></circle></svg>
+                    </span>
+                    <span class="t-caption">Learn Quiz · now</span>
+                  </span>
+                  <span class="t-body" style="font-weight: 600; color: var(--os-ink);">Your pick slot is empty. What do you do first?</span>
+                </div>
+              </div>
+            </div>
+            <div class="push-cap">
+              <div class="stack" style="gap: 2px;">
+                <h3 class="t-label">The push is the question</h3>
+                <p class="t-body muted">Under 60 characters, nothing else.</p>
+              </div>
+            </div>
+          </li>
+
+          <li class="push-step">
+            <div class="phone" role="img" aria-label="A one-question session: Your pick slot is empty. What do you do first? Report a short pick on the scanner is selected, and Sure.">
+              <div class="phone-screen" aria-hidden="true">
+                <div class="p-topbar">
+                  <span class="p-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+                  <span class="t-overline muted" style="flex: 1;">1 question</span>
+                </div>
+                <div class="p-scroll" style="gap: 16px;">
+                  <p class="t-title2">Your pick slot is empty. What do you do first?</p>
+                  <div class="opt-list" style="gap: 8px;">
+                    <div class="opt is-selected" style="min-height: 48px; font-size: 15px; line-height: 22px;"><span class="radio"></span><span class="opt-text">Report a short pick on the scanner</span></div>
+                    <div class="opt" style="min-height: 48px; font-size: 15px; line-height: 22px;"><span class="radio"></span><span class="opt-text">Take one from the next slot</span></div>
+                    <div class="opt" style="min-height: 48px; font-size: 15px; line-height: 22px;"><span class="radio"></span><span class="opt-text">Skip it and come back</span></div>
+                    <div class="opt" style="min-height: 48px; font-size: 15px; line-height: 22px;"><span class="radio"></span><span class="opt-text">Wait for a restock</span></div>
+                  </div>
+                </div>
+                <div class="p-dock">
+                  <div class="conf">
+                    <span class="conf-btn is-selected"><span class="conf-tick"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></span>Sure</span>
+                    <span class="conf-btn">Unsure</span>
+                    <span class="conf-btn">Guessing</span>
+                  </div>
+                  <span class="p-btn p-btn-primary">Check</span>
+                </div>
+              </div>
+            </div>
+            <div class="push-cap">
+              <div class="stack" style="gap: 2px;">
+                <h3 class="t-label">One question</h3>
+                <p class="t-body muted">Answer it and say how sure you are.</p>
+              </div>
+            </div>
+          </li>
+
+          <li class="push-step">
+            <div class="phone" role="img" aria-label="Done screen: Report a short pick on the scanner, with the quote from Warehouse picker SOPs, section 2.4. One review cleared, three left today.">
+              <div class="phone-screen" aria-hidden="true">
+                <div class="p-topbar">
+                  <span class="p-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+                </div>
+                <div class="p-scroll" style="gap: 16px;">
+                  <div class="card stack" style="gap: 4px;">
+                    <span class="t-label" style="display: flex; align-items: center; gap: 6px; color: var(--brand);"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"></path></svg>1 review cleared</span>
+                    <p class="t-body-lg">Report a short pick on the scanner.</p>
+                  </div>
+                  <div class="quote">
+                    <p class="quote-text">“If the slot is empty, report a short pick on the scanner. Don’t take stock from another slot.”</p>
+                    <p class="quote-src">Warehouse picker SOPs v3 · §2.4</p>
+                  </div>
+                  <p class="t-label muted">3 left today</p>
+                </div>
+                <div class="p-dock" style="border-top: 0;">
+                  <span class="p-btn p-btn-primary">Back to Today</span>
+                </div>
+              </div>
+            </div>
+            <div class="push-cap">
+              <div class="stack" style="gap: 2px;">
+                <h3 class="t-label">The answer, with its source</h3>
+                <p class="t-body muted">Then back to work.</p>
+              </div>
+            </div>
+          </li>
+        </ol>
+
+        <div class="push-facts">
+          <div class="fact">
+            <h3 class="t-title2">Working hours only</h3>
+            <p class="t-body muted">Pushes arrive during working hours. Nothing at night or on days off.</p>
+          </div>
+          <div class="fact">
+            <h3 class="t-title2">Ignoring one is fine</h3>
+            <p class="t-body muted">A push left unanswered is never penalized. The question waits for the next session.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7 · For managers -->
+    <section class="section" aria-labelledby="lqs-mgr">
+      <div class="wrap">
+        <div class="push-head">
+          <h2 id="lqs-mgr" class="h-section">You see who is on track. They see exactly what you see.</h2>
+        </div>
+
+        <div class="mgr-grid">
+          <figure class="stack" style="gap: 12px; min-width: 0;">
+            <div class="desk" role="img" aria-label="Company portal, Warehouse picker role at Northwind Logistics. Source document Warehouse picker SOPs, version 3. Curriculum of five units: Receiving, Picking, Scanning, Safety, Returns. People: Alex Rivera invited; Morgan Chen onboarding at 66 percent with one confident error on a critical step; Sam Patel proficient at 88 percent.">
+              <div class="desk-bar" aria-hidden="true">
+                <span class="desk-url">app.learnquiz.com/roles/warehouse-picker</span>
+              </div>
+              <div class="desk-body" aria-hidden="true">
+                <div class="desk-side">
+                  <span style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+                    <span class="org-logo">NW</span>
+                    <span class="t-label desk-org-name" style="white-space: nowrap;">Northwind Logistics</span>
+                  </span>
+                  <span class="desk-nav">
+                    <span class="is-on">Roles</span>
+                    <span>People</span>
+                    <span>Settings</span>
+                  </span>
+                </div>
+                <div class="desk-main">
+                  <div class="stack" style="gap: 4px;">
+                    <p class="t-title1">Warehouse picker</p>
+                    <p class="t-caption muted">Benchmark 85% · 30-day target · Demo company</p>
+                  </div>
+                  <div class="desk-cols">
+                      <div class="card stack" style="gap: 8px; align-self: start;">
+                        <p class="t-overline muted">Source</p>
+                        <span style="display: flex; align-items: center; gap: 8px;">
+                          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand);"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5M9 13h6M9 17h4"></path></svg>
+                          <span class="t-label">Warehouse picker SOPs.pdf</span>
+                        </span>
+                        <p class="t-caption muted">v3 · 24 pages · Uploaded Oct 12</p>
+                      </div>
+                      <div class="card" style="padding-top: 8px; padding-bottom: 8px;">
+                        <p class="t-overline muted" style="padding: 8px 0 4px;">Curriculum · 30 concepts</p>
+                        <div class="unit-row"><span class="node">1</span><span><span class="t-label">Receiving</span><span class="t-caption muted">6 concepts · 3 critical</span></span></div>
+                        <div class="unit-row"><span class="node">2</span><span><span class="t-label">Picking</span><span class="t-caption muted">8 concepts</span></span></div>
+                        <div class="unit-row"><span class="node">3</span><span><span class="t-label">Scanning</span><span class="t-caption muted">5 concepts · 2 critical</span></span></div>
+                        <div class="unit-row"><span class="node">4</span><span><span class="t-label">Safety</span><span class="t-caption muted">7 concepts · 3 critical</span></span></div>
+                        <div class="unit-row"><span class="node">5</span><span><span class="t-label">Returns</span><span class="t-caption muted">4 concepts</span></span></div>
+                      </div>
+                  </div>
+                  <div class="card stack" style="gap: 8px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                      <p class="t-overline muted">People · 3</p>
+                      <span class="t-label" style="color: var(--brand);">Invite</span>
+                    </div>
+                    <div class="people">
+                      <div class="people-head"><span>Name</span><span>Status</span><span>Progress</span><span>Note</span></div>
+                      <div class="people-row">
+                        <span class="t-label">Alex Rivera</span>
+                        <span><span class="chip chip-none"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M3 7l9 6 9-6"></path></svg>Invited</span></span>
+                        <span class="people-prog t-caption muted">Not started</span>
+                        <span class="people-note t-caption muted">Link sent Nov 2</span>
+                      </div>
+                      <div class="people-row">
+                        <span class="t-label">Morgan Chen</span>
+                        <span><span class="chip chip-neutral"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2.5 2.5M10 2h4"></path></svg>Onboarding</span></span>
+                        <span class="people-prog"><span class="bar" style="flex: 1; min-width: 48px;"><span class="bar-fill" style="width: 66%;"></span><span class="bar-bench" style="left: 85%;"></span></span><span class="t-caption num">66%</span></span>
+                        <span class="people-note critical-row" style="gap: 6px;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>1 confident error, critical step</span>
+                      </div>
+                      <div class="people-row">
+                        <span class="t-label">Sam Patel</span>
+                        <span><span class="chip chip-neutral"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand);"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="5"></circle><circle cx="12" cy="12" r="1.5" fill="currentColor"></circle></svg>Proficient</span></span>
+                        <span class="people-prog"><span class="bar" style="flex: 1; min-width: 48px;"><span class="bar-fill" style="width: 88%;"></span><span class="bar-bench" style="left: 85%;"></span></span><span class="t-caption num">88%</span></span>
+                        <span class="people-note t-caption muted">Reached the benchmark Oct 28</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <figcaption class="t-caption muted">Company portal. Northwind Logistics is a demo company; names and numbers are illustrative.</figcaption>
+          </figure>
+
+          <figure class="mgr-phone">
+            <div class="phone" role="img" aria-label="Morgan Chen’s Training progress page on a phone. Your manager sees this same page. 66 percent of 85 percent benchmark, day 16 of 30, projected Nov 12. By unit: Scanning 74 percent with one confident error on Resolve a scan mismatch, Receiving 82 percent, Picking 68 percent.">
+              <div class="phone-screen" aria-hidden="true">
+                <div class="p-scroll" style="padding-top: 24px; gap: 20px;">
+                  <div class="stack" style="gap: 4px;">
+                    <p class="t-title1">Training progress</p>
+                    <p class="t-body muted">Morgan Chen · Warehouse picker</p>
+                    <p class="t-caption muted" style="display: flex; align-items: center; gap: 6px; margin-top: 4px;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>Your manager sees this same page.</p>
+                  </div>
+                  <div class="card stack" style="gap: 12px;">
+                    <p style="display: flex; align-items: baseline; gap: 8px;"><span class="t-display num">66%</span><span class="t-body muted">of 85% benchmark</span></p>
+                    <div class="bar bar-lg"><div class="bar-fill" style="width: 66%;"></div><div class="bar-bench" style="left: 85%;"></div></div>
+                    <div style="display: flex; justify-content: space-between; padding-top: 12px; border-top: 1px solid var(--border);">
+                      <span class="t-label">Day 16 of 30</span>
+                      <span class="t-label">Projected: Nov 12</span>
+                    </div>
+                  </div>
+                  <div class="stack" style="gap: 12px;">
+                    <p class="t-label" style="font-size: 17px; line-height: 24px; font-weight: 700;">By unit</p>
+                    <div class="card stack" style="gap: 12px;">
+                      <div style="display: flex; justify-content: space-between;"><span class="t-label">Scanning</span><span class="t-label num">74%</span></div>
+                      <div class="bar"><div class="bar-fill" style="width: 74%;"></div><div class="bar-bench" style="left: 85%;"></div></div>
+                      <span class="critical-row"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>1 confident error: Resolve a scan mismatch</span>
+                    </div>
+                    <div class="card stack" style="gap: 12px;">
+                      <div style="display: flex; justify-content: space-between;"><span class="t-label">Receiving</span><span class="t-label num">82%</span></div>
+                      <div class="bar"><div class="bar-fill" style="width: 82%;"></div><div class="bar-bench" style="left: 85%;"></div></div>
+                    </div>
+                    <div class="card stack" style="gap: 12px;">
+                      <div style="display: flex; justify-content: space-between;"><span class="t-label">Picking</span><span class="t-label num">68%</span></div>
+                      <div class="bar"><div class="bar-fill" style="width: 68%;"></div><div class="bar-bench" style="left: 85%;"></div></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="p-nav">
+                  <span><span class="nav-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5L12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z"></path></svg></span>Today</span>
+                  <span><span class="nav-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2"></circle><circle cx="18" cy="18" r="2"></circle><path d="M8 6h7a3 3 0 0 1 0 6H9a3 3 0 0 0 0 6h7"></path></svg></span>Path</span>
+                  <span class="is-on"><span class="nav-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg></span>Profile</span>
+                </div>
+              </div>
+            </div>
+            <figcaption class="same t-body">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--brand); margin-top: 1px;"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              <span>Morgan’s Training progress, on their phone and in the portal alike.</span>
+            </figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8 · Fair by design -->
+    <section class="section" aria-labelledby="lqs-fair">
+      <div class="wrap">
+        <h2 id="lqs-fair" class="h-section" style="max-width: 760px;">What Learn Quiz records, and what it never does.</h2>
+        <div class="fair-grid">
+          <dl class="fair-dl">
+            <div>
+              <dt>Recorded</dt>
+              <dd>Answers, how sure you were, how long each took, and progress toward the benchmark.</dd>
+            </div>
+            <div>
+              <dt>Who sees it</dt>
+              <dd>You, and your company’s Learn Quiz admins, such as your manager or training lead.</dd>
+            </div>
+            <div>
+              <dt>What it’s for</dt>
+              <dd>Training and development: what to review next, and when you’ve reached the role’s benchmark.</dd>
+            </div>
+          </dl>
+          <div class="never">
+            <h3 class="t-label muted">Never</h3>
+            <ul class="stack" style="gap: 12px;">
+              <li><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M5.6 5.6l12.8 12.8"></path></svg><span>No camera, sensors or health data.</span></li>
+              <li><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M5.6 5.6l12.8 12.8"></path></svg><span>No personality scores.</span></li>
+              <li><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M5.6 5.6l12.8 12.8"></path></svg><span>No ranking against coworkers.</span></li>
+            </ul>
+          </div>
+        </div>
+        <p class="closer">No biometrics, no hidden tests. A person decides.</p>
+      </div>
+    </section>
+
+    <!-- 9 · The learning science -->
+    <section class="section" aria-labelledby="lqs-sci">
+      <div class="wrap">
+        <h2 id="lqs-sci" class="h-section" style="max-width: 760px;">Built on how memory works.</h2>
+        <div class="sci-grid">
+          <figure id="lqs-curve" class="{{curveCls}}">
+            <figcaption class="t-title2">One procedure, two ways to learn it (illustration)</figcaption>
+            <svg class="curve-svg" viewBox="0 -22 360 248" role="img" aria-label="Illustrative chart. Read once: recall falls steeply and is nearly gone by day 7. Reviewed on days 1, 3 and 7: each review brings recall back to the top, and each drop afterwards is shallower, so recall stays high at day 14.">
+              <line x1="32" y1="20" x2="352" y2="20" stroke="var(--border)" stroke-width="1"></line>
+              <line x1="32" y1="190" x2="352" y2="190" stroke="var(--border-strong)" stroke-width="1"></line>
+              <text x="0" y="-6">Recall</text>
+              <text x="32" y="214" text-anchor="middle">0</text>
+              <text x="54.9" y="214" text-anchor="middle">1</text>
+              <text x="100.6" y="214" text-anchor="middle">3</text>
+              <text x="192" y="214" text-anchor="middle">7</text>
+              <text x="352" y="214" text-anchor="end">14 days</text>
+              <polyline points="32,20 43.4,51 54.9,76 66.3,97 77.7,114 100.6,139 123.4,156 146.3,167 169.1,175 192,180 214.9,183 260.6,187 306.3,189 352,189" fill="none" stroke="var(--ink-muted)" stroke-width="2" stroke-dasharray="6 6" stroke-linecap="round" stroke-linejoin="round"></polyline>
+              <polyline class="curve-review" points="32,20 43.4,51 54.9,76 54.9,20 66.3,34 77.7,46 89.1,58 100.6,68 100.6,20 123.4,31 146.3,41 169.1,51 192,60 192,20 214.9,24 260.6,32 306.3,40 352,47" fill="none" stroke="var(--brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></polyline>
+              <circle class="curve-dot" cx="54.9" cy="20" r="5" fill="var(--brand)"></circle>
+              <circle class="curve-dot" cx="100.6" cy="20" r="5" fill="var(--brand)"></circle>
+              <circle class="curve-dot" cx="192" cy="20" r="5" fill="var(--brand)"></circle>
+            </svg>
+            <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;">
+              <div class="curve-key" aria-hidden="true">
+                <span><svg width="24" height="8" viewBox="0 0 24 8"><line x1="0" y1="4" x2="24" y2="4" stroke="var(--brand)" stroke-width="2.5"></line></svg>Reviewed on days 1, 3 and 7</span>
+                <span><svg width="24" height="8" viewBox="0 0 24 8"><line x1="0" y1="4" x2="24" y2="4" stroke="var(--ink-muted)" stroke-width="2" stroke-dasharray="6 6"></line></svg>Read once</span>
+              </div>
+              <sc-if value="{{motionOk}}" hint-placeholder-val="{{ false }}">
+                <button class="link-btn" type="button" onClick="{{replayCurve}}">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"></path></svg>
+                  Replay
+                </button>
+              </sc-if>
+            </div>
+          </figure>
+
+          <ul class="claims">
+            <li class="claim">
+              <h3 class="t-title2">Trying to recall beats rereading.</h3>
+              <p class="t-body-lg">Pulling an answer from memory makes it last longer than reading the page again.</p>
+              <cite class="cite">Roediger &amp; Karpicke, 2006, <i>Psychological Science</i> · Dunlosky et al., 2013, <i>Psychological Science in the Public Interest</i></cite>
+            </li>
+            <li class="claim">
+              <h3 class="t-title2">Spaced reviews make knowledge last.</h3>
+              <p class="t-body-lg">Reviews spread over days hold knowledge longer than one long session. FSRS, an open-source scheduler, picks the day for each review.</p>
+              <cite class="cite">Cepeda, Pashler, Vul, Wixted &amp; Rohrer, 2006, <i>Psychological Bulletin</i></cite>
+            </li>
+            <li class="claim">
+              <h3 class="t-title2">Knowing why makes practice count.</h3>
+              <p class="t-body-lg">Feedback that explains the right answer corrects mistakes and carries over to new situations.</p>
+              <cite class="cite">Butler, Karpicke &amp; Roediger, 2008, <i>JEP: Learning, Memory, and Cognition</i> · Butler, Godbole &amp; Marsh, 2013, <i>Journal of Educational Psychology</i></cite>
+            </li>
+            <li class="claim">
+              <h3 class="t-title2">Confidence shows what is shaky.</h3>
+              <p class="t-body-lg">Asking how sure you are separates lucky guesses from real knowledge. Mistakes made with confidence are the ones feedback corrects best.</p>
+              <cite class="cite">Butterfield &amp; Metcalfe, 2001, <i>JEP: Learning, Memory, and Cognition</i> · Metcalfe, 2017, <i>Annual Review of Psychology</i></cite>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 10 · Meta models + open source -->
+    <section class="section" aria-labelledby="lqs-models">
+      <div class="wrap">
+        <h2 id="lqs-models" class="h-section" style="max-width: 760px;">Built on Meta models. Open source.</h2>
+        <div class="models-grid">
+          <dl class="models">
+            <div>
+              <dt>Muse Spark</dt>
+              <dd>Writes the curriculum and questions from your SOPs, checks each one against the source, and grades written answers.</dd>
+            </div>
+            <div>
+              <dt>Muse Wonder</dt>
+              <dd>Orders each session, mixing due reviews with new concepts.</dd>
+            </div>
+            <div>
+              <dt>Muse Image</dt>
+              <dd>Draws diagrams of procedures.</dd>
+            </div>
+            <div>
+              <dt>Muse Voice</dt>
+              <dd>Transcribes spoken answers into a transcript the learner can edit before checking.</dd>
+            </div>
+          </dl>
+          <div class="oss">
+            <h3 class="t-title2">MIT licensed</h3>
+            <dl class="oss-list">
+              <div><dt class="t-label">Hosted</dt><dd>Run by us at learnquiz.com.</dd></div>
+              <div><dt class="t-label">Local</dt><dd>On your own server, with a Meta open-weight model.</dd></div>
+            </dl>
+            <a class="btn btn-secondary" href="https://github.com/">
+              View on GitHub
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M8 7h9v9"></path></svg>
+            </a>
+            <p class="hack">Built for the Meta Global AI Developer Hackathon 2026.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 11 · Close -->
+    <section class="close section" aria-labelledby="lqs-close">
+      <div class="wrap">
+        <div class="close-in">
+          <h2 id="lqs-close" class="h-hero">Quiz it, until you learn it.</h2>
+          <div class="close-actions" id="lqs-close-cta">
+            <a class="btn btn-accent btn-lg" href="https://app.learnquiz.com/sign-up">Create a company account</a>
+            <a class="btn btn-ghost btn-lg" href="https://app.learnquiz.com/learn">Learn on your own</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="ftr">
+    <div class="wrap">
+      <div class="ftr-in">
+        <a class="logo" href="#top" aria-label="Learn Quiz home">
+          <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><mask id="lqm-f" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"></rect><circle cx="18" cy="18" r="6" fill="#000"></circle></mask><path fill="var(--brand)" fill-rule="evenodd" mask="url(#lqm-f)" d="M11 1a10 10 0 1 0 0 20a10 10 0 1 0 0-20zm0 5a5 5 0 1 1 0 10a5 5 0 1 1 0-10z"></path><circle cx="18" cy="18" r="4" fill="var(--accent)"></circle></svg>
+          <span class="wordmark" aria-hidden="true">Learn Quiz</span>
+        </a>
+        <nav class="ftr-links" aria-label="Footer">
+          <a href="Privacy.dc.html">Privacy</a>
+          <a href="Terms.dc.html">Terms</a>
+          <a href="https://github.com/">GitHub</a>
+          <a href="https://app.learnquiz.com/sign-in">Sign in</a>
+        </nav>
+        <div class="ftr-meta">
+          <p class="t-caption muted">© 2026 Learn Quiz</p>
+          <div class="seg" role="group" aria-label="Theme">
+            <sc-for list="{{themes}}" as="t" hint-placeholder-count="3">
+              <button class="seg-btn" type="button" aria-pressed="{{t.pressed}}" onClick="{{t.pick}}">{{t.label}}</button>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <dialog id="lqs-video" class="video-dlg" aria-labelledby="lqs-video-t">
+    <div class="video-head">
+      <h2 id="lqs-video-t" class="t-title2" style="flex: 1;">Learn Quiz demo, 3 minutes</h2>
+      <button class="icon-btn" type="button" aria-label="Close" onClick="{{closeVideo}}">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+      </button>
+    </div>
+    <div class="video-frame">
+      <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"></path></svg>
+      <p class="t-label">[DEMO VIDEO EMBED]</p>
+    </div>
+    <p class="video-foot t-caption muted">Captions on by default. [TRANSCRIPT LINK]</p>
+  </dialog>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"$preview":{"width":1280,"height":7800}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      sel: null, conf: null, revealed: false, whyOpen: false,
+      menuOpen: false, themeChoice: null, ctaInView: true,
+      curve: 'static', motionOk: false, pushScroll: false
+    };
+    this.visible = {};
+  }
+
+  focusId(id) {
+    var el = document.getElementById(id);
+    if (el) el.focus();
+  }
+
+  componentDidMount() {
+    if (typeof window === 'undefined') return;
+    var self = this;
+    var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!reduced) this.setState({ motionOk: true });
+
+    // The push row is a keyboard-scrollable region only while it actually scrolls (below 1024).
+    this.checkPush = function () {
+      var row = document.getElementById('lqs-push-row');
+      var s = !!row && row.scrollWidth > row.clientWidth + 1;
+      if (s !== self.state.pushScroll) self.setState({ pushScroll: s });
+    };
+    this.checkPush();
+    window.addEventListener('resize', this.checkPush);
+
+    if (typeof IntersectionObserver === 'undefined') return;
+
+    // Saffron marks one thing per view: the header action goes quiet while the hero or close action is on screen.
+    var ctas = ['lqs-hero-cta', 'lqs-close-cta'].map(function (id) { return document.getElementById(id); }).filter(Boolean);
+    this.ctaIO = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { self.visible[e.target.id] = e.isIntersecting; });
+      var any = Object.keys(self.visible).some(function (k) { return self.visible[k]; });
+      if (any !== self.state.ctaInView) self.setState({ ctaInView: any });
+    }, { rootMargin: '-64px 0px 0px 0px' });
+    ctas.forEach(function (el) { self.ctaIO.observe(el); });
+
+    // Forgetting curve draws once when it scrolls into view. Static under reduced motion.
+    var curve = document.getElementById('lqs-curve');
+    if (curve && !reduced) {
+      var r = curve.getBoundingClientRect();
+      if (r.top > window.innerHeight) {
+        this.setState({ curve: 'armed' });
+        this.curveIO = new IntersectionObserver(function (entries) {
+          entries.forEach(function (e) {
+            if (e.isIntersecting) { self.setState({ curve: 'play' }); self.curveIO.disconnect(); }
+          });
+        }, { threshold: 0.5 });
+        this.curveIO.observe(curve);
+      }
+    }
+  }
+
+  componentWillUnmount() {
+    if (this.checkPush) window.removeEventListener('resize', this.checkPush);
+    if (this.ctaIO) this.ctaIO.disconnect();
+    if (this.curveIO) this.curveIO.disconnect();
+    if (this.replayT) clearTimeout(this.replayT);
+  }
+
+  componentDidUpdate() {
+    // Every new result (from Check or from an outcome button) moves focus to the result heading,
+    // which also scrolls the phone into view on small screens.
+    var key = this.state.revealed ? (this.state.sel + '/' + this.state.conf) : '';
+    var prev = this.shownKey || '';
+    this.shownKey = key;
+    if (key && key !== prev) {
+      var h = document.getElementById('lqs-result');
+      if (h) { h.focus(); if (h.scrollIntoView) h.scrollIntoView({ block: 'nearest' }); }
+    }
+    if (prev && !key && this.returnFocus) {
+      this.returnFocus = false;
+      this.focusId('lqs-a-a');
+    }
+    if (this.pendingFocus) {
+      var id = this.pendingFocus;
+      this.pendingFocus = null;
+      this.focusId(id);
+    }
+  }
+
+  renderVals() {
+    var self = this;
+    var st = this.state;
+
+    var answers = [
+      { id: 'a', text: 'Scan the item next to it',
+        why: 'A nearby label makes the scanner agree, but the pick is now recorded from the wrong slot.',
+        felt: 'The item next to it looks the same, so a match feels like a fix.' },
+      { id: 'b', text: 'Stop the pick and tell the shift lead', ok: true },
+      { id: 'c', text: 'Type the expected code',
+        why: 'Typing the code forces a match the scanner never made. The wrong item can still ship.',
+        felt: 'You know which item the pick wants, so typing it feels faster than waiting.' },
+      { id: 'd', text: 'Override and continue',
+        why: 'The warning is the check. Override it and the mistake travels to the customer.',
+        felt: 'Scanners misread sometimes, so the warning can feel like noise.' }
+    ];
+    var chosen = answers.filter(function (a) { return a.id === st.sel; })[0] || null;
+    var isCorrect = !!(chosen && chosen.ok);
+    var sure = st.conf === 'sure';
+    var kind = !st.revealed ? null : (isCorrect ? (sure ? 'cs' : 'cu') : (sure ? 'sw' : 'nq'));
+
+    // Radio groups (WAI-ARIA radiogroup pattern): one tab stop per group, arrow keys move and select.
+    function radios(ids, current, prefix, setKey, extra) {
+      return ids.map(function (k, i) {
+        var tabbable = current ? current === k : i === 0;
+        var o = {
+          id: k, domId: prefix + k,
+          ariaChecked: current === k ? 'true' : 'false',
+          tab: tabbable ? '0' : '-1',
+          pick: function () { var s = {}; s[setKey] = k; self.setState(s); },
+          key: function (e) {
+            var d = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
+            if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); var s0 = {}; s0[setKey] = k; self.setState(s0); return; }
+            if (!d) return;
+            e.preventDefault();
+            var nk = ids[(i + d + ids.length) % ids.length];
+            var s = {}; s[setKey] = nk; self.pendingFocus = prefix + nk; self.setState(s);
+          }
+        };
+        return extra(o, k);
+      });
+    }
+
+    var confLabels = { sure: 'Sure', unsure: 'Unsure', guessing: 'Guessing' };
+    var confs = radios(['sure', 'unsure', 'guessing'], st.conf, 'lqs-c-', 'conf', function (o, k) {
+      o.label = confLabels[k];
+      o.cls = 'conf-btn' + (st.conf === k ? ' is-selected' : '');
+      return o;
+    });
+
+    var reveals = [
+      { key: 'cs', title: 'Correct and sure', desc: 'A short confirmation. The reason is one tap away.', sel: 'b', conf: 'sure' },
+      { key: 'cu', title: 'Correct, unsure', desc: 'The explanation and the quote from your SOP, without asking.', sel: 'b', conf: 'unsure' },
+      { key: 'nq', title: 'Not quite', desc: 'The right answer next to yours, why, and the source.', sel: 'a', conf: 'guessing' },
+      { key: 'sw', title: 'Sure and wrong', desc: 'All of that, plus why it felt right. It comes back first next session.', sel: 'c', conf: 'sure' }
+    ].map(function (r) {
+      return {
+        title: r.title, desc: r.desc,
+        right: r.key === 'cs' || r.key === 'cu',
+        miss: r.key === 'nq' || r.key === 'sw',
+        pressed: kind === r.key ? 'true' : 'false',
+        show: function () {
+          if (kind === r.key) { self.returnFocus = false; self.setState({ sel: null, conf: null, revealed: false, whyOpen: false }); return; }
+          self.setState({ sel: r.sel, conf: r.conf, revealed: true, whyOpen: false });
+        }
+      };
+    });
+
+    var themeChoice = st.themeChoice;
+    var propTheme = this.props.theme === 'dark' ? 'dark' : 'light';
+    var theme = propTheme;
+    if (themeChoice === 'light' || themeChoice === 'dark') theme = themeChoice;
+    if (themeChoice === 'system') {
+      theme = (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    }
+    var themes = [['system', 'System'], ['light', 'Light'], ['dark', 'Dark']].map(function (t) {
+      var on = themeChoice ? themeChoice === t[0] : t[0] === propTheme;
+      return { label: t[1], pressed: on ? 'true' : 'false', pick: function () { self.setState({ themeChoice: t[0] }); } };
+    });
+
+    var curveCls = 'curve-fig' + (st.curve === 'armed' ? ' curve-armed' : '') + (st.curve === 'play' ? ' curve-play' : '');
+
+    return {
+      theme: theme,
+      themes: themes,
+      menuOpen: st.menuOpen,
+      menuExpanded: st.menuOpen ? 'true' : 'false',
+      toggleMenu: function () { self.setState({ menuOpen: !st.menuOpen }); },
+      menuKey: function (e) {
+        if (e.key === 'Escape' && st.menuOpen) { e.preventDefault(); self.pendingFocus = 'lqs-menu-btn'; self.setState({ menuOpen: false }); }
+      },
+      openVideo: function () {
+        var d = document.getElementById('lqs-video');
+        if (d && d.showModal) d.showModal();
+      },
+      closeVideo: function () {
+        var d = document.getElementById('lqs-video');
+        if (d && d.close) d.close();
+      },
+      pushTab: st.pushScroll ? '0' : '-1',
+      hdrCtaCls: 'btn hdr-cta ' + (st.ctaInView ? 'btn-secondary' : 'btn-accent'),
+
+      answers: radios(answers.map(function (a) { return a.id; }), st.sel, 'lqs-a-', 'sel', function (o, k) {
+        var a = answers.filter(function (x) { return x.id === k; })[0];
+        o.text = a.text;
+        o.cls = 'opt' + (st.sel === k ? ' is-selected' : '');
+        return o;
+      }),
+      confs: confs,
+      notReady: !(st.sel && st.conf),
+      submit: function (e) { if (e && e.preventDefault) e.preventDefault(); if (st.sel && st.conf) self.setState({ revealed: true, whyOpen: false }); },
+      asking: !st.revealed,
+      revealed: st.revealed,
+      results: answers.map(function (a) {
+        var c = !!a.ok, w = !a.ok && a.id === st.sel;
+        return { text: a.text, isCorrect: c, isWrong: w, isRest: !c && !w, cls: 'opt ' + (c ? 'is-correct' : (w ? 'is-wrong' : 'is-rest')) };
+      }),
+      isRight: kind === 'cs' || kind === 'cu',
+      isMiss: kind === 'nq' || kind === 'sw',
+      isCS: kind === 'cs',
+      isNQ: kind === 'nq',
+      isSW: kind === 'sw',
+      showWhy: kind === 'cu' || (kind === 'cs' && st.whyOpen),
+      whyExpanded: st.whyOpen ? 'true' : 'false',
+      chevron: st.whyOpen ? 'rotate(180deg)' : 'none',
+      toggleWhy: function () { self.setState({ whyOpen: !st.whyOpen }); },
+      bandCls: 'sheet-band ' + (kind === 'cs' || kind === 'cu' ? 'fb-correct' : 'fb-wrong'),
+      bandLabel: (kind === 'cs' || kind === 'cu') ? 'Correct' : 'Not quite',
+      bandSr: kind === 'cs' ? ', and you were sure.' : kind === 'cu' ? ', but you weren’t sure, so here is why.' : kind === 'sw' ? ', and you were sure. This is a critical step.' : '.',
+      chosenText: chosen ? chosen.text : '',
+      chosenWhy: chosen && chosen.why ? chosen.why : '',
+      chosenFelt: chosen && chosen.felt ? chosen.felt : '',
+      reset: function () { self.returnFocus = true; self.setState({ sel: null, conf: null, revealed: false, whyOpen: false }); },
+      reveals: reveals,
+
+      curveCls: curveCls,
+      motionOk: st.motionOk,
+      replayCurve: function () {
+        self.setState({ curve: 'armed' });
+        if (self.replayT) clearTimeout(self.replayT);
+        self.replayT = setTimeout(function () { self.setState({ curve: 'play' }); }, 60);
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

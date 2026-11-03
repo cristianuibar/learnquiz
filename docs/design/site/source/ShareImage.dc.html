@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Share image</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="light" style="width: 1200px; height: 630px; overflow: hidden; background: var(--surface-page); color: var(--ink);">
+
+  <!-- Left: lockup, headline, line, URL (64px safe margins) -->
+  <div style="position: absolute; left: 64px; top: 64px; bottom: 64px; width: 632px; display: flex; flex-direction: column; justify-content: space-between;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <svg viewBox="0 0 24 24" width="44" height="44" aria-hidden="true"><mask id="lqsi-logo" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"></rect><circle cx="18" cy="18" r="6" fill="#000"></circle></mask><path fill="#0E5A73" fill-rule="evenodd" mask="url(#lqsi-logo)" d="M11 1a10 10 0 1 0 0 20a10 10 0 1 0 0-20zm0 5a5 5 0 1 1 0 10a5 5 0 1 1 0-10z"></path><circle cx="18" cy="18" r="4" fill="#F2A900"></circle></svg>
+      <span style="font-size: 30px; line-height: 36px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink);">Learn Quiz</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+      <h1 style="font-size: 64px; line-height: 68px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink);">New hires learn the job from your own SOPs.</h1>
+      <p style="font-size: 26px; line-height: 36px; font-weight: 400; color: var(--ink-muted); max-width: 580px;">Five-minute quiz sessions on their phone. Every explanation quotes your document.</p>
+    </div>
+
+    <p style="font-size: 22px; line-height: 28px; font-weight: 500; color: var(--ink-muted);">learnquiz.com</p>
+  </div>
+
+  <!-- Right: phone, bleeding off the bottom edge -->
+  <div class="phone" role="img" aria-label="Learn Quiz on a phone. Question 8 of 20: Your scanner says the item doesn’t match the pick. What do you do first? Stop the pick and tell the shift lead is selected. How sure are you? Sure is selected." style="position: absolute; top: 64px; right: 64px;">
+    <div class="phone-screen" aria-hidden="true">
+      <div class="p-topbar">
+        <span class="p-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+        <div style="flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px;">
+          <div class="bar" style="flex: 1;"><div class="bar-fill" style="width: 40%;"></div></div>
+          <span class="t-overline num muted">8 of 20</span>
+        </div>
+        <span class="p-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"></path><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"></path></svg></span>
+      </div>
+      <div class="p-scroll" style="gap: 16px;">
+        <p class="t-title2">Your scanner says the item doesn’t match the pick. What do you do first?</p>
+        <div class="opt-list" style="gap: 8px;">
+          <div class="opt"><span class="radio"></span><span class="opt-text">Scan the item next to it</span></div>
+          <div class="opt is-selected"><span class="radio"></span><span class="opt-text">Stop the pick and tell the shift lead</span></div>
+          <div class="opt"><span class="radio"></span><span class="opt-text">Type the expected code</span></div>
+          <div class="opt"><span class="radio"></span><span class="opt-text">Override and continue</span></div>
+        </div>
+        <div style="margin-top: 4px;">
+          <span class="conf-legend">How sure are you?</span>
+          <div class="conf">
+            <span class="conf-btn is-selected"><span class="conf-tick"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></span>Sure</span>
+            <span class="conf-btn">Unsure</span>
+            <span class="conf-btn">Guessing</span>
+          </div>
+        </div>
+      </div>
+      <div class="p-dock">
+        <span class="p-btn p-btn-primary">Check</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1200,"height":630}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

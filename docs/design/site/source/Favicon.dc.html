@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Favicon and app icon</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="light" style="width: 960px; height: 520px; overflow: hidden; padding: 32px; display: flex; flex-direction: column; gap: 20px; background: var(--surface-page); color: var(--ink);">
+
+  <h1 class="t-title1">Favicon and app icon</h1>
+
+  <div style="flex: 1; min-height: 0; display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 32px;">
+
+    <!-- Left: favicon sizes on light and dark, plus the live file -->
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+
+      <figure style="display: flex; flex-direction: column; gap: 16px; padding: 20px; border: 1px solid var(--border); border-radius: var(--radius-md); background: #F7F6F2;">
+        <figcaption class="t-caption" style="color: #5B6472;">Light · ground #F7F6F2, ring #0E5A73</figcaption>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;">
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+            <div style="height: 48px; display: flex; align-items: center;"><svg viewBox="0 0 24 24" width="16" height="16" role="img" aria-label="Mark, 16 px, light"><mask id="lqfv-l16" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"></rect><circle cx="18" cy="18" r="6" fill="#000"></circle></mask><path fill="#0E5A73" fill-rule="evenodd" mask="url(#lqfv-l16)" d="M11 1a10 10 0 1 0 0 20a10 10 0 1 0 0-20zm0 5a5 5 0 1 1 0 10a5 5 0 1 1 0-10z"></path><circle cx="18" cy="18" r="4" fill="#F2A900"></circle></svg></div>
+            <span class="t-caption" style="color: #5B6472;">16 px</span>
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+            <div style="height: 48px; display: flex; align-items: center;"><svg viewBox="0 0 24 24" width="32" height="32" role="img" aria-label="Mark, 32 px, light"><mask id="lqfv-l32" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"></rect><circle cx="18" cy="18" r="6" fill="#000"></circle></mask><path fill="#0E5A73" fill-rule="evenodd" mask="url(#lqfv-l32)" d="M11 1a10 10 0 1 0 0 20a10 10 0 1 0 0-20zm0 5a5 5 0 1 1 0 10a5 5 0 1 1 0-10z"></path><circle cx="18" cy="18" r="4" fill="#F2A900"></circle></svg></div>
+            <span class="t-caption" style="color: #5B6472;">32 px</span>
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+            <div style="height: 48px; display: flex; align-items: center;"><svg viewBox="0 0 24 24" width="48" height="48" role="img" aria-label="Mark, 48 px, light"><mask id="lqfv-l48" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"></rect><circle cx="18" cy="18" r="6" fill="#000"></circle></mask><path fill="#0E5A73" fill-rule="evenodd" mask="url(#lqfv-l48)" d="M11 1a10 10 0 1 0 0 20a10 10 0 1 0 0-20zm0 5a5 5 0 1 1 0 10a5 5 0 1 1 0-10z"></path><circle cx="18" cy="18" r="4" fill="#F2A900"></circle></svg></div>
+            <span class="t-caption" style="color: #5B6472;">48 px</span>
+          </div>
+        </div>
+      </figure>
+
+      <figure style="display: flex; flex-direction: column; gap: 16px; padding: 20px; border: 1px solid #2E333B; border-radius: var(--radius-md); background: #121417;">
+        <figcaption class="t-caption" style="color: #A0A8B4;">Dark · ground #121417, ring #6FC3DC</figcaption>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;">
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+            <div style="height: 48px; display: flex; align-items: center;"><svg viewBox="0 0 24 24" width="16" height="16" role="img" aria-label="Mark, 16 px, dark"><mask id="lqfv-d16" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"></rect><circle cx="18" cy="18" r="6" fill="#000"></circle></mask><path fill="#6FC3DC" fill-rule="evenodd" mask="url(#lqfv-d16)" d="M11 1a10 10 0 1 0 0 20a10 10 0 1 0 0-20zm0 5a5 5 0 1 1 0 10a5 5 0 1 1 0-10z"></path><circle cx="18" cy="18" r="4" fill="#F2A900"></circle></svg></div>
+            <span class="t-caption" style="color: #A0A8B4;">16 px</span>
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+            <div style="height: 48px; display: flex; align-items: center;"><svg viewBox="0 0 24 24" width="32" height="32" role="img" aria-label="Mark, 32 px, dark"><mask id="lqfv-d32" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"></rect><circle cx="18" cy="18" r="6" fill="#000"></circle></mask><path fill="#6FC3DC" fill-rule="evenodd" mask="url(#lqfv-d32)" d="M11 1a10 10 0 1 0 0 20a10 10 0 1 0 0-20zm0 5a5 5 0 1 1 0 10a5 5 0 1 1 0-10z"></path><circle cx="18" cy="18" r="4" fill="#F2A900"></circle></svg></div>
+            <span class="t-caption" style="color: #A0A8B4;">32 px</span>
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+            <div style="height: 48px; display: flex; align-items: center;"><svg viewBox="0 0 24 24" width="48" height="48" role="img" aria-label="Mark, 48 px, dark"><mask id="lqfv-d48" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"></rect><circle cx="18" cy="18" r="6" fill="#000"></circle></mask><path fill="#6FC3DC" fill-rule="evenodd" mask="url(#lqfv-d48)" d="M11 1a10 10 0 1 0 0 20a10 10 0 1 0 0-20zm0 5a5 5 0 1 1 0 10a5 5 0 1 1 0-10z"></path><circle cx="18" cy="18" r="4" fill="#F2A900"></circle></svg></div>
+            <span class="t-caption" style="color: #A0A8B4;">48 px</span>
+          </div>
+        </div>
+      </figure>
+
+      <div class="card" style="display: flex; align-items: center; gap: 16px;">
+        <img src="favicon.svg" alt="favicon.svg" width="32" height="32" style="display: block; flex: none;">
+        <div class="stack" style="gap: 2px; min-width: 0;">
+          <span class="t-label">favicon.svg</span>
+          <span class="t-caption muted">Ring follows the system theme.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: 180 x 180 app icon, then export notes -->
+    <div style="display: flex; flex-direction: column; gap: 20px; min-width: 0;">
+      <div style="display: flex; gap: 24px;">
+        <figure style="display: flex; flex-direction: column; gap: 8px;">
+          <svg viewBox="-6.5 -6.5 36 36" width="180" height="180" role="img" aria-label="App icon, 180 by 180, previewed with 40 px corners"><mask id="lqfv-app-r" maskUnits="userSpaceOnUse" x="-6.5" y="-6.5" width="36" height="36"><rect x="-6.5" y="-6.5" width="36" height="36" fill="#fff"></rect><circle cx="18" cy="18" r="6" fill="#000"></circle></mask><rect x="-6.5" y="-6.5" width="36" height="36" rx="8" fill="#0E5A73"></rect><path fill="#FFFFFF" fill-rule="evenodd" mask="url(#lqfv-app-r)" d="M11 1a10 10 0 1 0 0 20a10 10 0 1 0 0-20zm0 5a5 5 0 1 1 0 10a5 5 0 1 1 0-10z"></path><circle cx="18" cy="18" r="4" fill="#F2A900"></circle></svg>
+          <figcaption class="t-caption muted">Preview, 40 px corners</figcaption>
+        </figure>
+        <figure style="display: flex; flex-direction: column; gap: 8px;">
+          <svg viewBox="-6.5 -6.5 36 36" width="180" height="180" role="img" aria-label="App icon, 180 by 180, square as exported"><mask id="lqfv-app-s" maskUnits="userSpaceOnUse" x="-6.5" y="-6.5" width="36" height="36"><rect x="-6.5" y="-6.5" width="36" height="36" fill="#fff"></rect><circle cx="18" cy="18" r="6" fill="#000"></circle></mask><rect x="-6.5" y="-6.5" width="36" height="36" fill="#0E5A73"></rect><path fill="#FFFFFF" fill-rule="evenodd" mask="url(#lqfv-app-s)" d="M11 1a10 10 0 1 0 0 20a10 10 0 1 0 0-20zm0 5a5 5 0 1 1 0 10a5 5 0 1 1 0-10z"></path><circle cx="18" cy="18" r="4" fill="#F2A900"></circle></svg>
+          <figcaption class="t-caption muted">Square, as exported</figcaption>
+        </figure>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px; padding-top: 16px; border-top: 1px solid var(--border);">
+        <h2 class="t-label">Export from this artboard</h2>
+        <dl style="display: grid; grid-template-columns: 184px minmax(0, 1fr); gap: 8px 16px; align-items: baseline;">
+          <dt class="t-label">favicon.svg</dt>
+          <dd class="t-caption muted">Ship as is, from this canvas.</dd>
+          <dt class="t-label">favicon-32.png</dt>
+          <dd class="t-caption muted">The 32 px light mark, transparent ground.</dd>
+          <dt class="t-label">apple-touch-icon.png</dt>
+          <dd class="t-caption muted">180 × 180, square. iOS rounds the corners.</dd>
+          <dt class="t-label">icon-512.png</dt>
+          <dd class="t-caption muted">The app icon at 512 × 512, square.</dd>
+        </dl>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":520}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
