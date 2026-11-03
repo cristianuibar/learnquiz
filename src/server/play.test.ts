@@ -427,6 +427,21 @@ describe('learner practice and unit unlocks', () => {
     expect(scalar(raw, 'SELECT COUNT(*) AS n FROM attempts').n).toBe(1)
   })
 
+  it.each([
+    { name: 'a quote with its source', quote: 'Subtract 1 from both sides.', deleted: null, title: 'Algebra Handbook' },
+    { name: 'a quote whose source was deleted', quote: 'Subtract 1 from both sides.', deleted: 5, title: null },
+    { name: 'no quote', quote: null, deleted: null, title: null },
+  ])('reveals the source title for $name', async ({ quote, deleted, title }) => {
+    seedFrontier(raw, 1, true)
+    raw.prepare('INSERT INTO sources (id, topic_id, kind, title, body_text, deleted_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run('s1', 't1', 'text', 'Algebra Handbook', 'Subtract 1 from both sides.', deleted, 1)
+    const payload = JSON.parse(scalar(raw, 'SELECT payload_json FROM items WHERE id = ?', 'i1').payload_json as string)
+    raw.prepare('UPDATE items SET payload_json = ?, source_id = ? WHERE id = ?').run(JSON.stringify({ ...payload, source_quote: quote }), 's1', 'i1')
+    const { sessionId } = await startMiniSession({ data: { itemId: 'i1' } })
+    const reveal = await answerItem({ data: { sessionId, itemId: 'i1', answer: { text: '1' }, confidence: 'sure', responseMs: 1000 } })
+    expect(reveal).toMatchObject({ sourceQuote: quote, sourceTitle: title })
+  })
+
   it('only exposes the learner\'s answered active questions in Path after placement', async () => {
     seedFrontier(raw, 8, false)
     raw.prepare('UPDATE items SET status = ? WHERE id = ?').run('reported', 'i7')
