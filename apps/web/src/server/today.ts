@@ -4,6 +4,7 @@ import { and, count, countDistinct, desc, eq, gt, gte, inArray, lte, min, ne, sq
 import { getDb } from '@/db'
 import { attempts, concepts, items, learnerItem, learnerTopic, placements, sessions, topics, units } from '@/db/schema'
 import { loadPKnown } from '@/server/helpers'
+import { liveConcept } from '@/server/live-concept'
 import { loadFrontier, SESSION_SIZE } from '@/server/play'
 import { getLearnerId } from '@/server/session'
 import { assignedRoleTopic, rolePlayable } from '@/server/topic-access'
@@ -37,11 +38,11 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
   const hasAttemptOn = async (topicId: string) => Boolean(await db.select({ id: attempts.id }).from(attempts)
     .innerJoin(items, eq(items.id, attempts.itemId))
     .where(and(eq(attempts.learnerId, learnerId), eq(items.topicId, topicId))).limit(1).get())
-  // Mastery over every role concept (unmet count 0) and question generation progress.
+  // Mastery over every live role concept (unmet count 0) and question generation progress.
   const roleStats = async () => {
     if (!assigned || !role) return
     const [cs, known, hasAttempt] = await Promise.all([
-      db.select({ id: concepts.id, gen: concepts.genStatus }).from(concepts).where(eq(concepts.topicId, assigned.topic.id)),
+      db.select({ id: concepts.id, gen: concepts.genStatus }).from(concepts).where(and(eq(concepts.topicId, assigned.topic.id), liveConcept())),
       loadPKnown(db, learnerId, assigned.topic.id),
       hasAttemptOn(assigned.topic.id),
     ])
