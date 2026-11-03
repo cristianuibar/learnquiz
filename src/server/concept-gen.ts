@@ -7,7 +7,7 @@ import { assertWithinCompanyCap, COMPANY_CAP_MESSAGE } from '@/server/model-cap'
 
 export const ITEMS_PER_CONCEPT = 6
 // A claim older than this belongs to a worker that died (waitUntil lasts about 30 s).
-const STALE_CLAIM_MS = 10 * 60 * 1000
+export const STALE_CLAIM_MS = 10 * 60 * 1000
 
 const activeItems = async (db: Db, conceptId: string) =>
   (await db.select({ n: count() }).from(items).where(and(eq(items.conceptId, conceptId), eq(items.status, 'active'))))[0]?.n ?? 0

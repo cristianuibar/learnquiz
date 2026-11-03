@@ -312,6 +312,23 @@ it.each(['session', 'placement'])('skips retired questions in a queued %s, inclu
   expect((await nextItem({ data: { sessionId: 'queued' } })).item).toBeNull()
 })
 
+it.each([[1, 2], [10, 12]])('credits the session bonus when the questions after answer %i of %i are retired', async (answered, count) => {
+  seedTopicAndLearner(raw, 0)
+  seedFrontier(raw, count, false)
+  const queue = Array.from({ length: count }, (_, i) => `i${i + 1}`)
+  const plan = { queue, position: answered - 1, answered: false, reinserted: [], reasons: { due: count, frontier: 0, closers: 0 }, unitStart: {} }
+  raw.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, item_ids_json, plan_json, started_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run('queued', 'u1', 't1', 'session', JSON.stringify(queue), JSON.stringify(plan), 1)
+  const asked = queue[answered - 1]
+  await answerItem({ data: { sessionId: 'queued', itemId: asked, answer: { text: '1' }, confidence: 'sure', responseMs: 100 } })
+  const xp = scalar(raw, 'SELECT xp FROM sessions WHERE id = ?', 'queued').xp as number
+  // Retire the remaining questions while the learner reads the reveal.
+  for (const id of queue.slice(answered)) raw.prepare('UPDATE items SET status = ? WHERE id = ?').run('retired', id)
+  expect((await nextItem({ data: { sessionId: 'queued' } })).ended).toBe(true)
+  expect((await endSession({ data: { sessionId: 'queued' } })).xp).toBe(xp + 20)
+  expect(scalar(raw, 'SELECT xp FROM learner_topic WHERE learner_id = ? AND topic_id = ?', 'u1', 't1').xp).toBe(xp + 20)
+})
+
 it.each(['session', 'placement'])('excludes retired questions from a new %s', async (kind) => {
   // Items are ordered by creation time; a frozen clock keeps their seeded order.
   vi.useFakeTimers({ toFake: ['Date'] })

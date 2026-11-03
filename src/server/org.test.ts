@@ -180,10 +180,11 @@ it('reports assigned training stages, unresolved critical errors and company pro
   expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { employees: 2, proficientEmployees: 1, daysToProficiency: 4, criticalErrorsThisWeek: 1, documentsToReview: null } })
 
   attempt.run('corrected', 'member', 'scan-item', 'scan', start + 2 * day, '"scan"', 1, 1, 'sure')
-  sqlite.prepare('UPDATE learner_concept SET p_known = 0.5 WHERE learner_id = ? AND concept_id = ?').run('admin', 'scan')
+  // Mean 0.86 clears the 0.85 benchmark, but the critical concept at 0.60 does not, so progress stays at 0.60 / 0.85.
+  sqlite.prepare("UPDATE learner_concept SET p_known = CASE concept_id WHEN 'scan' THEN 0.6 ELSE 0.99 END WHERE learner_id = ?").run('admin')
   expect((await getPeople({ data: { slug: 'alpha' } })).members).toEqual([
     expect.objectContaining({ name: 'owner', training: null }),
-    expect.objectContaining({ name: 'admin', training: { stage: 'onboarding', progress: expect.closeTo(0.75 / 0.85, 10), daysToProficiency: null, criticalConfidentErrors: 0 } }),
+    expect.objectContaining({ name: 'admin', training: { stage: 'onboarding', progress: expect.closeTo(0.6 / 0.85, 10), daysToProficiency: null, criticalConfidentErrors: 0 } }),
     expect.objectContaining({ name: 'member', training: { stage: 'onboarding', progress: expect.closeTo(0.4 / 3 / 0.85, 10), daysToProficiency: null, criticalConfidentErrors: 1 } }),
   ])
   expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { employees: 2, proficientEmployees: 0, daysToProficiency: null, criticalErrorsThisWeek: 1, documentsToReview: null } })

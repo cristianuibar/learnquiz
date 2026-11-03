@@ -5,6 +5,7 @@ import { getDb } from '@/db'
 import { concepts, jobRoles, sources, topics, units } from '@/db/schema'
 import { requireOrgAdmin, requireOrgReader } from '@/server/authz'
 import { httpError } from '@/server/helpers'
+import { releaseStaleBuild } from '@/server/role-curriculum'
 
 export type RoleDetail = {
   org: { slug: string; name: string }
@@ -30,6 +31,7 @@ export const getRoleDetail = createServerFn({ method: 'GET' })
       .innerJoin(topics, eq(topics.jobRoleId, jobRoles.id))
       .where(and(eq(jobRoles.id, data.roleId), eq(jobRoles.orgId, org.id), eq(jobRoles.status, 'active')))
     if (!role) throw httpError('Role not found', 404)
+    if (role.topicStatus === 'generating' && await releaseStaleBuild(db, role.topicId)) role.topicStatus = 'failed'
 
     const [documents, unitRows, conceptRows] = await Promise.all([
       db.select({ id: sources.id, title: sources.title, kind: sources.kind, version: sources.version, createdAt: sources.createdAt })

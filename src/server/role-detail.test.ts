@@ -102,6 +102,15 @@ it('gives an admin the role documents newest first and its units with concept ge
   ] }])
 })
 
+it('releases a build claim left by a request that died, so the role can be rebuilt', async () => {
+  const claim = raw.prepare("UPDATE topics SET status = 'generating', gen_started_at = ? WHERE id = 'picker-topic'")
+  claim.run(Date.now())
+  expect((await read()).role.topicStatus).toBe('generating')
+  claim.run(Date.now() - 11 * 60 * 1000)
+  expect((await read()).role.topicStatus).toBe('failed')
+  expect(raw.prepare("SELECT status FROM topics WHERE id = 'picker-topic'").get()).toEqual({ status: 'failed' })
+})
+
 it('does not show another company role, and rejects a non-member', async () => {
   await expect(detail.getRoleDetail({ data: { slug: 'northwind', roleId: 'other-role' } })).rejects.toMatchObject({ status: 404 })
   await expect(detail.getRoleDetail({ data: { slug: 'other-company', roleId: 'picker' } })).rejects.toMatchObject({ status: 403 })
