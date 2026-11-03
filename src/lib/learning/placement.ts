@@ -19,7 +19,7 @@ export function shouldStop(log: { level: number }[]): boolean {
 export function levelResult(log: { level: number }[]): number {
   const levels = lastFour(log)
   if (!levels.length) return PLACEMENT.start
-  return clamp(Math.round(levels.reduce((a, b) => a + b, 0) / levels.length))
+  return clamp(Math.ceil(levels.reduce((a, b) => a + b, 0) / levels.length - 0.5))
 }
 
 type Pool = { id: string; conceptId: string; difficulty: number }

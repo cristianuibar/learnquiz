@@ -213,6 +213,13 @@ it('turns a whitespace-only role name into a friendly message and per-field erro
   expect(sqlite.prepare('SELECT id FROM organization WHERE slug = ?').all('new-company')).toEqual([])
 })
 
+it.each([0, 366, 2147483648])('rejects an onboarding period of %s days with a per-field error', async (onboardingDays) => {
+  vi.mocked(getSessionUser).mockResolvedValue({ id: 'owner' } as never)
+  const role = await (async () => createRole({ data: { slug: 'alpha', name: 'Long onboarding', onboardingDays } }))().catch((e: unknown) => e)
+  expect(fieldErrors(role)).toEqual({ onboardingDays: onboardingDays < 1 ? 'Use at least 1 day for the onboarding period' : 'Use at most 365 days for the onboarding period' })
+  expect(sqlite.prepare('SELECT id FROM job_roles WHERE name = ?').all('Long onboarding')).toEqual([])
+})
+
 it('rejects a role name that matches an existing role after trimming and case folding', async () => {
   await createRole({ data: { slug: 'alpha', name: 'Customer Support' } })
   const duplicate = await (async () => createRole({ data: { slug: 'alpha', name: 'customer support ' } }))().catch((e: unknown) => e)

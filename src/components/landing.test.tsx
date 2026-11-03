@@ -144,6 +144,19 @@ it.each([
   } finally { await cleanup() }
 })
 
+it('switches the sign-in heading and page title with the form mode', async () => {
+  const { container, cleanup } = await renderApp()
+  const toggle = (label: string) => act(async () => [...container.querySelectorAll('button')].find((b) => b.textContent === label)!.click())
+  try {
+    expect([container.querySelector('h1')?.textContent, document.title]).toEqual(['Sign in', 'Sign in · Learn Quiz'])
+    await toggle('Create an account')
+    expect([container.querySelector('h1')?.textContent, document.title]).toEqual(['Create an account', 'Create an account · Learn Quiz'])
+    expect(container.querySelector('button[type="submit"]')?.textContent).toBe('Sign up')
+    await toggle('I have an account')
+    expect([container.querySelector('h1')?.textContent, document.title]).toEqual(['Sign in', 'Sign in · Learn Quiz'])
+  } finally { await cleanup() }
+})
+
 it('prefills an editable email from the sign-in link and returns to the redirect', async () => {
   const { container, router, cleanup } = await renderApp('/sign-in?email=learner%40example.test&redirect=%2Fjoin%2Finvite')
   try {

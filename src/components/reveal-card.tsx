@@ -19,20 +19,31 @@ export function RevealCard({
   chosen,
   why,
   onWhy,
+  model,
 }: {
   reveal: Reveal
   chosen: string | null // what the learner picked or typed
   why: string
   onWhy: (v: string) => void
+  model?: string | null
 }) {
   const reduce = useReducedMotion()
   const { state } = reveal
   const ungraded = state === 'ungraded'
   const wrong = !ungraded && !reveal.correct
-  const quote = reveal.sourceQuote && (
-    <blockquote className="mt-3 border-l-2 border-learning pl-3 text-sm text-muted-foreground">
-      {reveal.sourceQuote}
-    </blockquote>
+  const quote = reveal.sourceQuote ? (
+    <figure className="mt-3">
+      <blockquote className="border-l-2 border-learning pl-3 text-sm text-muted-foreground">
+        {reveal.sourceQuote}
+      </blockquote>
+      {reveal.sourceTitle && (
+        <figcaption className="mt-1 pl-3 text-xs text-muted-foreground">From {reveal.sourceTitle}</figcaption>
+      )}
+    </figure>
+  ) : (
+    <p className="mt-3 text-xs text-muted-foreground">
+      {model ? `No source: written by ${model} from general knowledge` : 'No source: written from general knowledge'}
+    </p>
   )
   return (
     <motion.section
