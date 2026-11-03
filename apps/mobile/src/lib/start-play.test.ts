@@ -1,5 +1,6 @@
 import { offlineBody, offlineTitle, startFailed } from '@learnquiz/api/system-copy'
 import { beginStartPlay, describeStartFailure, startPlay, type StartPlayEffects } from './start-play'
+import * as apiModule from './api'
 
 const mockGetToken = jest.fn((): string | null => null)
 const mockHandleUnauthorized = jest.fn((): Promise<void> => Promise.resolve())
@@ -147,7 +148,7 @@ test('an abort racing a late response still resolves undefined', async () => {
   await expect(startPlay({ topicId: 't1', start: 'session' }, controller.signal)).resolves.toBeUndefined()
 })
 
-test('ready calls onReady then replace with the encoded session id, never push', async () => {
+test('ready replaces with the encoded session id before scheduling the ready status', async () => {
   fetchMock.mockResolvedValue(jsonResponse(200, { sessionId: 's 1' }))
   const effects = makeEffects()
   const handle = beginStartPlay({ topicId: 't1', start: 'session' }, effects)
@@ -157,7 +158,7 @@ test('ready calls onReady then replace with the encoded session id, never push',
   expect(effects.replace).toHaveBeenCalledWith('/play/s%201')
   const [readyAt] = effects.onReady.mock.invocationCallOrder
   const [replaceAt] = effects.replace.mock.invocationCallOrder
-  expect(readyAt).toBeLessThan(replaceAt)
+  expect(replaceAt).toBeLessThan(readyAt)
 })
 
 test('a server failure reaches onFailure with no navigation', async () => {
@@ -168,6 +169,25 @@ test('a server failure reaches onFailure with no navigation', async () => {
   expect(effects.onFailure).toHaveBeenCalledWith({ message: startFailed, retry: true })
   expect(effects.replace).not.toHaveBeenCalled()
   expect(effects.dismissAll).not.toHaveBeenCalled()
+})
+
+describe.each(['session', 'placement'] as const)('malformed %s success', (start) => {
+  test.each([{}, null, { sessionId: null }, { sessionId: 42 }, { sessionId: '' }, { sessionId: '  ' }, '<html>Maintenance</html>'])(
+    '%p shows the neutral retryable error and leaves Cancel usable', async (payload) => {
+      const response = jsonResponse(200, payload)
+      if (typeof payload === 'string') response.text = async () => payload
+      fetchMock.mockResolvedValueOnce(response)
+      const effects = makeEffects()
+      const handle = beginStartPlay({ topicId: 't1', start }, effects)
+      await handle.done
+      expect(effects.onFailure).toHaveBeenCalledWith({ message: startFailed, retry: true })
+      expect(effects.onReady).not.toHaveBeenCalled()
+      expect(effects.replace).not.toHaveBeenCalled()
+      handle.cancel()
+      expect(effects.dismissAll).toHaveBeenCalledTimes(1)
+      expect(effects.replace).toHaveBeenCalledWith('/(tabs)/today')
+    },
+  )
 })
 
 test.each([409, 500])('Cancel still returns to Today after a %s failure', async (status) => {
@@ -190,7 +210,10 @@ test('cancel dismisses then returns to Today, suppressing a late success', async
   effects.dismissAll.mockImplementation(() => { order.push('dismissAll') })
   effects.replace.mockImplementation(() => { order.push('replace') })
   const handle = beginStartPlay({ topicId: 't1', start: 'session' }, effects)
+  const signal = lastCall().init.signal as AbortSignal
+  expect(signal.aborted).toBe(false)
   handle.cancel()
+  expect(signal.aborted).toBe(true)
   handle.cancel()
   expect(order).toEqual(['dismissAll', 'replace'])
   expect(effects.replace).toHaveBeenCalledWith('/(tabs)/today')
@@ -241,17 +264,25 @@ test('cancel after ready is a no-op', async () => {
   expect(effects.replace).toHaveBeenCalledWith('/play/s1')
 })
 
-test('placement still waits at 45s and times out at 90s', async () => {
+test.each(['session', 'placement'] as const)('%s waits until exactly 90s before aborting', async (start) => {
   jest.useFakeTimers()
+  const originalApi = apiModule.api
+  // A session start must keep its own 90s budget even if the shared API's
+  // default becomes shorter. Omitting the override must fail this test too.
+  const apiCall = jest.spyOn(apiModule, 'api').mockImplementation((path, options) =>
+    originalApi(path, { ...options, timeoutMs: options?.timeoutMs ?? 1_000 }),
+  )
   try {
     abortableFetch()
-    const pending = startPlay({ topicId: 't1', start: 'placement' })
+    const pending = startPlay({ topicId: 't1', start })
     const assertion = expect(pending).rejects.toThrow(/timed out/)
-    await jest.advanceTimersByTimeAsync(45_000)
+    await jest.advanceTimersByTimeAsync(89_999)
     expect((lastCall().init.signal as AbortSignal).aborted).toBe(false)
-    await jest.advanceTimersByTimeAsync(45_000)
+    await jest.advanceTimersByTimeAsync(1)
+    expect((lastCall().init.signal as AbortSignal).aborted).toBe(true)
     await assertion
   } finally {
+    apiCall.mockRestore()
     jest.useRealTimers()
   }
 })

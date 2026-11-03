@@ -87,13 +87,29 @@ describe('storage', () => {
     expect((await readPromptCounts(store)).finishedSessions).toBe(2)
   })
 
-  test('keeps only the last 50 ids but keeps counting', async () => {
+  test('revisiting an old session after 55 newer ones cannot recount it; storage stays bounded', async () => {
     const store = memoryStore()
+    await recordFinished('old', store)
     for (let i = 0; i < 55; i++) await recordFinished(`s${i}`, store)
+    const before = await readPromptCounts(store)
+    expect(await recordFinished('old', store)).toBe(before.finishedSessions)
     const stored = store.data.get(FINISHED_KEY) as { count: number; ids: string[] }
-    expect(stored.count).toBe(55)
-    expect(stored.ids).toHaveLength(50)
-    expect(stored.ids[49]).toBe('s54')
+    expect(stored.count).toBe(4)
+    expect(stored.ids).toHaveLength(4)
+    expect(stored.ids).toContain('old')
+  })
+
+  test.each([3, 55])('migrates a legacy count of %s without changing prompt timing or other keys', async (count) => {
+    const store = memoryStore({
+      [FINISHED_KEY]: { count, ids: Array.from({ length: Math.min(count, 50) }, (_, i) => `s${i}`) },
+      [SKIPS_KEY]: 1,
+      [PUSH_TOKEN_KEY]: { pending: true },
+    })
+    expect(await recordFinished('s0', store)).toBe(Math.min(count, 4))
+    expect(await readPromptCounts(store)).toEqual({ finishedSessions: Math.min(count, 4), skips: 1, registered: true })
+    expect(await recordFinished('new', store)).toBe(4)
+    expect((store.data.get(FINISHED_KEY) as { ids: string[] }).ids.length).toBeLessThanOrEqual(4)
+    expect(store.data.get(PUSH_TOKEN_KEY)).toEqual({ pending: true })
   })
 
   test('recordSkip increments', async () => {
