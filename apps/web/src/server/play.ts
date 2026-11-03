@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, count, eq, getTableColumns, gte, inArray, isNull, lt, lte, ne, sql, type SQL } from 'drizzle-orm'
+import { and, asc, count, eq, exists, getTableColumns, gte, inArray, isNull, lt, lte, ne, sql, type SQL } from 'drizzle-orm'
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core'
 import { z } from 'zod'
 import { getDb, type Db } from '@/db'
@@ -8,7 +8,6 @@ import { attempts, concepts, itemFlags, items, jobRoles, learnerConcept, learner
 import { BKT, guessFor, MASTERY, placementPrior, update } from '@/lib/learning/bkt'
 import { ratingFor, retrievability, review } from '@/lib/learning/fsrs'
 import { gradeAnswer, revealState, toItemView } from '@/lib/learning/grade'
-import { benchmarkMet } from '@/lib/learning/profile'
 import { levelResult, nextLevel, pickNext, PLACEMENT, shouldStop } from '@/lib/learning/placement'
 import { composeSession, reinsert, SESSION_BONUS, streakAfter, xpFor } from '@/lib/learning/session'
 import { reportReasons } from '@learnquiz/api/reveal'
@@ -477,25 +476,24 @@ export const transcribeAnswer = createServerFn({ method: 'POST' })
   })
 
 // Sticky: a role topic's assignment gets proficient_at once the benchmark is met, and it is never cleared.
-async function stampProficiency(db: Db, learnerId: string, topicId: string, now: number) {
-  const [role] = await db
-    .select({ orgId: memberRoleAssignments.orgId, benchmark: jobRoles.benchmark })
-    .from(memberRoleAssignments)
+// It runs inside the answer's batch, so the benchmark is judged on exactly the state this answer wrote,
+// even while another session's answer lands in between.
+function stampProficiency(db: Db, learnerId: string, topicId: string, now: number, when: SQL) {
+  const known = sql`coalesce(${learnerConcept.pKnown}, 0)`
+  // The same rule as benchmarkMet: live concepts average the benchmark and no critical one is below it.
+  const met = sql`(select count(*) > 0 and avg(${known}) >= ${jobRoles.benchmark} and coalesce(sum(${concepts.critical} and ${known} < ${jobRoles.benchmark}), 0) = 0
+    from ${concepts} left join ${learnerConcept} on ${learnerConcept.conceptId} = ${concepts.id} and ${learnerConcept.learnerId} = ${learnerId}
+    where ${concepts.topicId} = ${topicId} and ${liveConcept()})`
+  const role = db
+    .select({ id: jobRoles.id })
+    .from(jobRoles)
     .innerJoin(member, and(eq(member.userId, memberRoleAssignments.userId), eq(member.organizationId, memberRoleAssignments.orgId)))
-    .innerJoin(jobRoles, and(eq(jobRoles.id, memberRoleAssignments.jobRoleId), eq(jobRoles.orgId, memberRoleAssignments.orgId), eq(jobRoles.status, 'active')))
     .innerJoin(topics, and(eq(topics.jobRoleId, jobRoles.id), eq(topics.id, topicId)))
-    .where(and(eq(memberRoleAssignments.userId, learnerId), isNull(memberRoleAssignments.proficientAt)))
-  if (!role) return
-  const rows = await db
-    .select({ id: concepts.id, critical: concepts.critical, pKnown: learnerConcept.pKnown })
-    .from(concepts)
-    .leftJoin(learnerConcept, and(eq(learnerConcept.conceptId, concepts.id), eq(learnerConcept.learnerId, learnerId)))
-    .where(and(eq(concepts.topicId, topicId), liveConcept()))
-  if (!benchmarkMet(rows.map((r) => ({ id: r.id, critical: r.critical, pKnown: r.pKnown ?? 0 })), role.benchmark)) return
-  await db
+    .where(and(eq(jobRoles.id, memberRoleAssignments.jobRoleId), eq(jobRoles.orgId, memberRoleAssignments.orgId), eq(jobRoles.status, 'active'), met))
+  return db
     .update(memberRoleAssignments)
     .set({ proficientAt: now })
-    .where(and(eq(memberRoleAssignments.userId, learnerId), eq(memberRoleAssignments.orgId, role.orgId), isNull(memberRoleAssignments.proficientAt)))
+    .where(and(eq(memberRoleAssignments.userId, learnerId), isNull(memberRoleAssignments.proficientAt), when, exists(role)))
 }
 
 type RevealFields = Pick<Reveal, 'correct' | 'score' | 'feedback' | 'missingPoints' | 'correctAnswer' | 'chosenFeedback' | 'returnsThisSession' | 'pKnownBefore' | 'pKnownAfter'> & {
@@ -721,6 +719,7 @@ export const answerItem = createServerFn({ method: 'POST' })
           set: { pKnown: pKnownAfter, nAttempts: sql`${learnerConcept.nAttempts} + 1`, masteredAt, updatedAt: now },
         }),
     ]
+    if (topic.jobRoleId !== null) stmts.push(stampProficiency(db, learnerId, session.topicId, now, recorded))
     // Topic XP moves per answer, so a session abandoned without endSession loses nothing.
     if (xp) {
       stmts.push(
@@ -732,7 +731,6 @@ export const answerItem = createServerFn({ method: 'POST' })
     }
     const [kept] = (await batch(db, stmts)) as unknown as [unknown[]]
     if (!kept.length) throw await dropped()
-    await stampProficiency(db, learnerId, session.topicId, now)
 
     return revealOf({
       attemptId, correct, confidence: data.confidence, score: shortGrade?.score ?? (correct ? 1 : 0),
