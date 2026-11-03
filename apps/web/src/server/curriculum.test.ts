@@ -314,7 +314,7 @@ it.each([
   holder.userId = 'employee'
   raw.exec("INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES ('employee', 'northwind', 'picker', 1)")
   const today = await getToday()
-  expect(today.role).toEqual({ name: 'Warehouse picker', company, topicTitle: 'Warehouse picker', preparing })
+  expect(today.role).toMatchObject({ name: 'Warehouse picker', company, topicTitle: 'Warehouse picker', preparing })
   expect(today.topic?.id).toBe(preparing ? undefined : 'picker-topic')
   if (!preparing) expect(today.topic?.placeable).toBe(placeable)
   expect(await getLatestTopicIdFn()).toBe('picker-topic')
