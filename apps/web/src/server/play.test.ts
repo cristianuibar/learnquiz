@@ -943,6 +943,25 @@ it('prepareNextSession generates the next concepts\' items after placement so th
   expect(new Set(queue).size).toBe(12)
 })
 
+it('startSession answers 503 rather than "Nothing to practice yet" when another generation outlives the join wait', async () => {
+  seedTopicAndLearner(raw, 0)
+  raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un1', 't1', 0, 'Basics')
+  raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)').run('c1', 't1', 'un1', 0, 'Variables', '')
+  raw.prepare('INSERT INTO learner_unit (learner_id, unit_id, unlocked_at) VALUES (?, ?, ?)').run('u1', 'un1', 1)
+  vi.useFakeTimers({ toFake: ['setTimeout', 'Date'] })
+  onTestFinished(() => { vi.useRealTimers() })
+  raw.prepare("UPDATE concepts SET gen_status = 'generating', gen_started_at = ? WHERE id = 'c1'").run(Date.now())
+  const before = vi.mocked(chatJson).mock.calls.filter(([o]) => o.purpose === 'items').length
+
+  const start = startSession({ data: { topicId: 't1' } })
+  const rejected = expect(start).rejects.toMatchObject({ status: 503, message: 'Your questions are still being written. Try again in a moment.' })
+  await vi.advanceTimersByTimeAsync(121_000)
+  await rejected
+
+  expect(vi.mocked(chatJson).mock.calls.filter(([o]) => o.purpose === 'items').length - before).toBe(0)
+  expect(scalar(raw, "SELECT gen_status AS s FROM concepts WHERE id = 'c1'").s).toBe('generating')
+})
+
 it('startSession joins an in-flight prepareNextSession generation so one concept is generated once', async () => {
   seedTopicAndLearner(raw, 0)
   raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un1', 't1', 0, 'Basics')
