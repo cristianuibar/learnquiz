@@ -116,7 +116,7 @@ model configuration is in `wrangler.jsonc`. Local D1 data is separate from produ
 | `JOB_MODELS` | Provider and model for each model job |
 | `LLM_PROFILE`, `LLM_BASE_URL`, `LLM_MODEL` | Legacy defaults for unmapped jobs (`meta`, `baseten`, `fireworks`, `ollama`) |
 | `LLM_API_KEY`, `BASETEN_API_KEY`, `FIREWORKS_API_KEY` | Provider credentials; store as secrets |
-| `VOICE_ENABLED` | Enable the voice job with Meta's transcription model; default `false` |
+| `VOICE_ENABLED` | Enable the voice job with Meta's transcription model; `true` in `wrangler.jsonc`; set `false` in `.dev.vars` to hide voice locally |
 | `IMAGE_MODEL` | Legacy model for an unmapped image job |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web Push key pair and contact; required to enable notifications |
 | `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET` | App origin and authentication secret |
