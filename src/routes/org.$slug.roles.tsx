@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { RouteError, errorMessage } from '@/components/inline-error'
+import { RouteError, errorMessage, fieldErrors } from '@/components/inline-error'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -18,20 +18,29 @@ function Roles() {
   const router = useRouter()
   const create = useServerFn(createRole)
   const [error, setError] = useState('')
+  const [fields, setFields] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const form = e.currentTarget
     const f = new FormData(form)
-    setBusy(true)
+    const name = String(f.get('name')).trim()
     setError('')
+    if (!name) {
+      setFields({ name: 'Enter a role name' })
+      return
+    }
+    setFields({})
+    setBusy(true)
     try {
-      await create({ data: { slug: org.slug, name: String(f.get('name')), benchmark: Number(f.get('benchmark')), onboardingDays: Number(f.get('onboardingDays')) } })
+      await create({ data: { slug: org.slug, name, benchmark: Number(f.get('benchmark')), onboardingDays: Number(f.get('onboardingDays')) } })
       form.reset()
       await router.invalidate()
     } catch (err) {
-      setError(errorMessage(err))
+      const found = fieldErrors(err)
+      if (['name', 'benchmark', 'onboardingDays'].some((k) => found[k])) setFields(found)
+      else setError(errorMessage(err))
     } finally {
       setBusy(false)
     }
@@ -62,15 +71,18 @@ function Roles() {
         <form className="mt-6 flex flex-col gap-6" onSubmit={submit}>
           <div className="flex flex-col gap-2">
             <Label htmlFor="name">Role name</Label>
-            <Input id="name" name="name" className="h-11" minLength={2} maxLength={80} required />
+            <Input id="name" name="name" className="h-11" minLength={2} maxLength={80} required aria-invalid={!!fields.name || undefined} aria-describedby={fields.name ? 'name-error' : undefined} />
+            {fields.name && <p id="name-error" role="alert" className="text-sm font-medium text-wrong">{fields.name}</p>}
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="benchmark">Benchmark (0–1)</Label>
-            <Input id="benchmark" name="benchmark" type="number" className="h-11" min={0} max={1} step="any" defaultValue={0.85} required />
+            <Input id="benchmark" name="benchmark" type="number" className="h-11" min={0} max={1} step="any" defaultValue={0.85} required aria-invalid={!!fields.benchmark || undefined} aria-describedby={fields.benchmark ? 'benchmark-error' : undefined} />
+            {fields.benchmark && <p id="benchmark-error" role="alert" className="text-sm font-medium text-wrong">{fields.benchmark}</p>}
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="onboardingDays">Onboarding days</Label>
-            <Input id="onboardingDays" name="onboardingDays" type="number" className="h-11" min={1} step={1} defaultValue={30} required />
+            <Input id="onboardingDays" name="onboardingDays" type="number" className="h-11" min={1} step={1} defaultValue={30} required aria-invalid={!!fields.onboardingDays || undefined} aria-describedby={fields.onboardingDays ? 'onboardingDays-error' : undefined} />
+            {fields.onboardingDays && <p id="onboardingDays-error" role="alert" className="text-sm font-medium text-wrong">{fields.onboardingDays}</p>}
           </div>
           {error && <p role="alert" className="text-sm font-medium text-wrong">{error}</p>}
           <Button type="submit" className="h-11 self-end px-6" disabled={busy}>
