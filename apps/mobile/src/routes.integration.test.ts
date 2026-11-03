@@ -7,6 +7,11 @@ import { holdTarget, takeHeldTarget } from './lib/held-target'
 jest.mock('./app/play/[sessionId]/index', () => ({ __esModule: true, default: () => null }))
 jest.mock('@expo-google-fonts/inter', () => ({ useFonts: () => [true, null] }))
 jest.mock('expo-splash-screen', () => ({ preventAutoHideAsync: jest.fn(), hideAsync: jest.fn() }))
+jest.mock('expo-notifications', () => ({
+  DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
+  getLastNotificationResponseAsync: jest.fn(async () => null),
+  addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+}))
 jest.mock('./lib/session-store', () => ({
   SessionProvider: ({ children }: { children: unknown }) => children,
   useSession: jest.fn(),
