@@ -1,7 +1,7 @@
-import { and, desc, eq, inArray, ne, or, type SQL } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull, ne, notInArray, or, type SQL } from 'drizzle-orm'
 import type { Db } from '@/db'
 import { member, organization } from '@/db/auth-schema'
-import { items, jobRoles, learnerTopic, memberRoleAssignments, orgSettings, topics } from '@/db/schema'
+import { itemFlags, items, jobRoles, learnerTopic, memberRoleAssignments, orgSettings, topics } from '@/db/schema'
 
 // The active job roles the learner is assigned to as a current company member.
 const assignedRoleIds = (db: Db, learnerId: string) =>
@@ -14,6 +14,14 @@ const assignedRoleIds = (db: Db, learnerId: string) =>
 // A topic the learner owns, or the shared topic of the learner's assigned role. Use on every learner read of a topic.
 export const learnerCanAccess = (db: Db, learnerId: string): SQL =>
   or(eq(topics.learnerId, learnerId), inArray(topics.jobRoleId, assignedRoleIds(db, learnerId)))!
+
+// Hides an item from the learner while their own flag on it is open; it stays live for everyone else. Use on every learner read of items.
+export const notFlaggedBy = (db: Db, learnerId: string): SQL =>
+  notInArray(items.id, db.select({ id: itemFlags.itemId }).from(itemFlags).where(and(eq(itemFlags.userId, learnerId), isNull(itemFlags.resolvedAt))))
+
+// The learner's open flag on an item, if any: a learner holds at most one at a time.
+export const openFlag = (db: Db, learnerId: string, itemId: string) =>
+  db.select({ id: itemFlags.id }).from(itemFlags).where(and(eq(itemFlags.itemId, itemId), eq(itemFlags.userId, learnerId), isNull(itemFlags.resolvedAt))).get()
 
 // The topic of the learner's newest role assignment, whatever its status, with the company's name; null for the personal edition.
 export async function assignedRoleTopic(db: Db, learnerId: string) {

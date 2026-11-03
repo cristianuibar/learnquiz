@@ -8,7 +8,7 @@ import { loadPKnown } from '@/server/helpers'
 import { liveConcept } from '@/server/live-concept'
 import { loadFrontier, SESSION_SIZE } from '@/server/play'
 import { getLearnerId } from '@/server/session'
-import { assignedRoleTopic, rolePlayable } from '@/server/topic-access'
+import { assignedRoleTopic, notFlaggedBy, rolePlayable } from '@/server/topic-access'
 
 const DAY = 86_400_000
 
@@ -82,7 +82,7 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
       )).get(),
     db.select({ at: min(learnerItem.due) }).from(learnerItem)
       .innerJoin(items, eq(items.id, learnerItem.itemId))
-      .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topicId), eq(items.status, 'active'), gt(learnerItem.due, now)))
+      .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topicId), eq(items.status, 'active'), notFlaggedBy(db, learnerId), gt(learnerItem.due, now)))
       .get(),
     roleStats(),
   ])
@@ -99,7 +99,7 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
       const ids = frontier.slice(0, 4).map((f) => f.concept.id)
       if (!ids.length) return false
       return Boolean(await db.select({ id: items.id }).from(items)
-        .where(and(inArray(items.conceptId, ids), eq(items.status, 'active'), ne(items.format, 'short'))).limit(1).get())
+        .where(and(inArray(items.conceptId, ids), eq(items.status, 'active'), ne(items.format, 'short'), notFlaggedBy(db, learnerId))).limit(1).get())
     })(),
   ])
   return {

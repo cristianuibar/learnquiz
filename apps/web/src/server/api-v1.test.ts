@@ -8,12 +8,15 @@ const fns = vi.hoisted(() => ({
   answerItem: vi.fn(),
   getTopicPath: vi.fn(),
   getProfile: vi.fn(),
+  reportItem: vi.fn(),
+  flagResult: vi.fn(),
   subscribeExpo: vi.fn(),
   unsubscribe: vi.fn(),
 }))
 
 vi.mock('@/server/curriculum', () => ({ getConceptItems: vi.fn(), getTopicPath: fns.getTopicPath }))
 vi.mock('@/server/diagrams', () => ({ generateConceptDiagram: vi.fn() }))
+vi.mock('@/server/flags', () => ({ flagResult: fns.flagResult }))
 vi.mock('@/server/org', () => ({ getInvite: fns.getInvite }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: vi.fn() }))
 vi.mock('@/server/play', () => ({
@@ -21,7 +24,7 @@ vi.mock('@/server/play', () => ({
   endSession: vi.fn(),
   getSession: vi.fn(),
   nextItem: vi.fn(),
-  reportItem: vi.fn(),
+  reportItem: fns.reportItem,
   startMiniSession: vi.fn(),
   startPlacement: vi.fn(),
   startSession: vi.fn(),
@@ -104,6 +107,21 @@ it('always reads the caller own profile, ignoring learnerId', async () => {
   expect(res.status).toBe(200)
   expect(fns.getProfile).toHaveBeenCalledTimes(1)
   expect(fns.getProfile).toHaveBeenCalledWith({ data: {} })
+})
+
+it('routes item reports and result flags with a bearer only', async () => {
+  fns.reportItem.mockResolvedValue({ ok: true })
+  fns.flagResult.mockResolvedValue({ ok: true })
+  const post = (path: string, body: object, headers: object = auth) =>
+    call(path, { method: 'POST', headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify(body) })
+  expect((await post('/items/i-1/report', { reason: 'unclear' })).status).toBe(200)
+  expect(fns.reportItem).toHaveBeenCalledWith({ data: { itemId: 'i-1', reason: 'unclear' } })
+  expect((await post('/me/result-flags', { conceptId: 'c-1', note: 'Unfair' })).status).toBe(200)
+  expect(fns.flagResult).toHaveBeenCalledWith({ data: { conceptId: 'c-1', note: 'Unfair' } })
+  expect((await post('/items/i-1/report', {}, {})).status).toBe(401)
+  expect((await post('/me/result-flags', { conceptId: 'c-1' }, {})).status).toBe(401)
+  expect(fns.reportItem).toHaveBeenCalledTimes(1)
+  expect(fns.flagResult).toHaveBeenCalledTimes(1)
 })
 
 it('registers an Expo push token only with a bearer', async () => {

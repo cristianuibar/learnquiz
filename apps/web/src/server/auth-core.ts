@@ -5,7 +5,7 @@ import { admin, anonymous, bearer, organization } from 'better-auth/plugins'
 import type { BetterAuthPlugin } from 'better-auth'
 import { and, eq, inArray } from 'drizzle-orm'
 import { getDb, authSchema } from '@/db'
-import { attempts, badges, jobRoles, learnerConcept, learnerItem, learnerTopic, learnerUnit, memberRoleAssignments, modelCalls, placements, sessions, topics } from '@/db/schema'
+import { attempts, badges, itemFlags, jobRoles, learnerConcept, learnerItem, learnerTopic, learnerUnit, memberRoleAssignments, modelCalls, placements, sessions, topics } from '@/db/schema'
 import { getEnv } from '@/server/env'
 
 export function facebookEnabled(): boolean {
@@ -23,6 +23,7 @@ async function moveGuestData(guestId: string, userId: string) {
     // The account may already hold a badge the guest earned too; keep the existing one.
     db.delete(badges).where(and(eq(badges.learnerId, guestId), inArray(badges.badge, owned))),
     ...LEARNER_TABLES.map((t) => db.update(t).set({ learnerId: userId }).where(eq(t.learnerId, guestId))),
+    db.update(itemFlags).set({ userId }).where(eq(itemFlags.userId, guestId)),
   ])
 }
 
