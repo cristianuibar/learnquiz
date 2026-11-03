@@ -34,7 +34,8 @@ async function mount() {
     errorComponent: joinRoute.options.errorComponent,
   })
   const signIn = createRoute({ getParentRoute: () => rootRoute, path: '/sign-in', validateSearch: (search: Record<string, unknown>) => search, component: () => <p>Sign in page</p> })
-  const router = createRouter({ routeTree: rootRoute.addChildren([join, signIn]), history: createMemoryHistory({ initialEntries: ['/join/invite'] }) })
+  const today = createRoute({ getParentRoute: () => rootRoute, path: '/today', component: () => <p>Today page</p> })
+  const router = createRouter({ routeTree: rootRoute.addChildren([join, signIn, today]), history: createMemoryHistory({ initialEntries: ['/join/invite'] }) })
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -102,6 +103,26 @@ it('offers to sign in as the invited address instead of joining from another acc
     expect(signOut).toHaveBeenCalledTimes(1)
     expect(router.state.location.search).toEqual({ redirect: '/join/invite', email: 'learner@example.test' })
     expect(acceptInvitation).not.toHaveBeenCalled()
+  } finally {
+    await cleanup()
+  }
+})
+
+it.each([
+  { viewer: { id: 'learner', name: 'Learner', isAnonymous: false }, label: 'Continue to Today', path: '/today', search: {} },
+  { viewer: null, label: 'Sign in as learner@example.test', path: '/sign-in', search: { redirect: '/today', email: 'learner@example.test' } },
+])('leads $label from an invite that was already used', async ({ viewer, label, path, search }) => {
+  vi.mocked(getSessionFn).mockResolvedValue({ user: viewer, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })
+  getInvite.mockResolvedValue({ ...invite, status: 'accepted' })
+  const { router, container, cleanup } = await mount()
+  try {
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe('This invite was already used.')
+    const link = [...container.querySelectorAll('main a')].find((a) => a.textContent?.trim() === label) as HTMLAnchorElement
+    await act(async () => {
+      link.click()
+      await vi.waitFor(() => expect(router.state.location.pathname).toBe(path))
+    })
+    expect(router.state.location.search).toEqual(search)
   } finally {
     await cleanup()
   }
