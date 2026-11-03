@@ -34,8 +34,8 @@ type TopicRow = typeof topics.$inferSelect
 type Stmt = Parameters<Db['batch']>[0][number]
 
 // planJson. position indexes itemIdsJson; answered gates answerItem (once per slot) and nextItem (only after an answer).
-// answerClaim marks a slot being graded (see answerItem).
-type Plan = { position: number; answered: boolean; lastAttemptId?: string; answerClaim?: { token: string; at: number }; ungraded?: number }
+// answerClaim marks a slot being graded (see answerItem). lastReturns is the last reveal's returnsThisSession, for its replay.
+type Plan = { position: number; answered: boolean; lastAttemptId?: string; lastReturns?: boolean; answerClaim?: { token: string; at: number }; ungraded?: number }
 type PlacementPlan = Plan & {
   workingLevel: number
   log: { itemId: string; correct: boolean; confidence: Confidence; level: number }[]
@@ -292,7 +292,7 @@ export const startSession = createServerFn({ method: 'POST' })
     const rulesQueue = composeSession({ size: SESSION_SIZE, due, frontier: frontierInput, closers, targetDifficulty })
     if (!rulesQueue.length) {
       if (topic.jobRoleId !== null) throw httpError('Your training is being prepared. Try again in a few minutes.', 503)
-      throw httpError('Nothing to practise yet', 409)
+      throw httpError('Nothing to practice yet', 409)
     }
 
     const dueIds = new Set(due.map((d) => d.id))
@@ -497,6 +497,40 @@ async function stampProficiency(db: Db, learnerId: string, topicId: string, now:
     .where(and(eq(memberRoleAssignments.userId, learnerId), eq(memberRoleAssignments.orgId, role.orgId), isNull(memberRoleAssignments.proficientAt)))
 }
 
+type RevealFields = Pick<Reveal, 'correct' | 'score' | 'feedback' | 'missingPoints' | 'correctAnswer' | 'chosenFeedback' | 'returnsThisSession' | 'pKnownBefore' | 'pKnownAfter'> & {
+  attemptId: string
+  confidence: Confidence
+}
+
+// The reveal of a graded answer, built the same way for the first answer and for its replay.
+function buildReveal(session: SessionRow, item: typeof items.$inferSelect, concept: typeof concepts.$inferSelect, payload: ItemPayload, sourceTitle: string | null, r: RevealFields): Reveal {
+  const state = revealState(r.correct, r.confidence)
+  return {
+    attemptId: r.attemptId,
+    diagramConceptId: concept.visual ? concept.id : null,
+    state,
+    correct: r.correct,
+    xp: xpFor({ correct: r.correct, kind: session.kind }),
+    critical: concept.critical,
+    correctOptionIds: payload.format === 'mcq' ? payload.options.filter((option) => option.is_correct).map((option) => option.id) : null,
+    sourceVersion: item.sourceVersion,
+    detail: null,
+    score: r.score,
+    feedback: r.feedback,
+    missingPoints: r.missingPoints,
+    correctAnswer: r.correctAnswer,
+    chosenFeedback: r.chosenFeedback,
+    explanation: payload.explanation,
+    sourceQuote: payload.source_quote,
+    sourceTitle,
+    // State D only, read from the concept; no model call. chosenFeedback is shown on its own, so it is not repeated here.
+    mixUps: state === 'D' ? (JSON.parse(concept.misconceptionsJson) as string[]) : [],
+    returnsThisSession: r.returnsThisSession,
+    pKnownBefore: r.pKnownBefore,
+    pKnownAfter: r.pKnownAfter,
+  }
+}
+
 export const answerItem = createServerFn({ method: 'POST' })
   .validator(
     z.object({
@@ -516,15 +550,32 @@ export const answerItem = createServerFn({ method: 'POST' })
     const ids = JSON.parse(session.itemIdsJson) as string[]
     if (ids[plan.position] !== data.itemId) throw httpError('That is not the current question', 409)
     const alreadyAnswered = () => httpError('Already answered. Continue to the next question.', 409)
-    if (plan.answered) throw alreadyAnswered()
+    if (plan.answered && !plan.lastAttemptId) throw alreadyAnswered()
 
     const { item, concept, payload } = await loadItem(db, session.topicId, data.itemId, true)
-    if (item.status === 'retired') throw httpError('This question has been retired', 409)
     const sourceId = item.sourceId ?? concept.sourceId
     const sourceTitle = payload.source_quote && sourceId
       ? (await db.select({ title: sources.title }).from(sources)
           .where(and(eq(sources.id, sourceId), eq(sources.topicId, session.topicId), isNull(sources.deletedAt))).get())?.title ?? null
       : null
+    const revealOf = (r: RevealFields) => buildReveal(session, item, concept, payload, sourceTitle, r)
+
+    // A retry of the same answer whose response was lost gets the original reveal back; nothing is written.
+    if (plan.answered) {
+      const answerJson = JSON.stringify(data.answer)
+      const last = await db.select().from(attempts)
+        .where(and(eq(attempts.id, plan.lastAttemptId!), eq(attempts.learnerId, learnerId), eq(attempts.sessionId, session.id), eq(attempts.itemId, item.id)))
+        .get()
+      if (!last || last.confidence !== data.confidence || last.answerJson !== answerJson) throw alreadyAnswered()
+      const stored = JSON.parse(last.gradeJson ?? '{}') as { correctAnswer?: string } & Partial<Grade>
+      return revealOf({
+        attemptId: last.id, correct: last.correct, confidence: data.confidence, score: last.score,
+        feedback: stored.feedback ?? null, missingPoints: stored.missing_points ?? [],
+        correctAnswer: stored.correctAnswer ?? '', chosenFeedback: gradeAnswer(payload, data.answer).chosenFeedback,
+        returnsThisSession: plan.lastReturns ?? false, pKnownBefore: last.pKnownBefore, pKnownAfter: last.pKnownAfter,
+      })
+    }
+    if (item.status === 'retired') throw httpError('This question has been retired', 409)
 
     // Claim the slot before grading, so concurrent submits (double tap, retry, two tabs) score once.
     // A claim older than the grading timeout is abandoned and may be taken over.
@@ -584,7 +635,7 @@ export const answerItem = createServerFn({ method: 'POST' })
         // Advance without recording a wrong answer or changing mastery, scheduling or XP.
         const [kept] = await db
           .update(sessions)
-          .set({ planJson: JSON.stringify({ ...plan, answered: true, lastAttemptId: undefined, ungraded: (plan.ungraded ?? 0) + 1 }) })
+          .set({ planJson: JSON.stringify({ ...plan, answered: true, lastAttemptId: undefined, lastReturns: undefined, ungraded: (plan.ungraded ?? 0) + 1 }) })
           .where(claimHeld)
           .returning({ id: sessions.id })
         if (!kept) throw await dropped()
@@ -623,6 +674,7 @@ export const answerItem = createServerFn({ method: 'POST' })
     }
     nextPlan.answered = true
     nextPlan.lastAttemptId = attemptId
+    nextPlan.lastReturns = returnsThisSession
 
     // The session write goes first; the rest follow only if it landed (its plan now names this attempt).
     const recorded = sql`exists (select 1 from sessions where id = ${session.id} and json_extract(plan_json, '$.lastAttemptId') = ${attemptId})`
@@ -676,31 +728,11 @@ export const answerItem = createServerFn({ method: 'POST' })
     if (!kept.length) throw await dropped()
     await stampProficiency(db, learnerId, session.topicId, now)
 
-    // State D only, read from the concept; no model call. chosenFeedback is shown on its own, so it is not repeated here.
-    const mixUps = state === 'D' ? (JSON.parse(concept.misconceptionsJson) as string[]) : []
-    return {
-      attemptId,
-      diagramConceptId: concept.visual ? concept.id : null,
-      state,
-      correct,
-      xp,
-      critical: concept.critical,
-      correctOptionIds: payload.format === 'mcq' ? payload.options.filter((option) => option.is_correct).map((option) => option.id) : null,
-      sourceVersion: item.sourceVersion,
-      detail: null,
-      score: shortGrade?.score ?? (correct ? 1 : 0),
-      feedback: shortGrade?.feedback ?? null,
-      missingPoints: shortGrade?.missing_points ?? [],
-      correctAnswer: grade.correctAnswer,
-      chosenFeedback: grade.chosenFeedback,
-      explanation: payload.explanation,
-      sourceQuote: payload.source_quote,
-      sourceTitle,
-      mixUps,
-      returnsThisSession,
-      pKnownBefore,
-      pKnownAfter,
-    }
+    return revealOf({
+      attemptId, correct, confidence: data.confidence, score: shortGrade?.score ?? (correct ? 1 : 0),
+      feedback: shortGrade?.feedback ?? null, missingPoints: shortGrade?.missing_points ?? [],
+      correctAnswer: grade.correctAnswer, chosenFeedback: grade.chosenFeedback, returnsThisSession, pKnownBefore, pKnownAfter,
+    })
   })
 
 async function advance(db: Db, learnerId: string, session: SessionRow, topic: TopicRow, plan: PlacementPlan | QueuePlan): Promise<SessionView> {
