@@ -5,8 +5,7 @@ import { ChevronRight } from 'lucide-react-native'
 import { Button } from '@/components/ui/Button'
 import { Screen } from '@/components/ui/Screen'
 import { Text } from '@/components/ui/Text'
-import { signOut } from '@/lib/auth'
-import { useSession } from '@/lib/session-store'
+import { endSession, useSession } from '@/lib/session-store'
 import { useTheme } from '@/theme/ThemeProvider'
 
 export default function Profile() {
@@ -29,9 +28,10 @@ export default function Profile() {
   const handleSignOut = async () => {
     if (busy) return
     setBusy(true)
+    // endSession() never rejects and always drops the session, so the route guard
+    // alone moves the learner to sign-in, even when cleanup or push unregistration fails.
     try {
-      await signOut()
-      router.replace('/(auth)/sign-in')
+      await endSession()
     } finally {
       setBusy(false)
     }

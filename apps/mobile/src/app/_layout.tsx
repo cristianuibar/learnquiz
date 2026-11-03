@@ -8,7 +8,7 @@ import {
 import { useURL } from 'expo-linking'
 import { Stack, usePathname, useRouter, type Href } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
-import { useEffect, useRef, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
@@ -52,6 +52,9 @@ function SessionRoutes({ fontsLoaded }: { fontsLoaded: boolean }) {
   const url = useURL()
   const lastURL = useRef<string | null>(null)
   const mounted = useRef(false)
+  // Set once the first session resolved. A later loading (a new bearer waiting
+  // for /session) keeps the stack, so an open invitation stays mounted.
+  const [booted, setBooted] = useState(false)
   const resolved = fontsLoaded && session.status !== 'loading'
   useNotificationObserver(resolved && session.status === 'ready' && !session.needsDisclosure)
   // Re-runs the replay below when the last hold on it ends.
@@ -77,11 +80,12 @@ function SessionRoutes({ fontsLoaded }: { fontsLoaded: boolean }) {
   useEffect(() => {
     if (resolved && !mounted.current) {
       mounted.current = true
+      setBooted(true)
       void SplashScreen.hideAsync()
     }
   }, [resolved])
 
-  if (!resolved) return null
+  if (!resolved && !booted) return null
   const signedIn = session.status === 'ready'
   return (
     <ThemeProvider accent={session.branding?.accent}>

@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import type { DisclosureAccepted } from '@learnquiz/api'
+import type { DisclosureAccepted, SessionResponse } from '@learnquiz/api'
 import { and, asc, eq, isNull } from 'drizzle-orm'
 import { getDb } from '@/db'
 import { member, organization } from '@/db/auth-schema'
@@ -11,12 +11,7 @@ import { assignedRoleTopic } from '@/server/topic-access'
 
 // Lives apart from the request helpers so no server-only import reaches the client bundle.
 export const getSessionFn = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<{
-    user: { id: string; name: string; isAnonymous: boolean; role?: string | null } | null
-    facebookEnabled: boolean
-    needsDisclosure: boolean
-    adminCompanies: { name: string; slug: string }[]
-  }> => {
+  async (): Promise<SessionResponse> => {
     const user = await getSessionUser()
     // A signed-in member of any company who has not accepted the disclosure yet.
     const unconsented =
