@@ -17,7 +17,8 @@ import { gradePrompt } from '@/lib/llm/prompts'
 import { Grade, type ItemPayload } from '@/lib/llm/schemas'
 import { validateVoiceWav } from '@/lib/voice'
 import { plural } from '@/lib/utils'
-import { asItem, chunks, ensureConceptItems, httpError, liveConcept, loadPKnown, mean, targetFor } from '@/server/helpers'
+import { asItem, chunks, ensureConceptItems, httpError, loadPKnown, mean, targetFor } from '@/server/helpers'
+import { liveConcept } from '@/server/live-concept'
 import { requireLearnerId } from '@/server/session'
 import { assertWithinDailyCap } from '@/server/model-cap'
 import { learnerCanAccess, seedLearnerTopic } from '@/server/topic-access'
@@ -121,7 +122,7 @@ export async function loadFrontier(db: Db, learnerId: string, topicId: string) {
     .innerJoin(units, eq(units.id, concepts.unitId))
     .innerJoin(learnerUnit, and(eq(learnerUnit.unitId, units.id), eq(learnerUnit.learnerId, learnerId)))
     .leftJoin(learnerConcept, and(eq(learnerConcept.conceptId, concepts.id), eq(learnerConcept.learnerId, learnerId)))
-    .where(and(eq(concepts.topicId, topicId), liveConcept))
+    .where(and(eq(concepts.topicId, topicId), liveConcept()))
   return rows
     .map((r) => ({ concept: r.concept, unitOrder: r.unitOrder, pKnown: r.pKnown ?? BKT.L0 }))
     .filter((r) => r.pKnown < MASTERY)
@@ -177,7 +178,7 @@ export const startPlacement = createServerFn({ method: 'POST' })
     const sessionId = crypto.randomUUID()
     const [unitRows, conceptRows] = await Promise.all([
       db.select({ id: units.id }).from(units).where(eq(units.topicId, topic.id)).orderBy(asc(units.order)),
-      db.select().from(concepts).where(and(eq(concepts.topicId, topic.id), liveConcept)).orderBy(asc(concepts.order)),
+      db.select().from(concepts).where(and(eq(concepts.topicId, topic.id), liveConcept())).orderBy(asc(concepts.order)),
     ])
     // The first live concept of the first, middle and last unit that still has one.
     const liveUnits = unitRows.filter((u) => conceptRows.some((c) => c.unitId === u.id))
@@ -376,7 +377,7 @@ async function topUpFrontier(db: Db, learnerId: string, topic: TopicRow, reserve
     // The frontier is known only after placement ends, and units 0-1 are always unlocked then.
     placing
       ? db.select({ concept: concepts }).from(concepts).innerJoin(units, eq(units.id, concepts.unitId))
-        .where(and(eq(concepts.topicId, topic.id), lt(units.order, 2), liveConcept)).orderBy(asc(units.order), asc(concepts.order)).limit(5)
+        .where(and(eq(concepts.topicId, topic.id), lt(units.order, 2), liveConcept())).orderBy(asc(units.order), asc(concepts.order)).limit(5)
       // A session practises at most the first 4 frontier concepts, so the next 4 cover a session that masters them all.
       : loadFrontier(db, learnerId, topic.id).then((f) => f.slice(0, 8)),
   ])
@@ -485,7 +486,7 @@ async function stampProficiency(db: Db, learnerId: string, topicId: string, now:
     .select({ id: concepts.id, critical: concepts.critical, pKnown: learnerConcept.pKnown })
     .from(concepts)
     .leftJoin(learnerConcept, and(eq(learnerConcept.conceptId, concepts.id), eq(learnerConcept.learnerId, learnerId)))
-    .where(eq(concepts.topicId, topicId))
+    .where(and(eq(concepts.topicId, topicId), liveConcept()))
   if (!benchmarkMet(rows.map((r) => ({ id: r.id, critical: r.critical, pKnown: r.pKnown ?? 0 })), role.benchmark)) return
   await db
     .update(memberRoleAssignments)

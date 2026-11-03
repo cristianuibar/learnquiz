@@ -4,6 +4,7 @@ import { concepts, items, learnerConcept, sources, topics } from '@/db/schema'
 import { chatJson, jobModel, LlmError } from '@/lib/llm/client'
 import { ENABLED_FORMATS, itemsPrompt, selfCheckPrompt } from '@/lib/llm/prompts'
 import { ItemBatch, ItemPayload, SelfCheck } from '@/lib/llm/schemas'
+import { liveConcept } from '@/server/live-concept'
 import { assertWithinDailyCap } from '@/server/model-cap'
 
 // Server-only helpers shared by the server-function files. They live apart from them so no server-only import reaches the client bundle.
@@ -69,11 +70,11 @@ export async function ensureConceptItems(
   const claimed = await db
     .update(concepts)
     .set({ genStatus: 'generating', genStartedAt: now })
-    .where(and(eq(concepts.id, concept.id), liveConcept, or(eq(concepts.genStatus, 'ready'), and(eq(concepts.genStatus, 'generating'), lt(concepts.genStartedAt, now - STALE_CLAIM_MS)))))
+    .where(and(eq(concepts.id, concept.id), liveConcept(), or(eq(concepts.genStatus, 'ready'), and(eq(concepts.genStatus, 'generating'), lt(concepts.genStartedAt, now - STALE_CLAIM_MS)))))
     .returning({ id: concepts.id })
   if (!claimed.length) {
     // A refused claim on a dead concept must not fall through to generating unclaimed.
-    const [dead] = await db.select({ id: concepts.id }).from(concepts).where(and(eq(concepts.id, concept.id), sql`not (${liveConcept})`))
+    const [dead] = await db.select({ id: concepts.id }).from(concepts).where(and(eq(concepts.id, concept.id), sql`not (${liveConcept()})`))
     if (dead) return existing.map(asItem)
     const status = async () => (await db.select({ s: concepts.genStatus }).from(concepts).where(eq(concepts.id, concept.id)))[0]?.s
     if ((await status()) === 'generating') {
@@ -104,10 +105,6 @@ export async function ensureConceptItems(
     }
   }
 }
-
-// A concept is live while its document is: one retired source takes its concepts out of generation, claims,
-// the learner frontier and placement. Use it inside the statement that claims or selects, never as an earlier read.
-export const liveConcept = sql`not exists (select 1 from ${sources} where ${sources.id} = ${concepts.sourceId} and ${sources.retiredAt} is not null)`
 
 const sourceRetired = async (db: Db, concept: typeof concepts.$inferSelect) => Boolean(concept.sourceId &&
   (await db.select({ retiredAt: sources.retiredAt }).from(sources).where(eq(sources.id, concept.sourceId)))[0]?.retiredAt)

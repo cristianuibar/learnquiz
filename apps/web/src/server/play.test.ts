@@ -363,6 +363,9 @@ it('stamps proficient_at once when a role topic meets its benchmark and never cl
   raw.prepare('UPDATE concepts SET critical = 1 WHERE id = ?').run('c1')
   raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un2', 't1', 1, 'Later')
   raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)').run('c2', 't1', 'un2', 0, 'Other', '')
+  // A critical concept of a retired document has no questions left, so it cannot hold the benchmark back.
+  raw.prepare('INSERT INTO sources (id, topic_id, kind, title, body_text, retired_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run('src-old', 't1', 'text', 'Old', 'Old.', 1, 1)
+  raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary, critical, source_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run('c3', 't1', 'un2', 1, 'Retired', '', 1, 'src-old')
   const learned = raw.prepare('INSERT INTO learner_concept (learner_id, concept_id, p_known, n_attempts, updated_at) VALUES (?, ?, ?, ?, ?)')
   learned.run('u1', 'c1', 0.3, 1, 1)
   learned.run('u1', 'c2', 0.9, 1, 1)
