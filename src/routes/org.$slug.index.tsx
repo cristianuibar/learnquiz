@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { RouteError } from '@/components/inline-error'
+import { plural } from '@/lib/utils'
 import { getOrgOverview } from '@/server/org'
 
 export const Route = createFileRoute('/org/$slug/')({
@@ -17,9 +18,9 @@ function Overview() {
       <section className="mt-10" aria-labelledby="training-progress">
         <h2 id="training-progress" className="text-xl font-semibold">Training progress</h2>
         <p className="mt-4">
-          <strong>{org.training.proficientEmployees}</strong> proficient {org.training.proficientEmployees === 1 ? 'employee' : 'employees'}
+          <strong>{plural(org.training.proficientEmployees, 'proficient employee', 'proficient employees')}</strong>
         </p>
-        {org.training.daysToProficiency !== null && <p className="mt-2">Average time to proficiency: <strong>{org.training.daysToProficiency} days</strong></p>}
+        {org.training.daysToProficiency !== null && <p className="mt-2">Average time to proficiency: <strong>{plural(org.training.daysToProficiency, 'day', 'days')}</strong></p>}
       </section>
       <section className="mt-10">
         <h2 className="text-xl font-semibold">Job roles</h2>

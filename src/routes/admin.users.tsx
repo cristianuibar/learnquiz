@@ -5,6 +5,7 @@ import { errorMessage, RouteError } from '@/components/inline-error'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { plural } from '@/lib/utils'
 import { listUsers, setUserBan } from '@/server/admin'
 
 export const Route = createFileRoute('/admin/users')({
@@ -50,7 +51,7 @@ function Users() {
         <Button type="submit" className="h-11">Search</Button>
       </form>
       {error && <p role="alert" className="mt-4 font-medium text-wrong">{error}</p>}
-      <p role="status" className="mt-6">{total} users found</p>
+      <p role="status" className="mt-6">{plural(total, 'user', 'users')} found</p>
       {users.length === 0 && <p className="mt-4">No users on this page.</p>}
       <ul className="mt-4 flex flex-col gap-4">
         {users.map((user) => (

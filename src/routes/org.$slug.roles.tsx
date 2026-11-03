@@ -6,6 +6,7 @@ import { RoleDocumentForm } from '@/components/role-document-form'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { plural } from '@/lib/utils'
 import { createRole, listRoles } from '@/server/org'
 
 export const Route = createFileRoute('/org/$slug/roles')({
@@ -59,7 +60,7 @@ function Roles() {
           {org.roles.map((role) => (
             <li key={role.id} className="rounded-lg border p-4">
               <p className="font-medium">{role.name}</p>
-              <p className="text-sm text-muted-foreground">Benchmark: {Math.round(role.benchmark * 100)}% · Onboarding: {role.onboardingDays} days · {role.topicStatus}</p>
+              <p className="text-sm text-muted-foreground">Benchmark: {Math.round(role.benchmark * 100)}% · Onboarding: {plural(role.onboardingDays, 'day', 'days')} · {role.topicStatus}</p>
               {(role.topicStatus === 'draft' || role.topicStatus === 'failed') && (
                 <RoleDocumentForm slug={org.slug} roleId={role.id} roleName={role.name} onUploaded={() => router.invalidate()} />
               )}

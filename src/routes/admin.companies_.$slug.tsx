@@ -1,5 +1,6 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { RouteError } from '@/components/inline-error'
+import { plural } from '@/lib/utils'
 import { getCompany } from '@/server/admin'
 
 export const Route = createFileRoute('/admin/companies_/$slug')({
@@ -14,7 +15,7 @@ function Company() {
     <main>
       <h1 className="text-3xl font-bold tracking-tight">{company.name}</h1>
       <Link to="/org/$slug" params={{ slug: company.slug }} className="mt-4 inline-flex min-h-11 items-center rounded-md underline focus-visible:ring-[3px] focus-visible:ring-ring/50">View company portal (read only)</Link>
-      <p className="mt-4">{company.activeLearners} active learners in the last 30 days · ${company.modelSpend.toFixed(4)} USD lifetime model spend</p>
+      <p className="mt-4">{plural(company.activeLearners, 'active learner', 'active learners')} in the last 30 days · ${company.modelSpend.toFixed(4)} USD lifetime model spend</p>
       <p className="mt-2 text-sm text-muted-foreground">Documents belong to the company's roles. Activity and spend are attributed to current members.</p>
       <section className="mt-8">
         <h2 className="text-xl font-semibold">Members ({company.members.length})</h2>
