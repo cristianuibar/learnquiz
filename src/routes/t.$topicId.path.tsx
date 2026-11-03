@@ -2,8 +2,11 @@ import { useState } from 'react'
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { Check, X } from 'lucide-react'
+import { ConceptDiagram } from '@/components/concept-diagram'
 import { RouteError } from '@/components/inline-error'
 import { MasteryBar } from '@/components/mastery-bar'
+import { ModelLabel } from '@/components/model-label'
+import { ModelTrace } from '@/components/model-trace'
 import { StartButton } from '@/components/start-button'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -26,18 +29,22 @@ export const Route = createFileRoute('/t/$topicId/path')({
 
 function Path() {
   const { topic, units, learner } = Route.useLoaderData()
+  const [expandedUnits, setExpandedUnits] = useState<Set<string>>(() => new Set())
   return (
     <main className="mx-auto w-full max-w-2xl px-4 pt-8 pb-4">
       <h1 className="text-3xl font-bold tracking-tight">{topic.title}</h1>
+      <ModelLabel model={topic.generatedBy} />
+      <ModelTrace key={topic.id} scope={{ scope: 'topic', topicId: topic.id }} />
       {learner.placed ? (
         <>
           <p className="mt-2 text-lg font-medium">
             Level {learner.level} of 5 · {LEVELS[learner.level - 1]}
           </p>
           {learner.levelLine && (
-            <blockquote className="mt-2 border-l-2 border-learning pl-3 text-muted-foreground">
-              {learner.levelLine}
-            </blockquote>
+            <div>
+              <blockquote className="mt-2 border-l-2 border-learning pl-3 text-muted-foreground">{learner.levelLine}</blockquote>
+              <ModelLabel model={learner.levelLineModel} />
+            </div>
           )}
         </>
       ) : (
@@ -67,13 +74,21 @@ function Path() {
                   {unit.unlocked ? `${Math.round(unit.mastery * 100)}%` : 'locked'}
                 </span>
               </div>
-              <details className="mt-2">
+              <details className="mt-2" onToggle={(event) => {
+                const open = event.currentTarget.open
+                setExpandedUnits((current) => {
+                  const next = new Set(current)
+                  if (open) next.add(unit.id)
+                  else next.delete(unit.id)
+                  return next
+                })
+              }}>
                 <summary className="flex min-h-12 cursor-pointer items-center text-sm font-medium">
                   {unit.concepts.length} concepts
                 </summary>
                 <ul className="mt-2 flex flex-col gap-3">
                   {unit.concepts.map((concept) => (
-                    <Concept key={concept.id} concept={concept} />
+                    <Concept key={concept.id} concept={concept} showDiagram={expandedUnits.has(unit.id)} />
                   ))}
                 </ul>
               </details>
@@ -92,11 +107,13 @@ function Path() {
 
 function Concept({
   concept,
+  showDiagram,
 }: {
   concept: ReturnType<typeof Route.useLoaderData>['units'][number]['concepts'][number]
+  showDiagram: boolean
 }) {
   const load = useServerFn(getConceptItems)
-  const [items, setItems] = useState<Item[]>([])
+  const [items, setItems] = useState<Item[] | null>(null)
   const [working, setWorking] = useState(false)
   const [error, setError] = useState('')
 
@@ -119,15 +136,16 @@ function Concept({
         {concept.itemCount > 0 && <span className="text-sm text-muted-foreground">{concept.itemCount} questions</span>}
       </div>
       <p className="mt-1 text-sm text-muted-foreground">{concept.summary}</p>
+      {showDiagram && concept.visual && <ConceptDiagram conceptId={concept.id} />}
       {working ? (
         <div className="mt-4">
-          <Working label="Loading questions" />
+          <Working label="Loading answered questions" />
         </div>
       ) : (
         concept.itemCount > 0 &&
-        items.length === 0 && (
+        items === null && (
           <Button variant="outline" className="mt-4 h-12 px-6" onClick={show}>
-            Show questions
+            Show answered questions
           </Button>
         )
       )}
@@ -136,7 +154,12 @@ function Concept({
           {error}
         </p>
       )}
-      {items.length > 0 && (
+      {items?.length === 0 && (
+        <p role="status" className="mt-3 text-sm text-muted-foreground">
+          No answered questions to review yet.
+        </p>
+      )}
+      {items && items.length > 0 && (
         <ol className="mt-4 flex flex-col gap-4 border-t pt-4">
           {items.map((item) => (
             <ItemView key={item.id} item={item} />
@@ -152,6 +175,7 @@ function ItemView({ item }: { item: Item }) {
   return (
     <li className="flex flex-col gap-3">
       <p className="font-medium">{payload.stem}</p>
+      <ModelLabel model={item.generatedBy} />
       {item.format === 'mcq' ? (
         <ul className="flex flex-col gap-2">
           {payload.options.map((option) => (

@@ -3,6 +3,7 @@ CREATE TABLE `__new_model_calls` (
 	`id` text PRIMARY KEY NOT NULL,
 	`learner_id` text,
 	`session_id` text,
+	`topic_id` text,
 	`purpose` text NOT NULL,
 	`model` text NOT NULL,
 	`latency_ms` integer NOT NULL,
@@ -15,7 +16,7 @@ CREATE TABLE `__new_model_calls` (
 	`created_at` integer NOT NULL
 );
 --> statement-breakpoint
-INSERT INTO `__new_model_calls`("id", "learner_id", "session_id", "purpose", "model", "latency_ms", "prompt_tokens", "completion_tokens", "reasoning_tokens", "cost_usd", "ok", "error", "created_at") SELECT "id", "learner_id", "session_id", "purpose", "model", "latency_ms", "prompt_tokens", "completion_tokens", "reasoning_tokens", "cost_usd", "ok", "error", "created_at" FROM `model_calls`;--> statement-breakpoint
+INSERT INTO `__new_model_calls`("id", "learner_id", "session_id", "topic_id", "purpose", "model", "latency_ms", "prompt_tokens", "completion_tokens", "reasoning_tokens", "cost_usd", "ok", "error", "created_at") SELECT "id", "learner_id", "session_id", "topic_id", "purpose", "model", "latency_ms", "prompt_tokens", "completion_tokens", "reasoning_tokens", "cost_usd", "ok", "error", "created_at" FROM `model_calls`;--> statement-breakpoint
 DROP TABLE `model_calls`;--> statement-breakpoint
 ALTER TABLE `__new_model_calls` RENAME TO `model_calls`;--> statement-breakpoint
 PRAGMA foreign_keys=ON;

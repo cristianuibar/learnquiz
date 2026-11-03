@@ -11,13 +11,14 @@ const { signUp, acceptInvitation } = vi.hoisted(() => ({ signUp: vi.fn(), accept
 
 vi.mock('@/lib/auth-client', () => ({ authClient: { signUp: { email: signUp }, organization: { acceptInvitation } } }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
+vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => null }))
 vi.mock('@/server/org', () => ({
   getInvite: async () => ({ company: 'Acme', email: 'learner@example.test', name: 'Learner', status: 'pending' }),
 }))
 
 it('keeps the signed-in join controls and error when accepting fails after sign-up', async () => {
-  const session = { user: null, facebookEnabled: false, needsDisclosure: false }
+  const session = { user: null, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] }
   vi.mocked(getSessionFn).mockResolvedValue(session)
   signUp.mockImplementation(async () => {
     vi.mocked(getSessionFn).mockResolvedValue({ ...session, user: { id: 'learner', name: 'Learner', isAnonymous: false } })

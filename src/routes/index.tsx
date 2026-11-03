@@ -6,7 +6,11 @@ import { authClient } from '@/lib/auth-client'
 
 export const Route = createFileRoute('/')({
   beforeLoad: ({ context }) => {
-    if (context.user) throw redirect({ to: '/start' })
+    if (context.user) {
+      const company = context.adminCompanies[0]
+      if (company) throw redirect({ to: '/org/$slug', params: { slug: company.slug } })
+      throw redirect({ to: '/start' })
+    }
   },
   component: Landing,
 })

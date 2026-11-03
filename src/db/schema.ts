@@ -1,14 +1,18 @@
-import { integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { organization, user } from './auth-schema'
+import type { WorkingHours } from '@/lib/company-settings'
 
 // learner_id everywhere is the Better Auth user id (guest or Facebook). ids are crypto.randomUUID().
 // Times are epoch milliseconds. JSON lives in *_json text columns.
 
 export const topics = sqliteTable('topics', {
   id: text('id').primaryKey(),
-  learnerId: text('learner_id').notNull(),
+  learnerId: text('learner_id'), // Personal topics belong to a learner; company topics belong to a job role.
+  jobRoleId: text('job_role_id').unique().references(() => jobRoles.id),
   title: text('title').notNull(),
   goal: text('goal'),
-  status: text('status', { enum: ['generating', 'ready', 'failed'] }).notNull().default('generating'),
+  generatedBy: text('generated_by'),
+  status: text('status', { enum: ['draft', 'generating', 'ready', 'failed'] }).notNull().default('generating'),
   createdAt: integer('created_at').notNull(),
 })
 
@@ -18,6 +22,7 @@ export const sources = sqliteTable('sources', {
   kind: text('kind', { enum: ['text', 'url', 'pdf', 'image'] }).notNull(),
   title: text('title').notNull(),
   bodyText: text('body_text').notNull(),
+  deletedAt: integer('deleted_at'),
   createdAt: integer('created_at').notNull(),
 })
 
@@ -42,9 +47,11 @@ export const concepts = sqliteTable('concepts', {
   sourceQuote: text('source_quote'),
   misconceptionsJson: text('misconceptions_json').notNull().default('[]'),
   grounded: integer('grounded', { mode: 'boolean' }).notNull().default(false),
+  critical: integer('critical', { mode: 'boolean' }).notNull().default(false),
   visual: integer('visual', { mode: 'boolean' }).notNull().default(false),
   imageKey: text('image_key'),
   imageAlt: text('image_alt'),
+  imageGenerationStartedAt: integer('image_generation_started_at'),
 })
 
 export const conceptEdges = sqliteTable(
@@ -65,10 +72,13 @@ export const items = sqliteTable('items', {
   topicId: text('topic_id').notNull(),
   format: text('format', { enum: ['mcq', 'cloze', 'short', 'image', 'order'] }).notNull(),
   payloadJson: text('payload_json').notNull(), // ItemPayload from src/lib/llm/schemas.ts
+  generatedBy: text('generated_by'),
   difficultyPrior: integer('difficulty_prior').notNull().default(3),
   eloDifficulty: real('elo_difficulty'),
   checkJson: text('check_json'),
-  status: text('status', { enum: ['active', 'rejected', 'reported'] }).notNull().default('active'),
+  status: text('status', { enum: ['active', 'rejected', 'reported', 'retired'] }).notNull().default('active'),
+  reviewedBy: text('reviewed_by'),
+  reviewedAt: integer('reviewed_at'),
   createdAt: integer('created_at').notNull(),
 })
 
@@ -184,6 +194,7 @@ export const modelCalls = sqliteTable('model_calls', {
   id: text('id').primaryKey(),
   learnerId: text('learner_id'),
   sessionId: text('session_id'),
+  topicId: text('topic_id'),
   purpose: text('purpose').notNull(),
   model: text('model').notNull(),
   latencyMs: integer('latency_ms').notNull(),
@@ -228,3 +239,36 @@ export const consents = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.userId, t.kind] })],
 )
+
+export const orgSettings = sqliteTable('org_settings', {
+  orgId: text('org_id').primaryKey().references(() => organization.id, { onDelete: 'cascade' }),
+  companyName: text('company_name').notNull(),
+  timezone: text('timezone').notNull().default('UTC'),
+  workingHours: text('working_hours_json', { mode: 'json' }).$type<WorkingHours>().notNull(),
+  logoKey: text('logo_key'),
+  accent: text('accent'),
+})
+
+export const pushSubscriptions = sqliteTable('push_subscriptions', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  endpoint: text('endpoint').notNull().unique(),
+  p256dh: text('p256dh').notNull(),
+  auth: text('auth').notNull(),
+  createdAt: integer('created_at').notNull(),
+}, (t) => [index('push_subscriptions_user_idx').on(t.userId)])
+
+export const pushPrefs = sqliteTable('push_prefs', {
+  userId: text('user_id').primaryKey().references(() => user.id, { onDelete: 'cascade' }),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(false),
+  updatedAt: integer('updated_at').notNull(),
+})
+
+export const pushLog = sqliteTable('push_log', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  subscriptionId: text('subscription_id').notNull(), // Retained when a subscription expires.
+  outcome: text('outcome', { enum: ['accepted', 'gone', 'failed'] }).notNull(),
+  httpStatus: integer('http_status'),
+  createdAt: integer('created_at').notNull(),
+}, (t) => [index('push_log_user_idx').on(t.userId)])

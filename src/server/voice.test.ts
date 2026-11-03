@@ -101,8 +101,8 @@ it.each([
   const body = request.body as FormData
   expect(JSON.parse(await (body.get('request') as Blob).text())).toEqual({ model: 'muse-voice-transcribe-1.0', mode: 'PUSH_TO_TALK', audioEncoding: 'WAV' })
   expect(new Uint8Array(await (body.get('audio') as File).arrayBuffer())).toEqual(new Uint8Array(await recording().arrayBuffer()))
-  expect(row('SELECT learner_id, session_id, purpose, model, ok, error FROM model_calls')).toEqual({
-    learner_id: 'u1', session_id: 's1', purpose: 'voice', model: 'muse-voice-transcribe-1.0', ok: 1, error: null,
+  expect(row('SELECT learner_id, session_id, topic_id, purpose, model, ok, error FROM model_calls')).toEqual({
+    learner_id: 'u1', session_id: 's1', topic_id: 't1', purpose: 'voice', model: 'muse-voice-transcribe-1.0', ok: 1, error: null,
   })
   expect(row('SELECT COUNT(*) AS n FROM attempts').n).toBe(0)
   const reveal = await answerItem({ data: { sessionId: 's1', itemId: 'i1', answer: { text: '1' }, confidence: 'sure', responseMs: 1500 } })

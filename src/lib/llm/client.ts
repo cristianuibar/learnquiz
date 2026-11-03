@@ -24,7 +24,7 @@ export class LlmError extends Error {
 type Usage = { prompt_tokens?: number; completion_tokens?: number; completion_tokens_details?: { reasoning_tokens?: number } }
 type Message = { role: 'system' | 'user' | 'assistant'; content: string }
 
-function jobModel(job: ModelJob) {
+export function jobModel(job: ModelJob) {
   const env = getEnv()
   try {
     // Wrangler JSON bindings are objects; .dev.vars can supply JSON strings.
@@ -41,6 +41,7 @@ function jobModel(job: ModelJob) {
     if (!provider) throw new Error('Unknown provider')
     return {
       ...selected,
+      modelId,
       baseUrl: (selected.provider === env.LLM_PROFILE ? env.LLM_BASE_URL : provider.baseUrl).replace(/\/$/, ''),
       apiKey: env[provider.keyBinding] || (selected.provider === env.LLM_PROFILE ? env.LLM_API_KEY : undefined),
       jsonMode: provider.jsonMode,
@@ -61,6 +62,15 @@ export function isVoiceEnabled(): boolean {
   }
 }
 
+export function isImageEnabled(): boolean {
+  try {
+    const selected = jobModel('image')
+    return selected.provider !== 'ollama' && selected.modelId === 'muse-image-1.0'
+  } catch {
+    return false
+  }
+}
+
 // Calls the model for JSON matching `schema`; one retry with the error appended, then throws LlmError.
 export async function chatJson<T>(opts: {
   purpose: ModelJob
@@ -72,6 +82,7 @@ export async function chatJson<T>(opts: {
   maxTokens?: number
   learnerId?: string | null
   sessionId?: string | null
+  topicId?: string | null
 }): Promise<T> {
   const selected = jobModel(opts.purpose)
   const log = { ...opts, model: selected.model }
@@ -165,12 +176,12 @@ export async function chatJson<T>(opts: {
 }
 
 // The one-shot voice contract uses a JSON request part and a WAV audio part.
-export async function transcribeAudio(opts: { audio: File; learnerId: string; sessionId: string }): Promise<string> {
+export async function transcribeAudio(opts: { audio: File; learnerId: string; sessionId: string; topicId: string }): Promise<string> {
   if (!isVoiceEnabled()) throw new LlmError('Voice answers are unavailable.', 404)
   const selected = jobModel('voice')
   await assertWithinDailyCap(getDb(), opts.learnerId)
   const model = selected.model
-  const log = { learnerId: opts.learnerId, sessionId: opts.sessionId, purpose: 'voice', model }
+  const log = { learnerId: opts.learnerId, sessionId: opts.sessionId, topicId: opts.topicId, purpose: 'voice', model }
   const started = Date.now()
   try {
     const body = new FormData()
@@ -197,7 +208,7 @@ export async function transcribeAudio(opts: { audio: File; learnerId: string; se
 }
 
 async function logCall(
-  opts: { purpose: string; model: string; learnerId?: string | null; sessionId?: string | null },
+  opts: { purpose: string; model: string; learnerId?: string | null; sessionId?: string | null; topicId?: string | null },
   started: number,
   usage: Usage | undefined,
   error: string | null,
@@ -213,6 +224,7 @@ async function logCall(
         id: crypto.randomUUID(),
         learnerId: opts.learnerId ?? null,
         sessionId: opts.sessionId ?? null,
+        topicId: opts.topicId ?? null,
         purpose: opts.purpose,
         model,
         latencyMs: Date.now() - started,
@@ -226,5 +238,36 @@ async function logCall(
       })
   } catch (e) {
     console.error('model_calls log failed', e instanceof Error ? e.message : e)
+  }
+}
+
+// Images use their job's provider and model, with the same daily cap and call ledger as text.
+// No automatic retry: a second paid generation needs an explicit retry by the learner.
+export async function generateImage(opts: { prompt: string; learnerId: string; topicId: string }): Promise<Uint8Array> {
+  if (!isImageEnabled()) throw new LlmError('Diagrams are unavailable.', 404)
+  const selected = jobModel('image')
+  await assertWithinDailyCap(getDb(), opts.learnerId)
+  const started = Date.now()
+  let error: string | null = null
+  try {
+    const res = await fetch(`${selected.baseUrl}/images/generations`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...(selected.apiKey && { authorization: `Bearer ${selected.apiKey}` }) },
+      body: JSON.stringify({ model: selected.model, prompt: opts.prompt, n: 1, size: '1024x1024', response_format: 'b64_json' }),
+      signal: AbortSignal.timeout(120_000),
+    })
+    if (!res.ok) throw new LlmError(`Image HTTP ${res.status}`, res.status)
+    const body = z.object({ data: z.array(z.object({ b64_json: z.string().min(1).max(14_000_000) })).length(1) }).parse(await res.json())
+    const bytes = Uint8Array.from(atob(body.data[0].b64_json), (c) => c.charCodeAt(0))
+    if (bytes.length > 10_000_000 || ![137, 80, 78, 71, 13, 10, 26, 10].every((b, i) => bytes[i] === b)) {
+      throw new Error('Image response is not a PNG under 10 MB')
+    }
+    return bytes
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    error = (selected.apiKey ? message.replaceAll(selected.apiKey, '[redacted]') : message).slice(0, 300)
+    throw new LlmError('The diagram could not be generated. Try again.', e instanceof LlmError ? e.status : 502)
+  } finally {
+    await logCall({ purpose: 'diagram', learnerId: opts.learnerId, topicId: opts.topicId, model: selected.model }, started, undefined, error)
   }
 }

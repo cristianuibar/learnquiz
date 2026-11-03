@@ -14,8 +14,10 @@ export const CurriculumSkeleton = z.object({
             z.object({
               name: z.string().max(80),
               summary: z.string().max(400),
+              visual: z.boolean(),
               prerequisites: z.array(z.string().max(80)).max(4),
               source_quote: z.string().max(300).nullable(),
+              critical: z.boolean(),
               misconceptions: z.array(z.string().max(200)).max(3),
             }),
           )
@@ -62,3 +64,11 @@ export const SelfCheck = z.object({
   results: z.array(z.object({ index: z.number().int().min(0).max(99), keep: z.boolean(), reasons: z.array(z.string().max(200)).max(4) })),
 })
 export type SelfCheck = z.infer<typeof SelfCheck>
+
+// Job 7.4: short-answer grading against the model answer and source quote.
+export const Grade = z.object({
+  score: z.number().min(0).max(1),
+  feedback: z.string().min(1).max(400),
+  missing_points: z.array(z.string().min(1).max(200)).max(6),
+})
+export type Grade = z.infer<typeof Grade>

@@ -4,8 +4,11 @@ export type ValidatedConcept = {
   id: string
   name: string
   summary: string
+  visual: boolean
+  sourceId: string | null
   sourceQuote: string | null
   grounded: boolean
+  critical: boolean
   misconceptions: string[]
 }
 export type ValidatedUnit = { id: string; name: string; summary: string; concepts: ValidatedConcept[] }
@@ -18,9 +21,23 @@ export type ValidatedSkeleton = {
 const norm = (s: string) => s.replace(/\s+/g, ' ').trim()
 const key = (s: string) => norm(s).toLowerCase()
 
-export function validateSkeleton(skeleton: CurriculumSkeleton, sourceText?: string | null): ValidatedSkeleton {
+// Match whitespace, case and quote-style variants, retaining the exact source substring.
+export function findSourceQuote(quote: string | null, source: string | null | undefined): string | null {
+  const pattern = quote && norm(quote).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/ /g, '\\s+')
+    .replace(/["“”]/g, '["“”]')
+    .replace(/['‘’]/g, "['‘’]")
+  return source && pattern ? source.match(new RegExp(pattern, 'iu'))?.[0] ?? null : null
+}
+
+export function validateSkeleton(
+  skeleton: CurriculumSkeleton,
+  sourceText?: string | readonly { id: string; bodyText: string }[] | null,
+): ValidatedSkeleton {
   const notes: string[] = []
-  const source = sourceText?.trim() ? sourceText : null
+  const sources = typeof sourceText === 'string'
+    ? [{ id: null, bodyText: sourceText }]
+    : sourceText ?? []
   const byName = new Map<string, string>()
   const units: ValidatedUnit[] = skeleton.units.map((u) => ({
     id: crypto.randomUUID(),
@@ -31,13 +48,14 @@ export function validateSkeleton(skeleton: CurriculumSkeleton, sourceText?: stri
       if (!byName.has(key(c.name))) byName.set(key(c.name), id)
       // Match whitespace, case and quote-style variants, retaining the exact source substring.
       const quote = c.source_quote && norm(c.source_quote)
-      const pattern = quote?.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        .replace(/ /g, '\\s+')
-        .replace(/["“”]/g, '["“”]')
-        .replace(/['‘’]/g, "['‘’]")
-      const kept = source && pattern ? source.match(new RegExp(pattern, 'iu'))?.[0] ?? null : null
-      if (quote && source && !kept) notes.push(`dropped quote not found in source: ${c.name}`)
-      return { id, name: c.name, summary: c.summary, sourceQuote: kept, grounded: kept !== null, misconceptions: c.misconceptions }
+      let sourceId: string | null = null
+      let kept: string | null = null
+      for (const source of sources) {
+        kept = findSourceQuote(quote, source.bodyText)
+        if (kept) { sourceId = source.id; break }
+      }
+      if (quote && sources.length && !kept) notes.push(`dropped quote not found in source: ${c.name}`)
+      return { id, name: c.name, summary: c.summary, visual: c.visual, sourceId, sourceQuote: kept, grounded: kept !== null, critical: c.critical, misconceptions: c.misconceptions }
     }),
   }))
 
@@ -90,8 +108,10 @@ export function fallbackSkeleton(topic: string): CurriculumSkeleton {
         const concept = {
           name: `${n}: ${topic}`,
           summary: `${n} for ${topic}.`,
+          visual: false,
           prerequisites: previous ? [previous] : [],
           source_quote: null,
+          critical: false,
           misconceptions: [],
         }
         previous = concept.name

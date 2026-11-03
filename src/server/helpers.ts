@@ -1,7 +1,7 @@
 import { and, desc, eq } from 'drizzle-orm'
 import type { Db } from '@/db'
 import { concepts, items, learnerConcept, topics } from '@/db/schema'
-import { chatJson, LlmError } from '@/lib/llm/client'
+import { chatJson, jobModel, LlmError } from '@/lib/llm/client'
 import { itemsPrompt, selfCheckPrompt } from '@/lib/llm/prompts'
 import { ItemBatch, ItemPayload, SelfCheck } from '@/lib/llm/schemas'
 import { assertWithinDailyCap } from '@/server/model-cap'
@@ -29,13 +29,14 @@ export async function loadPKnown(db: Db, learnerId: string, topicId: string) {
   return new Map(rows.map((r) => [r.conceptId, r.pKnown]))
 }
 
-export type StoredItem = { id: string; format: ItemPayload['format']; difficultyPrior: number; payload: ItemPayload }
+export type StoredItem = { id: string; format: ItemPayload['format']; difficultyPrior: number; payload: ItemPayload; generatedBy: string | null }
 
 export const asItem = (r: typeof items.$inferSelect): StoredItem => ({
   id: r.id,
   format: r.format as ItemPayload['format'],
   difficultyPrior: r.difficultyPrior,
   payload: JSON.parse(r.payloadJson) as ItemPayload,
+  generatedBy: r.generatedBy,
 })
 
 // Returns the concept's active items, generating a batch first when fewer than 6 exist. The caller has checked that the learner owns the topic.
@@ -44,12 +45,12 @@ export async function ensureConceptItems(
   learnerId: string,
   concept: typeof concepts.$inferSelect,
   topic: typeof topics.$inferSelect,
-  opts: { targetDifficulty: number; spread?: boolean; unseen?: Set<string> },
+  opts: { targetDifficulty: number; spread?: boolean; unseen?: Set<string>; sessionId?: string },
 ): Promise<StoredItem[]> {
   const existing = await db
     .select()
     .from(items)
-    .where(and(eq(items.conceptId, concept.id), eq(items.status, 'active')))
+    .where(and(eq(items.conceptId, concept.id), eq(items.topicId, topic.id), eq(items.status, 'active')))
     .orderBy(desc(items.createdAt))
   // Six stored items are enough unless the learner has already seen them all.
   const fresh = opts.unseen ? existing.filter((r) => !opts.unseen!.has(r.id)).length : existing.length
@@ -75,12 +76,14 @@ export async function ensureConceptItems(
           misconceptions,
           targetDifficulty: opts.targetDifficulty,
           spread: opts.spread,
-          formats: ['mcq', 'cloze'],
+          formats: ['mcq', 'cloze', 'short'],
           sourceQuote: concept.sourceQuote,
           avoidStems,
         }),
         maxTokens: 16000,
         learnerId,
+        topicId: topic.id,
+        sessionId: opts.sessionId,
       })
       const drafted = batch.items.flatMap((i) => {
         const ok = ItemPayload.safeParse(i)
@@ -97,6 +100,8 @@ export async function ensureConceptItems(
             ...selfCheckPrompt({ items: drafted }),
             reasoningEffort: 'minimal',
             learnerId,
+            topicId: topic.id,
+            sessionId: opts.sessionId,
           })
         ).results
       } catch (e) {
@@ -123,11 +128,12 @@ export async function ensureConceptItems(
     topicId: topic.id,
     format: payload.format,
     payloadJson: JSON.stringify(payload),
+    generatedBy: jobModel('items').model,
     difficultyPrior: payload.difficulty,
     checkJson: check === null ? null : JSON.stringify(check),
     createdAt: now,
   }))
   const [first, ...rest] = chunks(rows, 10).map((r) => db.insert(items).values(r))
   await db.batch([first, ...rest])
-  return [...existing.map(asItem), ...rows.map((r, i) => ({ id: r.id, format: r.format, difficultyPrior: r.difficultyPrior, payload: kept[i].payload }))]
+  return [...existing.map(asItem), ...rows.map((r, i) => ({ id: r.id, format: r.format, difficultyPrior: r.difficultyPrior, payload: kept[i].payload, generatedBy: r.generatedBy }))]
 }

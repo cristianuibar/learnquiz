@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7901ed88-ed89-4d75-bb3c-08705f822a92",
+  "id": "0596bced-7d46-4fa9-beb9-38b652f0d286",
   "prevId": "7f6eba53-aa74-4f37-892b-b0af0462a4ef",
   "tables": {
     "attempts": {
@@ -406,6 +406,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "generated_by": {
+          "name": "generated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "difficulty_prior": {
@@ -868,6 +875,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "topic_id": {
+          "name": "topic_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "purpose": {
           "name": "purpose",
           "type": "text",
@@ -917,8 +931,9 @@
           "name": "cost_usd",
           "type": "real",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         },
         "ok": {
           "name": "ok",
@@ -1161,6 +1176,13 @@
         },
         "goal": {
           "name": "goal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "generated_by": {
+          "name": "generated_by",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

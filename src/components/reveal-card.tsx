@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from 'motion/react'
 import { Check, X } from 'lucide-react'
+import { ConceptDiagram } from '@/components/concept-diagram'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
@@ -10,6 +11,7 @@ const HEADING = {
   B: "Correct, but you weren't sure",
   C: 'Not quite, the answer is ',
   D: "You were sure, and it's wrong",
+  ungraded: 'Could not grade this answer',
 }
 
 export function RevealCard({
@@ -25,7 +27,8 @@ export function RevealCard({
 }) {
   const reduce = useReducedMotion()
   const { state } = reveal
-  const wrong = !reveal.correct
+  const ungraded = state === 'ungraded'
+  const wrong = !ungraded && !reveal.correct
   const quote = reveal.sourceQuote && (
     <blockquote className="mt-3 border-l-2 border-learning pl-3 text-sm text-muted-foreground">
       {reveal.sourceQuote}
@@ -39,14 +42,29 @@ export function RevealCard({
       transition={{ duration: 0.2 }}
       className={cn(
         'rounded-lg border p-5',
-        wrong ? 'border-wrong bg-wrong-soft' : 'border-correct bg-correct-soft',
+        ungraded ? 'border-border bg-muted' : wrong ? 'border-wrong bg-wrong-soft' : 'border-correct bg-correct-soft',
         state === 'D' && 'border-2',
       )}
     >
-      <h2 className={cn('flex items-center gap-2 text-lg font-semibold', wrong ? 'text-wrong' : 'text-correct')}>
-        {wrong ? <X className="size-5 shrink-0" aria-hidden /> : <Check className="size-5 shrink-0" aria-hidden />}
+      <h2 className={cn('flex items-center gap-2 text-lg font-semibold', !ungraded && (wrong ? 'text-wrong' : 'text-correct'))}>
+        {!ungraded && (wrong ? <X className="size-5 shrink-0" aria-hidden /> : <Check className="size-5 shrink-0" aria-hidden />)}
         {HEADING[state] + (state === 'C' ? reveal.correctAnswer : '')}
       </h2>
+      {reveal.diagramConceptId && <ConceptDiagram conceptId={reveal.diagramConceptId} />}
+      {reveal.feedback && (
+        <div className="mt-2">
+          {reveal.score !== null && <p className="font-medium">Score: {Math.round(reveal.score * 100)}%</p>}
+          <p className="mt-2">{reveal.feedback}</p>
+          {reveal.missingPoints.length > 0 && (
+            <div className="mt-3">
+              <p className="font-medium">Missing points</p>
+              <ul className="mt-1 list-disc pl-5">
+                {reveal.missingPoints.map((point, i) => <li key={i}>{point}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
       {state === 'A' && (
         <>
           <p className="mt-2 text-lg font-medium">{reveal.correctAnswer}</p>
@@ -59,7 +77,7 @@ export function RevealCard({
       )}
       {state !== 'A' && (
         <div className="mt-2">
-          {state === 'D' && <p className="font-medium">The answer is {reveal.correctAnswer}</p>}
+          {(state === 'D' || ungraded) && <p className="font-medium">The answer is {reveal.correctAnswer}</p>}
           {wrong && reveal.chosenFeedback && (
             <p className="mt-2">{(chosen ? `You chose ${chosen}: ` : '') + reveal.chosenFeedback}</p>
           )}

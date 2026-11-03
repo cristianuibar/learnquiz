@@ -1,16 +1,35 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, count, desc, eq } from 'drizzle-orm'
+import { and, asc, count, desc, eq, inArray, isNull } from 'drizzle-orm'
 import { z } from 'zod'
-import { getDb } from '@/db'
-import { conceptEdges, concepts, items, learnerTopic, learnerUnit, placements, sources, topics, units } from '@/db/schema'
-import { validateSkeleton, fallbackSkeleton } from '@/lib/curriculum/validate'
-import { chatJson, LlmError } from '@/lib/llm/client'
+import { getDb, type Db } from '@/db'
+import { conceptEdges, concepts, items, jobRoles, learnerItem, learnerTopic, learnerUnit, placements, sources, topics, units } from '@/db/schema'
+import { validateSkeleton, fallbackSkeleton, type ValidatedSkeleton } from '@/lib/curriculum/validate'
+import { chatJson, jobModel, LlmError } from '@/lib/llm/client'
 import { curriculumPrompt } from '@/lib/llm/prompts'
 import { CurriculumSkeleton } from '@/lib/llm/schemas'
 import { MAX_SOURCE_TEXT_CHARS } from '@/lib/limits'
 import { asItem, chunks, ensureConceptItems, httpError, loadPKnown, mean, targetFor, type StoredItem } from '@/server/helpers'
 import { assertWithinDailyCap } from '@/server/model-cap'
+import { requireOrgAdmin } from '@/server/authz'
 import { requireLearnerId } from '@/server/session'
+
+function curriculumWrites(db: Db, topicId: string, valid: ValidatedSkeleton, generatedBy: string | null) {
+  const unitRows = valid.units.map((u, order) => ({ id: u.id, topicId, order, name: u.name, summary: u.summary }))
+  const conceptRows = valid.units.flatMap((u) =>
+    u.concepts.map((c, order) => ({
+      id: c.id, topicId, unitId: u.id, order, name: c.name, summary: c.summary, level: 3,
+      sourceId: c.sourceId, sourceQuote: c.sourceQuote, grounded: c.grounded, critical: c.critical, visual: c.visual,
+      misconceptionsJson: JSON.stringify(c.misconceptions),
+    })),
+  )
+  return [
+    ...chunks(unitRows, 10).map((rows) => db.insert(units).values(rows)),
+    // Each concept binds 13 parameters including defaults; seven rows stay below D1's 100-parameter limit.
+    ...chunks(conceptRows, 7).map((rows) => db.insert(concepts).values(rows)),
+    ...chunks(valid.edges.map((e) => ({ topicId, ...e })), 20).map((rows) => db.insert(conceptEdges).values(rows)),
+    db.update(topics).set({ status: 'ready', generatedBy }).where(eq(topics.id, topicId)),
+  ] as const
+}
 
 export const createTopic = createServerFn({ method: 'POST' })
   .validator(
@@ -34,6 +53,7 @@ export const createTopic = createServerFn({ method: 'POST' })
         await db.insert(sources).values({ id: sourceId, topicId, kind: 'text', title: 'Pasted text', bodyText: data.sourceText, createdAt: Date.now() })
       }
       let skeleton: CurriculumSkeleton
+      let generatedBy: string | null = null
       try {
         skeleton = await chatJson({
           purpose: 'curriculum',
@@ -42,7 +62,9 @@ export const createTopic = createServerFn({ method: 'POST' })
           ...curriculumPrompt({ topic: data.topic, goal: data.goal, levelHint: 3, sourceText: data.sourceText }),
           maxTokens: 16000, // measured: 8.6k tokens on a 30-concept topic, reasoning included
           learnerId,
+          topicId,
         })
+        generatedBy = jobModel('curriculum').model
       } catch (e) {
         if (e instanceof LlmError && e.status === 429) {
           // A request that raced the cap check stored its rows before the backstop
@@ -58,40 +80,71 @@ export const createTopic = createServerFn({ method: 'POST' })
         console.error('curriculum output invalid, using fallback', e.message)
         skeleton = fallbackSkeleton(data.topic)
       }
-      const valid = validateSkeleton(skeleton, data.sourceText)
+      const valid = validateSkeleton(skeleton, sourceId ? [{ id: sourceId, bodyText: data.sourceText! }] : [])
       if (valid.notes.length) console.warn('curriculum notes', valid.notes)
 
-      const unitRows = valid.units.map((u, order) => ({ id: u.id, topicId, order, name: u.name, summary: u.summary }))
-      const conceptRows = valid.units.flatMap((u) =>
-        u.concepts.map((c, order) => ({
-          id: c.id,
-          topicId,
-          unitId: u.id,
-          order,
-          name: c.name,
-          summary: c.summary,
-          level: 3,
-          sourceId,
-          sourceQuote: c.sourceQuote,
-          misconceptionsJson: JSON.stringify(c.misconceptions),
-          grounded: c.grounded,
-        })),
-      )
-      const edgeRows = valid.edges.map((e) => ({ topicId, ...e }))
       // One batch = one D1 transaction: the topic is 'ready' only when its whole path exists.
       await db.batch([
         db
           .insert(learnerTopic)
           .values({ learnerId, topicId, level: 3, rating: 1500 })
           .onConflictDoUpdate({ target: [learnerTopic.learnerId, learnerTopic.topicId], set: { level: 3, rating: 1500 } }),
-        ...chunks(unitRows, 10).map((rows) => db.insert(units).values(rows)),
-        ...chunks(conceptRows, 8).map((rows) => db.insert(concepts).values(rows)),
-        ...chunks(edgeRows, 20).map((rows) => db.insert(conceptEdges).values(rows)),
-        db.update(topics).set({ status: 'ready' }).where(eq(topics.id, topicId)),
+        ...curriculumWrites(db, topicId, valid, generatedBy),
       ])
       return { topicId }
     } catch (e) {
       // The status write must not mask the original error.
+      await db.update(topics).set({ status: 'failed' }).where(eq(topics.id, topicId)).catch(() => {})
+      throw e
+    }
+  })
+
+export const generateRoleCurriculum = createServerFn({ method: 'POST' })
+  .validator(z.object({ slug: z.string().min(1).max(100), roleId: z.string().min(1).max(100) }))
+  .handler(async ({ data }): Promise<{ topicId: string }> => {
+    const { user, org } = await requireOrgAdmin(data.slug)
+    const db = getDb()
+    const [row] = await db
+      .select({ topic: topics })
+      .from(jobRoles)
+      .innerJoin(topics, eq(topics.jobRoleId, jobRoles.id))
+      .where(and(eq(jobRoles.id, data.roleId), eq(jobRoles.orgId, org.id), eq(jobRoles.status, 'active')))
+    if (!row) throw httpError('Role topic not found', 404)
+    const topicId = row.topic.id
+    const documents = await db.select().from(sources)
+      .where(and(eq(sources.topicId, topicId), isNull(sources.deletedAt)))
+      .orderBy(asc(sources.createdAt), asc(sources.id))
+    if (!documents.length || documents.some((d) => !d.bodyText.trim())) {
+      throw httpError('Add documents with extracted text before building the curriculum.', 422)
+    }
+    await assertWithinDailyCap(db, user.id)
+    // Claim once; a repeat request must not duplicate the path or overwrite learner progress.
+    const claimed = await db.update(topics).set({ status: 'generating' })
+      .where(and(eq(topics.id, topicId), inArray(topics.status, ['draft', 'failed'])))
+      .returning({ id: topics.id })
+    if (!claimed.length) throw httpError('The curriculum is already generating or ready.', 409)
+    try {
+      let skeleton: CurriculumSkeleton
+      try {
+        skeleton = await chatJson({
+          purpose: 'curriculum', schema: CurriculumSkeleton, schemaName: 'curriculum_skeleton',
+          ...curriculumPrompt({ topic: row.topic.title, goal: row.topic.goal, levelHint: 3, sourceDocuments: documents }),
+          maxTokens: 16000, learnerId: user.id, topicId,
+        })
+      } catch (e) {
+        if (e instanceof LlmError && e.status === 429) throw httpError(e.message, 429)
+        if (e instanceof LlmError && e.status === 422) throw httpError('The model did not produce a valid document curriculum. Try again.', 422)
+        throw httpError('The model did not answer. Try again.', 503)
+      }
+      const valid = validateSkeleton(skeleton, documents)
+      if (valid.units.some((u) => u.concepts.some((c) => !c.grounded))) {
+        throw httpError('The curriculum contains concepts without a matching document quote. Try again.', 422)
+      }
+      // Publish the complete path and its ready status together; never publish a generic fallback for an SOP.
+      const [first, ...rest] = curriculumWrites(db, topicId, valid, jobModel('curriculum').model)
+      await db.batch([first, ...rest])
+      return { topicId }
+    } catch (e) {
       await db.update(topics).set({ status: 'failed' }).where(eq(topics.id, topicId)).catch(() => {})
       throw e
     }
@@ -103,7 +156,7 @@ export const getTopicPath = createServerFn({ method: 'GET' })
     const learnerId = await requireLearnerId()
     const db = getDb()
     const [topic] = await db
-      .select({ id: topics.id, title: topics.title, goal: topics.goal, status: topics.status })
+      .select({ id: topics.id, title: topics.title, goal: topics.goal, status: topics.status, generatedBy: topics.generatedBy })
       .from(topics)
       .where(and(eq(topics.id, data.topicId), eq(topics.learnerId, learnerId)))
     if (!topic) throw httpError('Topic not found', 404)
@@ -141,6 +194,7 @@ export const getTopicPath = createServerFn({ method: 'GET' })
       learner: {
         level: lt?.level ?? 3,
         levelLine: placement ? ((JSON.parse(placement.logJson) as { levelLine?: string }).levelLine ?? null) : null,
+        levelLineModel: placement ? ((JSON.parse(placement.logJson) as { levelLineModel?: string }).levelLineModel ?? null) : null,
         placed: Boolean(placement),
         xp: lt?.xp ?? 0,
         streak: lt?.streak ?? 0,
@@ -153,7 +207,9 @@ export const getTopicPath = createServerFn({ method: 'GET' })
             order: c.order,
             name: c.name,
             summary: c.summary,
+            visual: c.visual,
             grounded: c.grounded,
+            critical: c.critical,
             itemCount: itemCount.get(c.id) ?? 0,
             pKnown: known.get(c.id) ?? 0,
           }))
@@ -179,6 +235,7 @@ export const getConceptItems = createServerFn({ method: 'GET' })
       .select({ item: items })
       .from(items)
       .innerJoin(topics, eq(topics.id, items.topicId))
+      .innerJoin(learnerItem, and(eq(learnerItem.itemId, items.id), eq(learnerItem.learnerId, learnerId)))
       .where(and(eq(items.conceptId, data.conceptId), eq(items.status, 'active'), eq(topics.learnerId, learnerId)))
       .orderBy(desc(items.createdAt))
     return { items: rows.map((r) => asItem(r.item)) }
