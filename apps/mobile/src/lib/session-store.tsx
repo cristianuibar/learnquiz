@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { AppState } from 'react-native'
 import type { Branding, SessionResponse, SessionUser } from '@learnquiz/api'
-import { api, ApiError } from './api'
+import { api, ApiError, authCall } from './api'
 import { getToken, handleUnauthorized, loadToken, signOut, subscribeAuth } from './auth'
 import { releaseReplayHolds } from './held-target'
 import * as kv from './kv'
@@ -39,23 +39,31 @@ function writeStored(value: StoredSession) {
   return kv.setJSON(SESSION_KEY, value).catch(() => {})
 }
 
-// How long sign-out may wait on its own steps (push unregistration first) before
-// the local session is cleared anyway.
-export const SIGN_OUT_WAIT_MS = 5_000
+// How long sign-out may wait on its own steps before the local session is cleared
+// anyway. signOut() first unregisters push (the opt-in PR): a pending 5 s registration,
+// then a 5 s DELETE, so a slow but working network stays under this.
+export const SIGN_OUT_WAIT_MS = 12_000
+
+// Settles when work settles or after ms, whichever comes first; never rejects.
+async function within(work: Promise<unknown>, ms: number): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  await Promise.race([work.catch(() => {}), new Promise<void>((resolve) => { timer = setTimeout(resolve, ms) })])
+  clearTimeout(timer)
+}
 
 // Sign out from a screen. Never rejects, and never leaves the learner signed in:
-// when signOut() rejects or stalls while the same bearer is still live, the local
-// session is cleared directly (token, lq: data, the signedOut event).
+// when signOut() rejects or stalls (a hung keystore or SQLite read during push
+// unregistration) while the same bearer is still live, this revokes it on the
+// server and clears the local session directly (token, lq: data, signedOut event).
 export async function endSession(waitMs = SIGN_OUT_WAIT_MS): Promise<void> {
   const bearer = getToken()
-  let timer: ReturnType<typeof setTimeout> | undefined
-  await Promise.race([
-    signOut().catch(() => {}),
-    new Promise<void>((resolve) => { timer = setTimeout(resolve, waitMs) }),
-  ])
-  clearTimeout(timer)
+  await within(signOut(), waitMs)
   // A cleared or newer bearer means sign-out already happened, or someone signed in since.
-  if (bearer !== null && getToken() === bearer) await handleUnauthorized().catch(() => {})
+  if (bearer === null || getToken() !== bearer) return
+  // signOut() skips its revocation once the session is cleared under it; send it while the bearer is current.
+  void authCall('/sign-out', {}, { authenticated: true, timeoutMs: 5_000 }).catch(() => {})
+  // The token and the signedOut event go synchronously; storage cleanup may share the stalled store.
+  await within(handleUnauthorized(), waitMs)
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
