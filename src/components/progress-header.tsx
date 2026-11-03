@@ -29,7 +29,7 @@ export function ProgressHeader({
         className="h-1.5 min-w-8 flex-1 *:motion-reduce:transition-none"
       />
       <span className="shrink-0 text-sm font-medium tabular-nums">
-        {placement ? `Finding your level, ${position} of ${total}` : `${position} / ${total}`}
+        {placement ? `Finding your level, ${position} of up to ${total}` : `${position} / ${total}`}
       </span>
     </div>
   )

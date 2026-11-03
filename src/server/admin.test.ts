@@ -119,10 +119,13 @@ it('returns company members, roles, documents, distinct active learners and scop
   ])
   await expect(getCompany({ data: { slug: 'alpha' } })).resolves.toMatchObject({
     members: [{ name: 'learner', role: 'owner', jobRole: 'alpha role' }],
-    roles: [{ id: 'alpha', name: 'alpha role', status: 'active' }],
+    roles: [{ id: 'alpha', name: 'alpha role', status: 'active', topicStatus: 'draft' }],
     documents: [{ id: 'alpha-sop', title: 'alpha SOP', role: 'alpha role' }],
     activeLearners: 1, modelSpend: 0.125,
   })
+  sqlite.prepare('INSERT INTO job_roles (id, org_id, name, created_at) VALUES (?, ?, ?, ?)').run('ready-role', 'empty', 'Ready role', NOW)
+  sqlite.prepare('INSERT INTO topics (id, job_role_id, title, status, created_at) VALUES (?, ?, ?, ?, ?)').run('ready-topic', 'ready-role', 'Ready role', 'ready', NOW)
+  await expect(getCompany({ data: { slug: 'empty' } })).resolves.toMatchObject({ roles: [{ id: 'ready-role', status: 'active', topicStatus: 'ready' }] })
   await expect(getCompany({ data: { slug: 'beta' } })).resolves.toMatchObject({ documents: [] })
   await expect(getCompany({ data: { slug: 'missing' } })).rejects.toMatchObject({ status: 404 })
 })

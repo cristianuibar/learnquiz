@@ -69,6 +69,7 @@ export type SummaryView = {
   level: number | null // placement result, or the current level
   levelLine: string | null // two sentences: what you know, where you will grow
   levelLineModel: string | null
+  endedEarly: boolean // placement stopped before its question limit because it had enough answers
   masteryMoved: { unitId: string; unitName: string; before: number; after: number }[]
   mistakes: { itemId: string; stem: string; correctAnswer: string; wasSure: boolean; generatedBy: string | null }[]
   nextLine: string // coach: what happens next time

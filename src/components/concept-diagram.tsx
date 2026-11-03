@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useServerFn } from '@tanstack/react-start'
+import { errorMessage } from '@/components/inline-error'
 import { Button } from '@/components/ui/button'
 import { generateConceptDiagram, type DiagramResult } from '@/server/diagrams'
 
@@ -14,7 +15,7 @@ export function ConceptDiagram({ conceptId }: { conceptId: string }) {
     setError('')
     generate({ data: { conceptId } }).then(
       (value) => { if (active) setResult(value) },
-      (err: unknown) => { if (active) setError(err instanceof Error ? err.message : 'The diagram could not be loaded.') },
+      (err: unknown) => { if (active) setError(errorMessage(err, 'The diagram could not be loaded.')) },
     )
     return () => { active = false }
   }, [conceptId, generate, retry])

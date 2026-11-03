@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { errorMessage } from '@/components/inline-error'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -86,7 +87,7 @@ export function PushSettings({ publicKey, isStaff, endpoints, prefs, prompt = fa
         setMessage(action === 'hours' ? 'Working hours saved.' : next.paused ? 'Pushes paused on all your devices.' : 'Pushes resumed.')
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not update notifications. Try again.')
+      setError(errorMessage(e, 'Could not update notifications. Try again.'))
     } finally {
       setBusy(false)
     }

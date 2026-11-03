@@ -9,7 +9,7 @@ import { httpError } from '@/server/helpers'
 export type RoleDetail = {
   org: { slug: string; name: string }
   readOnly: boolean
-  role: { id: string; name: string; benchmark: number; onboardingDays: number; topicId: string; topicStatus: string }
+  role: { id: string; name: string; benchmark: number; onboardingDays: number; topicId: string; topicStatus: typeof topics.$inferSelect.status }
   documents: { id: string; title: string; kind: string; version: number; createdAt: number }[]
   units: {
     id: string

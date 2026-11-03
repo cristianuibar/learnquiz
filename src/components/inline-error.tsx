@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react'
-import { useRouter } from '@tanstack/react-router'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useRouter } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
+import { authClient } from '@/lib/auth-client'
 
 // Server validation failures arrive as a JSON-stringified zod issues array.
 function issuesOf(err: unknown) {
@@ -22,10 +23,10 @@ export function fieldErrors(err: unknown): Record<string, string> {
   return out
 }
 
-export const errorMessage = (err: unknown) =>
+export const errorMessage = (err: unknown, fallback = 'Something went wrong') =>
   typeof navigator !== 'undefined' && navigator.onLine === false
     ? "You're offline"
-    : issuesOf(err)?.[0].message || (err instanceof Error && err.message) || 'Something went wrong'
+    : issuesOf(err)?.[0].message || (err instanceof Error && err.message) || fallback
 
 // After a failed submit, moves focus to the form's first field marked aria-invalid.
 export function useFocusInvalid(fields: Record<string, string>) {
@@ -47,17 +48,60 @@ export function InlineError({ message, onRetry }: { message: string; onRetry: ()
   )
 }
 
+// 401 and 403 can never succeed on retry for the same account, so they offer a way out instead.
+function PermissionError({ message }: { message: string }) {
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  return (
+    <div role="alert" className="flex flex-col gap-3">
+      <p className="text-sm font-medium text-wrong">{message}</p>
+      <div className="flex flex-wrap gap-3">
+        <Button asChild className="h-12 px-6">
+          <Link to="/today">Go to Today</Link>
+        </Button>
+        <Button
+          variant="outline"
+          className="h-12 px-6"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true)
+            setError('')
+            const redirect = router.state.location.href
+            const { error } = await authClient.signOut()
+            if (error) {
+              setError(error.message ?? 'Could not sign out')
+              setBusy(false)
+              return
+            }
+            await router.invalidate()
+            await router.navigate({ to: '/sign-in', search: { redirect } })
+          }}
+        >
+          Sign in as someone else
+        </Button>
+      </div>
+      {error && <p className="text-sm font-medium text-wrong">{error}</p>}
+    </div>
+  )
+}
+
 export function RouteError({ error, reset }: { error: unknown; reset: () => void }) {
   const router = useRouter()
+  const status = (error as { status?: unknown } | null)?.status
   return (
     <main className="mx-auto w-full max-w-xl px-4 pt-8">
-      <InlineError
-        message={errorMessage(error)}
-        onRetry={() => {
-          reset()
-          void router.invalidate()
-        }}
-      />
+      {status === 401 || status === 403 ? (
+        <PermissionError message={errorMessage(error)} />
+      ) : (
+        <InlineError
+          message={errorMessage(error)}
+          onRetry={() => {
+            reset()
+            void router.invalidate()
+          }}
+        />
+      )}
     </main>
   )
 }

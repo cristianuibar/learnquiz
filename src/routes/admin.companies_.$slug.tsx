@@ -1,5 +1,6 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { RouteError } from '@/components/inline-error'
+import { TRAINING_STATUS } from '@/lib/training-status'
 import { plural } from '@/lib/utils'
 import { getCompany } from '@/server/admin'
 
@@ -28,7 +29,7 @@ function Company() {
         <h2 className="text-xl font-semibold">Job roles ({company.roles.length})</h2>
         {company.roles.length === 0 && <p className="mt-4">No job roles.</p>}
         <ul className="mt-4 flex flex-col gap-3">
-          {company.roles.map((role) => <li key={role.id} className="rounded-lg border p-4"><p className="font-medium">{role.name}</p><p className="text-sm">{role.status} · {Math.round(role.benchmark * 100)}% mastery in {role.onboardingDays} days</p></li>)}
+          {company.roles.map((role) => <li key={role.id} className="rounded-lg border p-4"><p className="font-medium">{role.name}</p><p className="text-sm">{role.status === 'archived' ? 'Archived · ' : ''}{TRAINING_STATUS[role.topicStatus ?? 'draft']} · {Math.round(role.benchmark * 100)}% mastery in {role.onboardingDays} days</p></li>)}
         </ul>
       </section>
       <section className="mt-8">

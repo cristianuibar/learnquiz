@@ -49,8 +49,8 @@ export const getCompany = createServerFn({ method: 'GET' })
         .leftJoin(memberRoleAssignments, and(eq(memberRoleAssignments.userId, member.userId), eq(memberRoleAssignments.orgId, member.organizationId)))
         .leftJoin(jobRoles, and(eq(jobRoles.id, memberRoleAssignments.jobRoleId), eq(jobRoles.orgId, member.organizationId)))
         .where(eq(member.organizationId, company.id)).orderBy(asc(user.name)),
-      db.select({ id: jobRoles.id, name: jobRoles.name, status: jobRoles.status, benchmark: jobRoles.benchmark, onboardingDays: jobRoles.onboardingDays })
-        .from(jobRoles).where(eq(jobRoles.orgId, company.id)).orderBy(asc(jobRoles.name)),
+      db.select({ id: jobRoles.id, name: jobRoles.name, status: jobRoles.status, topicStatus: topics.status, benchmark: jobRoles.benchmark, onboardingDays: jobRoles.onboardingDays })
+        .from(jobRoles).leftJoin(topics, eq(topics.jobRoleId, jobRoles.id)).where(eq(jobRoles.orgId, company.id)).orderBy(asc(jobRoles.name)),
       db.select({ id: sources.id, title: sources.title, kind: sources.kind, role: jobRoles.name })
         .from(sources).innerJoin(topics, eq(topics.id, sources.topicId)).innerJoin(jobRoles, eq(jobRoles.id, topics.jobRoleId))
         .where(eq(jobRoles.orgId, company.id))

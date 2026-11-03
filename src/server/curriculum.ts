@@ -20,7 +20,7 @@ import { buildRoleCurriculum, curriculumWrites } from '@/server/role-curriculum'
 export const createTopic = createServerFn({ method: 'POST' })
   .validator(
     z.object({
-      topic: z.string().trim().min(2).max(200),
+      topic: z.string().trim().min(1, 'Enter a topic').min(2, 'Use at least 2 characters for the topic').max(200, 'Use at most 200 characters for the topic'),
       goal: z.string().max(300).optional(),
       sourceText: z.string().max(MAX_SOURCE_TEXT_CHARS).optional(),
     }),

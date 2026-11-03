@@ -87,6 +87,12 @@ it('sends the entered whole percentage and shows the stored benchmark on the rol
   expect(createRole).toHaveBeenCalledWith({ data: expect.objectContaining({ benchmark: 85 }) })
 })
 
+it('words the training state on the role card instead of the raw status', async () => {
+  const container = await mount('/org/$slug/roles', rolesRoute.options.component!, '/org/x/roles', () => ({ slug: 'x', name: 'Acme', roles: [{ id: 'r', name: 'Cashier', benchmark: 0.85, onboardingDays: 30, topicId: 't', topicStatus: 'draft' }] }))
+  expect(container.textContent).toContain('No documents yet')
+  expect(container.textContent).not.toContain(' · draft')
+})
+
 it('links a server benchmark error to its field without showing JSON', async () => {
   vi.mocked(createRole).mockRejectedValue(new Error(JSON.stringify([{ origin: 'number', code: 'too_big', path: ['benchmark'], message: 'Enter a whole percentage from 50 to 100' }])))
   const container = await mount('/org/$slug/roles', rolesRoute.options.component!, '/org/x/roles', () => ({ slug: 'x', name: 'Acme', roles: [] }))

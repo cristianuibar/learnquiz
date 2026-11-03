@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { CredentialsForm } from '@/components/credentials-form'
-import { RouteError } from '@/components/inline-error'
+import { RouteError, errorMessage } from '@/components/inline-error'
 import { Button } from '@/components/ui/button'
 import { authClient } from '@/lib/auth-client'
 import { getInvite } from '@/server/org'
@@ -104,7 +104,7 @@ function Join() {
                   try {
                     await accept()
                   } catch (err) {
-                    setError(err instanceof Error ? err.message : 'Could not join')
+                    setError(errorMessage(err, 'Could not join'))
                     setBusy(false)
                   }
                 }}
