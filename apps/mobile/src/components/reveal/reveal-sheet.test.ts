@@ -109,7 +109,7 @@ test('an error shows as an alert above continue', async () => {
   expect(screen.getByText('Could not save. Try again.')).toBeOnTheScreen()
   const order = screen.toJSON() as { children: unknown[] }
   const text = JSON.stringify(order)
-  expect(text.indexOf('Could not save')).toBeLessThan(text.indexOf('"button"'))
+  expect(text.indexOf('Could not save')).toBeLessThan(text.indexOf('"Continue"'))
   expect(alert).toBeOnTheScreen()
 })
 
