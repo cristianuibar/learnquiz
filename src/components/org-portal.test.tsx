@@ -230,3 +230,45 @@ it('focuses the invalid field on the invite form and ties its message to it', as
     delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT
   }
 })
+
+it('brings a new invite\'s Copy link and its expanded QR code into view', async () => {
+  const old = { id: 'inv0', name: 'Bo', email: 'bo@acme.test', jobRole: 'Cashier', expired: false }
+  let invites = [old]
+  vi.mocked(getPeople).mockImplementation(async () => ({ id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles: [{ id: 'r1', name: 'Cashier' }], members: [], readOnly: false, invites }) as never)
+  inviteMember.mockReset().mockImplementation(async () => { invites = [{ id: 'inv1', name: 'Sam', email: 'sam@acme.test', jobRole: 'Cashier', expired: false }, old]; return { data: { id: 'inv1' }, error: null } })
+  const scrolled: Element[] = []
+  const scroll = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(function (this: Element) { scrolled.push(this) })
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+  vi.mocked(getSessionFn).mockImplementation(async () => ({ user: { id: 'u', name: 'U', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] }))
+  const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
+  const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, component: orgRoute.options.component })
+  const people = createRoute({ getParentRoute: () => org, path: '/people', loader: peopleRoute.options.loader as (ctx: { params: { slug: string } }) => ReturnType<typeof getPeople>, component: peopleRoute.options.component })
+  const router = createRouter({ routeTree: rootRoute.addChildren([org.addChildren([people])]), history: createMemoryHistory({ initialEntries: ['/org/x/people'] }) })
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  const field = (id: string) => container.querySelector<HTMLInputElement>('#' + id)!
+  const type = (id: string, value: string) => act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field(id), value)
+    field(id).dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  const row = (email: string) => [...container.querySelectorAll('li')].find((li) => li.textContent?.includes(email))!
+  const button = (scope: Element, name: string) => [...scope.querySelectorAll('button')].find((b) => b.textContent === name)!
+  try {
+    await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
+    expect(scrolled).toEqual([])
+    await type('name', 'Sam')
+    await type('email', 'sam@acme.test')
+    await act(async () => { container.querySelector('form')!.requestSubmit() })
+    await vi.waitFor(() => expect(document.activeElement).toBe(button(row('sam@acme.test'), 'Copy link')))
+    expect(scrolled).toEqual([row('sam@acme.test')])
+
+    await act(async () => { button(row('sam@acme.test'), 'QR code').click() })
+    expect(scrolled.at(-1)).toBe(row('sam@acme.test').querySelector('img[alt="QR code for the invite link of Sam"]'))
+  } finally {
+    scroll.mockRestore()
+    await act(async () => root.unmount())
+    container.remove()
+    delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT
+  }
+})

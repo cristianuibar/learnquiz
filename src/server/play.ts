@@ -16,6 +16,7 @@ import { chatJson, DailyCapError, isVoiceEnabled, jobModel, transcribeAudio } fr
 import { gradePrompt } from '@/lib/llm/prompts'
 import { Grade, type ItemPayload } from '@/lib/llm/schemas'
 import { validateVoiceWav } from '@/lib/voice'
+import { plural } from '@/lib/utils'
 import { asItem, chunks, ensureConceptItems, httpError, loadPKnown, mean, targetFor } from '@/server/helpers'
 import { requireLearnerId } from '@/server/session'
 import { assertWithinDailyCap } from '@/server/model-cap'
@@ -874,7 +875,7 @@ async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: 
       },
     ]),
   )
-  const next = [reviews > 0 ? `${reviews} review${reviews === 1 ? '' : 's'}` : null, frontier[0]?.concept.name ?? null].filter(Boolean)
+  const next = [reviews > 0 ? plural(reviews, 'review', 'reviews') : null, frontier[0]?.concept.name ?? null].filter(Boolean)
   return {
     sessionId: session.id,
     kind: session.kind,

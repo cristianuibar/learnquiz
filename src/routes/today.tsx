@@ -1,6 +1,7 @@
 import { createFileRoute, Link, redirect } from '@tanstack/react-router'
 import { RouteError } from '@/components/inline-error'
 import { StartButton } from '@/components/start-button'
+import { plural } from '@/lib/utils'
 import { getToday } from '@/server/today'
 
 export const Route = createFileRoute('/today')({
@@ -25,7 +26,7 @@ function Today() {
         <div className="mt-4 flex flex-col gap-6">
           <div className="flex flex-col gap-1">
             <p className="text-lg font-medium">
-              {topic.due > 0 ? `${topic.due} ${topic.due === 1 ? 'item' : 'items'} due` : 'Nothing due, fresh questions await'}
+              {topic.due > 0 ? `${plural(topic.due, 'item', 'items')} due` : 'Nothing due, fresh questions await'}
             </p>
             <p className="text-sm text-muted-foreground">Streak {topic.streak} · {topic.xp} XP</p>
           </div>

@@ -1,10 +1,11 @@
 import { z } from 'zod'
+import { eq } from 'drizzle-orm'
 import { getDb } from '@/db'
 import { modelCalls } from '@/db/schema'
 import { COMPANY_DAILY_MODEL_CALL_CAP, isOverDailyCap } from '@/lib/limits'
 import { META_MODELS, PROVIDERS, type ModelJob } from '@/lib/llm/models'
 import { getEnv } from '@/server/env'
-import { assertWithinDailyCap, COMPANY_CAP_MESSAGE, companyCallsToday, isOverLearnerDailyCap } from '@/server/model-cap'
+import { COMPANY_CAP_MESSAGE, companyCallsToday, dailyCapError, reserveModelCall } from '@/server/model-cap'
 
 // USD per million tokens; reasoning tokens bill as output. Unlisted prices are unknown.
 export const PRICES: Record<string, { in: number; out: number }> = {
@@ -109,24 +110,12 @@ export async function chatJson<T>(opts: {
 
   let failure = ''
   for (let attempt = 0; attempt < (opts.retry === false ? 1 : 2); attempt++) {
-    // Daily cap backstop for every attempt: reject before fetch and before logCall,
-    // so a capped learner gets a 429 and no new model_calls row.
-    // shortcut: count-then-call is not atomic, so concurrent calls can overshoot by a few; the per-handler check keeps the common path exact.
-    if (opts.learnerId) {
-      try {
-        if (await isOverLearnerDailyCap(getDb(), opts.learnerId)) throw new DailyCapError()
-      } catch (e) {
-        if (e instanceof LlmError) throw e
-        console.error('daily cap check failed, allowing call', e instanceof Error ? e.message : e)
-      }
-    }
-    if (opts.orgId) {
-      try {
-        if (isOverDailyCap(await companyCallsToday(getDb(), opts.orgId), COMPANY_DAILY_MODEL_CALL_CAP)) throw new LlmError(COMPANY_CAP_MESSAGE, 429)
-      } catch (e) {
-        if (e instanceof LlmError) throw e
-        console.error('company cap check failed, allowing call', e instanceof Error ? e.message : e)
-      }
+    // Daily cap backstop for every attempt: the slot is reserved atomically before fetch,
+    // so a capped learner gets a 429 and no new model_calls row, and concurrent calls cannot overshoot.
+    const reservedId = await reserve({ ...log, id: crypto.randomUUID() }, opts.orgId)
+    if (reservedId === false) {
+      if (opts.orgId && (await companyOverCap(opts.orgId))) throw new LlmError(COMPANY_CAP_MESSAGE, 429)
+      throw new DailyCapError()
     }
 
     const started = Date.now()
@@ -168,11 +157,11 @@ export async function chatJson<T>(opts: {
       }
       const parsed = opts.schema.safeParse(json)
       if (!parsed.success) throw new Error(z.prettifyError(parsed.error))
-      await logCall(log, started, usage, null)
+      await logCall(log, started, usage, null, reservedId)
       return parsed.data
     } catch (e) {
       failure = clean(e instanceof Error ? e.message : String(e))
-      await logCall(log, started, usage, failure)
+      await logCall(log, started, usage, failure, reservedId)
       // Only bad output is worth a second try; transport and HTTP errors fail fast.
       if (e instanceof LlmError) throw new LlmError(`LLM request failed (${e.status})`, e.status)
       if (opts.retry === false) break
@@ -193,9 +182,10 @@ export async function chatJson<T>(opts: {
 export async function transcribeAudio(opts: { audio: File; learnerId: string; sessionId: string; topicId: string }): Promise<string> {
   if (!isVoiceEnabled()) throw new LlmError('Voice answers are unavailable.', 404)
   const selected = jobModel('voice')
-  await assertWithinDailyCap(getDb(), opts.learnerId)
   const model = selected.model
   const log = { learnerId: opts.learnerId, sessionId: opts.sessionId, topicId: opts.topicId, purpose: 'voice', model }
+  const reservedId = await reserve({ ...log, id: crypto.randomUUID() })
+  if (reservedId === false) throw dailyCapError()
   const started = Date.now()
   try {
     const body = new FormData()
@@ -211,13 +201,31 @@ export async function transcribeAudio(opts: { audio: File; learnerId: string; se
     const result = await res.json() as { transcript?: unknown }
     if (typeof result.transcript !== 'string' || !result.transcript.trim()) throw new LlmError('No speech was recognised. Please try again.', 422)
     if (result.transcript.trim().length > 1000) throw new LlmError('Please record a shorter answer.', 422)
-    await logCall(log, started, undefined, null)
+    await logCall(log, started, undefined, null, reservedId)
     return result.transcript.trim()
   } catch (e) {
     // Never log the recording, transcript, credentials or provider response body.
     const error = e instanceof LlmError ? e : new LlmError('Voice transcription failed. Please try again.', 502)
-    await logCall(log, started, undefined, error.message)
+    await logCall(log, started, undefined, error.message, reservedId)
     throw error
+  }
+}
+
+async function companyOverCap(orgId: string): Promise<boolean> {
+  try {
+    return isOverDailyCap(await companyCallsToday(getDb(), orgId), COMPANY_DAILY_MODEL_CALL_CAP)
+  } catch {
+    return false
+  }
+}
+
+// Returns the reserved row id, false when the cap is reached, or undefined when the reservation failed and the call is allowed.
+async function reserve(row: Parameters<typeof reserveModelCall>[1], orgId?: string | null): Promise<string | false | undefined> {
+  try {
+    return (await reserveModelCall(getDb(), { ...row, orgId })) ? row.id : false
+  } catch (e) {
+    console.error('daily cap reservation failed, allowing call', e instanceof Error ? e.message : e)
+    return undefined
   }
 }
 
@@ -226,13 +234,28 @@ async function logCall(
   started: number,
   usage: Usage | undefined,
   error: string | null,
+  reservedId?: string,
 ) {
   try {
     const promptTokens = usage?.prompt_tokens ?? 0
     const completionTokens = usage?.completion_tokens ?? 0
     const model = opts.model
     const price = PRICES[model.replace(/^accounts\/fireworks\/models\//, '')]
-    await getDb()
+    const db = getDb()
+    const done = {
+      latencyMs: Date.now() - started,
+      promptTokens,
+      completionTokens,
+      reasoningTokens: usage?.completion_tokens_details?.reasoning_tokens ?? 0,
+      costUsd: price ? (promptTokens * price.in + completionTokens * price.out) / 1_000_000 : null,
+      ok: error === null,
+      error,
+    }
+    if (reservedId) {
+      await db.update(modelCalls).set(done).where(eq(modelCalls.id, reservedId))
+      return
+    }
+    await db
       .insert(modelCalls)
       .values({
         id: crypto.randomUUID(),
@@ -241,13 +264,7 @@ async function logCall(
         topicId: opts.topicId ?? null,
         purpose: opts.purpose,
         model,
-        latencyMs: Date.now() - started,
-        promptTokens,
-        completionTokens,
-        reasoningTokens: usage?.completion_tokens_details?.reasoning_tokens ?? 0,
-        costUsd: price ? (promptTokens * price.in + completionTokens * price.out) / 1_000_000 : null,
-        ok: error === null,
-        error,
+        ...done,
         createdAt: Date.now(),
       })
   } catch (e) {
@@ -260,7 +277,9 @@ async function logCall(
 export async function generateImage(opts: { prompt: string; learnerId: string; topicId: string }): Promise<Uint8Array> {
   if (!isImageEnabled()) throw new LlmError('Diagrams are unavailable.', 404)
   const selected = jobModel('image')
-  await assertWithinDailyCap(getDb(), opts.learnerId)
+  const log = { purpose: 'diagram', learnerId: opts.learnerId, topicId: opts.topicId, model: selected.model }
+  const reservedId = await reserve({ ...log, id: crypto.randomUUID() })
+  if (reservedId === false) throw dailyCapError()
   const started = Date.now()
   let error: string | null = null
   try {
@@ -282,6 +301,6 @@ export async function generateImage(opts: { prompt: string; learnerId: string; t
     error = (selected.apiKey ? message.replaceAll(selected.apiKey, '[redacted]') : message).slice(0, 300)
     throw new LlmError('The diagram could not be generated. Try again.', e instanceof LlmError ? e.status : 502)
   } finally {
-    await logCall({ purpose: 'diagram', learnerId: opts.learnerId, topicId: opts.topicId, model: selected.model }, started, undefined, error)
+    await logCall(log, started, undefined, error, reservedId)
   }
 }

@@ -5,8 +5,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vite
 import { z } from 'zod'
 import { modelCalls, topics } from '@/db/schema'
 import { getEnv } from '@/server/env'
-import { ACCOUNT_DAILY_MODEL_CALL_CAP } from '@/lib/limits'
-import { chatJson, DailyCapError, LlmError } from './client'
+import { ACCOUNT_DAILY_MODEL_CALL_CAP, GUEST_DAILY_MODEL_CALL_CAP } from '@/lib/limits'
+import { chatJson, DailyCapError, LlmError, transcribeAudio } from './client'
 
 const holder = vi.hoisted(() => ({ db: null as unknown }))
 
@@ -214,6 +214,40 @@ it('refuses a malformed-output retry after the twentieth daily model call', asyn
   expect(calls.filter((call) => !call.ok)).toEqual([
     expect.objectContaining({ learnerId: 'u1', error: expect.stringContaining('invalid JSON:') }),
   ])
+})
+
+it('lets only one of five concurrent grading and voice calls take the last daily slot', async () => {
+  Object.assign(getEnv(), {
+    VOICE_ENABLED: 'true',
+    JOB_MODELS: { voice: { provider: 'meta', model: 'muse-voice-transcribe-1.0' } },
+  })
+  await db.insert(modelCalls).values(Array.from({ length: GUEST_DAILY_MODEL_CALL_CAP - 1 }, (_, i) => ({
+    id: `call-${i}`, learnerId: 'u1', purpose: 'test', model: 'muse-spark-1.3', latencyMs: 0, ok: true, createdAt: Date.now(),
+  })))
+  // The provider answers after yielding, so requests genuinely interleave before any ledger row is finalised.
+  const fetchModel = vi.fn(async (url: string) => {
+    for (let i = 0; i < 20; i++) await Promise.resolve()
+    return url.endsWith('/asr/transcribe')
+      ? Response.json({ transcript: 'hello' })
+      : Response.json({ choices: [{ message: { content: JSON.stringify({ answer: 'x' }) }, finish_reason: 'stop' }] })
+  })
+  vi.stubGlobal('fetch', fetchModel)
+  const voice = () => transcribeAudio({ audio: new File([new Uint8Array(8)], 'answer.wav'), learnerId: 'u1', sessionId: 's1', topicId: 't1' })
+
+  const results = await Promise.allSettled([
+    chatJson({ ...answerRequest, purpose: 'grade', retry: false }),
+    voice(),
+    chatJson({ ...answerRequest, purpose: 'grade', retry: false }),
+    voice(),
+    chatJson({ ...answerRequest, purpose: 'grade', retry: false }),
+  ])
+
+  expect(fetchModel).toHaveBeenCalledTimes(1)
+  expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
+  const rejected = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+  expect(rejected).toHaveLength(4)
+  for (const r of rejected) expect(r.reason).toMatchObject({ status: 429 })
+  expect(raw.prepare("SELECT COUNT(*) AS n FROM model_calls WHERE learner_id = 'u1'").get()).toEqual({ n: GUEST_DAILY_MODEL_CALL_CAP })
 })
 
 it.each([
