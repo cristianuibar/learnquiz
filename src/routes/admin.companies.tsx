@@ -13,7 +13,7 @@ function Companies() {
   return (
     <main>
       <h1 className="text-3xl font-bold tracking-tight">Companies</h1>
-      <p className="mt-4 text-muted-foreground">Activity, documents and lifetime model spend are attributed to current members. Active learners started a session in the last 30 days.</p>
+      <p className="mt-4 text-muted-foreground">Documents belong to the company's roles. Activity and lifetime model spend are attributed to current members. Active learners started a session in the last 30 days.</p>
       {companies.length === 0 && <p className="mt-8">No companies yet.</p>}
       <ul className="mt-8 flex flex-col gap-4">
         {companies.map((company) => (
