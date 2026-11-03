@@ -8,7 +8,7 @@ afterEach(() => {
 })
 
 it('applies a saved theme before paint and returns to the system theme, including when storage is unavailable', () => {
-  localStorage.setItem(themeStorageKey, 'dark')
+  localStorage.setItem('lq-theme', 'dark')
   new Function(themeBootstrap)()
   expect(document.documentElement.dataset.theme).toBe('dark')
   expect(readTheme()).toBe('dark')
@@ -23,7 +23,7 @@ it('applies a saved theme before paint and returns to the system theme, includin
   }
 
   applyTheme('light')
-  expect(localStorage.getItem(themeStorageKey)).toBe('light')
+  expect(localStorage.getItem('lq-theme')).toBe('light')
   expect(document.documentElement.dataset.theme).toBe('light')
   expect(readTheme()).toBe('light')
   document.documentElement.removeAttribute('data-theme')

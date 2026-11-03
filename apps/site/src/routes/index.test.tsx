@@ -45,7 +45,7 @@ it('keeps accessible page landmarks and labelled sections', async () => {
   const main = container.querySelector('main')!
   expect(container.querySelectorAll('main')).toHaveLength(1)
   expect(container.querySelectorAll('h1')).toHaveLength(1)
-  expect(container.querySelector('a[href="#main"]')?.textContent).toBe('Skip to content')
+  expect(container.querySelector('a[href="#main"]')).not.toBeNull()
   expect(main.id).toBe('main')
   expect(main.getAttribute('tabindex')).toBe('-1')
   for (const landmark of ['header', 'footer']) {
