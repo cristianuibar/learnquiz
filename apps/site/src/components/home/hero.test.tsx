@@ -37,7 +37,7 @@ it.each([
 })
 
 it('keeps embed params, adds captions, and leaves other URLs alone', () => {
-  const embed = new URL(demoEmbedUrl('https://www.youtube.com/embed/abc123?start=5'))
+  const embed = new URL(demoEmbedUrl('https://www.youtube.com/embed/abc123?start=5')!)
   expect(embed.host).toBe('www.youtube-nocookie.com')
   expect(embed.pathname).toBe('/embed/abc123')
   expect(embed.searchParams.get('start')).toBe('5')
@@ -45,6 +45,35 @@ it('keeps embed params, adds captions, and leaves other URLs alone', () => {
   for (const same of ['https://www.youtube-nocookie.com/embed/abc123?cc_load_policy=1', 'https://player.vimeo.com/video/42']) {
     expect(demoEmbedUrl(same)).toBe(same)
   }
+})
+
+const unsafeUrls = [
+  'data:text/html,<script>alert(1)</script>',
+  'javascript:alert(1)',
+  'vbscript:msgbox(1)',
+  'http://example.com/video',
+  '/videos/demo.mp4',
+  'not a url',
+]
+
+it.each(unsafeUrls)('treats %s as no demo video', async (videoUrl) => {
+  expect(demoEmbedUrl(videoUrl)).toBeNull()
+  await renderHero({ videoUrl })
+  expect(watchButton()).toBeUndefined()
+  expect(container.querySelector('dialog')).toBeNull()
+  expect(container.querySelector('iframe')).toBeNull()
+})
+
+it('embeds a non-YouTube https video as given', async () => {
+  await renderHero({ videoUrl: 'https://player.vimeo.com/video/42' })
+  await click(watchButton())
+  expect(container.querySelector('iframe')?.getAttribute('src')).toBe('https://player.vimeo.com/video/42')
+})
+
+it.each(unsafeUrls)('renders no transcript link for %s', async (transcriptUrl) => {
+  await renderHero({ videoUrl: 'https://youtu.be/abc123', transcriptUrl })
+  expect(container.querySelector('dialog p')?.textContent).toBe('Captions on by default.')
+  expect(container.querySelector('dialog a')).toBeNull()
 })
 
 it('shows only the sign-up link when no demo video is configured', async () => {

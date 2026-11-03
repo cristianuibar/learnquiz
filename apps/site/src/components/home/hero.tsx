@@ -26,17 +26,24 @@ function youTubeId(url: URL): string | null {
   return null
 }
 
-/**
- * Turns the configured demo URL into the iframe src. YouTube links become a
- * youtube-nocookie.com embed with captions on; any other URL is used as given.
- */
-export function demoEmbedUrl(videoUrl: string): string {
-  let url: URL
+/** Parses an absolute https URL; anything else (other schemes, relative, garbage) is null. */
+function httpsUrl(value: string): URL | null {
   try {
-    url = new URL(videoUrl)
+    const url = new URL(value)
+    return url.protocol === 'https:' ? url : null
   } catch {
-    return videoUrl
+    return null
   }
+}
+
+/**
+ * Turns the configured demo URL into the iframe src, or null when it is not an
+ * absolute https URL. YouTube links become a youtube-nocookie.com embed with
+ * captions on; any other https URL is used as given.
+ */
+export function demoEmbedUrl(videoUrl: string): string | null {
+  const url = httpsUrl(videoUrl)
+  if (!url) return null
   const id = youTubeId(url)
   if (!id) return videoUrl
   const isEmbed = url.pathname.startsWith('/embed/')
@@ -46,7 +53,7 @@ export function demoEmbedUrl(videoUrl: string): string {
   return embed.toString()
 }
 
-function DemoVideo({ videoUrl, transcriptUrl }: { videoUrl: string; transcriptUrl: string }) {
+function DemoVideo({ embedUrl, transcriptUrl }: { embedUrl: string; transcriptUrl: string | null }) {
   const titleId = useId()
   const dialogRef = useRef<HTMLDialogElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
@@ -87,7 +94,7 @@ function DemoVideo({ videoUrl, transcriptUrl }: { videoUrl: string; transcriptUr
           {open ? (
             <iframe
               className="absolute inset-0 size-full border-0"
-              src={demoEmbedUrl(videoUrl)}
+              src={embedUrl}
               title={videoTitle}
               allow="encrypted-media; picture-in-picture"
               allowFullScreen
@@ -118,6 +125,8 @@ export function Hero({
   videoUrl?: string
   transcriptUrl?: string
 }) {
+  const embedUrl = demoEmbedUrl(videoUrl)
+  const transcriptHref = httpsUrl(transcriptUrl) ? transcriptUrl : null
   return (
     <section className="hero" aria-labelledby="lqs-h1" id="top">
       <div className="wrap">
@@ -134,7 +143,7 @@ export function Hero({
               <a className="btn btn-accent btn-lg" href={signUpUrl}>
                 Create a company account
               </a>
-              {videoUrl ? <DemoVideo videoUrl={videoUrl} transcriptUrl={transcriptUrl} /> : null}
+              {embedUrl ? <DemoVideo embedUrl={embedUrl} transcriptUrl={transcriptHref} /> : null}
             </div>
           </div>
 
