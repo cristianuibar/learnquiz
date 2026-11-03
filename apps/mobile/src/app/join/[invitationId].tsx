@@ -46,7 +46,7 @@ type Pending =
 export default function JoinScreen() {
   const { invitationId } = useLocalSearchParams<{ invitationId: string }>()
   const [load, setLoad] = useState<InviteLoad | null>(null)
-  const [attempt, setAttempt] = useState(0)
+  const [reload, setReload] = useState(0)
 
   useEffect(() => {
     let live = true
@@ -55,13 +55,13 @@ export default function JoinScreen() {
       if (live) setLoad(result)
     })
     return () => { live = false }
-  }, [invitationId, attempt])
+  }, [invitationId, reload])
 
   return (
     <ThemeProvider accent={load?.kind === 'found' ? load.invite.accent : null}>
       <JoinLayout>
         {!load ? <Skeleton />
-          : load.kind === 'failed' ? <LoadFailed message={load.message} onRetry={() => setAttempt((n) => n + 1)} />
+          : load.kind === 'failed' ? <LoadFailed message={load.message} onRetry={() => setReload((n) => n + 1)} />
           : load.kind === 'invalid' ? <Heading title={invalidScreen.title} body={invalidScreen.body} />
           : <Invite invitationId={invitationId} invite={load.invite} />}
       </JoinLayout>
@@ -162,7 +162,11 @@ function Invite({ invitationId, invite }: { invitationId: string; invite: Invite
     }
     const { outcome, token } = next
     if (outcome.kind === 'error') {
-      if (!flow.isLive(token)) { pending.current = null; return }
+      if (!flow.isLive(token)) {
+        pending.current = null
+        if (attempt.current === token) attempt.current = null
+        return
+      }
       finish()
       setError(outcome.message)
       if (outcome.mode) setMode(outcome.mode)
@@ -170,7 +174,11 @@ function Invite({ invitationId, invite }: { invitationId: string; invite: Invite
     }
     const decision = decideJoinNavigation(outcome, { live: flow.isLive(token), focused, session, held: peekHeldTarget() })
     if (decision.kind === 'keep') return // the session store catches up and re-runs this
-    if (decision.kind === 'drop') { pending.current = null; return }
+    if (decision.kind === 'drop') {
+      pending.current = null
+      if (attempt.current === token) attempt.current = null
+      return
+    }
     if (decision.kind === 'offline') { finish(); setError(networkError); return }
     pending.current = null
     // Take the held link while this screen still holds replay, then leave.
