@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Home, 360, dark, top half</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0;background:#121417}.part-b .hdr{position:static}</style>
+</helmet>
+<div class="{{partCls}}" style="overflow: clip; height: {{h}};">
+  <div style="margin-top: {{mt}};">
+    <dc-import name="Main" theme="dark" hint-size="100%,13000px"></dc-import>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":360,"height":6400}}'>
+// One half of the home page, split where "For managers" starts, so each canvas frame stays under 8000px.
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { top: 0 }; this.part = 'a'; }
+  componentDidMount() {
+    var self = this, n = 0;
+    this.t = setInterval(function () {
+      var s = document.querySelector('[aria-labelledby="lqs-mgr"]');
+      if (s && s.offsetTop !== self.state.top) self.setState({ top: s.offsetTop });
+      if (++n > 40) clearInterval(self.t);
+    }, 250);
+  }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    var top = this.state.top;
+    return {
+      partCls: 'part-' + this.part,
+      h: this.part === 'a' && top ? top + 'px' : 'auto',
+      mt: this.part === 'b' && top ? (-top) + 'px' : '0px'
+    };
+  }
+}
+</script>
+</body>
+</html>

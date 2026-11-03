@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <style>
+    .lq-ring { fill: #0E5A73; }
+    @media (prefers-color-scheme: dark) {
+      .lq-ring { fill: #6FC3DC; }
+    }
+  </style>
+  <defs>
+    <mask id="lq-favicon-dot-gap" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+      <rect width="24" height="24" fill="#fff"/>
+      <circle cx="18" cy="18" r="6" fill="#000"/>
+    </mask>
+  </defs>
+  <path class="lq-ring" fill-rule="evenodd" mask="url(#lq-favicon-dot-gap)" d="M11 1a10 10 0 1 0 0 20a10 10 0 1 0 0-20zm0 5a5 5 0 1 1 0 10a5 5 0 1 1 0-10z"/>
+  <circle cx="18" cy="18" r="4" fill="#F2A900"/>
+</svg>
