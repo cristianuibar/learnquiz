@@ -581,8 +581,7 @@ describe('learner practice and unit unlocks', () => {
 
     // Retained legacy timestamps must not grant the next learner access.
     raw.prepare('UPDATE units SET unlocked_at = ? WHERE topic_id = ?').run(1, 't1')
-    // Shared-role access is not available yet. Transfer ownership so both learners
-    // exercise the same stored units through the existing authorization checks.
+    // Transfer ownership so both learners exercise the same stored units through the existing authorization checks.
     raw.prepare('UPDATE topics SET learner_id = ? WHERE id = ?').run('u2', 't1')
     raw.prepare('INSERT INTO learner_topic (learner_id, topic_id) VALUES (?, ?)').run('u2', 't1')
     vi.mocked(requireLearnerId).mockResolvedValueOnce('u2')
@@ -730,4 +729,113 @@ it.each([
     .run('s1', 'u1', 't1', 'placement', plan, Date.now())
 
   expect((await endSession({ data: { sessionId: 's1' } })).endedEarly).toBe(endedEarly)
+})
+
+describe('employees training on their role topic', () => {
+  const fetchModel = vi.fn()
+  const mcq = (n: number) => JSON.stringify({
+    format: 'mcq', stem: `Question ${n}?`, accepted_answers: [], model_answer: '', explanation: 'Because.', difficulty: 1 + (n % 5),
+    source_quote: null, grounded: false, bloom: 'apply',
+    options: ['a', 'b', 'c'].map((id) => ({ id, text: id, is_correct: id === 'a', feedback: '' })),
+  })
+  const short = (n: number) => JSON.stringify({
+    format: 'short', stem: `Explain ${n}.`, accepted_answers: ['because'], model_answer: 'Because.', explanation: 'Because.', difficulty: 1 + (n % 5),
+    source_quote: null, grounded: false, bloom: 'apply', options: [],
+  })
+  // Company o1 has a role topic with two units of six stored mcq and six short items; company o2 has an employee with its own role.
+  const seedRoleTopic = (itemsPerConcept: number) => {
+    const org = raw.prepare('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, ?)')
+    const member = raw.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, ?)')
+    const role = raw.prepare('INSERT INTO job_roles (id, org_id, name, created_at) VALUES (?, ?, ?, ?)')
+    const assign = raw.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES (?, ?, ?, ?)')
+    for (const [o, user] of [['o1', 'u1'], ['o2', 'u2']]) {
+      raw.prepare('INSERT INTO user (id, name, email) VALUES (?, ?, ?)').run(user, user, `${user}@example.test`)
+      org.run(o, o, o, 1)
+      member.run(`m-${o}`, o, user, 'member', 1)
+      role.run(`r-${o}`, o, 'Support agent', 1)
+      assign.run(user, o, `r-${o}`, 1)
+    }
+    raw.prepare('INSERT INTO topics (id, learner_id, org_id, job_role_id, title, goal, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run('rt', null, 'o1', 'r-o1', 'Support agent', null, 'ready', 1)
+    const item = raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    for (const u of [0, 1]) {
+      raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run(`ru${u}`, 'rt', u, `Unit ${u}`)
+      raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)').run(`rc${u}`, 'rt', `ru${u}`, 0, `Concept ${u}`, '')
+      for (let i = 0; i < itemsPerConcept; i++) {
+        item.run(`ri${u}-${i}`, `rc${u}`, 'rt', 'mcq', mcq(i), 1 + (i % 5), i)
+        item.run(`rs${u}-${i}`, `rc${u}`, 'rt', 'short', short(i), 1 + (i % 5), i)
+      }
+    }
+  }
+  const count = (table: string) => scalar(raw, `SELECT COUNT(*) AS n FROM ${table}`).n
+  beforeEach(() => {
+    vi.mocked(chatJson).mockClear()
+    fetchModel.mockReset()
+    vi.stubGlobal('fetch', fetchModel)
+  })
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it('lets an assigned employee place and practise on stored items without any model call', async () => {
+    seedRoleTopic(6)
+    expect(count('learner_topic')).toBe(0)
+    const { sessionId } = await startPlacement({ data: { topicId: 'rt' } })
+    expect(scalar(raw, 'SELECT COUNT(*) AS n FROM learner_topic WHERE learner_id = ? AND topic_id = ?', 'u1', 'rt').n).toBe(1)
+    for (let view = await getSession({ data: { sessionId } }); view.item; view = await nextItem({ data: { sessionId } })) {
+      await answerItem({ data: { sessionId, itemId: view.item.id, answer: { optionId: 'a' }, confidence: 'sure', responseMs: 1000 } })
+    }
+    expect(await endSession({ data: { sessionId } })).toMatchObject({ kind: 'placement', levelLine: expect.stringContaining('landed at level'), levelLineModel: null })
+    expect(count('placements')).toBe(1)
+
+    const practice = await startSession({ data: { topicId: 'rt' } })
+    expect((await getSession({ data: practice })).item).not.toBeNull()
+    expect(scalar(raw, 'SELECT learner_id FROM topics WHERE id = ?', 'rt').learner_id).toBeNull()
+    expect(chatJson).not.toHaveBeenCalled()
+    expect(fetchModel).not.toHaveBeenCalled()
+    expect(count('model_calls')).toBe(0)
+  })
+
+  it('keeps another company’s employee out of the role topic and its sessions', async () => {
+    seedRoleTopic(6)
+    const { sessionId } = await startPlacement({ data: { topicId: 'rt' } })
+    vi.mocked(requireLearnerId).mockResolvedValueOnce('u2')
+    await expect(startPlacement({ data: { topicId: 'rt' } })).rejects.toMatchObject({ status: 404, message: 'Topic not found' })
+    vi.mocked(requireLearnerId).mockResolvedValueOnce('u2')
+    await expect(startSession({ data: { topicId: 'rt' } })).rejects.toMatchObject({ status: 404, message: 'Topic not found' })
+    vi.mocked(requireLearnerId).mockResolvedValueOnce('u2')
+    await expect(getSession({ data: { sessionId } })).rejects.toMatchObject({ status: 404 })
+    expect(scalar(raw, 'SELECT COUNT(*) AS n FROM learner_topic WHERE learner_id = ?', 'u2').n).toBe(0)
+  })
+
+  it('asks the employee to wait while the role topic has no stored items', async () => {
+    seedRoleTopic(0)
+    await expect(startPlacement({ data: { topicId: 'rt' } })).rejects.toMatchObject({ status: 409, message: 'Your training is being prepared' })
+    expect(count('sessions')).toBe(0)
+    expect(fetchModel).not.toHaveBeenCalled()
+  })
+
+  it('waits for the shared role questions, then starts a session on them without any model call', async () => {
+    seedRoleTopic(0)
+    raw.exec("UPDATE concepts SET gen_status = 'pending' WHERE topic_id = 'rt'")
+    await expect(startSession({ data: { topicId: 'rt' } })).rejects.toMatchObject({ status: 503, message: expect.stringContaining('being prepared') })
+    expect(count('sessions')).toBe(0)
+    // The company queue stores the concept's questions; the next start plays them.
+    const item = raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    for (let i = 0; i < 6; i++) item.run(`rq-${i}`, 'rc0', 'rt', 'mcq', mcq(i), 1 + (i % 5), i)
+    const { sessionId } = await startSession({ data: { topicId: 'rt' } })
+    expect((await getSession({ data: { sessionId } })).item).not.toBeNull()
+    expect(count('learner_unit')).toBe(2)
+    expect(chatJson).not.toHaveBeenCalled()
+    expect(fetchModel).not.toHaveBeenCalled()
+    expect(count('model_calls')).toBe(0)
+  })
+
+  it('places on a stored question outside the first concept of each unit', async () => {
+    seedRoleTopic(0)
+    raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)').run('rc-late', 'rt', 'ru0', 1, 'Later concept', '')
+    raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run('ri-late', 'rc-late', 'rt', 'mcq', mcq(2), 3, 1)
+    const { sessionId } = await startPlacement({ data: { topicId: 'rt' } })
+    expect((await getSession({ data: { sessionId } })).item?.id).toBe('ri-late')
+    expect(fetchModel).not.toHaveBeenCalled()
+  })
 })

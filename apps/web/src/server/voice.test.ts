@@ -117,6 +117,14 @@ it.each([
   { name: 'local profile', status: 404, setup: () => { getEnv().LLM_PROFILE = 'ollama' } },
   { name: 'unsupported voice provider', status: 404, setup: () => { getEnv().JOB_MODELS = { voice: { provider: 'baseten', model: 'muse-voice-transcribe-1.0' } } } },
   { name: 'text model mapped to voice', status: 404, setup: () => { getEnv().JOB_MODELS = { voice: { provider: 'meta', model: 'muse-spark-1.3' } } } },
+  { name: 'role topic', status: 404, setup: () => { raw.exec(`
+    INSERT INTO user (id, name, email) VALUES ('u1', 'Ann', 'ann@example.test');
+    INSERT INTO organization (id, name, slug, created_at) VALUES ('o1', 'Acme', 'acme', 1);
+    INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES ('m1', 'o1', 'u1', 'member', 1);
+    INSERT INTO job_roles (id, org_id, name, created_at) VALUES ('r1', 'o1', 'Support agent', 1);
+    INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES ('u1', 'o1', 'r1', 1);
+    UPDATE topics SET learner_id = NULL, org_id = 'o1', job_role_id = 'r1';
+  `) } },
   { name: 'ended session', status: 409, setup: () => { raw.exec('UPDATE sessions SET ended_at = 2') } },
   { name: 'answered question', status: 409, setup: () => { raw.exec(`UPDATE sessions SET plan_json = json_set(plan_json, '$.answered', json('true'))`) } },
   { name: 'stale question', status: 409, setup: () => { raw.exec(`UPDATE sessions SET item_ids_json = '["i2"]'`) } },

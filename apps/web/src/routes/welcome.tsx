@@ -23,7 +23,7 @@ const points = [
 
 function Welcome() {
   const router = useRouter()
-  const { redirect: next = '/' } = Route.useSearch()
+  const { redirect: next } = Route.useSearch()
   const accept = useServerFn(acceptDisclosure)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -32,8 +32,9 @@ function Welcome() {
     setBusy(true)
     setError('')
     try {
-      await accept()
-      await router.navigate({ href: next })
+      const { roleTopicId } = await accept()
+      if (!next && roleTopicId) await router.navigate({ to: '/t/$topicId/path', params: { topicId: roleTopicId } })
+      else await router.navigate({ href: next ?? '/' })
       await router.invalidate()
     } catch (err) {
       setError(errorMessage(err))
