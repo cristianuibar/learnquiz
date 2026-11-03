@@ -8,8 +8,10 @@ import { NORTHWIND, seedNorthwind } from './northwind'
 
 const request = vi.hoisted(() => ({ headers: new Headers() }))
 const background = vi.hoisted(() => [] as Promise<unknown>[])
+const media = vi.hoisted(() => ({ objects: new Map<string, { body: unknown; options?: { httpMetadata?: { contentType?: string } } }>() }))
 const bindings = vi.hoisted(() => ({ waitUntil: (task: Promise<unknown>) => { background.push(task) }, env: {
   DB: null as unknown,
+  MEDIA: { put: async (key: string, body: unknown, options?: { httpMetadata?: { contentType?: string } }) => { media.objects.set(key, { body, options }) }, get: async (key: string) => media.objects.get(key) ?? null },
   BETTER_AUTH_URL: 'http://127.0.0.1:8800',
   BETTER_AUTH_SECRET: '',
   LLM_PROFILE: 'meta',
@@ -189,7 +191,11 @@ it('seeds the three employee stages through the real SOP pipeline and preserves 
   expect(calls.filter((call) => !call.ok)).toEqual([])
   expect(calls.find((call) => call.purpose === 'curriculum')).toEqual({ purpose: 'curriculum', ok: 1, n: 1 })
   const questions = raw.prepare('SELECT COUNT(*) AS n FROM items WHERE topic_id = ? AND status = \'active\'').get(result.topicId) as { n: number }
-  expect(raw.prepare('SELECT COUNT(*) AS n FROM items WHERE topic_id = ? AND generated_by = ? AND json_extract(check_json, \'$.keep\') = 1').get(result.topicId, 'muse-spark-1.3')).toEqual(questions)
+  expect(raw.prepare('SELECT COUNT(*) AS n FROM items WHERE topic_id = ? AND generated_by = ? AND json_extract(check_json, \'$.keep\') = 1').get(result.topicId, 'muse-spark-1.3')).toEqual({ n: questions.n - 1 })
+  // The authored label question carries its image, stored in R2 beside the item.
+  const label = raw.prepare('SELECT payload_json FROM items WHERE id = ? AND status = \'active\'').get('northwind-demo-v1:label-item') as { payload_json: string }
+  expect(JSON.parse(label.payload_json).image).toMatchObject({ key: 'label.svg', width: 640, height: 300 })
+  expect(media.objects.get('items/northwind-demo-v1:label-item/label.svg')).toMatchObject({ options: { httpMetadata: { contentType: 'image/svg+xml' } } })
   expect(raw.prepare(`SELECT c.critical, a.correct, a.confidence FROM attempts a
     JOIN concepts c ON c.id = a.concept_id JOIN user u ON u.id = a.learner_id WHERE u.email = ?`).all(NORTHWIND.emails.onboarding)).toEqual([{ critical: 1, correct: 0, confidence: 'sure' }])
   expect(raw.prepare('SELECT id FROM user WHERE email = ?').all(NORTHWIND.emails.invited)).toEqual([])
