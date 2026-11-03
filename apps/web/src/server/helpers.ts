@@ -88,7 +88,6 @@ export async function generateConceptItems(
           misconceptions,
           targetDifficulty: opts.targetDifficulty,
           spread: opts.spread,
-          formats: ['mcq', 'cloze', 'short'],
           sourceQuote: concept.sourceQuote,
           avoidStems,
         }),
