@@ -168,19 +168,19 @@ describe('route head', () => {
     expectIconsAndTheme()
   })
 
-  it('renders legal title with shared social tags and /privacy canonical', async () => {
-    await renderAt('/privacy')
+  it.each(['/privacy', '/privacy/'])('renders legal title with shared social tags and /privacy/ canonical at %s', async (path) => {
+    await renderAt(path)
     expect(title()).toBe('Privacy — Learn Quiz')
-    expectSharedHead('https://learnquiz.com/privacy')
-    expectCanonical('https://learnquiz.com/privacy')
+    expectSharedHead('https://learnquiz.com/privacy/')
+    expectCanonical('https://learnquiz.com/privacy/')
     expectIconsAndTheme()
   })
 
-  it('renders legal title with shared social tags and /terms canonical', async () => {
-    await renderAt('/terms')
+  it.each(['/terms', '/terms/'])('renders legal title with shared social tags and /terms/ canonical at %s', async (path) => {
+    await renderAt(path)
     expect(title()).toBe('Terms — Learn Quiz')
-    expectSharedHead('https://learnquiz.com/terms')
-    expectCanonical('https://learnquiz.com/terms')
+    expectSharedHead('https://learnquiz.com/terms/')
+    expectCanonical('https://learnquiz.com/terms/')
     expectIconsAndTheme()
   })
 
@@ -193,15 +193,15 @@ describe('route head', () => {
       await router.navigate({ to: '/privacy' })
     })
     expect(title()).toBe('Privacy — Learn Quiz')
-    expectCanonical('https://learnquiz.com/privacy')
-    expect(metaContent('meta[property="og:url"]')).toBe('https://learnquiz.com/privacy')
+    expectCanonical('https://learnquiz.com/privacy/')
+    expect(metaContent('meta[property="og:url"]')).toBe('https://learnquiz.com/privacy/')
 
     await act(async () => {
       await router.navigate({ to: '/terms' })
     })
     expect(title()).toBe('Terms — Learn Quiz')
-    expectCanonical('https://learnquiz.com/terms')
-    expect(metaContent('meta[property="og:url"]')).toBe('https://learnquiz.com/terms')
+    expectCanonical('https://learnquiz.com/terms/')
+    expect(metaContent('meta[property="og:url"]')).toBe('https://learnquiz.com/terms/')
 
     await act(async () => {
       await router.navigate({ to: '/' })
