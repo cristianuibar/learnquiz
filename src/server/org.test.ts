@@ -161,23 +161,32 @@ it('reports assigned training stages, unresolved critical errors and company pro
   attempt.run('critical-error', 'member', 'scan-item', 'scan', start + day, '"skip scan"', 0, 0, 'sure')
   attempt.run('ordinary-error', 'member', 'pick-item', 'pick', start + day, '"skip ticket"', 0, 0, 'sure')
   attempt.run('foreign-error', 'member', 'foreign-item', 'foreign', start + day, '"skip safety"', 0, 0, 'sure')
+  const session = sqlite.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, started_at) VALUES (?, ?, ?, ?, ?)')
+  const now = Date.now()
+  session.run('s-old', 'member', topic, 'session', now - 3 * day)
+  session.run('s-new', 'member', topic, 'session', now - day)
+  session.run('s-foreign', 'admin', foreignTopic, 'session', now - 100)
+  session.run('s-personal', 'admin', 'personal', 'session', now - 50)
+  attempt.run('week-critical', 'member', 'scan-item-2', 'scan', now - day, '"x"', 0, 0, 'unsure')
+  attempt.run('week-ordinary', 'member', 'pick-item-2', 'pick', now - day, '"x"', 0, 0, 'sure')
+  attempt.run('old-critical', 'member', 'scan-item-3', 'scan', now - 8 * day, '"x"', 0, 0, 'sure')
   const people = await getPeople({ data: { slug: 'alpha' } })
   expect(people.members).toEqual([
-    expect.objectContaining({ name: 'owner', training: null }),
-    expect.objectContaining({ name: 'admin', training: { stage: 'proficient', daysToProficiency: 4, criticalConfidentErrors: 0 } }),
-    expect.objectContaining({ name: 'member', training: { stage: 'onboarding', daysToProficiency: null, criticalConfidentErrors: 1 } }),
+    expect.objectContaining({ name: 'owner', training: null, lastActiveAt: null }),
+    expect.objectContaining({ name: 'admin', training: { stage: 'proficient', progress: 1, daysToProficiency: 4, criticalConfidentErrors: 0 }, lastActiveAt: null }),
+    expect.objectContaining({ name: 'member', training: { stage: 'onboarding', progress: expect.closeTo(0.4 / 3 / 0.85, 10), daysToProficiency: null, criticalConfidentErrors: 2 }, lastActiveAt: now - day }),
   ])
   expect(people.invites).toEqual([expect.objectContaining({ name: 'Waiting', expired: false })])
-  expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { proficientEmployees: 1, daysToProficiency: 4 } })
+  expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { employees: 2, proficientEmployees: 1, daysToProficiency: 4, criticalErrorsThisWeek: 1, documentsToReview: null } })
 
   attempt.run('corrected', 'member', 'scan-item', 'scan', start + 2 * day, '"scan"', 1, 1, 'sure')
   sqlite.prepare('UPDATE learner_concept SET p_known = 0.5 WHERE learner_id = ? AND concept_id = ?').run('admin', 'scan')
   expect((await getPeople({ data: { slug: 'alpha' } })).members).toEqual([
     expect.objectContaining({ name: 'owner', training: null }),
-    expect.objectContaining({ name: 'admin', training: { stage: 'onboarding', daysToProficiency: null, criticalConfidentErrors: 0 } }),
-    expect.objectContaining({ name: 'member', training: { stage: 'onboarding', daysToProficiency: null, criticalConfidentErrors: 0 } }),
+    expect.objectContaining({ name: 'admin', training: { stage: 'onboarding', progress: expect.closeTo(0.75 / 0.85, 10), daysToProficiency: null, criticalConfidentErrors: 0 } }),
+    expect.objectContaining({ name: 'member', training: { stage: 'onboarding', progress: expect.closeTo(0.4 / 3 / 0.85, 10), daysToProficiency: null, criticalConfidentErrors: 1 } }),
   ])
-  expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { proficientEmployees: 0, daysToProficiency: null } })
+  expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { employees: 2, proficientEmployees: 0, daysToProficiency: null, criticalErrorsThisWeek: 1, documentsToReview: null } })
 })
 
 it('rolls back the role when its draft topic cannot be stored', async () => {

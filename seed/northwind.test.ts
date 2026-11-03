@@ -183,14 +183,16 @@ it('seeds the three employee stages through the real SOP pipeline and preserves 
 
   await signIn(NORTHWIND.emails.owner, secret.ownerPassword)
   const people = await getPeople({ data: { slug: result.slug } })
-  expect(people.members.map(({ email, training }) => ({ email, training }))).toEqual(expect.arrayContaining([
-    { email: NORTHWIND.emails.owner, training: null },
-    { email: NORTHWIND.emails.onboarding, training: { stage: 'onboarding', daysToProficiency: null, criticalConfidentErrors: 1 } },
-    { email: NORTHWIND.emails.proficient, training: { stage: 'proficient', daysToProficiency: 6, criticalConfidentErrors: 0 } },
+  const { known } = raw.prepare(`SELECT AVG(COALESCE(lc.p_known, 0)) AS known FROM concepts c
+    LEFT JOIN learner_concept lc ON lc.concept_id = c.id AND lc.learner_id = (SELECT id FROM user WHERE email = ?) WHERE c.topic_id = ?`).get(NORTHWIND.emails.onboarding, result.topicId) as { known: number }
+  expect(people.members.map(({ email, training, lastActiveAt }) => ({ email, training, lastActiveAt }))).toEqual(expect.arrayContaining([
+    { email: NORTHWIND.emails.owner, training: null, lastActiveAt: null },
+    { email: NORTHWIND.emails.onboarding, training: { stage: 'onboarding', progress: expect.closeTo(known / 0.85, 10), daysToProficiency: null, criticalConfidentErrors: 1 }, lastActiveAt: now - 86_400_000 - 60_000 },
+    { email: NORTHWIND.emails.proficient, training: { stage: 'proficient', progress: 1, daysToProficiency: 6, criticalConfidentErrors: 0 }, lastActiveAt: now - 4 * 86_400_000 - 60_000 },
   ]))
   expect(people.members).toHaveLength(3)
   expect(people.invites).toEqual([expect.objectContaining({ email: NORTHWIND.emails.invited, expired: false, jobRole: 'Warehouse picker' })])
-  expect(await getOrgOverview({ data: { slug: result.slug } })).toMatchObject({ training: { proficientEmployees: 1, daysToProficiency: 6 } })
+  expect(await getOrgOverview({ data: { slug: result.slug } })).toMatchObject({ training: { employees: 2, proficientEmployees: 1, daysToProficiency: 6, criticalErrorsThisWeek: 1, documentsToReview: null } })
   await signIn(NORTHWIND.emails.onboarding, secret.learnerPassword)
 
   raw.prepare('UPDATE learner_concept SET p_known = 0.32 WHERE learner_id = (SELECT id FROM user WHERE email = ?)').run(NORTHWIND.emails.onboarding)
