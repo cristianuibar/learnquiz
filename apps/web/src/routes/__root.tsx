@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { brandCss } from '@learnquiz/tokens'
-import { HeadContent, Outlet, Scripts, createRootRoute, redirect, useLocation } from '@tanstack/react-router'
+import { HeadContent, Outlet, Scripts, createRootRoute, redirect, useLocation, useRouterState } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 import { BottomNav } from '@/components/bottom-nav'
@@ -65,8 +65,22 @@ function Root() {
   const { user } = Route.useRouteContext()
   const { latestTopicId, branding } = Route.useLoaderData()
   const { pathname } = useLocation()
-  const focus = /^\/play\/(?:quick\/)?[^/]+\/?$/.test(pathname) // an active session has no chrome
-  const nav = user && !focus && !/^\/(org|admin|welcome|join|sign-in)(\/|$)/.test(pathname)
+  const bare = /^\/(?:join\/.*|welcome|sign-in|today|play(?:\/.*)?|opt-in)\/?$/.test(pathname) // screens that bring their own header
+  const nav = user && /^\/(?:today|t\/[^/]+\/path|me|me\/profile)\/?$/.test(pathname) // the four bottom-nav screens
+  const resolved = useRouterState({ select: (s) => s.resolvedLocation?.pathname })
+  const first = useRef(true)
+
+  // After a navigation, move focus to the new page's heading (not on first load).
+  useEffect(() => {
+    if (first.current) {
+      first.current = false
+      return
+    }
+    const h1 = document.querySelector('h1')
+    if (!h1) return
+    if (!h1.hasAttribute('tabindex')) h1.tabIndex = -1
+    h1.focus()
+  }, [resolved])
 
   useEffect(() => {
     void navigator.serviceWorker?.register('/sw.js')
@@ -74,7 +88,7 @@ function Root() {
 
   return (
     <>
-      {!focus && <TopBar branding={branding} home={user ? '/today' : '/'} signIn={(!user || user.isAnonymous) && pathname !== '/sign-in'} />}
+      {!bare && <TopBar branding={branding} home={user ? '/today' : '/'} signIn={(!user || user.isAnonymous) && pathname !== '/sign-in'} />}
       <Outlet />
       {nav && <BottomNav topicId={latestTopicId} />}
     </>

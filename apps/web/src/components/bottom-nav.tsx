@@ -1,46 +1,52 @@
 import { Link, useLocation } from '@tanstack/react-router'
-import { CalendarCheck, Route, User } from 'lucide-react'
+import { House, Route, User } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 const tab = (active: boolean) =>
   cn(
-    'flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-xs font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring/50',
-    active ? 'text-primary' : 'text-muted-foreground',
+    'flex flex-col items-center justify-center gap-0.5 text-xs/4 font-semibold',
+    active ? 'text-brand' : 'text-ink-muted',
   )
+
+// Icon sits in a pill that is tinted when the tab is active.
+const pill = (active: boolean, icon: ReactNode, extra?: string) => (
+  <span className={cn('flex h-[30px] w-14 items-center justify-center rounded-full', active && 'bg-brand-tint', extra)}>
+    {icon}
+  </span>
+)
 
 // Link directly to the learner screen to avoid redirecting through the landing page.
 export function BottomNav({ topicId }: { topicId: string | null }) {
   const { pathname } = useLocation()
-  const today = pathname === '/' || pathname === '/start' || pathname === '/today' || pathname.startsWith('/play')
+  const today = pathname === '/today' || pathname === '/today/'
   const path = pathname.startsWith('/t/')
-  const me = pathname.startsWith('/me')
+  const me = pathname === '/me' || pathname.startsWith('/me/')
   return (
     <>
-      <div aria-hidden className="h-[calc(3.5rem+env(safe-area-inset-bottom))]" />
+      <div aria-hidden className="h-[calc(4rem+env(safe-area-inset-bottom))]" />
       <nav
         aria-label="Main"
-        className="fixed inset-x-0 bottom-0 z-40 border-t bg-background pb-[env(safe-area-inset-bottom)]"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface-card pb-[env(safe-area-inset-bottom)]"
       >
-        <div className="mx-auto flex max-w-xl">
+        <div className="mx-auto grid h-16 max-w-xl grid-cols-3">
           <Link to={topicId ? '/today' : '/start'} className={tab(today)} aria-current={today ? 'page' : undefined}>
-            <CalendarCheck className="size-6" aria-hidden />
+            {pill(today, <House className="size-6" aria-hidden />)}
             Today
           </Link>
           {topicId ? (
             <Link to="/t/$topicId/path" params={{ topicId }} className={tab(path)} aria-current={path ? 'page' : undefined}>
-              <Route className="size-6" aria-hidden />
+              {pill(path, <Route className="size-6" aria-hidden />)}
               Path
             </Link>
           ) : (
             <span aria-disabled="true" className={cn(tab(false), 'cursor-not-allowed text-ink-muted')}>
-              <span className="flex h-[30px] w-14 items-center justify-center rounded-full border-2 border-dashed border-border-strong bg-surface-sunken">
-                <Route className="size-6" aria-hidden />
-              </span>
+              {pill(false, <Route className="size-6" aria-hidden />, 'border-2 border-dashed border-border-strong bg-surface-sunken')}
               Path
             </span>
           )}
           <Link to="/me" className={tab(me)} aria-current={me ? 'page' : undefined}>
-            <User className="size-6" aria-hidden />
+            {pill(me, <User className="size-6" aria-hidden />)}
             Profile
           </Link>
         </div>
