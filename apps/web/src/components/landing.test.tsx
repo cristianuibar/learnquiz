@@ -153,8 +153,8 @@ it('switches the sign-in heading and page title with the form mode', async () =>
     expect([container.querySelector('h1')?.textContent, document.title]).toEqual(['Sign in', 'Sign in · Learn Quiz'])
     await toggle('Create an account')
     expect([container.querySelector('h1')?.textContent, document.title]).toEqual(['Create an account', 'Create an account · Learn Quiz'])
-    expect(container.querySelector('button[type="submit"]')?.textContent).toBe('Sign up')
-    await toggle('I have an account')
+    expect(container.querySelector('button[type="submit"]')?.textContent).toBe('Create account')
+    await toggle('I already have an account')
     expect([container.querySelector('h1')?.textContent, document.title]).toEqual(['Sign in', 'Sign in · Learn Quiz'])
   } finally { await cleanup() }
 })
@@ -253,7 +253,7 @@ it('sends a guest who creates an account to Today with their topic', async () =>
   vi.mocked(getSessionUser).mockResolvedValue({ id: 'guest', name: 'Guest', isAnonymous: true } as never)
   const { container, router, cleanup } = await renderApp()
   try {
-    await act(async () => { container.querySelector<HTMLButtonElement>('form button[type="button"]')!.click() })
+    await act(async () => { [...container.querySelectorAll('button')].find((b) => b.textContent === 'Create an account')!.click() })
     container.querySelector<HTMLInputElement>('#name')!.value = 'Gina'
     container.querySelector<HTMLInputElement>('#email')!.value = 'gina@example.test'
     container.querySelector<HTMLInputElement>('#password')!.value = 'test-password'

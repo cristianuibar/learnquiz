@@ -238,6 +238,7 @@ describe('getToday', () => {
     it.each([
       ['today', 0, 4],
       ['yesterday', DAY, 4],
+      ['two days ago', 2 * DAY, 0],
       ['three days ago', 3 * DAY, 0],
     ])('reads the stored streak of 4 as per last session %s', async (_when, ago, streak) => {
       personal(4, NOW - ago)

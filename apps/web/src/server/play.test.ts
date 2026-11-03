@@ -37,7 +37,7 @@ vi.mock('@/lib/llm/client', async (importOriginal) => {
 
 vi.mock('cloudflare:workers', () => ({ env: { LLM_PROFILE: 'ollama', LLM_MODEL: 'muse-spark-1.3', LLM_BASE_URL: 'https://llm.example/v1' } }))
 
-import { answerItem, endSession, getSession, nextItem, prepareNextSession, startMiniSession, startPlacement, startSession } from './play'
+import { answerItem, endSession, getSession, nextItem, prepareNextSession, reportItem, startMiniSession, startPlacement, startSession } from './play'
 import { getEnv } from '@/server/env'
 import { getConceptItems, getTopicPath } from './curriculum'
 import { getModelTrace } from './model-trace'
@@ -103,6 +103,9 @@ function seedTopicAndLearner(raw: DatabaseSync, xp: number) {
     )
     .run('u1', 't1', 1, 1500, null, 0, 1, xp)
 }
+
+const flag = (raw: DatabaseSync, itemId: string, userId = 'u1') =>
+  raw.prepare('INSERT INTO item_flags (id, item_id, user_id, reason, created_at) VALUES (?, ?, ?, ?, ?)').run(`f-${userId}-${itemId}`, itemId, userId, 'other', 1)
 
 const scalar = (raw: DatabaseSync, sqlText: string, ...params: (string | number)[]) =>
   (raw.prepare(sqlText).get(...params) as unknown as Record<string, unknown> | undefined) ?? {}
@@ -285,7 +288,7 @@ it('refuses another learner’s question or notification and inactive questions 
   }
   vi.mocked(requireLearnerId).mockResolvedValueOnce('u2')
   await expect(startMiniSession({ data: { itemId: 'i1' } })).rejects.toMatchObject({ status: 404 })
-  raw.prepare('UPDATE items SET status = ? WHERE id = ?').run('reported', 'i1')
+  flag(raw, 'i1')
   await expect(startMiniSession({ data: { itemId: 'i1' } })).rejects.toMatchObject({ status: 404 })
   expect(scalar(raw, 'SELECT COUNT(*) AS n FROM sessions').n).toBe(0)
   expect(scalar(raw, 'SELECT COUNT(*) AS n FROM push_log WHERE opened_at IS NOT NULL').n).toBe(0)
@@ -390,17 +393,51 @@ it('stamps proficient_at once when a role topic meets its benchmark and never cl
   expect(proficientAt()).toBe(now + 1000)
 })
 
+it('hides a reported question from the reporter only, and keeps one open flag per learner', async () => {
+  seedTopicAndLearner(raw, 0)
+  raw.prepare('INSERT INTO user (id, name, email) VALUES (?, ?, ?)').run('u1', 'Learner', 'learner@example.test')
+  seedFrontier(raw, 2, true)
+  raw.prepare('DELETE FROM learner_item WHERE item_id = ?').run('i2')
+  const { sessionId } = await startMiniSession({ data: { itemId: 'i1' } })
+  await answerItem({ data: { sessionId, itemId: 'i1', answer: { text: '1' }, confidence: 'sure', responseMs: 1000 } })
+  const attemptId = scalar(raw, 'SELECT id FROM attempts WHERE item_id = ?', 'i1').id as string
+  raw.prepare('UPDATE items SET source_version = 3 WHERE id = ?').run('i1')
+  await expect(reportItem({ data: { itemId: 'i1', attemptId: 'nope' } })).rejects.toMatchObject({ status: 404 })
+
+  await reportItem({ data: { itemId: 'i1', reason: 'unclear', note: 'Which x?', attemptId } })
+  await reportItem({ data: { itemId: 'i1', reason: 'incorrect', note: '', attemptId: null } })
+  expect(raw.prepare('SELECT user_id, reason, note, attempt_id, source_version FROM item_flags').all()).toEqual([
+    { user_id: 'u1', reason: 'unclear', note: 'Which x?', attempt_id: attemptId, source_version: 3 },
+  ])
+  expect(scalar(raw, 'SELECT status FROM items WHERE id = ?', 'i1').status).toBe('active')
+  expect(await getConceptItems({ data: { conceptId: 'c1' } })).toEqual({ items: [] })
+  await expect(startMiniSession({ data: { itemId: 'i1' } })).rejects.toMatchObject({ status: 404 })
+  expect(await getSession({ data: { sessionId: (await startSession({ data: { topicId: 't1' } })).sessionId } })).toMatchObject({ item: { id: 'i2' } })
+
+  // Another learner who owns the topic still gets the question.
+  raw.prepare('UPDATE topics SET learner_id = ? WHERE id = ?').run('u2', 't1')
+  raw.prepare('INSERT INTO learner_item (learner_id, item_id, due, stability, difficulty, state) VALUES (?, ?, ?, ?, ?, ?)').run('u2', 'i1', 1, 1, 5, 2)
+  vi.mocked(requireLearnerId).mockResolvedValueOnce('u2')
+  expect((await getConceptItems({ data: { conceptId: 'c1' } })).items.map((i) => i.id)).toEqual(['i1'])
+
+  // A resolved flag (Approve in question review) brings the question back for the reporter.
+  raw.prepare('UPDATE topics SET learner_id = ? WHERE id = ?').run('u1', 't1')
+  raw.prepare('UPDATE item_flags SET resolved_at = 1').run()
+  expect((await getConceptItems({ data: { conceptId: 'c1' } })).items.map((i) => i.id)).toEqual(['i1'])
+})
+
 it('names the concept behind a sure-and-wrong answer and counts the active reviews still due', async () => {
   const now = 1793620800000
   vi.spyOn(Date, 'now').mockReturnValue(now)
   seedTopicAndLearner(raw, 0)
   seedFrontier(raw, 4, true)
-  raw.exec(`UPDATE learner_item SET due = ${now - 1} WHERE item_id IN ('i2', 'i3', 'i4'); UPDATE items SET status = 'reported' WHERE id = 'i4'`)
+  raw.exec(`UPDATE learner_item SET due = ${now - 1} WHERE item_id IN ('i2', 'i3', 'i4')`)
+  flag(raw, 'i4')
   const { sessionId } = await startSession({ data: { topicId: 't1' } })
   const { item } = await getSession({ data: { sessionId } })
   await answerItem({ data: { sessionId, itemId: item!.id, answer: { text: '0' }, confidence: 'sure', responseMs: 1000 } })
   const summary = await endSession({ data: { sessionId } })
-  const dueActive = scalar(raw, "SELECT COUNT(*) AS n FROM learner_item li JOIN items i ON i.id = li.item_id WHERE i.topic_id = 't1' AND i.status = 'active' AND li.due <= ?", now).n
+  const dueActive = scalar(raw, "SELECT COUNT(*) AS n FROM learner_item li JOIN items i ON i.id = li.item_id WHERE i.topic_id = 't1' AND i.status = 'active' AND li.due <= ? AND i.id NOT IN (SELECT item_id FROM item_flags)", now).n
   expect(summary.benchmark).toBeNull()
   expect(summary.mistakes).toEqual([expect.objectContaining({ conceptName: 'Variables' })])
   expect(summary.nextLine).toMatch(/ Variables comes back first\.$/)
@@ -537,7 +574,7 @@ describe('learner practice and unit unlocks', () => {
 
   it('only exposes the learner\'s answered active questions in Path after placement', async () => {
     seedFrontier(raw, 8, false)
-    raw.prepare('UPDATE items SET status = ? WHERE id = ?').run('reported', 'i7')
+    flag(raw, 'i7')
     raw.prepare('UPDATE items SET status = ? WHERE id = ?').run('rejected', 'i8')
     raw.prepare('DELETE FROM learner_item WHERE item_id NOT IN (?, ?)').run('i7', 'i8')
     raw.prepare('INSERT INTO learner_item (learner_id, item_id, due, stability, difficulty, state) VALUES (?, ?, ?, ?, ?, ?)')
@@ -1095,6 +1132,12 @@ describe('employees training on their role topic', () => {
     }
     expect(await endSession({ data: { sessionId } })).toMatchObject({ kind: 'placement', levelLine: expect.stringContaining('landed at level'), levelLineModel: null })
     expect(count('placements')).toBe(1)
+    // See your path opens the shared role topic, whose learner_id is NULL.
+    const path = await getTopicPath({ data: { topicId: 'rt' } })
+    expect(path).toMatchObject({ topic: { id: 'rt', title: 'Support agent' }, company: 'o1', learner: { placed: true } })
+    const answered = raw.prepare("SELECT li.item_id AS id FROM learner_item li JOIN items i ON i.id = li.item_id WHERE li.learner_id = 'u1' AND i.concept_id = 'rc0'").all()
+    expect(answered.length).toBeGreaterThan(0)
+    expect((await getConceptItems({ data: { conceptId: 'rc0' } })).items.map((i) => i.id).sort()).toEqual(answered.map((r) => r.id).sort())
 
     const practice = await startSession({ data: { topicId: 'rt' } })
     expect((await getSession({ data: practice })).item).not.toBeNull()

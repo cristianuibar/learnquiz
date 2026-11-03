@@ -5,6 +5,7 @@ import { ThemeProvider } from '../../theme/ThemeProvider'
 import { MultiBody } from './multi'
 import type { QuestionBodyProps } from './types'
 
+// multi.tsx renders the diagram (#339), whose expo-image view and authenticated media source need native modules jest does not have.
 jest.mock('./diagram-image', () => ({ DiagramImage: () => null }))
 
 const item: ItemView = {

@@ -4,13 +4,14 @@ import type { SQLiteTable } from 'drizzle-orm/sqlite-core'
 import { z } from 'zod'
 import { getDb, type Db } from '@/db'
 import { member } from '@/db/auth-schema'
-import { attempts, concepts, items, jobRoles, learnerConcept, learnerItem, learnerTopic, learnerUnit, memberRoleAssignments, placements, pushLog, sessions, sources, topics, units } from '@/db/schema'
+import { attempts, concepts, itemFlags, items, jobRoles, learnerConcept, learnerItem, learnerTopic, learnerUnit, memberRoleAssignments, placements, pushLog, sessions, sources, topics, units } from '@/db/schema'
 import { BKT, guessFor, MASTERY, placementPrior, update } from '@/lib/learning/bkt'
 import { ratingFor, retrievability, review } from '@/lib/learning/fsrs'
 import { gradeAnswer, revealState, toItemView } from '@/lib/learning/grade'
 import { benchmarkMet } from '@/lib/learning/profile'
 import { levelResult, nextLevel, pickNext, PLACEMENT, shouldStop } from '@/lib/learning/placement'
 import { composeSession, reinsert, SESSION_BONUS, streakAfter, xpFor } from '@/lib/learning/session'
+import { reportReasons } from '@learnquiz/api/reveal'
 import type { Confidence, ItemView, Reveal, SessionPlanning, SessionView, SummaryView } from '@learnquiz/api'
 import { chatJson, chatJsonWithModel, DailyCapError, isVoiceEnabled, jobModel, transcribeAudio } from '@/lib/llm/client'
 import { gradePrompt } from '@/lib/llm/prompts'
@@ -22,7 +23,7 @@ import { asItem, chunks, ensureConceptItems, httpError, loadPKnown, mean, target
 import { liveConcept } from '@/server/live-concept'
 import { requireLearnerId } from '@/server/session'
 import { assertWithinDailyCap } from '@/server/model-cap'
-import { learnerCanAccess, seedLearnerTopic } from '@/server/topic-access'
+import { learnerCanAccess, notFlaggedBy, openFlag, seedLearnerTopic } from '@/server/topic-access'
 
 // shortcut: 12 instead of the spec's 20 while generation is slow, raise it once items are generated ahead of play.
 export const SESSION_SIZE = 12
@@ -77,9 +78,9 @@ async function ownedTopic(db: Db, learnerId: string, topicId: string) {
 }
 
 // Role topics play stored items graded without a model, so short answers stay out.
-async function storedItems(db: Db, topicId: string, conceptId: string) {
+async function storedItems(db: Db, learnerId: string, topicId: string, conceptId: string) {
   const rows = await db.select().from(items)
-    .where(and(eq(items.conceptId, conceptId), eq(items.topicId, topicId), eq(items.status, 'active'), ne(items.format, 'short')))
+    .where(and(eq(items.conceptId, conceptId), eq(items.topicId, topicId), eq(items.status, 'active'), ne(items.format, 'short'), notFlaggedBy(db, learnerId)))
     .orderBy(asc(items.createdAt), asc(items.id))
   return rows.map(asItem)
 }
@@ -149,7 +150,7 @@ async function viewOf(db: Db, session: SessionRow, topic: TopicRow, plan: Placem
   let item: ItemView | null = null
   if (!ended && ids[plan.position]) {
     const { item: row, concept, payload } = await loadItem(db, session.topicId, ids[plan.position], true)
-    if (row.status === 'retired') return advance(db, session.learnerId, session, topic, plan)
+    if (row.status === 'retired' || await openFlag(db, session.learnerId, row.id)) return advance(db, session.learnerId, session, topic, plan)
     item = toItemView(
       { id: row.id, conceptId: concept.id, conceptName: concept.name, format: payload.format, difficultyPrior: row.difficultyPrior, payload },
       session.id + row.id,
@@ -192,7 +193,7 @@ export const startPlacement = createServerFn({ method: 'POST' })
     // Role topics are never generated per learner: they place on the stored items of every concept.
     const sources = topic.jobRoleId !== null ? conceptRows : picks
     const generated = topic.jobRoleId !== null
-      ? await Promise.all(sources.map((c) => storedItems(db, topic.id, c.id)))
+      ? await Promise.all(sources.map((c) => storedItems(db, learnerId, topic.id, c.id)))
       : await Promise.all(
         picks.map((c) => ensureConceptItems(db, learnerId, c, topic, { targetDifficulty: PLACEMENT.start, spread: true, sessionId })),
       )
@@ -239,7 +240,7 @@ export const startSession = createServerFn({ method: 'POST' })
         .select({ row: learnerItem, conceptId: items.conceptId })
         .from(learnerItem)
         .innerJoin(items, eq(items.id, learnerItem.itemId))
-        .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topic.id), eq(items.status, 'active'),
+        .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId),
           topic.jobRoleId !== null ? ne(items.format, 'short') : undefined)),
       loadFrontier(db, learnerId, topic.id),
     ])
@@ -258,7 +259,7 @@ export const startSession = createServerFn({ method: 'POST' })
     const top = frontier.slice(0, 4)
     // Anything practisable stored starts the session at once (a shorter one is fine); prepareNextSession tops up during play.
     const storedRows = top.length
-      ? await db.select().from(items).where(and(eq(items.topicId, topic.id), inArray(items.conceptId, top.map((f) => f.concept.id)), eq(items.status, 'active'),
+      ? await db.select().from(items).where(and(eq(items.topicId, topic.id), inArray(items.conceptId, top.map((f) => f.concept.id)), eq(items.status, 'active'), notFlaggedBy(db, learnerId),
         topic.jobRoleId !== null ? ne(items.format, 'short') : undefined))
       : []
     const stored = top.map((f) => storedRows.filter((r) => r.conceptId === f.concept.id).map(asItem))
@@ -282,7 +283,7 @@ export const startSession = createServerFn({ method: 'POST' })
       .select({ id: items.id, conceptId: items.conceptId })
       .from(items)
       .innerJoin(learnerConcept, and(eq(learnerConcept.conceptId, items.conceptId), eq(learnerConcept.learnerId, learnerId)))
-      .where(and(eq(items.topicId, topic.id), eq(items.status, 'active'), gte(learnerConcept.pKnown, CLOSER_MIN), lte(items.difficultyPrior, lt.level),
+      .where(and(eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId), gte(learnerConcept.pKnown, CLOSER_MIN), lte(items.difficultyPrior, lt.level),
         topic.jobRoleId !== null ? ne(items.format, 'short') : undefined))
     const closers = closerRows
       .filter((c) => !taken.has(c.id))
@@ -376,7 +377,7 @@ async function topUpFrontier(db: Db, learnerId: string, topic: TopicRow, reserve
       .select({ itemId: learnerItem.itemId })
       .from(learnerItem)
       .innerJoin(items, eq(items.id, learnerItem.itemId))
-      .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topic.id), eq(items.status, 'active'))),
+      .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId))),
     // The frontier is known only after placement ends, and units 0-1 are always unlocked then.
     placing
       ? db.select({ concept: concepts }).from(concepts).innerJoin(units, eq(units.id, concepts.unitId))
@@ -408,7 +409,7 @@ export const startMiniSession = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<{ sessionId: string }> => {
     const learnerId = await requireLearnerId()
     const db = getDb()
-    const [item] = await db.select().from(items).where(and(eq(items.id, data.itemId), eq(items.status, 'active')))
+    const [item] = await db.select().from(items).where(and(eq(items.id, data.itemId), eq(items.status, 'active'), notFlaggedBy(db, learnerId)))
     if (!item) throw httpError('Question not found', 404)
     const topic = await ownedTopic(db, learnerId, item.topicId)
     await loadLearnerTopic(db, learnerId, topic.id)
@@ -744,9 +745,9 @@ async function advance(db: Db, learnerId: string, session: SessionRow, topic: To
   const ids = JSON.parse(session.itemIdsJson) as string[]
   // Recheck persisted queues and placement pools: an admin can retire an item after the session starts.
   const candidates = 'pool' in plan ? plan.pool.map((p) => p.id) : ids.slice(plan.position + 1)
-  // Leave two of D1's 100 bindings for the topic and retired status.
-  const rows = await Promise.all(chunks(candidates, 98).map((ids) => db.select({ id: items.id }).from(items)
-    .where(and(eq(items.topicId, session.topicId), ne(items.status, 'retired'), inArray(items.id, ids)))))
+  // Leave three of D1's 100 bindings for the topic, retired status and learner.
+  const rows = await Promise.all(chunks(candidates, 97).map((ids) => db.select({ id: items.id }).from(items)
+    .where(and(eq(items.topicId, session.topicId), ne(items.status, 'retired'), notFlaggedBy(db, session.learnerId), inArray(items.id, ids)))))
   const available = new Set(rows.flat().map((i) => i.id))
   let position = plan.position + 1
   let nextId: string | null
@@ -809,16 +810,29 @@ export const endSession = createServerFn({ method: 'POST' })
   })
 
 export const reportItem = createServerFn({ method: 'POST' })
-  .validator(z.object({ itemId: z.string().min(1) }))
+  .validator(z.object({
+    itemId: z.string().min(1),
+    reason: z.enum(reportReasons.map((r) => r.code) as [string, ...string[]]).default('other'),
+    note: z.string().max(300).optional(),
+    attemptId: z.string().min(1).nullish(),
+  }))
   .handler(async ({ data }): Promise<{ ok: true }> => {
     const learnerId = await requireLearnerId()
     const db = getDb()
-    const done = await db
-      .update(items)
-      .set({ status: 'reported' })
+    const [item] = await db.select().from(items)
       .where(and(eq(items.id, data.itemId), ne(items.status, 'retired'), inArray(items.topicId, db.select({ id: topics.id }).from(topics).where(learnerCanAccess(db, learnerId)))))
-      .returning({ id: items.id })
-    if (!done.length) throw httpError('Item not found', 404)
+    if (!item) throw httpError('Item not found', 404)
+    if (data.attemptId) {
+      const [own] = await db.select({ id: attempts.id }).from(attempts)
+        .where(and(eq(attempts.id, data.attemptId), eq(attempts.learnerId, learnerId), eq(attempts.itemId, item.id)))
+      if (!own) throw httpError('Attempt not found', 404)
+    }
+    // One open flag per learner and item; a repeat is a no-op.
+    if (await openFlag(db, learnerId, item.id)) return { ok: true }
+    await db.insert(itemFlags).values({
+      id: crypto.randomUUID(), itemId: item.id, userId: learnerId, reason: data.reason, note: data.note || null,
+      attemptId: data.attemptId ?? null, sourceVersion: item.sourceVersion, createdAt: Date.now(),
+    })
     return { ok: true }
   })
 
@@ -956,7 +970,7 @@ async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: 
       .select({ reviews: count() })
       .from(learnerItem)
       .innerJoin(items, eq(items.id, learnerItem.itemId))
-      .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topic.id), eq(items.status, 'active'), lte(learnerItem.due, Date.now() + DAY))),
+      .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId), lte(learnerItem.due, Date.now() + DAY))),
     dueCount(db, learnerId, topic.id, Date.now()),
     topic.jobRoleId ? db.select({ benchmark: jobRoles.benchmark }).from(jobRoles).where(eq(jobRoles.id, topic.jobRoleId)).get() : undefined,
     db

@@ -369,3 +369,15 @@ it.each([
   const path = await curriculum.getTopicPath({ data: { topicId: 'picker-topic' } })
   expect(path).toMatchObject({ preparing, placeable, company })
 })
+
+it.each([
+  ['yesterday', '2026-11-01T23:59:00Z', 5],
+  ['two UTC days ago', '2026-10-31T23:59:00Z', 0],
+])('shows the stored streak of 5 on the path when the last session was %s', async (_when, last, streak) => {
+  seedRoleCurriculum(true)
+  holder.userId = 'employee'
+  raw.exec("INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES ('employee', 'northwind', 'picker', 1)")
+  await curriculum.getTopicPath({ data: { topicId: 'picker-topic' } })
+  raw.exec(`UPDATE learner_topic SET streak_count = 5, last_session_at = ${Date.parse(last)} WHERE learner_id = 'employee'`)
+  expect((await curriculum.getTopicPath({ data: { topicId: 'picker-topic' } })).learner.streak).toBe(streak)
+})
