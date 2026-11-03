@@ -18,7 +18,6 @@ import { Grade, type ItemPayload } from '@/lib/llm/schemas'
 import { validateVoiceWav } from '@/lib/voice'
 import { plural } from '@/lib/utils'
 import { asItem, chunks, ensureConceptItems, httpError, loadPKnown, mean, targetFor } from '@/server/helpers'
-import { processConcept } from '@/server/concept-gen'
 import { requireLearnerId } from '@/server/session'
 import { assertWithinDailyCap } from '@/server/model-cap'
 import { learnerCanAccess, seedLearnerTopic } from '@/server/topic-access'
@@ -252,15 +251,9 @@ export const startSession = createServerFn({ method: 'POST' })
 
     // Seen items come back through the due list, not as fresh frontier questions.
     const top = frontier.slice(0, 4)
-    const stored = () => Promise.all(top.map((f) => storedItems(db, topic.id, f.concept.id)))
-    let roleStored = topic.jobRoleId !== null ? await stored() : []
-    if (topic.jobRoleId !== null && !roleStored.some((l) => l.length)) {
-      // Builds the shared company questions once (no-op when another call holds the claim); not per-learner generation.
-      await Promise.all(top.map((f) => processConcept(db, f.concept.id)))
-      roleStored = await stored()
-    }
-    const generated = await Promise.all(top.map(async (f, i) => {
-      if (topic.jobRoleId !== null) return roleStored[i]
+    const generated = await Promise.all(top.map(async (f) => {
+      // Role questions are built once per concept by the company queue; a session only plays what is stored.
+      if (topic.jobRoleId !== null) return storedItems(db, topic.id, f.concept.id)
       try {
         return await ensureConceptItems(db, learnerId, f.concept, topic, { targetDifficulty, unseen: seen, sessionId })
       } catch (error) {
