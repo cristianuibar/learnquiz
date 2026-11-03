@@ -5,6 +5,9 @@ import { ThemeProvider } from '../../theme/ThemeProvider'
 import { MultiBody } from './multi'
 import type { QuestionBodyProps } from './types'
 
+// The diagram needs native image and secure-store modules; these items carry no image.
+jest.mock('./diagram-image', () => ({ DiagramImage: () => null }))
+
 const item: ItemView = {
   id: 'i', conceptId: 'c', conceptName: 'Receiving', format: 'multi', blank: null, image: null, difficulty: 1,
   stem: 'Which inbound cartons need a lead’s sign-off before put-away?',
