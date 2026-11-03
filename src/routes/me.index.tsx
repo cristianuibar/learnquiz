@@ -3,18 +3,21 @@ import { Button } from '@/components/ui/button'
 import { authClient } from '@/lib/auth-client'
 import { PushSettings } from '@/components/push-settings'
 import { getPushSettings } from '@/server/push'
+import { getToday } from '@/server/today'
 
 export const Route = createFileRoute('/me/')({
   beforeLoad: ({ context }) => {
     if (!context.user) throw redirect({ to: '/' })
   },
-  loader: ({ context }) => context.user && !context.user.isAnonymous ? getPushSettings() : null,
+  loader: async ({ context }) => context.user?.isAnonymous
+    ? { push: null, today: await getToday() }
+    : { push: context.user ? await getPushSettings() : null, today: null },
   component: Me,
 })
 
 function Me() {
   const { user, adminCompanies } = Route.useRouteContext()
-  const push = Route.useLoaderData()
+  const { push, today } = Route.useLoaderData()
   const router = useRouter()
 
   async function signOut() {
@@ -27,6 +30,19 @@ function Me() {
   return (
     <main className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pt-8 pb-8">
       <h1 className="text-3xl font-bold tracking-tight">{user.isAnonymous ? 'Guest' : user.name}</h1>
+      {user.isAnonymous && (
+        <section aria-label="Your progress" className="flex flex-col gap-4">
+          {today?.topic && (
+            <div className="flex flex-col gap-1">
+              <p className="text-lg font-medium">{today.topic.title}</p>
+              <p className="text-sm text-muted-foreground">Streak {today.topic.streak} · {today.topic.xp} XP</p>
+            </div>
+          )}
+          <Button asChild className="h-12 px-6 sm:self-start">
+            <Link to="/sign-in" search={{ mode: 'up', redirect: '/me' }}>Save your progress</Link>
+          </Button>
+        </section>
+      )}
       <Link to="/me/profile" className="flex min-h-12 items-center rounded-lg border p-4 font-medium text-primary focus-visible:outline-2">
         Training progress
       </Link>
