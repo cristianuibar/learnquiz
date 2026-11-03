@@ -1,4 +1,4 @@
-import { HeadContent, Link, Outlet, Scripts, createRootRoute } from '@tanstack/react-router'
+import { HeadContent, Link, Outlet, Scripts, createRootRoute, useMatch } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import styles from '../styles.css?url'
 
@@ -15,7 +15,15 @@ export const Route = createRootRoute({
       { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
     ],
   }),
-  component: () => (
+  component: RootLayout,
+  shellComponent: RootDocument,
+})
+
+function RootLayout() {
+  const isHome = useMatch({ from: '/', shouldThrow: false })
+  if (isHome) return <Outlet />
+
+  return (
     <>
       <main className="mx-auto max-w-2xl px-4 py-12">
         <Outlet />
@@ -28,9 +36,8 @@ export const Route = createRootRoute({
         </nav>
       </footer>
     </>
-  ),
-  shellComponent: RootDocument,
-})
+  )
+}
 
 function RootDocument({ children }: { children: ReactNode }) {
   return (
