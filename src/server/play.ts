@@ -1,8 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, count, eq, gte, inArray, isNull, lte, ne, sql } from 'drizzle-orm'
+import { and, asc, count, eq, getTableColumns, gte, inArray, isNull, lte, ne, sql, type SQL } from 'drizzle-orm'
+import type { SQLiteTable } from 'drizzle-orm/sqlite-core'
 import { z } from 'zod'
 import { getDb, type Db } from '@/db'
-import { attempts, concepts, items, learnerConcept, learnerItem, learnerTopic, learnerUnit, placements, sessions, topics, units } from '@/db/schema'
+import { attempts, concepts, items, learnerConcept, learnerItem, learnerTopic, learnerUnit, placements, pushLog, sessions, topics, units } from '@/db/schema'
 import { BKT, guessFor, MASTERY, placementPrior, update } from '@/lib/learning/bkt'
 import { ratingFor, retrievability, review } from '@/lib/learning/fsrs'
 import { gradeAnswer, revealState, toItemView } from '@/lib/learning/grade'
@@ -28,7 +29,8 @@ type TopicRow = typeof topics.$inferSelect
 type Stmt = Parameters<Db['batch']>[0][number]
 
 // planJson. position indexes itemIdsJson; answered gates answerItem (once per slot) and nextItem (only after an answer).
-type Plan = { position: number; answered: boolean; lastAttemptId?: string }
+// answerClaim marks a slot being graded (see answerItem).
+type Plan = { position: number; answered: boolean; lastAttemptId?: string; answerClaim?: { token: string; at: number } }
 type PlacementPlan = Plan & {
   workingLevel: number
   log: { itemId: string; correct: boolean; confidence: Confidence; level: number }[]
@@ -45,6 +47,17 @@ type QueuePlan = Plan & {
 
 const readPlan = (s: SessionRow) => JSON.parse(s.planJson ?? '{}') as PlacementPlan | QueuePlan
 const batch = (db: Db, stmts: Stmt[]) => db.batch(stmts as [Stmt, ...Stmt[]])
+// The longest grading call (the model client's 120 s timeout) plus slack.
+const CLAIM_TTL = 150_000
+
+// INSERT ... SELECT of one row that is written only while `when` holds. Every column must be set.
+function insertIf<T extends SQLiteTable>(db: Db, table: T, when: SQL, row: T['$inferInsert']) {
+  const values = Object.entries(getTableColumns(table)).map(([key, col]) => {
+    const value = (row as Record<string, unknown>)[key] ?? null
+    return sql`${value === null ? null : col.mapToDriverValue(value)}`
+  })
+  return db.insert(table).select(sql`select ${sql.join(values, sql`, `)} where ${when}`)
+}
 
 async function ownedTopic(db: Db, learnerId: string, topicId: string) {
   const [topic] = await db
@@ -317,6 +330,39 @@ export const startSession = createServerFn({ method: 'POST' })
     return { sessionId }
   })
 
+export const startMiniSession = createServerFn({ method: 'POST' })
+  .validator(z.object({ itemId: z.string().min(1), pushId: z.string().min(1).optional() }))
+  .handler(async ({ data }): Promise<{ sessionId: string }> => {
+    const learnerId = await requireLearnerId()
+    const db = getDb()
+    const [item] = await db.select().from(items).where(and(eq(items.id, data.itemId), eq(items.status, 'active')))
+    if (!item) throw httpError('Question not found', 404)
+    const topic = await ownedTopic(db, learnerId, item.topicId)
+    await loadLearnerTopic(db, learnerId, topic.id)
+    let sessionId: string = crypto.randomUUID()
+    if (data.pushId) {
+      const [log] = await db.select().from(pushLog).where(and(eq(pushLog.id, data.pushId), eq(pushLog.userId, learnerId),
+        eq(pushLog.itemId, item.id), eq(pushLog.outcome, 'accepted')))
+      if (!log) throw httpError('Notification not found', 404)
+      // A notification always resumes the same session, including across reloads and racing opens.
+      sessionId = log.id
+    }
+    const plan: QueuePlan = {
+      queue: [item.id], position: 0, answered: false, reinserted: [], reasons: { due: 1, frontier: 0, closers: 0 },
+      unitStart: Object.fromEntries((await unitMastery(db, learnerId, topic.id)).map((u) => [u.unitId, u.mastery])),
+    }
+    const now = Date.now()
+    const insert = db.insert(sessions).values({ id: sessionId, learnerId, topicId: topic.id, kind: 'mini',
+      itemIdsJson: JSON.stringify([item.id]), planJson: JSON.stringify(plan), startedAt: now }).onConflictDoNothing()
+    if (data.pushId) {
+      await db.batch([insert, db.update(pushLog).set({ openedAt: sql`coalesce(${pushLog.openedAt}, ${now})`, sessionId })
+        .where(and(eq(pushLog.id, data.pushId), eq(pushLog.userId, learnerId)))])
+    } else {
+      await insert
+    }
+    return { sessionId }
+  })
+
 export const getSession = createServerFn({ method: 'GET' })
   .validator(z.object({ sessionId: z.string().min(1) }))
   .handler(async ({ data }): Promise<SessionView> => {
@@ -373,11 +419,40 @@ export const answerItem = createServerFn({ method: 'POST' })
     const plan = readPlan(session)
     const ids = JSON.parse(session.itemIdsJson) as string[]
     if (ids[plan.position] !== data.itemId) throw httpError('That is not the current question', 409)
-    if (plan.answered) throw httpError('Already answered. Continue to the next question.', 409)
-    // shortcut: no row lock, two concurrent answers to one slot would both count; add a version check if the UI double-fires.
+    const alreadyAnswered = () => httpError('Already answered. Continue to the next question.', 409)
+    if (plan.answered) throw alreadyAnswered()
 
     const { item, concept, payload } = await loadItem(db, session.topicId, data.itemId, true)
     if (item.status === 'retired') throw httpError('This question has been retired', 409)
+
+    // Claim the slot before grading, so concurrent submits (double tap, retry, two tabs) score once.
+    // A claim older than the grading timeout is abandoned and may be taken over.
+    const claimToken = crypto.randomUUID()
+    const [claim] = await db
+      .update(sessions)
+      .set({ planJson: sql`json_set(plan_json, '$.answerClaim', json_object('token', ${claimToken}, 'at', ${Date.now()}))` })
+      .where(and(
+        eq(sessions.id, session.id),
+        isNull(sessions.endedAt),
+        eq(sessions.itemIdsJson, session.itemIdsJson),
+        sql`json_extract(plan_json, '$.position') = ${plan.position}`,
+        sql`not coalesce(json_extract(plan_json, '$.answered'), 0)`,
+        sql`coalesce(json_extract(plan_json, '$.answerClaim.at'), 0) < ${Date.now() - CLAIM_TTL}`,
+      ))
+      .returning({ id: sessions.id })
+    if (!claim) throw alreadyAnswered()
+    // The plan was read under any abandoned claim; the writes below replace it, which also releases ours.
+    plan.answerClaim = undefined
+    // Writes after grading land only while this claim still holds the unanswered, unended slot.
+    const claimHeld = and(
+      eq(sessions.id, session.id),
+      isNull(sessions.endedAt),
+      sql`json_extract(plan_json, '$.answerClaim.token') = ${claimToken}`,
+    )
+    const dropped = async () => {
+      const { session: current } = await loadSession(db, learnerId, session.id)
+      return current.endedAt === null ? alreadyAnswered() : httpError('This session has ended', 409)
+    }
     const [[lc], [li]] = await Promise.all([
       db.select().from(learnerConcept).where(and(eq(learnerConcept.learnerId, learnerId), eq(learnerConcept.conceptId, concept.id))),
       db.select().from(learnerItem).where(and(eq(learnerItem.learnerId, learnerId), eq(learnerItem.itemId, item.id))),
@@ -403,7 +478,12 @@ export const answerItem = createServerFn({ method: 'POST' })
       } catch (e) {
         console.error('short answer grading failed, revealing model answer', e instanceof Error ? e.message : e)
         // Advance without recording a wrong answer or changing mastery, scheduling or XP.
-        await db.update(sessions).set({ planJson: JSON.stringify({ ...plan, answered: true, lastAttemptId: undefined }) }).where(eq(sessions.id, session.id))
+        const [kept] = await db
+          .update(sessions)
+          .set({ planJson: JSON.stringify({ ...plan, answered: true, lastAttemptId: undefined }) })
+          .where(claimHeld)
+          .returning({ id: sessions.id })
+        if (!kept) throw await dropped()
         return {
           attemptId: null, diagramConceptId: concept.visual ? concept.id : null, state: 'ungraded', correct: false, score: null,
           feedback: 'Compare your answer with the model answer. Your learning progress has not changed.',
@@ -432,15 +512,27 @@ export const answerItem = createServerFn({ method: 'POST' })
     } else {
       // The closers stay last, so a missed closer is not re-asked.
       const body = ids.length - plan.reasons.closers
-      returnsThisSession = (state === 'C' || state === 'D') && !plan.reinserted.includes(item.id) && plan.position < body
+      returnsThisSession = session.kind !== 'mini' && (state === 'C' || state === 'D') && !plan.reinserted.includes(item.id) && plan.position < body
       if (returnsThisSession) itemIds = [...reinsert(ids.slice(0, body), item.id, plan.position), ...ids.slice(body)]
       nextPlan = { ...plan, reinserted: returnsThisSession ? [...plan.reinserted, item.id] : plan.reinserted }
     }
     nextPlan.answered = true
     nextPlan.lastAttemptId = attemptId
 
+    // The session write goes first; the rest follow only if it landed (its plan now names this attempt).
+    const recorded = sql`exists (select 1 from sessions where id = ${session.id} and json_extract(plan_json, '$.lastAttemptId') = ${attemptId})`
     const stmts: Stmt[] = [
-      db.insert(attempts).values({
+      db
+        .update(sessions)
+        .set({
+          itemIdsJson: JSON.stringify(itemIds),
+          planJson: JSON.stringify(nextPlan),
+          correctCount: sql`${sessions.correctCount} + ${correct ? 1 : 0}`,
+          xp: sql`${sessions.xp} + ${xp}`,
+        })
+        .where(claimHeld)
+        .returning({ id: sessions.id }),
+      insertIf(db, attempts, recorded, {
         id: attemptId,
         learnerId,
         sessionId: session.id,
@@ -458,26 +550,13 @@ export const answerItem = createServerFn({ method: 'POST' })
         pKnownAfter,
         retrievabilityBefore,
       }),
-      db
-        .insert(learnerItem)
-        .values({ learnerId, itemId: item.id, ...next, lastWrongConfidentAt })
+      insertIf(db, learnerItem, recorded, { learnerId, itemId: item.id, ...next, lastWrongConfidentAt })
         .onConflictDoUpdate({ target: [learnerItem.learnerId, learnerItem.itemId], set: { ...next, lastWrongConfidentAt } }),
-      db
-        .insert(learnerConcept)
-        .values({ learnerId, conceptId: concept.id, pKnown: pKnownAfter, nAttempts: 1, masteredAt, updatedAt: now })
+      insertIf(db, learnerConcept, recorded, { learnerId, conceptId: concept.id, pKnown: pKnownAfter, nAttempts: 1, masteredAt, updatedAt: now })
         .onConflictDoUpdate({
           target: [learnerConcept.learnerId, learnerConcept.conceptId],
           set: { pKnown: pKnownAfter, nAttempts: sql`${learnerConcept.nAttempts} + 1`, masteredAt, updatedAt: now },
         }),
-      db
-        .update(sessions)
-        .set({
-          itemIdsJson: JSON.stringify(itemIds),
-          planJson: JSON.stringify(nextPlan),
-          correctCount: sql`${sessions.correctCount} + ${correct ? 1 : 0}`,
-          xp: sql`${sessions.xp} + ${xp}`,
-        })
-        .where(eq(sessions.id, session.id)),
     ]
     // Topic XP moves per answer, so a session abandoned without endSession loses nothing.
     if (xp) {
@@ -485,10 +564,11 @@ export const answerItem = createServerFn({ method: 'POST' })
         db
           .update(learnerTopic)
           .set({ xp: sql`${learnerTopic.xp} + ${xp}` })
-          .where(and(eq(learnerTopic.learnerId, learnerId), eq(learnerTopic.topicId, session.topicId))),
+          .where(and(eq(learnerTopic.learnerId, learnerId), eq(learnerTopic.topicId, session.topicId), recorded)),
       )
     }
-    await batch(db, stmts)
+    const [kept] = (await batch(db, stmts)) as unknown as [unknown[]]
+    if (!kept.length) throw await dropped()
 
     // State D only, read from the concept; no model call. chosenFeedback is shown on its own, so it is not repeated here.
     const mixUps = state === 'D' ? (JSON.parse(concept.misconceptionsJson) as string[]) : []

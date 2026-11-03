@@ -1,7 +1,8 @@
 import { DatabaseSync } from 'node:sqlite'
 import { readFileSync, readdirSync } from 'node:fs'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
+import type { z } from 'zod'
 import { chatJson, LlmError } from '@/lib/llm/client'
 import { requireLearnerId } from '@/server/session'
 
@@ -12,15 +13,16 @@ const holder = vi.hoisted(() => ({ db: null as unknown }))
 
 vi.mock('@tanstack/react-start', () => ({
   createServerFn: () => ({
-    validator: () => ({
-      handler: (fn: unknown) => fn,
+    handler: (fn: unknown) => fn,
+    validator: (schema: z.ZodType | ((data: unknown) => unknown)) => ({
+      handler: (fn: (input: { data: unknown }) => unknown) => ({ data }: { data: unknown }) => fn({ data: typeof schema === 'function' ? schema(data) : schema.parse(data) }),
     }),
   }),
 }))
 
 vi.mock('@/db', () => ({ getDb: () => holder.db }))
 
-vi.mock('@/server/session', () => ({ requireLearnerId: vi.fn(async () => 'u1') }))
+vi.mock('@/server/session', () => ({ requireLearnerId: vi.fn(async () => 'u1'), getSessionUser: async () => ({ id: 'u1', isAnonymous: false }) }))
 
 vi.mock('@/lib/llm/client', async (importOriginal) => {
   const client = await importOriginal<typeof import('@/lib/llm/client')>()
@@ -34,10 +36,11 @@ vi.mock('@/lib/llm/client', async (importOriginal) => {
 
 vi.mock('cloudflare:workers', () => ({ env: { LLM_PROFILE: 'ollama', LLM_MODEL: 'muse-spark-1.3', LLM_BASE_URL: 'https://llm.example/v1' } }))
 
-import { answerItem, endSession, getSession, nextItem, startPlacement, startSession } from './play'
+import { answerItem, endSession, getSession, nextItem, startMiniSession, startPlacement, startSession } from './play'
 import { getEnv } from '@/server/env'
 import { getConceptItems, getTopicPath } from './curriculum'
 import { getModelTrace } from './model-trace'
+import { getPushSettings } from './push'
 
 type Method = 'run' | 'all' | 'values' | 'get'
 
@@ -86,7 +89,7 @@ function makeDb() {
 let raw: DatabaseSync
 beforeAll(() => { raw = makeDb() })
 beforeEach(() => { raw.exec('BEGIN') })
-afterEach(() => { raw.exec('ROLLBACK') })
+afterEach(() => { raw.exec('ROLLBACK'); vi.restoreAllMocks() })
 afterAll(() => { raw.close() })
 
 function seedTopicAndLearner(raw: DatabaseSync, xp: number) {
@@ -231,6 +234,54 @@ describe('Wonder session planning', () => {
   })
 })
 
+it('opens a notification once, records its open, and finishes after one wrong answer', async () => {
+  const now = 1793620800000
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
+  seedTopicAndLearner(raw, 0)
+  raw.prepare('INSERT INTO user (id, name, email) VALUES (?, ?, ?)').run('u1', 'Learner', 'learner@example.test')
+  seedFrontier(raw, 1, true)
+  raw.prepare('INSERT INTO push_log (id, user_id, subscription_id, item_id, outcome, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .run('push-1', 'u1', 'device-1', 'i1', 'accepted', 1)
+  expect((await getPushSettings()).canPrompt).toBe(false)
+  const { sessionId } = await startMiniSession({ data: { itemId: 'i1', pushId: 'push-1' } })
+  const openedAt = scalar(raw, 'SELECT opened_at FROM push_log WHERE id = ?', 'push-1').opened_at
+  expect(openedAt).toBe(now)
+  clock.mockReturnValue(now + 1000)
+  expect(await startMiniSession({ data: { itemId: 'i1', pushId: 'push-1' } })).toEqual({ sessionId })
+  expect(scalar(raw, 'SELECT opened_at, session_id FROM push_log WHERE id = ?', 'push-1')).toEqual({ opened_at: openedAt, session_id: sessionId })
+  expect(scalar(raw, 'SELECT COUNT(*) AS n FROM sessions').n).toBe(1)
+  expect(await getSession({ data: { sessionId } })).toMatchObject({ kind: 'mini', item: { id: 'i1' }, progress: { position: 1, total: 1 } })
+  const reveal = await answerItem({ data: { sessionId, itemId: 'i1', answer: { text: '2' }, confidence: 'sure', responseMs: 1000 } })
+  expect(reveal).toMatchObject({ correct: false, returnsThisSession: false })
+  expect(await nextItem({ data: { sessionId } })).toMatchObject({ ended: true, item: null, progress: { total: 1 } })
+  expect(await endSession({ data: { sessionId } })).toMatchObject({ kind: 'mini', total: 1, correct: 0 })
+  expect(scalar(raw, 'SELECT COUNT(*) AS n FROM attempts WHERE session_id = ?', sessionId).n).toBe(1)
+  expect((await getPushSettings()).canPrompt).toBe(true)
+  const second = await startMiniSession({ data: { itemId: 'i1' } })
+  await answerItem({ data: { sessionId: second.sessionId, itemId: 'i1', answer: { text: '1' }, confidence: 'sure', responseMs: 1000 } })
+  await nextItem({ data: { sessionId: second.sessionId } })
+  expect((await getPushSettings()).canPrompt).toBe(false)
+})
+
+it('refuses another learner’s question or notification and inactive questions without recording an open', async () => {
+  seedTopicAndLearner(raw, 0)
+  for (const id of ['u1', 'u2']) raw.prepare('INSERT INTO user (id, name, email) VALUES (?, ?, ?)').run(id, id, `${id}@example.test`)
+  seedFrontier(raw, 1, true)
+  const log = raw.prepare('INSERT INTO push_log (id, user_id, subscription_id, item_id, outcome, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+  log.run('other-user', 'u2', 'device-1', 'i1', 'accepted', 1)
+  log.run('other-item', 'u1', 'device-1', 'i2', 'accepted', 1)
+  log.run('failed-push', 'u1', 'device-1', 'i1', 'failed', 1)
+  for (const pushId of ['other-user', 'other-item', 'failed-push', 'missing']) {
+    await expect(startMiniSession({ data: { itemId: 'i1', pushId } })).rejects.toMatchObject({ status: 404 })
+  }
+  vi.mocked(requireLearnerId).mockResolvedValueOnce('u2')
+  await expect(startMiniSession({ data: { itemId: 'i1' } })).rejects.toMatchObject({ status: 404 })
+  raw.prepare('UPDATE items SET status = ? WHERE id = ?').run('reported', 'i1')
+  await expect(startMiniSession({ data: { itemId: 'i1' } })).rejects.toMatchObject({ status: 404 })
+  expect(scalar(raw, 'SELECT COUNT(*) AS n FROM sessions').n).toBe(0)
+  expect(scalar(raw, 'SELECT COUNT(*) AS n FROM push_log WHERE opened_at IS NOT NULL').n).toBe(0)
+})
+
 it.each(['session', 'placement'])('skips retired questions in a queued %s, including reloads', async (kind) => {
   seedTopicAndLearner(raw, 0)
   seedFrontier(raw, 3, false)
@@ -254,6 +305,9 @@ it.each(['session', 'placement'])('skips retired questions in a queued %s, inclu
 })
 
 it.each(['session', 'placement'])('excludes retired questions from a new %s', async (kind) => {
+  // Items are ordered by creation time; a frozen clock keeps their seeded order.
+  vi.useFakeTimers({ toFake: ['Date'] })
+  onTestFinished(() => { vi.useRealTimers() })
   seedTopicAndLearner(raw, 0)
   seedFrontier(raw, 7, true)
   raw.prepare("UPDATE items SET status = 'retired' WHERE id = 'i1'").run()

@@ -18,7 +18,7 @@ vi.mock('@tanstack/react-start', () => ({ createServerFn: () => ({
   }),
 }) }))
 
-import { answerItem, getSession, nextItem, startSession } from './play'
+import { answerItem, endSession, getSession, nextItem, startSession } from './play'
 
 let raw: DatabaseSync
 const fetchModel = vi.fn()
@@ -139,6 +139,70 @@ it.each([
   expect(fetchModel).not.toHaveBeenCalled()
   expect(row('SELECT COUNT(*) AS n FROM model_calls').n).toBe(0)
   expect(row('SELECT COUNT(*) AS n FROM attempts').n).toBe(0)
+})
+
+const graded = () => completion({ score: 1, feedback: 'Correct.', missing_points: [] })
+// Holds the grading response until the test releases it.
+function heldGrade() {
+  let release!: (response: Response | Error) => void
+  fetchModel.mockImplementationOnce(() => new Promise<Response>((resolve, reject) => {
+    release = (r) => (r instanceof Error ? reject(r) : resolve(r))
+  }))
+  return (r: Response | Error) => release(r)
+}
+
+it('scores concurrent submits of one question once', async () => {
+  const release = heldGrade()
+  const first = answerItem(request)
+  await vi.waitFor(() => expect(fetchModel).toHaveBeenCalledTimes(1))
+  const others = await Promise.allSettled([answerItem(request), answerItem(request)])
+  release(graded())
+
+  expect(await first).toMatchObject({ correct: true, score: 1 })
+  expect(others).toMatchObject([{ status: 'rejected', reason: { status: 409 } }, { status: 'rejected', reason: { status: 409 } }])
+  expect(fetchModel).toHaveBeenCalledTimes(1)
+  expect(row('SELECT COUNT(*) AS n FROM attempts').n).toBe(1)
+  expect(row('SELECT correct_count, xp FROM sessions')).toEqual({ correct_count: 1, xp: 10 })
+  expect(row('SELECT xp FROM learner_topic').xp).toBe(10)
+  expect(row('SELECT reps FROM learner_item WHERE item_id = \'i1\'').reps).toBe(1)
+  expect(row('SELECT n_attempts FROM learner_concept').n_attempts).toBe(3)
+})
+
+it('drops a grade that returns after the session ended', async () => {
+  const release = heldGrade()
+  const answer = answerItem(request)
+  await vi.waitFor(() => expect(fetchModel).toHaveBeenCalledTimes(1))
+  await endSession({ data: { sessionId: 's1' } })
+  const ended = row('SELECT ended_at, plan_json, xp, correct_count FROM sessions')
+  release(graded())
+
+  await expect(answer).rejects.toMatchObject({ status: 409, message: 'This session has ended' })
+  expect(row('SELECT ended_at, plan_json, xp, correct_count FROM sessions')).toEqual(ended)
+  expect(row('SELECT COUNT(*) AS n FROM attempts').n).toBe(0)
+  expect(row('SELECT COUNT(*) AS n FROM learner_item').n).toBe(0)
+  expect(row('SELECT n_attempts FROM learner_concept').n_attempts).toBe(2)
+  expect(row('SELECT xp FROM learner_topic').xp).toBe(0)
+})
+
+it.each([
+  { name: 'success', late: graded },
+  { name: 'failure', late: () => new TypeError('Failed to fetch') },
+])('keeps an advanced session when an abandoned grading $name arrives late', async ({ late }) => {
+  const release = heldGrade()
+  const stale = answerItem(request)
+  await vi.waitFor(() => expect(fetchModel).toHaveBeenCalledTimes(1))
+  // Past the grading timeout the first claim is abandoned, so a retry takes the slot and advances.
+  vi.setSystemTime(Date.now() + 200_000)
+  fetchModel.mockResolvedValueOnce(graded())
+  expect(await answerItem(request)).toMatchObject({ correct: true })
+  expect((await nextItem({ data: { sessionId: 's1' } })).item?.id).toBe('i2')
+  release(late())
+
+  await expect(stale).rejects.toMatchObject({ status: 409 })
+  expect(JSON.parse(row('SELECT plan_json FROM sessions').plan_json as string)).toMatchObject({ position: 1, answered: false })
+  expect(row('SELECT COUNT(*) AS n FROM attempts').n).toBe(1)
+  expect(row('SELECT correct_count, xp FROM sessions')).toEqual({ correct_count: 1, xp: 10 })
+  expect(row('SELECT reps FROM learner_item WHERE item_id = \'i1\'').reps).toBe(1)
 })
 
 it.each([1, 12])('moves past an ungraded placement question and respects the question limit (presented=%s)', async (presented) => {

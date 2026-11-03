@@ -12,7 +12,8 @@
 		"preview": "pnpm run build && vite preview",
 		"deploy": "pnpm run build && wrangler deploy",
 		"cf-typegen": "wrangler types",
-		"test": "vitest run"
+		"test": "vitest run",
+		"seed:northwind": "node seed/run-northwind.mjs"
 	},
 	"dependencies": {
 		"@better-auth/drizzle-adapter": "1.7.14",

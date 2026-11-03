@@ -64,7 +64,7 @@ function Root() {
   const { user } = Route.useRouteContext()
   const { latestTopicId, branding } = Route.useLoaderData()
   const { pathname } = useLocation()
-  const focus = /^\/play\/[^/]+\/?$/.test(pathname) // an active session has no chrome
+  const focus = /^\/play\/(?:quick\/)?[^/]+\/?$/.test(pathname) // an active session has no chrome
   const nav = user && !focus && !/^\/(org|admin|welcome|join|sign-in)(\/|$)/.test(pathname)
 
   useEffect(() => {

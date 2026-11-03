@@ -5,15 +5,16 @@ import { createMemoryHistory, createRootRoute, createRoute, createRouter, Router
 import { afterEach, expect, it, vi } from 'vitest'
 import { Route as appRootRoute } from '@/routes/__root'
 import { Route as meRoute } from '@/routes/me.index'
-import { getPushSettings, sendTestPush, subscribe, unsubscribe } from '@/server/push'
+import { getPushSettings, savePushPreferences, sendTestPush, subscribe, unsubscribe } from '@/server/push'
 import { getSessionFn } from '@/server/session-fn'
 
 // The component's external boundaries are browser push APIs and server functions.
-vi.mock('@/server/push', () => ({ getPushSettings: vi.fn(), subscribe: vi.fn(), unsubscribe: vi.fn(), sendTestPush: vi.fn() }))
+vi.mock('@/server/push', () => ({ getPushSettings: vi.fn(), subscribe: vi.fn(), unsubscribe: vi.fn(), sendTestPush: vi.fn(), savePushPreferences: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => null }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
+const prefs = { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' }
 afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
@@ -33,7 +34,7 @@ it('keeps staff navigation while enabling, testing and disabling notifications f
   vi.stubGlobal('Notification', { requestPermission })
   Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: { register: vi.fn(async () => registration), ready: Promise.resolve(registration) } })
   const publicKey = btoa('public-key').replace(/=+$/, '')
-  vi.mocked(getPushSettings).mockResolvedValue({ publicKey, isStaff: true, endpoints: [] })
+  vi.mocked(getPushSettings).mockResolvedValue({ publicKey, isStaff: true, endpoints: [], prefs, canPrompt: false })
   vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'staff', name: 'Staff', role: 'admin', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [{ name: 'Acme', slug: 'acme' }] })
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader })
   const me = createRoute({ getParentRoute: () => rootRoute, path: '/me/', beforeLoad: meRoute.options.beforeLoad, loader: meRoute.options.loader, component: meRoute.options.component })
@@ -49,6 +50,7 @@ it('keeps staff navigation while enabling, testing and disabling notifications f
     expect(container.querySelector('a[href="/org/acme"]')?.textContent).toBe('Acme portal')
     expect(container.querySelector('a[href="/me/profile"]')?.textContent).toBe('Training progress')
     expect(container.querySelector('h2')?.textContent).toBe('Notifications')
+    expect(container.querySelectorAll('[aria-labelledby="push-heading"]')).toHaveLength(1)
     expect(requestPermission).not.toHaveBeenCalled()
     expect(button('Send test push').disabled).toBe(true)
 
@@ -61,11 +63,31 @@ it('keeps staff navigation while enabling, testing and disabling notifications f
     expect(sendTestPush).toHaveBeenCalledExactlyOnceWith({ data: { endpoint } })
     expect(container.querySelector('[role="status"]')?.textContent).toContain('Test push accepted.')
 
+    vi.mocked(unsubscribe).mockRejectedValueOnce(new Error('Could not disable. Try again.'))
     await act(async () => button('Disable notifications').click())
-    expect(unsubscribe).toHaveBeenCalledExactlyOnceWith({ data: { endpoint } })
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe('Could not disable. Try again.')
+    expect(current.unsubscribe).not.toHaveBeenCalled()
+    expect(button('Send test push').disabled).toBe(false)
+
+    await act(async () => button('Disable notifications').click())
+    expect(unsubscribe).toHaveBeenNthCalledWith(2, { data: { endpoint } })
     expect(current.unsubscribe).toHaveBeenCalledOnce()
     expect(button('Send test push').disabled).toBe(true)
     expect(container.querySelector('[role="status"]')?.textContent).toBe('Notifications disabled on this browser.')
+    await act(async () => button('Pause pushes').click())
+    expect(savePushPreferences).toHaveBeenLastCalledWith({ data: { ...prefs, paused: true } })
+    expect(button('Resume pushes').disabled).toBe(false)
+    await act(async () => {
+      const input = container.querySelector<HTMLInputElement>('#push-start')!
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '10:00')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => button('Save working hours').click())
+    expect(savePushPreferences).toHaveBeenLastCalledWith({ data: { ...prefs, paused: true, startMinute: 600 } })
+    vi.mocked(savePushPreferences).mockRejectedValueOnce(new Error('Could not save. Try again.'))
+    await act(async () => button('Resume pushes').click())
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe('Could not save. Try again.')
+    expect(button('Resume pushes').disabled).toBe(false)
   } finally {
     await act(async () => root.unmount())
     container.remove()

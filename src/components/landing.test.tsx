@@ -94,7 +94,7 @@ async function renderApp(initialEntry = '/sign-in') {
     createRoute({ getParentRoute: () => rootRoute, path: '/sign-in', beforeLoad: signInRoute.options.beforeLoad, validateSearch: signInRoute.options.validateSearch, component: signInRoute.options.component }),
     createRoute({ getParentRoute: () => rootRoute, path: '/start', validateSearch: startRoute.options.validateSearch, component: startRoute.options.component }),
     createRoute({ getParentRoute: () => rootRoute, path: '/me', beforeLoad: meRoute.options.beforeLoad, loader: meRoute.options.loader, component: meRoute.options.component }),
-    createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', loader: orgRoute.options.loader, errorComponent: orgRoute.options.errorComponent, component: orgRoute.options.component }),
+    createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', loader: orgRoute.options.loader as (ctx: { params: { slug: string } }) => unknown, errorComponent: orgRoute.options.errorComponent, component: orgRoute.options.component }),
     createRoute({ getParentRoute: () => rootRoute, path: '/welcome', beforeLoad: welcomeRoute.options.beforeLoad, validateSearch: welcomeRoute.options.validateSearch, component: welcomeRoute.options.component }),
   ]
   const router = createRouter({ routeTree: rootRoute.addChildren(routes), history: createMemoryHistory({ initialEntries: [initialEntry] }) })
@@ -150,8 +150,9 @@ it('lets an owner leave the portal to train, return through Profile and sign out
     expect(container.querySelector('h1')?.textContent).toBe('Contoso')
     await act(async () => { container.querySelector<HTMLAnchorElement>('header a')!.click(); await router.load() })
     await act(async () => { container.querySelector<HTMLAnchorElement>('a[href="/me"]')!.click(); await router.load() })
+    const signOut = [...container.querySelectorAll<HTMLButtonElement>('main button')].find((button) => button.textContent === 'Sign out')!
     await act(async () => {
-      container.querySelector<HTMLButtonElement>('main button')!.click()
+      signOut.click()
       await vi.waitFor(() => expect(router.state.location.pathname).toBe('/'))
     })
     expect(container.querySelector('h1')?.textContent).toBe('Quiz it, until you learn it')

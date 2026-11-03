@@ -1,6 +1,6 @@
 // Learn Quiz service worker: app shell and offline page only. Answering needs the network,
 // so /api/* and server-function requests are never intercepted or cached.
-const CACHE = 'lq-shell-v1'
+const CACHE = 'lq-shell-v2'
 const SHELL = ['/offline.html', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png']
 
 self.addEventListener('install', (event) => {
