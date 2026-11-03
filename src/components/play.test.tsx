@@ -116,7 +116,10 @@ it.each([
       container.querySelector<HTMLInputElement>(`input[value="${repeats ? 'unsure' : 'sure'}"]`)!.click()
     })
     await act(async () => { button(container, 'Check').click() })
-    if (repeats) expect(container.querySelector('[role="status"]')!.textContent).toContain('No source: written by gpt-test from general knowledge')
+    if (repeats) {
+      expect(container.querySelector('[role="status"]')!.textContent).toContain('No source: written by gpt-test from general knowledge')
+      expect(container.querySelector('label[for="why"]')!.textContent).toBe('In one line, why? (optional)')
+    }
     await act(async () => {
       const next = button(container, 'Continue')
       next.focus()
