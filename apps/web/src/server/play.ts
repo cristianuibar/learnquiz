@@ -536,7 +536,12 @@ export const answerItem = createServerFn({ method: 'POST' })
     z.object({
       sessionId: z.string().min(1),
       itemId: z.string().min(1),
-      answer: z.object({ optionId: z.string().max(8).optional(), text: z.string().max(1000).optional() }),
+      answer: z.object({
+        optionId: z.string().max(8).optional(),
+        optionIds: z.array(z.string().max(8)).max(5).optional(),
+        order: z.array(z.string().max(8)).max(5).optional(),
+        text: z.string().max(1000).optional(),
+      }),
       confidence: z.enum(['sure', 'unsure', 'guess']),
       responseMs: z.number().int().min(0),
     }),
