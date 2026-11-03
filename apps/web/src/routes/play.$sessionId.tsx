@@ -231,7 +231,7 @@ function Play({ initial }: { initial: SessionView }) {
             ) : (
               <Button
                 variant="link"
-                className="h-12 self-start px-0 text-muted-foreground"
+                className="self-start px-0 text-muted-foreground"
                 disabled={busy}
                 onClick={() =>
                   void run(async () => {
@@ -274,7 +274,6 @@ function Play({ initial }: { initial: SessionView }) {
                   </Label>
                   <Input
                     id="answer"
-                    className="h-12"
                     value={choice}
                     onChange={(e) => setChoice(e.target.value)}
                     maxLength={1000}
@@ -303,7 +302,7 @@ function Play({ initial }: { initial: SessionView }) {
             form="play"
             autoFocus={Boolean(reveal)}
             disabled={busy || voiceBusy || (!reveal && (!ready || loading))}
-            className="h-12 w-full px-6"
+            className="w-full px-6"
           >
             {reveal ? (reveal.state === 'D' ? 'Got it' : 'Continue') : 'Check'}
           </Button>

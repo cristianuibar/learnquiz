@@ -46,11 +46,11 @@ function Settings() {
         <input type="hidden" name="slug" value={settings.slug} />
         <div className="flex flex-col gap-2">
           <Label htmlFor="name">Company name</Label>
-          <Input id="name" name="name" className="h-11" defaultValue={settings.name} minLength={2} maxLength={80} required />
+          <Input id="name" name="name" defaultValue={settings.name} minLength={2} maxLength={80} required />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="timezone">Timezone</Label>
-          <Input id="timezone" name="timezone" className="h-11" defaultValue={settings.timezone} placeholder="Europe/London" maxLength={100} aria-describedby="timezone-help" required />
+          <Input id="timezone" name="timezone" defaultValue={settings.timezone} placeholder="Europe/London" maxLength={100} aria-describedby="timezone-help" required />
           <p id="timezone-help" className="text-sm text-muted-foreground">Use a timezone such as Europe/London, America/New_York or UTC.</p>
         </div>
         <fieldset className="flex flex-col gap-3">
@@ -66,29 +66,29 @@ function Settings() {
           <div className="flex flex-wrap gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="start">Start time</Label>
-              <Input id="start" name="start" type="time" className="h-11" defaultValue={settings.workingHours.start} required />
+              <Input id="start" name="start" type="time" defaultValue={settings.workingHours.start} required />
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="end">End time</Label>
-              <Input id="end" name="end" type="time" className="h-11" defaultValue={settings.workingHours.end} required />
+              <Input id="end" name="end" type="time" defaultValue={settings.workingHours.end} required />
             </div>
           </div>
           <p className="text-sm text-muted-foreground">Times use the company timezone. The end time must be later on the same day.</p>
         </fieldset>
         <div className="flex flex-col gap-2">
           <Label htmlFor="logo">Company logo</Label>
-          <Input id="logo" name="logo" type="file" accept="image/png,image/jpeg,image/webp" className="min-h-11" aria-describedby="logo-help" />
+          <Input id="logo" name="logo" type="file" accept="image/png,image/jpeg,image/webp" aria-describedby="logo-help" />
           <p id="logo-help" className="text-sm text-muted-foreground">PNG, JPEG or WebP, up to 2 MB. Leave empty to keep the current logo.</p>
           {settings.hasLogo && <label className="flex min-h-11 items-center gap-2"><input id="removeLogo" name="removeLogo" type="checkbox" className="size-4" />Remove current logo</label>}
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="accent">Accent color</Label>
-          <Input id="accent" name="accent" className="h-11" defaultValue={settings.accent ?? ''} placeholder="#0E5A73" pattern="#[0-9a-fA-F]{6}" maxLength={7} aria-describedby="accent-help" />
+          <Input id="accent" name="accent" defaultValue={settings.accent ?? ''} placeholder="#0E5A73" pattern="#[0-9a-fA-F]{6}" maxLength={7} aria-describedby="accent-help" />
           <p id="accent-help" className="text-sm text-muted-foreground">Use a hex color such as #0E5A73. Green and red are reserved for answer feedback, and the color needs 4.5:1 contrast. Leave empty for the default brand.</p>
         </div>
         {error && <p role="alert" className="text-sm font-medium text-wrong">{error}</p>}
         {saved && <p role="status" className="text-sm">Settings saved.</p>}
-        <Button type="submit" className="h-11 self-end px-6" disabled={busy}>{busy ? 'Saving…' : 'Save settings'}</Button>
+        <Button type="submit" className="self-end px-6" disabled={busy}>{busy ? 'Saving…' : 'Save settings'}</Button>
       </form>
     </main>
   )

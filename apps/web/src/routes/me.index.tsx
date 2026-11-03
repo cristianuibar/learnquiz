@@ -49,7 +49,7 @@ function Me() {
               <p className="text-sm text-muted-foreground">Streak {today.topic.streak} · {today.topic.xp} XP</p>
             </div>
           )}
-          <Button asChild className="h-12 px-6 sm:self-start">
+          <Button asChild className="px-6 sm:self-start">
             <Link to="/sign-in" search={{ mode: 'up', redirect: '/me' }}>Save your progress</Link>
           </Button>
         </section>
@@ -61,7 +61,7 @@ function Me() {
         <ul className="flex flex-col gap-3">
           {adminCompanies.map((company) => (
             <li key={company.slug}>
-              <Button asChild variant="outline" className="h-12 px-6">
+              <Button asChild variant="secondary" className="px-6">
                 <Link to="/org/$slug" params={{ slug: company.slug }}>{company.name} portal</Link>
               </Button>
             </li>
@@ -72,7 +72,7 @@ function Me() {
       {push && <PushSettings {...push} />}
       {!user.isAnonymous && (
         <>
-          <Button variant="outline" className="h-12 w-full px-6 sm:w-auto sm:self-start" onClick={signOut} disabled={busy}>
+          <Button variant="secondary" className="w-full px-6 sm:w-auto sm:self-start" onClick={signOut} disabled={busy}>
             Sign out
           </Button>
           {error && <p role="alert" className="text-sm font-medium text-wrong">{error}</p>}

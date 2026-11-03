@@ -100,7 +100,7 @@ export function PushSettings({ publicKey, isStaff, endpoints, prefs, prompt = fa
       <p className="text-sm text-muted-foreground">{prompt ? 'Keep learning with a one-question reminder during your working hours.' : 'Enable push notifications on this browser.'}</p>
       {addToHome ? <div><h3 className="font-semibold">Add to home screen</h3><p>In Safari, tap Share, then Add to Home Screen. Open Learn Quiz from your home screen to enable notifications.</p></div> : !supported ? <p>Push notifications are not supported in this browser.</p> : !publicKey ? <p>Push notifications are not configured yet.</p> : (
         <div className="flex flex-wrap gap-3">
-          <Button variant="outline" disabled={!ready || busy} onClick={() => void act(enabled ? 'disable' : 'enable')}>
+          <Button variant="secondary" disabled={!ready || busy} onClick={() => void act(enabled ? 'disable' : 'enable')}>
             {busy ? 'Working…' : enabled ? 'Disable notifications' : 'Enable notifications'}
           </Button>
           {isStaff && !prompt && <Button disabled={!ready || !enabled || busy} onClick={() => void act('test')}>Send test push</Button>}
@@ -108,7 +108,7 @@ export function PushSettings({ publicKey, isStaff, endpoints, prefs, prompt = fa
       )}
       {prompt ? <Button variant="ghost" className="self-start" onClick={() => setDismissed(true)}>Not now</Button> : (
         <>
-          <Button variant="outline" className="self-start" disabled={busy} onClick={() => void act('pause')}>
+          <Button variant="secondary" className="self-start" disabled={busy} onClick={() => void act('pause')}>
             {preferences.paused ? 'Resume pushes' : 'Pause pushes'}
           </Button>
           <form className="flex flex-col gap-3" onSubmit={(event) => { event.preventDefault(); void act('hours') }}>
@@ -120,7 +120,7 @@ export function PushSettings({ publicKey, isStaff, endpoints, prefs, prompt = fa
             </div>
             <Label htmlFor="push-timezone">Timezone</Label>
             <Input id="push-timezone" required value={timezone} maxLength={100} onChange={(event) => setTimezone(event.target.value)} placeholder="Europe/Bucharest" />
-            <Button variant="outline" className="self-start" disabled={busy} type="submit">Save working hours</Button>
+            <Button variant="secondary" className="self-start" disabled={busy} type="submit">Save working hours</Button>
           </form>
         </>
       )}

@@ -37,7 +37,7 @@ export function TrainingProgress({ profile, back }: { profile: Profile; back: Re
                 <li key={concept.id} className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2 text-sm">
                     <span className="font-medium">{concept.name}</span>
-                    {concept.critical && <Badge variant="outline">Critical</Badge>}
+                    {concept.critical && <Badge variant="neutral">Critical</Badge>}
                     <span className="ml-auto tabular-nums">{percent(concept.pKnown)}</span>
                   </div>
                   <MasteryBar value={concept.pKnown} label={`${concept.name} mastery; benchmark ${percent(benchmark)}`} />
