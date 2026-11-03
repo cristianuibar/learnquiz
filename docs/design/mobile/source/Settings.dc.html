@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="lq.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" data-brand="{{brand}}" style="width: {{w}}px; height: {{h}}px; font-family: var(--font-sans); color: var(--ink);">
+  <header class="topbar">
+    <a class="icon-btn" href="Profile.dc.html" aria-label="Back">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+    </a>
+    <h1 class="t-title2">Settings</h1>
+  </header>
+
+  <main class="scroll" style="padding: 8px 16px 32px; display: flex; flex-direction: column; gap: 32px;">
+
+    <section aria-labelledby="s-learning" style="display: flex; flex-direction: column; gap: 12px;">
+      <h2 id="s-learning" class="section-title">Learning questions</h2>
+
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <div class="row" style="padding: 4px 0;">
+          <span id="s-send" class="t-body-lg" style="flex: 1;">Send me questions</span>
+          <button class="switch" type="button" role="switch" aria-checked="{{pushOn}}" aria-labelledby="s-send" onClick="{{togglePush}}"></button>
+        </div>
+        <sc-if value="{{paused}}" hint-placeholder-val="{{ false }}">
+          <p class="t-caption muted" role="status">Paused. Turn back on any time.</p>
+        </sc-if>
+      </div>
+
+      <div role="group" aria-labelledby="s-hours" style="display: flex; flex-direction: column; gap: 8px;">
+        <span id="s-hours" class="field-label">Working hours</span>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="field">
+            <span id="s-from" class="t-caption muted">From</span>
+            <button class="input num" type="button" aria-labelledby="s-from s-from-val" onClick="{{nextStart}}" style="display: flex; align-items: center; justify-content: space-between; text-align: left; cursor: pointer;">
+              <span id="s-from-val">{{startLabel}}</span>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--ink-muted);"><path d="M6 9l6 6 6-6"></path></svg>
+            </button>
+          </div>
+          <div class="field">
+            <span id="s-to" class="t-caption muted">To</span>
+            <button class="input num" type="button" aria-labelledby="s-to s-to-val" onClick="{{nextEnd}}" style="display: flex; align-items: center; justify-content: space-between; text-align: left; cursor: pointer;">
+              <span id="s-to-val">{{endLabel}}</span>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--ink-muted);"><path d="M6 9l6 6 6-6"></path></svg>
+            </button>
+          </div>
+        </div>
+        <p class="t-caption muted">Inside Northwind’s hours: <span class="num">6:00 AM–6:00 PM</span></p>
+      </div>
+
+      <div role="group" aria-labelledby="s-days" style="display: flex; flex-direction: column; gap: 8px;">
+        <span id="s-days" class="field-label">Days</span>
+        <div class="seg" style="grid-template-columns: repeat(5, minmax(0, 1fr));">
+          <button class="seg-btn" type="button" aria-pressed="{{d0}}" onClick="{{tog0}}" aria-label="Monday" style="display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 0;"><sc-if value="{{d0on}}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></sc-if>Mon</button>
+          <button class="seg-btn" type="button" aria-pressed="{{d1}}" onClick="{{tog1}}" aria-label="Tuesday" style="display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 0;"><sc-if value="{{d1on}}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></sc-if>Tue</button>
+          <button class="seg-btn" type="button" aria-pressed="{{d2}}" onClick="{{tog2}}" aria-label="Wednesday" style="display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 0;"><sc-if value="{{d2on}}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></sc-if>Wed</button>
+          <button class="seg-btn" type="button" aria-pressed="{{d3}}" onClick="{{tog3}}" aria-label="Thursday" style="display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 0;"><sc-if value="{{d3on}}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></sc-if>Thu</button>
+          <button class="seg-btn" type="button" aria-pressed="{{d4}}" onClick="{{tog4}}" aria-label="Friday" style="display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 0;"><sc-if value="{{d4on}}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></sc-if>Fri</button>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="s-look" style="display: flex; flex-direction: column; gap: 12px;">
+      <h2 id="s-look" class="section-title">Appearance</h2>
+      <div class="seg" role="radiogroup" aria-labelledby="s-look" style="grid-template-columns: repeat(3, minmax(0, 1fr));">
+        <button class="seg-btn" type="button" role="radio" aria-checked="{{tSystem}}" onClick="{{setSystem}}" style="display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 0;"><sc-if value="{{tSystemon}}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></sc-if>System</button>
+        <button class="seg-btn" type="button" role="radio" aria-checked="{{tLight}}" onClick="{{setLight}}" style="display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 0;"><sc-if value="{{tLighton}}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></sc-if>Light</button>
+        <button class="seg-btn" type="button" role="radio" aria-checked="{{tDark}}" onClick="{{setDark}}" style="display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 0;"><sc-if value="{{tDarkon}}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></sc-if>Dark</button>
+      </div>
+    </section>
+
+    <section aria-labelledby="s-account" style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="s-account" class="section-title">Account</h2>
+      <div class="rows">
+        <div class="row">
+          <span class="t-body-lg" style="flex: none;">Email</span>
+          <span class="t-body muted" style="flex: 1; min-width: 0; text-align: right; overflow-wrap: anywhere;">jordan.reyes@northwind.example</span>
+        </div>
+        <a class="row row-link" href="Disclosure.dc.html">
+          <span class="t-body-lg" style="flex: 1;">What we record</span>
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--ink-muted);"><path d="M9 6l6 6-6 6"></path></svg>
+        </a>
+      </div>
+      <div style="padding-top: 12px;">
+        <a class="btn btn-secondary btn-block" href="Main.dc.html">Sign out</a>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"brand":{"editor":"enum","options":["default","plum"],"default":"default","section":"Theme"},"w":{"editor":"int","default":360,"section":"Frame"},"h":{"editor":"int","default":740,"section":"Frame"},"$preview":{"width":360,"height":740}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { on: true, start: 420, end: 930, days: [true, true, true, true, true], look: 'system' };
+  }
+  renderVals() {
+    const s = this.state;
+    const fmt = (m) => {
+      const h24 = Math.floor(m / 60);
+      const mm = m % 60;
+      const h = h24 % 12 === 0 ? 12 : h24 % 12;
+      return h + ':' + (mm < 10 ? '0' : '') + mm + ' ' + (h24 < 12 ? 'AM' : 'PM');
+    };
+    const toggleDay = (i) => () => {
+      const next = s.days.slice();
+      const count = next.filter(Boolean).length;
+      if (next[i] && count === 1) return;
+      next[i] = !next[i];
+      this.setState({ days: next });
+    };
+    const base = this.props.theme ?? 'light';
+    return {
+      theme: s.look === 'system' ? base : s.look,
+      brand: this.props.brand ?? 'default',
+      w: this.props.w ?? 360,
+      h: this.props.h ?? 740,
+      pushOn: s.on ? 'true' : 'false',
+      paused: !s.on,
+      togglePush: () => this.setState({ on: !s.on }),
+      startLabel: fmt(s.start),
+      endLabel: fmt(s.end),
+      nextStart: () => {
+        let n = s.start + 30;
+        if (n > s.end - 30) n = 360;
+        this.setState({ start: n });
+      },
+      nextEnd: () => {
+        let n = s.end + 30;
+        if (n > 1080) n = s.start + 30;
+        this.setState({ end: n });
+      },
+      d0on: s.days[0], d1on: s.days[1], d2on: s.days[2], d3on: s.days[3], d4on: s.days[4],
+      tSystemon: s.look === 'system', tLighton: s.look === 'light', tDarkon: s.look === 'dark',
+      d0: s.days[0] ? 'true' : 'false',
+      d1: s.days[1] ? 'true' : 'false',
+      d2: s.days[2] ? 'true' : 'false',
+      d3: s.days[3] ? 'true' : 'false',
+      d4: s.days[4] ? 'true' : 'false',
+      tog0: toggleDay(0), tog1: toggleDay(1), tog2: toggleDay(2), tog3: toggleDay(3), tog4: toggleDay(4),
+      tSystem: s.look === 'system' ? 'true' : 'false',
+      tLight: s.look === 'light' ? 'true' : 'false',
+      tDark: s.look === 'dark' ? 'true' : 'false',
+      setSystem: () => this.setState({ look: 'system' }),
+      setLight: () => this.setState({ look: 'light' }),
+      setDark: () => this.setState({ look: 'dark' })
+    };
+  }
+}
+</script>
+</body>
+</html>

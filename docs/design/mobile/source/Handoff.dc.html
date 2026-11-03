@@ -1,0 +1,877 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Handoff notes</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="lq.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" data-brand="{{brand}}" style="width: 100%; min-height: 100%; height: auto; display: block; overflow: visible; font-family: var(--font-sans); color: var(--ink);">
+<main style="max-width: 1120px; margin: 0 auto; padding: 48px 32px; display: flex; flex-direction: column; gap: 32px;">
+
+  <!-- ================= Intro ================= -->
+  <header style="display: flex; flex-direction: column; gap: 8px;">
+    <h1 class="t-title1">Handoff notes</h1>
+    <p class="t-body muted">Learn Quiz learner app. One section per screen, in flow order. Each heading links to its artboard.</p>
+    <p class="t-body muted">Prototype: the light artboards are the clickable flow. Dark and variant artboards are the same files rendered with <code>theme</code> / <code>state</code> / <code>variant</code> / <code>scroll</code> props.</p>
+  </header>
+
+  <section aria-labelledby="h-basics" style="display: flex; flex-wrap: wrap; gap: 24px 32px; padding-top: 32px; border-top: 1px solid var(--border);">
+    <h2 id="h-basics" class="sr-only">Basics</h2>
+    <div style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <h3 class="t-label">Target</h3>
+        <p class="t-body">Android Chrome PWA now (installable, Web Push). Expo (React Native) later: keep push, haptics, speech and viewport calls behind small adapters so screens port unchanged.</p>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <h3 class="t-label">Base frame</h3>
+        <p class="t-body">360 × 740 portrait, 16 px gutters. Also checked at 390 × 844 (Today390). Shell: <code>.topbar</code> 56 → <code>.scroll</code> (flex 1) → <code>.dock</code> → <code>.nav</code> 64 (Today, Path, Profile only; never during a session).</p>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <h3 class="t-label">Tokens</h3>
+        <p class="t-body"><code>lq.css</code> on top of the Learn Quiz tokens (Petrol &amp; Saffron). Dark by <code>data-theme="dark"</code>, tokens only. White-label by <code>data-brand</code>: only <code>--brand</code>, <code>--brand-hover</code>, <code>--on-brand</code>, <code>--brand-tint</code> change. Rules marked ADDITION are proposed DS additions.</p>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <h3 class="t-label">Routes in spec</h3>
+        <p class="t-body"><code>/</code> Today · <code>/play</code> session (Loading, questions, Reveal, Report and Summary live inside it) · <code>/play/quick/:itemId</code> quick session from a push · <code>/me/profile</code> Training progress. <code>/org/:slug</code> (admin) is not in scope. Screens without a spec route say so.</p>
+      </div>
+    </div>
+
+    <div style="flex: 1.6 1 368px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+      <h3 class="t-label">Global rules</h3>
+      <ol class="t-body" style="list-style: decimal; padding-left: 20px; display: flex; flex-direction: column; gap: 8px;">
+        <li>One saffron element per screen: the key action (<code>btn-accent</code>) or the reward (<code>streak</code>, <code>xp</code>). If a saffron button is on screen the streak is <code>streak streak-quiet</code>.</li>
+        <li>Feedback never by color alone: icon + word ("Correct", "Not quite", "Still learning", "Mastered", "Not started"). <code>--feedback-*</code> only for answer feedback and mastery status. Never for errors; the critical marker (<code>chip-critical</code>) is neutral.</li>
+        <li>Critical is never shown before answering (it would give the answer away). It appears on the reveal, in Unit, Path and Training progress only.</li>
+        <li>Chips mark exceptions only. "In progress" is the default and carries no chip; status records that are not mastery states use <code>chip-neutral</code>.</li>
+        <li>Targets ≥ 48 px (<code>--target</code>): <code>icon-btn</code> 48 × 48, <code>link-btn</code> 48 high, <code>opt</code> 56, <code>btn-lg</code> 56.</li>
+        <li>Focus ring 2 px <code>--brand</code>, offset 2 px (<code>.lq :focus-visible</code>). On the petrol lead card (Today, light) the ring is <code>--on-brand</code>.</li>
+        <li>Focus on route change moves to the screen’s <code>h1</code> (<code>tabindex="-1"</code>), exceptions noted. Sheets take focus to their heading, trap it, and return it to the opener on close.</li>
+        <li>Reduced motion: <code>prefers-reduced-motion: reduce</code> drops the sheet rise and <code>.pop-in</code>. Nothing loops. No spinners: a determinate bar or a static skeleton plus a status line.</li>
+        <li>Safe areas: <code>viewport-fit=cover</code>; set <code>--safe-top: env(safe-area-inset-top)</code> and <code>--safe-bottom: max(8px, env(safe-area-inset-bottom))</code>. Consumed by <code>.topbar</code>, <code>.dock</code>, <code>.sheet-foot</code>, <code>.nav</code>.</li>
+        <li>Keyboard: content scrolls and the dock sits above the keyboard. Viewport meta <code>interactive-widget=resizes-content</code>; fallback via the VisualViewport API (on <code>resize</code>, pad the shell by <code>innerHeight − visualViewport.height</code>). Focused fields <code>scrollIntoView({block: "nearest"})</code>.</li>
+        <li>Announcements: results <code>role="status"</code> / <code>aria-live="polite"</code>; blocking errors <code>role="alert"</code>. One announcement per action.</li>
+        <li>Disabled-until-ready actions are a real <code>&lt;button disabled&gt;</code> that becomes enabled in place; focus never jumps when it enables. Disabled style: sunken fill, 2 px dashed <code>--border-strong</code> outline, muted ink, so it stays visible in dark mode.</li>
+        <li>Haptics, proposal only (not agreed; web = <code>navigator.vibrate</code>, Android only): <em>result-correct</em> 15 ms, <em>result-miss</em> 20-60-20 ms, <em>record</em> 10 ms. Never the only signal; nothing else vibrates. Every "Haptics" line below refers to this proposal.</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ================= 1 Join ================= -->
+  <section aria-labelledby="h-join" style="display: flex; flex-direction: column; gap: 16px; padding-top: 32px; border-top: 1px solid var(--border);">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="h-join" class="t-title2"><a href="Main.dc.html" style="color: inherit;">1 · Join by invite</a></h2>
+      <p class="t-caption muted">Route: not in spec (invite link) · Main</p>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 16px 32px;">
+      <div style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+          <li>No top bar. Scroll padding 32 / 16 / 16, gap 24.</li>
+          <li>Org row: logo tile 56 + "Northwind Logistics" (label), gap 12. Then <code>h1</code> "Train as a warehouse picker" (title-1). Block gap 16.</li>
+          <li>Form: Email (read-only, lock), Your name, Create a password (eye toggle, "At least 8 characters"), Create account.</li>
+          <li>"or" divider, Continue with Facebook, "I already have an account".</li>
+          <li>Footer: Learn Quiz mark 20 + "Training by Learn Quiz", bottom padding 12 + <code>--safe-bottom</code>.</li>
+        </ul>
+      </div>
+      <div style="flex: 1.6 1 368px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Components</h3>
+          <p class="t-body"><code>org-logo org-logo-lg</code>, <code>field</code> / <code>field-label</code> / <code>input</code> / <code>input-wrap</code> / <code>input-icon</code>, <code>icon-btn</code>, <code>btn-primary btn-lg btn-block</code>, <code>btn-secondary</code>, <code>link-btn</code>, <code>divider</code>. No saffron (the mark’s dot is the logo).</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Interaction</h3>
+          <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+            <li>Email comes from the invite token; <code>readonly</code>, described by sr-only "Set by your invite".</li>
+            <li>Create account is disabled until the password has 8 characters, then → Disclosure.</li>
+            <li>Eye button toggles <code>type</code> password/text, <code>aria-pressed</code>, label "Show password". Password rule is <code>aria-describedby</code>.</li>
+            <li>Facebook and "I already have an account" → Disclosure in the prototype (real: OAuth, sign-in).</li>
+            <li>Focus: <code>h1</code>. Do not autofocus a field; the keyboard would cover the invite.</li>
+            <li>Server errors go under the field as <code>role="alert"</code> (not drawn). Haptics: none.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 2 Disclosure ================= -->
+  <section aria-labelledby="h-disc" style="display: flex; flex-direction: column; gap: 16px; padding-top: 32px; border-top: 1px solid var(--border);">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="h-disc" class="t-title2"><a href="Disclosure.dc.html" style="color: inherit;">2 · First sign-in disclosure</a></h2>
+      <p class="t-caption muted">Route: not in spec · Disclosure</p>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 16px 32px;">
+      <div style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+          <li>Scroll padding 48 / 16 / 16. <code>h1</code> "Before you start".</li>
+          <li>Three text blocks, no icons, gap 24; each a label heading + body (gap 4): What we record, Who sees it, What it’s for.</li>
+          <li>Sunken block "Never recorded", padding 16, lock icon (the only icon on the screen): "Camera, location, sensors or health data. The microphone only while you record a voice answer."</li>
+          <li>"Read the full privacy notice" link (external URL). Dock: Got it.</li>
+        </ul>
+      </div>
+      <div style="flex: 1.6 1 368px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Components</h3>
+          <p class="t-body"><code>t-title1</code>, <code>t-label</code>, <code>t-body</code>, <code>sunken</code>, <code>link-btn</code>, <code>dock</code>, <code>btn-primary btn-lg btn-block</code>.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Interaction</h3>
+          <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+            <li>Got it stores the acknowledgement (disclosure version + timestamp) and → <code>/</code> in its first-day state. Shown again only when the version changes.</li>
+            <li>Also opened from Settings › What we record; in the build Got it then returns to Settings.</li>
+            <li>Focus: <code>h1</code>. No live regions. Haptics: none.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 3 Today ================= -->
+  <section aria-labelledby="h-today" style="display: flex; flex-direction: column; gap: 16px; padding-top: 32px; border-top: 1px solid var(--border);">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="h-today" class="t-title2"><a href="Today.dc.html" style="color: inherit;">3 · Today</a></h2>
+      <p class="t-caption muted">Route: <code>/</code> · Today, TodayFirst, TodayBasics, TodayDone, TodayGenerating, TodayOffline, TodayPlum, Today390</p>
+      <p class="t-body"><span class="t-label">States:</span> normal · first (day 1) · basics (after a level drop) · done · generating (content still building) · offline.</p>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 16px 32px;">
+      <div style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+          <li>Top bar 56: logo tile 32 + org name; streak pill right; sr-only <code>h1</code> "Today".</li>
+          <li>Lead card (petrol hero), padding 24 / 16 / 16, gap 32: title-2 ("4 reviews, then Picking"), meta "20 questions", Play · 5 min (56). The button carries the duration; the meta never repeats it.</li>
+          <li>Daily quest: section title + card of rows ("Clear your reviews" "2 of 6", done "6 of 6"; "One session"). Marks are 20 px status circles: not done = the DS not-started dotted circle, done = brand-tint disc with check.</li>
+          <li>Role card (whole card is a link): "Warehouse picker" + chevron, bar with benchmark tick at 85%, "66% of 85% benchmark", "Day 16 of 30".</li>
+          <li>Bottom nav, Today current.</li>
+        </ul>
+      </div>
+      <div style="flex: 1.6 1 368px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Components</h3>
+          <p class="t-body"><code>topbar</code>, <code>org-logo</code>, <code>streak</code> / <code>streak-quiet</code> / <code>pop-in</code>, <code>card</code>, <code>btn-accent</code>, <code>btn-secondary</code>, <code>section-title</code>, <code>rows</code> / <code>row</code>, <code>bar</code> / <code>bar-fill</code> / <code>bar-bench</code>, <code>chip-none</code>, <code>sunken</code>, <code>nav</code>.</p>
+          <p class="t-body">Lead card ground: light = <code>--brand</code> with <code>--on-brand</code> text; dark = <code>--brand-tint</code> with <code>--ink</code> (saffron has no edge on dark-mode cyan).</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Interaction</h3>
+          <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+            <li>Play → <code>/play</code> (Loading, then question 1). Role card → <code>/me/profile</code>.</li>
+            <li>normal / first / basics / generating: the petrol hero; Play is the saffron element, streak quiet. First: "Your first session", "Starts with Receiving", "Play · 5 min", no streak, quest shows "One session" only (nothing to review on day 1), role chip "Not started", "Day 1 of 30".</li>
+            <li>basics: after a level drop. Same calm petrol card, no warning color: "Back to basics: Receiving", "Full explanations · 20 questions", Play · 5 min. The session opens every explanation without asking.</li>
+            <li>done: card heading "Done for today" (with check icon) / "Next reviews tomorrow" + Practise anyway (secondary) → <code>/play</code>. The streak is the saffron element, reads "5 days", scales in once (<code>.pop-in</code>, 300 ms).</li>
+            <li>Quest marks are status, not controls: <code>role="img"</code> "Done" / "Not done", not focusable; they tick from session data.</li>
+            <li>generating: same petrol hero, heading "Building your questions", an outlined in-hero bar (1 px <code>currentColor</code>) + "28 of 42 topics ready" (<code>role="status"</code>, polite; announce at most every 10 %), saffron "Play Receiving · 5 min". Streak stays quiet.</li>
+            <li>offline: sunken <code>role="status"</code> "You’re offline / Sessions need a connection." + Try again; Play rendered disabled; nothing saffron. On the <code>online</code> event, refetch and swap to normal without moving focus.</li>
+            <li>Focus: sr-only <code>h1</code>, then lead action → quest → role card → nav. Returning from a session also lands on <code>h1</code>.</li>
+            <li>Streak pill carries sr-only " in a row". Haptics: none.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 4 Loading ================= -->
+  <section aria-labelledby="h-load" style="display: flex; flex-direction: column; gap: 16px; padding-top: 32px; border-top: 1px solid var(--border);">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="h-load" class="t-title2"><a href="Loading.dc.html" style="color: inherit;">4 · Loading the session</a></h2>
+      <p class="t-caption muted">Route: <code>/play</code> (before question 1) · Loading</p>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 16px 32px;">
+      <div style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+          <li>Top bar: close only (label "Cancel"). No dock.</li>
+          <li>Static skeleton in the shape of a question: two 24 px lines (92 %, 64 %), four 56 px option blocks.</li>
+          <li>Bottom of scroll (padding-bottom 24): <code>h1</code> "Preparing your session", bar, "12 of 20 questions ready".</li>
+        </ul>
+      </div>
+      <div style="flex: 1.6 1 368px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Components</h3>
+          <p class="t-body"><code>skel</code> (<code>aria-hidden</code>), <code>bar</code> / <code>bar-fill</code> with <code>role="progressbar"</code> and <code>aria-valuetext</code> "12 of 20 questions ready", <code>icon-btn</code>.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Interaction</h3>
+          <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+            <li>Advances to question 1 on its own when ready, replacing this history entry so Back does not return here.</li>
+            <li>Close ("Cancel") → <code>/</code>.</li>
+            <li>Status block is <code>role="status"</code>: announce once on open and once when ready, not every increment.</li>
+            <li>Focus: <code>h1</code>. No spinner, nothing loops. Haptics: none.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 5 Session frame ================= -->
+  <section aria-labelledby="h-frame" style="display: flex; flex-direction: column; gap: 16px; padding-top: 32px; border-top: 1px solid var(--border);">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="h-frame" class="t-title2">5 · Session frame (all question screens)</h2>
+      <p class="t-caption muted">Route: <code>/play</code> · QChoice, QMulti, QCloze, QVoice, QOrder, QImage</p>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 16px 32px;">
+      <div style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+          <li>Top bar 56: close (End session) · progress bar (flex 1) + "7 of 20" overline · Read aloud toggle.</li>
+          <li>Scroll: stem as <code>h1</code> (title-2), then the answer area.</li>
+          <li>Dock: "How sure are you?" + Sure / Unsure / Guessing (three equal 48 px), then Check (56).</li>
+          <li>No bottom nav.</li>
+        </ul>
+      </div>
+      <div style="flex: 1.6 1 368px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Components</h3>
+          <p class="t-body"><code>topbar</code>, <code>icon-btn</code> (pressed = <code>--brand-tint</code>), <code>bar</code> / <code>bar-fill</code>, <code>t-overline num</code>, <code>dock</code>, <code>conf</code> / <code>conf-btn</code> / <code>conf-tick</code> / <code>conf-legend</code> (ADDITION), <code>btn-primary btn-lg btn-block</code>.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Interaction</h3>
+          <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+            <li>Progress: <code>role="progressbar"</code> "Session progress", <code>aria-valuenow</code> = current question number, <code>aria-valuetext</code> "7 of 20".</li>
+            <li>End session → <code>/</code>; answered items are kept.</li>
+            <li>Read aloud: <code>aria-pressed</code>; when on, SpeechSynthesis reads the stem, then the options, on each new question; persists for the session; stops on Check.</li>
+            <li>Confidence: radiogroup labelled by its legend; checked shows a tick and the brand tint (not color alone).</li>
+            <li>Check is disabled until an answer and a confidence are set. Selections can change until Check.</li>
+            <li>Radiogroups use a roving tabindex: one Tab stop, arrow keys move and select.</li>
+            <li>Drawn reveals: multiple choice (five variants) and multi-select partial credit. Cloze, voice, order and diagram link straight to the next format in the prototype.</li>
+            <li>Critical is not marked on any question screen; see global rules.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 6 QChoice ================= -->
+  <section aria-labelledby="h-qc" style="display: flex; flex-direction: column; gap: 16px; padding-top: 32px; border-top: 1px solid var(--border);">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="h-qc" class="t-title2"><a href="QChoice.dc.html" style="color: inherit;">6 · Multiple choice</a></h2>
+      <p class="t-caption muted">Route: <code>/play</code> · QChoice, QError (<code>error</code> prop)</p>
+      <p class="t-body"><span class="t-label">States:</span> unanswered · answer + confidence set · error ("Couldn’t check").</p>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 16px 32px;">
+      <div style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+          <li>Stem, then four options, gap 12, each ≥ 56 with a 20 px radio.</li>
+          <li>Error: sunken alert row between scroll and dock; Try again (primary, retry icon) replaces Check.</li>
+        </ul>
+      </div>
+      <div style="flex: 1.6 1 368px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Components</h3>
+          <p class="t-body"><code>opt-list</code> <code>role="radiogroup"</code> labelled by the stem, <code>opt</code> <code>role="radio"</code> + <code>radio</code>, <code>sunken</code>, <code>btn-primary</code>.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Interaction</h3>
+          <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+            <li>Check opens the reveal by answer × confidence: correct + Sure → correct, sure · correct + Unsure/Guessing → correct, unsure · wrong + Sure → sure and wrong · wrong + other → not quite.</li>
+            <li>Error: the answer is queued on the device (IndexedDB) and retried. <code>role="alert"</code> "Couldn’t check your answer. It’s saved on this phone." Focus moves to Try again (Check is gone). Success opens the reveal.</li>
+            <li>Focus: stem <code>h1</code>. After Check: the reveal heading. Haptics: none on select.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 7 Reveal ================= -->
+  <section aria-labelledby="h-rv" style="display: flex; flex-direction: column; gap: 16px; padding-top: 32px; border-top: 1px solid var(--border);">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="h-rv" class="t-title2"><a href="Reveal.dc.html" style="color: inherit;">7 · Reveal</a></h2>
+      <p class="t-caption muted">Route: overlay inside <code>/play</code> · Reveal, RevealUnsure, RevealNotQuite, RevealSureWrong, RevealNoSource, RevealPartial (<code>variant</code> prop)</p>
+      <p class="t-body"><span class="t-label">States:</span> correct, sure · correct, unsure · not quite · sure and wrong (critical) · correct, no source quote · partly right (multi-select).</p>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 16px 32px;">
+      <div style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+          <li>Behind: the answered question, <code>inert</code>. Options marked correct (check + "Correct"), chosen wrong (x + "Not quite"), rest muted.</li>
+          <li>Scrim, then the sheet: top radius 16, max height = frame − 48, raised shadow, grabber 36 × 4.</li>
+          <li>Band (padding 24 / 16 / 16): 32 px icon disc, <code>h2</code> "Correct" / "Not quite" / "Partly right", then "+10 XP" quiet (correct) or "1 of 2 found · 1 extra" (partial).</li>
+          <li>Body scrolls, gap 16. Foot: Continue (Got it for sure and wrong) + "Report this question".</li>
+          <li>Correct, sure: the answer line + Why disclosure (explanation + SOP quote).</li>
+          <li>Correct, unsure: leads with the same answer line, then explanation + quote, open without asking. No extra sentence about confidence.</li>
+          <li>Not quite: The answer / You chose pair, why-wrong line, quote, "This comes back later this session". No reflection field.</li>
+          <li>Sure and wrong: the pair, then a plain row (shield icon, no fill, no card) "Critical step · Comes back first next session", then "Why it felt right" / "What actually matters", then the optional reflection "In one line: why record before moving?", quote, "This comes back later this session".</li>
+          <li>No source: answer + explanation + "Not quoted from your SOP"; no quote block.</li>
+          <li>Partly right (multi-select): background question keeps square checks; amber band "Partly right" + "1 of 2 found · 1 extra"; one line per item that was off ("Broken seal: needs sign-off. You missed it." with check; "Mixed-SKU: no sign-off needed." with x); quote (§2.6); "This comes back later this session". Continue → QCloze.</li>
+        </ul>
+      </div>
+      <div style="flex: 1.6 1 368px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Components</h3>
+          <p class="t-body"><code>opt</code> <code>is-correct</code> / <code>is-wrong</code> / <code>is-rest</code> + <code>fb-mark</code> / <code>fb-word</code>, <code>scrim</code>, <code>sheet</code>, <code>grabber</code>, <code>sheet-band</code> + <code>fb-correct</code> / <code>fb-wrong</code> / <code>fb-learning</code>, <code>sheet-body</code>, <code>sheet-foot</code>, <code>xp xp-quiet</code>, <code>quote</code> / <code>quote-text</code> / <code>quote-src</code>, <code>field</code> / <code>input</code>, <code>link-btn muted-link</code>. No saffron on the reveal.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Interaction</h3>
+          <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+            <li>Sheet rises once: <code>lq-rise</code>, 300 ms <code>--ease-out</code>, translateY 32 → 0 with fade. Reduced motion: appears in place.</li>
+            <li>Sheet is <code>role="dialog"</code> <code>aria-modal</code> labelled by the band heading; the band is <code>role="status"</code> polite and announces the result once.</li>
+            <li>Focus: band heading. Order: Why (sure) or reflection (sure and wrong) → Continue / Got it → Report. Scrim tap does nothing.</li>
+            <li>Why: <code>link-btn</code> with <code>aria-expanded</code>; chevron flips.</li>
+            <li>Reflection (sure and wrong only) is optional, saved with the attempt; with the keyboard open the foot rides above it.</li>
+            <li>Continue / Got it → next question (QMulti; partial → QCloze). Report → the Report sheet replaces this one; "Back to result" returns here with focus on the Report link.</li>
+            <li>Partial credit: multi-select scores per option. The band states the answer result ("Partly right", found / extra counts), not a mastery label, and never "Wrong".</li>
+            <li>Haptics (proposal): <em>result-correct</em> on correct; <em>result-miss</em> on not quite, sure and wrong, and partial.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 8 Report ================= -->
+  <section aria-labelledby="h-rp" style="display: flex; flex-direction: column; gap: 16px; padding-top: 32px; border-top: 1px solid var(--border);">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="h-rp" class="t-title2"><a href="Report.dc.html" style="color: inherit;">8 · Report this question</a></h2>
+      <p class="t-caption muted">Route: overlay inside <code>/play</code> and <code>/play/quick/:itemId</code> · Report</p>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 16px 32px;">
+      <div style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+          <li>Replaces the result sheet (never stacked): the answered question stays behind, <code>inert</code>, under one scrim.</li>
+          <li>Sheet header: back chevron <code>icon-btn</code> "Back to result" + <code>h2</code> "Report this question". No grabber.</li>
+          <li>Four reasons as plain radio rows (48 high, divided, no boxes): "The answer looks incorrect", "The question is unclear", "It doesn’t match how we do it here", "Something else"; note textarea (2 rows, optional); caption "Goes to Northwind’s training team."</li>
+          <li>Foot: Send report (56) + Cancel (ghost).</li>
+        </ul>
+      </div>
+      <div style="flex: 1.6 1 368px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Components</h3>
+          <p class="t-body"><code>scrim</code>, <code>sheet</code>, <code>icon-btn</code>, <code>sheet-body</code>, <code>rows</code> <code>role="radiogroup"</code> + <code>button.row</code> <code>role="radio"</code> with an inline 20 px radio (not <code>opt</code>, so reasons read as settings, not answers), <code>field</code> / <code>textarea.input</code>, <code>sheet-foot</code>, <code>btn-primary</code>, <code>btn-ghost</code>.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Interaction</h3>
+          <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+            <li>Send report is disabled until a reason is picked. Sends item id, item version, attempt id, reason, note.</li>
+            <li>Send → continues the session (QMulti in the prototype); the next screen announces "Report sent" via <code>role="status"</code>.</li>
+            <li>Back to result and Cancel → the result sheet again, focus on "Report this question". Android Back does the same.</li>
+            <li>Focus: sheet heading; trapped in the sheet. Swaps in place of the result sheet (no second rise). Haptics: none.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 9 QMulti ================= -->
+  <section aria-labelledby="h-qm" style="display: flex; flex-direction: column; gap: 16px; padding-top: 32px; border-top: 1px solid var(--border);">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="h-qm" class="t-title2"><a href="QMulti.dc.html" style="color: inherit;">9 · Multi-select</a></h2>
+      <p class="t-caption muted">Route: <code>/play</code> · QMulti</p>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 16px 32px;">
+      <div style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+          <li>Stem + caption "Choose all that apply" (gap 4), then four options with square checks.</li>
+        </ul>
+      </div>
+      <div style="flex: 1.6 1 368px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Components</h3>
+          <p class="t-body"><code>opt-list</code> <code>role="group"</code> (labelled by stem, described by the caption), <code>opt</code> <code>role="checkbox"</code> + <code>check</code>.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Interaction</h3>
+          <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+            <li>The artboard opens mid-interaction: two options selected (Hazmat, Mixed-SKU), no confidence, so Check is still disabled.</li>
+            <li>Each option toggles <code>aria-checked</code>; each is its own Tab stop; Space toggles.</li>
+            <li>Check needs ≥ 1 selection + confidence → QCloze in the prototype. In the build these selections produce the partial-credit reveal (RevealPartial).</li>
+            <li>Focus: stem <code>h1</code>. Haptics: none.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 10 QCloze ================= -->
+  <section aria-labelledby="h-qz" style="display: flex; flex-direction: column; gap: 16px; padding-top: 32px; border-top: 1px solid var(--border);">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="h-qz" class="t-title2"><a href="QCloze.dc.html" style="color: inherit;">10 · Cloze, keyboard open</a></h2>
+      <p class="t-caption muted">Route: <code>/play</code> · QCloze</p>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 16px 32px;">
+      <div style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+          <li>The sentence is one <code>&lt;label for&gt;</code> in title-2 (line height 40) wrapping an inline 88 × 36 numeric field, 20 px text; the whole line is the tap target.</li>
+          <li>Compact dock directly above the keyboard: "How sure are you?" legend + confidence + Check; padding 8, gap 8, no safe-area inset while the keyboard is up.</li>
+          <li><code>kbd-area</code> drawn as the number pad (3 × 4 keys), standing in for the system keyboard; not built.</li>
+        </ul>
+      </div>
+      <div style="flex: 1.6 1 368px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Components</h3>
+          <p class="t-body"><code>input num</code> inline, <code>conf</code>, <code>dock</code>, <code>kbd-area</code> (spec annotation only).</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Interaction</h3>
+          <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+            <li>Exception to the focus rule: the blank autofocuses and the keyboard opens on load.</li>
+            <li><code>inputmode="numeric"</code>, <code>pattern="[0-9]*"</code>, <code>autocomplete="off"</code>, label "Missing number"; digits only, max 3. Add <code>enterkeyhint="done"</code>; Enter = Check when enabled.</li>
+            <li>Dock stays visible above the keyboard (<code>resizes-content</code> / VisualViewport). Check → QVoice in the prototype.</li>
+            <li>Haptics: none.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 11 QVoice ================= -->
+  <section aria-labelledby="h-qv" style="display: flex; flex-direction: column; gap: 16px; padding-top: 32px; border-top: 1px solid var(--border);">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="h-qv" class="t-title2"><a href="QVoice.dc.html" style="color: inherit;">11 · Short answer, voice</a></h2>
+      <p class="t-caption muted">Route: <code>/play</code> · QVoice, QVoiceRecording (<code>step</code> prop)</p>
+      <p class="t-body"><span class="t-label">States:</span> idle · recording · review (default).</p>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 16px 32px;">
+      <div style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+          <li>Stem only, no critical marker (critical is shown on the reveal).</li>
+          <li>Idle: centered 64 px round mic button (brand), "Tap to record", "Type instead" link.</li>
+          <li>Recording: sunken transcript (≥ 72), static five-bar level, 64 px button in pressed style (brand-hover + 2 px ring) showing a filled stop square, "Tap to stop".</li>
+          <li>Review: "Your answer" textarea (4 rows, editable), Record again (secondary, mic icon).</li>
+        </ul>
+      </div>
+      <div style="flex: 1.6 1 368px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Components</h3>
+          <p class="t-body"><code>sunken</code>, <code>link-btn</code>, <code>field</code> / <code>textarea.input</code>, <code>btn-secondary</code>, <code>conf</code>. The 64 px mic button is one-off; candidate for a DS class.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Interaction</h3>
+          <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+            <li>Tap to start, tap to stop (one button, "Record answer" → "Stop recording", <code>aria-pressed</code>). No press-and-hold, so it works with gloves, keyboards and switches.</li>
+            <li>Mic permission is asked on the first tap only (matches the Disclosure).</li>
+            <li>Stop → review with the transcript in the editable field. "Type instead" → review with an empty field.</li>
+            <li>Check needs non-empty text + confidence, review state only → QOrder in the prototype.</li>
+            <li>Announce "Recording" on start and the final transcript once on stop. Throttle the live transcript region (polite) to final phrases, not every partial result.</li>
+            <li>Focus: stem <code>h1</code>. After start: Stop recording. After stop: the answer field.</li>
+            <li>Haptics (proposal): <em>record</em> on start and on stop; the thumb covers the button.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 12 QOrder ================= -->
+  <section aria-labelledby="h-qo" style="display: flex; flex-direction: column; gap: 16px; padding-top: 32px; border-top: 1px solid var(--border);">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="h-qo" class="t-title2"><a href="QOrder.dc.html" style="color: inherit;">12 · Order the steps</a></h2>
+      <p class="t-caption muted">Route: <code>/play</code> · QOrder</p>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 16px 32px;">
+      <div style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+          <li>Stem, then the instruction "Tap the steps in order" (caption) with Clear (ghost) on the right once anything is placed.</li>
+          <li>Four steps as options: 28 px position badge (dashed empty, brand filled with the number) + label. No drag handle.</li>
+        </ul>
+      </div>
+      <div style="flex: 1.6 1 368px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Components</h3>
+          <p class="t-body"><code>opt-list</code>, <code>opt</code> / <code>opt is-selected</code>, <code>btn-ghost</code>. The position badge is inline; candidate for a DS class.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Interaction</h3>
+          <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+            <li>Tap-to-number only, no drag. Tap an unplaced step to give it the next number; tap a numbered step to remove it (later ones move up). Clear empties all.</li>
+            <li>The artboard opens mid-interaction: "Scan the return label" = 1, "Inspect the item" = 2, Check disabled.</li>
+            <li>Each step: <code>aria-label</code> "Inspect the item, position 2" / "…, not placed yet". Announce the new position via a polite status ("Inspect the item, 2 of 4").</li>
+            <li>Focus stays on the tapped step; after Clear it goes to the first step.</li>
+            <li>Check needs all four placed + confidence → QImage in the prototype. Haptics: none.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 13 QImage ================= -->
+  <section aria-labelledby="h-qi" style="display: flex; flex-direction: column; gap: 16px; padding-top: 32px; border-top: 1px solid var(--border);">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="h-qi" class="t-title2"><a href="QImage.dc.html" style="color: inherit;">13 · Question with a diagram</a></h2>
+      <p class="t-caption muted">Route: <code>/play</code> · QImage</p>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 16px 32px;">
+      <div style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+          <li>Stem, location-label diagram (full width × 148), then four standard options (<code>opt</code>, 56, gap 12). The scroll region handles overflow; the dock never moves.</li>
+          <li>Diagram: label card with barcode, "A12-04-C-2", boxed check digits "57", callouts Aisle, Bay, Level, Position, Check digits.</li>
+        </ul>
+      </div>
+      <div style="flex: 1.6 1 368px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Components</h3>
+          <p class="t-body">Inline SVG drawn with tokens (works in dark), <code>role="img"</code> with a full text description; <code>opt-list</code> radiogroup with <code>opt</code>.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Interaction</h3>
+          <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+            <li>As multiple choice. Check → Summary in the prototype (last question).</li>
+            <li>Customer-supplied images need author-written alt text; the content pipeline should require it.</li>
+            <li>Focus: stem <code>h1</code>. Haptics: none.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 14 Summary ================= -->
+  <section aria-labelledby="h-sm" style="display: flex; flex-direction: column; gap: 16px; padding-top: 32px; border-top: 1px solid var(--border);">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="h-sm" class="t-title2"><a href="Summary.dc.html" style="color: inherit;">14 · Session summary</a></h2>
+      <p class="t-caption muted">Route: end of <code>/play</code> · Summary</p>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 16px 32px;">
+      <div style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+          <li>No top bar. Scroll padding 32 / 16 / 24, gap 32.</li>
+          <li><code>h1</code> "Session done", "16 of 20 correct · 4:52"; then "+180 XP" and "5 days in a row"; then the sunken coach line directly under the stats ("Tomorrow: 5 reviews, then pedestrian lanes. …").</li>
+          <li>Mastery moved: rows with name, "58% → 72%", bar = earlier value (<code>--ink-muted</code>, meets 3:1 for graphics) + gain (<code>--brand</code>) + benchmark tick at 85%.</li>
+          <li>Mistakes (4): one 48 px disclosure row between dividers, collapsed by default; open shows rows with chevron and "You were sure" where it applies.</li>
+          <li>Dock: Continue (56) + "Another session" (link, 48).</li>
+        </ul>
+      </div>
+      <div style="flex: 1.6 1 368px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Components</h3>
+          <p class="t-body"><code>xp</code> (the saffron element), <code>streak streak-quiet pop-in</code>, <code>sunken</code>, <code>section-title</code>, <code>rows</code> / <code>row</code> / <code>row-link</code>, <code>bar</code> / <code>bar-before</code> / <code>bar-gain</code> / <code>bar-bench</code> (ADDITION), <code>link-btn</code>, <code>dock</code>.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Interaction</h3>
+          <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+            <li>Continue → push opt-in after the first finished session (while permission is undecided); after later sessions → <code>/</code>. Another session → <code>/play</code>.</li>
+            <li>Streak pill scales in once (300 ms).</li>
+            <li>Mastery bars: <code>aria-valuetext</code> "72%, up from 58%. Benchmark 85%".</li>
+            <li>Mistakes row: <code>button</code> with <code>aria-expanded</code>, chevron flips, focus stays on it. Mistake rows are links (to a review of that item; prototype → QChoice), <code>aria-label</code> "Review: …. You were sure".</li>
+            <li>Focus: <code>h1</code>. Haptics: none.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 15 OptIn ================= -->
+  <section aria-labelledby="h-oi" style="display: flex; flex-direction: column; gap: 16px; padding-top: 32px; border-top: 1px solid var(--border);">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="h-oi" class="t-title2"><a href="OptIn.dc.html" style="color: inherit;">15 · Push opt-in</a></h2>
+      <p class="t-caption muted">Route: not in spec · OptIn, OptInIOS (<code>platform</code> prop)</p>
+      <p class="t-body"><span class="t-label">States:</span> Android (permission) · iOS step 1 (add to Home Screen first).</p>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 16px 32px;">
+      <div style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+          <li>Android: scroll padding 48. <code>h1</code> "Get a question during your shift?", notification preview (OS colors, radius 16), three plain body-lg lines (gap 12, no icons): daily cap; the company window "Only 6:00 AM–6:00 PM, Monday to Friday. You can narrow it in Settings."; "Skip any. Nothing is lost."</li>
+          <li>Dock: Turn on questions (56) + Not now (ghost).</li>
+          <li>iOS: top bar with "1 of 2" on the right (sr-only "Step"), <code>h1</code> "Add Learn Quiz to your Home Screen", one line why, three numbered steps (32 px circles, Share and add-home icons). Dock: I’ve added it + Not now.</li>
+        </ul>
+      </div>
+      <div style="flex: 1.6 1 368px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Components</h3>
+          <p class="t-body"><code>--os-card</code> / <code>--os-ink</code> / <code>--os-ink-muted</code> (ADDITION) for the preview, <code>t-title1</code>, <code>t-body-lg</code>, <code>t-overline</code>, <code>btn-primary</code>, <code>btn-ghost</code>. No saffron.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Interaction</h3>
+          <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+            <li>Turn on calls <code>Notification.requestPermission()</code> only from this tap, then <code>PushManager.subscribe</code> (VAPID) and posts the subscription. Granted → done (PushLock in the prototype).</li>
+            <li>Not now → <code>/</code> (done state). Ask again after a later session, not on every launch.</li>
+            <li>Cap and hours are data. Opt-in shows the company window (6:00 AM–6:00 PM, Mon–Fri) because the learner has not narrowed it yet; after narrowing (Jordan: 7:00 AM–3:30 PM) sends follow the learner’s window.</li>
+            <li>iOS: skip step 1 when already standalone (<code>display-mode: standalone</code>). I’ve added it → step 2 = the Android screen.</li>
+            <li>Preview card is <code>role="img"</code> with the notification text. Focus: <code>h1</code>. Haptics: none.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 16 PushLock ================= -->
+  <section aria-labelledby="h-pl" style="display: flex; flex-direction: column; gap: 16px; padding-top: 32px; border-top: 1px solid var(--border);">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="h-pl" class="t-title2"><a href="PushLock.dc.html" style="color: inherit;">16 · Push notification</a></h2>
+      <p class="t-caption muted">Route: opens <code>/play/quick/:itemId</code> · PushLock, PushHeadsUp (<code>view</code> prop)</p>
+      <p class="t-body"><span class="t-label">States:</span> lock screen · heads-up over another app. OS chrome, not app UI.</p>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 16px 32px;">
+      <div style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+          <li>Lock: OS ground, clock 9:41, "Tuesday, November 3", notification card: 20 px brand badge, "Learn Quiz · now", the stem in 600.</li>
+          <li>Heads-up: over a light home screen (sunken ground, icon grid), a light card (surface-card, ink) 16 from the top, 8 side inset, raised shadow.</li>
+          <li>Stem is 55 characters; keep pushed stems ≤ 60 so the collapsed notification does not truncate.</li>
+        </ul>
+      </div>
+      <div style="flex: 1.6 1 368px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Components</h3>
+          <p class="t-body">Built by the OS from the payload. App supplies: manifest name, a monochrome badge icon, body text.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Interaction</h3>
+          <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+            <li>Payload: body = stem, <code>data.itemId</code>, <code>tag</code> per item (no duplicates), no action buttons (answer in the app).</li>
+            <li>Service worker <code>notificationclick</code>: focus an open client and navigate, else <code>clients.openWindow('/play/quick/' + itemId)</code>.</li>
+            <li>Send only inside the learner’s window and daily cap; set TTL to the window’s end so nothing arrives after hours.</li>
+            <li>Heads-up vs. tray is the OS’s call on the web. Sound and vibration: OS default.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 17 QuickQuestion ================= -->
+  <section aria-labelledby="h-qq" style="display: flex; flex-direction: column; gap: 16px; padding-top: 32px; border-top: 1px solid var(--border);">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="h-qq" class="t-title2"><a href="QuickQuestion.dc.html" style="color: inherit;">17 · Quick session, one question</a></h2>
+      <p class="t-caption muted">Route: <code>/play/quick/:itemId</code> · QuickQuestion</p>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 16px 32px;">
+      <div style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+          <li>Top bar: close · "1 question" label in place of the progress bar · Read aloud.</li>
+          <li>Body and dock as multiple choice.</li>
+        </ul>
+      </div>
+      <div style="flex: 1.6 1 368px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Components</h3>
+          <p class="t-body">Same as the session frame and multiple choice.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Interaction</h3>
+          <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+            <li>Cold start from a notification: render the item from the service-worker cache so it opens fast and survives a weak signal; sync the answer when online.</li>
+            <li>Check → QuickDone (inline result, no sheet). Close → <code>/</code>.</li>
+            <li>Focus: stem <code>h1</code>. Haptics (proposal): on Check, as the reveal.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 18 QuickDone ================= -->
+  <section aria-labelledby="h-qd" style="display: flex; flex-direction: column; gap: 16px; padding-top: 32px; border-top: 1px solid var(--border);">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="h-qd" class="t-title2"><a href="QuickDone.dc.html" style="color: inherit;">18 · Quick session, done</a></h2>
+      <p class="t-caption muted">Route: <code>/play/quick/:itemId</code> (result) · QuickDone</p>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 16px 32px;">
+      <div style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+          <li>Top bar: close only. sr-only <code>h1</code> "Quick question done".</li>
+          <li>Result card in the reveal’s language: tinted band (check + "Correct", <code>fb-head</code>, padding 12 / 16) on top of a bordered card, the answer in body-lg below. SOP quote. "1 review cleared · 3 left today".</li>
+          <li>Dock: Back to Today (56) + "Report this question".</li>
+        </ul>
+      </div>
+      <div style="flex: 1.6 1 368px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Components</h3>
+          <p class="t-body"><code>fb-correct</code> + <code>fb-head</code> (band), <code>quote</code>, <code>btn-primary</code>, <code>link-btn muted-link</code>. A miss uses <code>fb-wrong</code> + "Not quite" + the answer (not drawn).</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Interaction</h3>
+          <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+            <li>Band is <code>role="status"</code> polite and announces the result.</li>
+            <li>Back to Today and close → <code>/</code> (Today shows the cleared review). Report → Report sheet.</li>
+            <li>Focus: sr-only <code>h1</code>. Haptics: none here (fired on Check).</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 19 Path ================= -->
+  <section aria-labelledby="h-pa" style="display: flex; flex-direction: column; gap: 16px; padding-top: 32px; border-top: 1px solid var(--border);">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="h-pa" class="t-title2"><a href="Path.dc.html" style="color: inherit;">19 · Path</a></h2>
+      <p class="t-caption muted">Route: not in spec · Path</p>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 16px 32px;">
+      <div style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+          <li>No top bar. Scroll padding 24 / 16 / 24. <code>h1</code> "Warehouse picker", "66% of 85% benchmark · Day 16 of 30", role bar with benchmark.</li>
+          <li>Ordered units, gap 8: a plain 32 px numbered node on a 2 px rail (row ≥ 48) + tight card (name 17/24, %, bar with benchmark).</li>
+          <li>Node carries kind only, the bar carries progress: in progress = solid border-strong ring + number; current unit (Picking) = brand ring + brand number, plus a brand caption "Next" after the unit name; estimate = dashed ring; not started = dotted ring; mastered = check on brand-tint; locked = lock on sunken.</li>
+          <li>Estimate (Safety): bar is a 2 px dashed <code>--ink-muted</code> outline, no fill; "~40%" in muted ink; Estimate chip under the bar. Profile uses the same treatment.</li>
+          <li>Chips only for exceptions: Mastered, Estimate, Not started, Locked, and "3 critical". In-progress units (Picking, Scanning) show no chip row.</li>
+          <li>Bottom nav, Path current.</li>
+        </ul>
+      </div>
+      <div style="flex: 1.6 1 368px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Components</h3>
+          <p class="t-body">Path node (ADDITION, 32 px circle, 2 px border, inline style; candidate for a DS class), <code>card card-tight</code>, <code>bar</code> / <code>bar-fill</code> / <code>bar-est</code> / <code>bar-bench</code>, <code>chip-mastered</code> / <code>chip-estimate</code> / <code>chip-none</code>, <code>tag</code>, <code>nav</code>.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Interaction</h3>
+          <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+            <li>Each row is one link → that unit’s detail (all go to Receiving in the prototype).</li>
+            <li>Row <code>aria-label</code>: "Unit 1, Receiving: 82%, Still learning, 3 critical concepts"; current reads "Unit 2, Picking, Next up: 68%, …"; estimate reads "about 40%, Placement estimate, not practised yet". Inner bar and node are <code>aria-hidden</code>.</li>
+            <li>Mastered = at or above the 85% benchmark. "Next" = the unit the next session starts with (from the scheduler).</li>
+            <li>Focus: <code>h1</code>. Haptics: none.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 20 Unit ================= -->
+  <section aria-labelledby="h-un" style="display: flex; flex-direction: column; gap: 16px; padding-top: 32px; border-top: 1px solid var(--border);">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="h-un" class="t-title2"><a href="Unit.dc.html" style="color: inherit;">20 · Unit detail</a></h2>
+      <p class="t-caption muted">Route: not in spec · Unit (Receiving), UnitDiagram (<code>scroll</code> = 600, shows the procedure diagram)</p>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 16px 32px;">
+      <div style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+          <li>Top bar: back + <code>h1</code> "Receiving" (title-2).</li>
+          <li>Mastery: "82%" (title-1) + "of 85% benchmark", 12 px bar with benchmark.</li>
+          <li>Concepts card: per row name + %, bar + benchmark, status chip + Critical chip.</li>
+          <li>Procedure: card with a 326 × 360 flowchart, caption "Receiving SOP v3 · §2". The critical step has a 2 px ink outline and shield, never red.</li>
+          <li>Dock: Practise Receiving · 5 min. No bottom nav.</li>
+        </ul>
+      </div>
+      <div style="flex: 1.6 1 368px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Components</h3>
+          <p class="t-body"><code>topbar</code>, <code>icon-btn</code>, <code>bar bar-lg</code>, <code>bar-bench</code>, <code>card rows</code>, <code>chip-mastered</code> / <code>chip-learning</code> / <code>chip-critical</code>, inline SVG diagram (<code>role="img"</code> with the full procedure as text), <code>dock</code>, <code>btn-primary</code>.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Interaction</h3>
+          <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+            <li>Back ("Back to Path") → Path; focus returns to this unit’s row.</li>
+            <li>Practise → a session scoped to this unit (<code>/play</code> with a unit scope; parameter not in spec).</li>
+            <li>Concept bars: <code>aria-valuetext</code> "72%, Still learning, critical, benchmark 85%".</li>
+            <li><code>scroll</code> prop sets the initial <code>scrollTop</code> of the scroll region (artboard only, not app state).</li>
+            <li>Focus: <code>h1</code>. Haptics: none.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 21 Profile ================= -->
+  <section aria-labelledby="h-pf" style="display: flex; flex-direction: column; gap: 16px; padding-top: 32px; border-top: 1px solid var(--border);">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="h-pf" class="t-title2"><a href="Profile.dc.html" style="color: inherit;">21 · Training progress</a></h2>
+      <p class="t-caption muted">Route: <code>/me/profile</code> · Profile, ProfileEmpty (<code>state</code> prop), ProfileErrors (<code>scroll</code> = 1300, shows "Critical steps to recheck")</p>
+      <p class="t-body"><span class="t-label">States:</span> normal · empty (before session 1).</p>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 16px 32px;">
+      <div style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+          <li>Header: <code>h1</code> "Training progress" + Settings gear; "Jordan Reyes · Warehouse picker"; eye caption "Your manager sees this same page."</li>
+          <li>Mastery card: "66%" (display) + "of 85% benchmark", 12 px bar, two facts: "Day 16 of 30", "Projected: Nov 12 / Reaches 85% on day 25".</li>
+          <li>Weekly trend: 188 px line chart, 3 weekly points, dashed projection to 85% on Nov 12, dashed benchmark line.</li>
+          <li>By unit: accordion rows (Receiving open), bars, concept lists with chips. Safety: dashed estimate bar + Estimate chip under the bar, as on Path.</li>
+          <li>Critical steps to recheck: two rows, each led by a neutral state chip ("Corrected Oct 30" / "Comes back first"), then the concept name and caption "Answered with confidence, missed Oct 28" / "Nov 2". These are records, not mastery states, so no green/amber.</li>
+          <li>Flag an unfair result (secondary). Bottom nav, Profile current.</li>
+          <li>Empty: no 0%. Leads with "Day 1 of 30 · Benchmark 85%" (title-2), empty bar with benchmark tick, "Your progress shows up after your first session."; dock "Play first session" above the nav.</li>
+        </ul>
+      </div>
+      <div style="flex: 1.6 1 368px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Components</h3>
+          <p class="t-body"><code>t-display num</code>, <code>card</code>, <code>bar bar-lg</code> / <code>bar-fill</code> / <code>bar-est</code> / <code>bar-bench</code>, inline SVG chart + sr-only data table, <code>card rows</code>, <code>chip-estimate</code> / <code>chip-mastered</code> / <code>chip-learning</code> / <code>chip-none</code> / <code>chip-critical</code> / <code>chip-neutral</code> (ADDITION), <code>btn-secondary</code>, <code>dock</code>, <code>nav</code>.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Interaction</h3>
+          <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+            <li>Gear → Settings. Empty-state Play first session → <code>/play</code>; its bar reads <code>aria-valuetext</code> "No sessions yet, benchmark 85%". Flag an unfair result → the report sheet (prototype); the real flow is not designed.</li>
+            <li><code>scroll</code> prop sets the initial <code>scrollTop</code> (artboard only).</li>
+            <li>Unit rows: <code>h3 &gt; button</code> with <code>aria-expanded</code> + <code>aria-controls</code>; focus stays on the button; chevron rotates 150 ms (none under reduced motion).</li>
+            <li>Chart is not interactive; its numbers are in the sr-only table ("Role mastery by week").</li>
+            <li>Same data as the manager sees; no hidden fields on either side.</li>
+            <li>Focus: <code>h1</code>. Haptics: none.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 22 Settings ================= -->
+  <section aria-labelledby="h-st" style="display: flex; flex-direction: column; gap: 16px; padding-top: 32px; border-top: 1px solid var(--border);">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="h-st" class="t-title2"><a href="Settings.dc.html" style="color: inherit;">22 · Settings</a></h2>
+      <p class="t-caption muted">Route: not in spec · Settings</p>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 16px 32px;">
+      <div style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+          <li>Top bar: back + <code>h1</code> "Settings". Sections gap 32.</li>
+          <li>Learning questions: "Send me questions" switch; working hours From / To (7:00 AM, 3:30 PM), caption "Inside Northwind’s hours: 6:00 AM–6:00 PM"; days Mon–Fri as five toggles.</li>
+          <li>Appearance: System / Light / Dark.</li>
+          <li>Account: Email (read-only), "What we record" → Disclosure, Sign out (secondary) → Join.</li>
+          <li>Selected day and appearance chips show a 16 px check before the label plus the brand tint (not color alone).</li>
+        </ul>
+      </div>
+      <div style="flex: 1.6 1 368px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Components</h3>
+          <p class="t-body"><code>switch</code> (ADDITION, <code>role="switch"</code>), <code>input</code> styled time buttons, <code>seg</code> / <code>seg-btn</code>, <code>rows</code> / <code>row</code> / <code>row-link</code>, <code>section-title</code>, <code>btn-secondary</code>.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h3 class="t-label">Interaction</h3>
+          <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+            <li>Every change saves immediately (no Save button); on failure revert the control and show <code>role="alert"</code>.</li>
+            <li>Switch off: server pauses sends (keep the subscription); "Paused. Turn back on any time." appears as <code>role="status"</code>. The switch’s hit area is 48 px (<code>::before</code>) around the 52 × 32 track.</li>
+            <li>Times: native <code>&lt;input type="time" step="1800"&gt;</code> clamped to the company window, end ≥ start + 30 min (the prototype cycles in 30-minute steps).</li>
+            <li>Days: <code>aria-pressed</code> toggles; the last day on cannot be turned off; announce "At least one day" via <code>role="status"</code>.</li>
+            <li>Appearance: radiogroup; System follows <code>prefers-color-scheme</code>; stored per device; applies at once.</li>
+            <li>Back → Profile, focus on the gear. Focus on load: <code>h1</code>. Haptics: none.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= Open questions ================= -->
+  <section aria-labelledby="h-oq" style="display: flex; flex-direction: column; gap: 16px; padding-top: 32px; border-top: 1px solid var(--border);">
+    <h2 id="h-oq" class="t-title2">Open questions</h2>
+    <ol class="t-body" style="list-style: decimal; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; max-width: 800px;">
+      <li>Expo haptics mapping: is <em>result-correct</em> → <code>expo-haptics</code> <code>notificationAsync(Success)</code>, <em>result-miss</em> → <code>Warning</code> (not <code>Error</code>), <em>record</em> → <code>impactAsync(Light)</code>? Do we need a haptics off switch in Settings?</li>
+      <li>iOS PWA push: Web Push works only for Home Screen web apps (iOS 16.4+), and permission must be asked inside the installed app from a tap. "I’ve added it" in a Safari tab cannot hand over to the installed app. What should Safari show after step 1?</li>
+      <li>What does "Practise anyway" (Today, done) and "Another session" count toward: the streak (already earned today), XP, the review schedule?</li>
+      <li>Does a quick question from a push count as the day’s session for the streak and the daily quest?</li>
+      <li>Reveals for cloze, voice, order and diagram are not drawn. Each needs its own "your answer vs. the answer" layout. For order: does a partly right sequence get partial credit like multi-select?</li>
+      <li>Voice: Chrome’s SpeechRecognition sends audio to Google. Does that fit the Disclosure, or do we record and transcribe on our servers? How long may grading a free-text answer take (no wait state drawn)?</li>
+      <li>Android Back and End session mid-session: leave at once (prototype) or confirm?</li>
+      <li>Sheet grabber: draggable (to expand long explanations) or remove it?</li>
+      <li>Does a reported question still count toward mastery until the training team reviews it?</li>
+      <li>Design-system proposal (a DS decision, not changed in these screens): in dark theme the DS primary fill (<code>--brand</code>, light cyan #6FC3DC) is the brightest element on screen and competes with the answer band. Proposal: a deeper dark-mode primary button fill, about #2A7F99 with near-white text (contrast to be AA-checked before adoption), while cyan stays for focus rings, links and bars.</li>
+      <li>Back to basics (Today): what triggers the level drop (threshold, window), and does the learner get the reason anywhere?</li>
+      <li>Not drawn: Join errors (expired invite, account exists), push permission denied, the review screen behind Summary mistake rows, the "Flag an unfair result" flow, Sign out confirmation, a quick question that is expired or already answered, slow or failed session loading.</li>
+    </ol>
+  </section>
+
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"brand":{"editor":"enum","options":["default","plum"],"default":"default","section":"Theme"},"$preview":{"width":1280,"height":12940}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      theme: this.props.theme ?? 'light',
+      brand: this.props.brand ?? 'default'
+    };
+  }
+}
+</script>
+</body>
+</html>

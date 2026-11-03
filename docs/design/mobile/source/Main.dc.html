@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Join Northwind Logistics</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="lq.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" data-brand="{{brand}}" style="width: {{w}}px; height: {{h}}px; font-family: var(--font-sans); color: var(--ink);">
+  <main class="scroll" style="padding: 32px 16px 16px; display: flex; flex-direction: column; gap: 24px;">
+
+    <section aria-labelledby="join-role" style="display: flex; flex-direction: column; align-items: flex-start; gap: 16px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span class="org-logo org-logo-lg" aria-hidden="true">NW</span>
+        <span class="t-label">Northwind Logistics</span>
+      </div>
+      <h1 id="join-role" class="t-title1">Train as a warehouse picker</h1>
+    </section>
+
+    <form style="display: flex; flex-direction: column; gap: 16px;" aria-label="Create your account">
+      <div class="field">
+        <label class="field-label" for="join-email">Email</label>
+        <div class="input-wrap">
+          <input id="join-email" class="input" type="email" value="jordan.reyes@northwind.example" readonly aria-describedby="join-email-note">
+          <span class="input-icon icon-btn" style="color: var(--ink-muted); cursor: default;" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
+          </span>
+        </div>
+        <span id="join-email-note" class="sr-only">Set by your invite</span>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="join-name">Your name</label>
+        <input id="join-name" class="input" type="text" value="Jordan Reyes" autocomplete="name">
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="join-pw">Create a password</label>
+        <div class="input-wrap">
+          <input id="join-pw" class="input" type="{{pwType}}" value="{{pw}}" onChange="{{onPw}}" autocomplete="new-password" aria-describedby="join-pw-rule">
+          <button class="input-icon icon-btn" type="button" aria-label="Show password" aria-pressed="{{pwShown}}" onClick="{{togglePw}}" style="color: var(--ink-muted);">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+          </button>
+        </div>
+        <span id="join-pw-rule" class="t-caption" style="color: var(--ink-muted);">At least 8 characters</span>
+      </div>
+
+      <sc-if value="{{canJoin}}" hint-placeholder-val="{{ true }}">
+        <a class="btn btn-primary btn-lg btn-block" href="Disclosure.dc.html">Create account</a>
+      </sc-if>
+      <sc-if value="{{cannotJoin}}" hint-placeholder-val="{{ false }}">
+        <button class="btn btn-lg btn-block" type="button" disabled>Create account</button>
+      </sc-if>
+    </form>
+
+    <div style="display: flex; align-items: center; gap: 12px;" aria-hidden="true">
+      <span class="divider" style="flex: 1;"></span>
+      <span class="t-caption" style="color: var(--ink-muted);">or</span>
+      <span class="divider" style="flex: 1;"></span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 4px; align-items: center;">
+      <a class="btn btn-secondary btn-lg btn-block" href="Disclosure.dc.html">Continue with Facebook</a>
+      <a class="link-btn" href="Disclosure.dc.html">I already have an account</a>
+    </div>
+  </main>
+
+  <footer style="flex: none; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 16px calc(12px + var(--safe-bottom));">
+    <svg viewBox="0 0 64 64" width="20" height="20" aria-hidden="true"><mask id="lqm-join" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="#fff"></rect><circle cx="48" cy="48" r="13"></circle></mask><circle cx="32" cy="32" r="19" fill="none" stroke="var(--brand)" stroke-width="14" mask="url(#lqm-join)"></circle><circle cx="48" cy="48" r="9" fill="#F2A900"></circle></svg>
+    <span class="t-caption" style="color: var(--ink-muted);">Training by Learn Quiz</span>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"brand":{"editor":"enum","options":["default","plum"],"default":"default","section":"Theme"},"w":{"editor":"int","default":360,"section":"Frame"},"h":{"editor":"int","default":740,"section":"Frame"},"$preview":{"width":360,"height":740}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { pw: 'forklift-77', shown: false };
+  }
+  renderVals() {
+    const pw = this.state.pw;
+    const ok = pw.length >= 8;
+    return {
+      theme: this.props.theme ?? 'light',
+      brand: this.props.brand ?? 'default',
+      w: this.props.w ?? 360,
+      h: this.props.h ?? 740,
+      pw,
+      pwType: this.state.shown ? 'text' : 'password',
+      pwShown: this.state.shown ? 'true' : 'false',
+      onPw: (e) => this.setState({ pw: e.target.value }),
+      togglePw: () => this.setState({ shown: !this.state.shown }),
+      canJoin: ok,
+      cannotJoin: !ok
+    };
+  }
+}
+</script>
+</body>
+</html>

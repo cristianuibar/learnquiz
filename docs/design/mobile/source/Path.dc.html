@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Path</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="lq.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" data-brand="{{brand}}" style="width: {{w}}px; height: {{h}}px; font-family: var(--font-sans); color: var(--ink);">
+  <main class="scroll" style="padding: 24px 16px 24px; display: flex; flex-direction: column; gap: 24px;">
+
+    <header style="display: flex; flex-direction: column; gap: 12px;">
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <h1 class="t-title1">Warehouse picker</h1>
+        <p class="t-body muted num">66% of 85% benchmark · Day 16 of 30</p>
+      </div>
+      <div class="bar" role="progressbar" aria-label="Role mastery" aria-valuenow="66" aria-valuemin="0" aria-valuemax="100" aria-valuetext="66%, benchmark 85%">
+        <span class="bar-fill" style="width: 66%;"></span>
+        <span class="bar-bench" style="left: 85%;"></span>
+      </div>
+    </header>
+
+    <ol aria-label="Units" style="display: flex; flex-direction: column; gap: 8px;">
+      <sc-for list="{{units}}" as="u" hint-placeholder-count="5">
+        <li style="position: relative;">
+          <span aria-hidden="true" style="position: absolute; left: 15px; width: 2px; background: var(--border); {{u.lineStyle}}"></span>
+          <a href="Unit.dc.html" class="row-link" aria-label="{{u.aria}}" style="position: relative; display: flex; align-items: center; gap: 12px; min-height: var(--target);">
+
+            <span aria-hidden="true" style="flex: none; width: 32px; height: 32px; border-radius: var(--radius-full); display: inline-flex; align-items: center; justify-content: center; {{u.nodeStyle}}">
+              <sc-if value="{{u.showNumber}}" hint-placeholder-val="{{ true }}">
+                <span class="t-label num">{{u.n}}</span>
+              </sc-if>
+              <sc-if value="{{u.isMastered}}" hint-placeholder-val="{{ false }}">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12.5l5 5L19.5 7"></path></svg>
+              </sc-if>
+              <sc-if value="{{u.isLocked}}" hint-placeholder-val="{{ false }}">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
+              </sc-if>
+            </span>
+
+            <span class="card card-tight" style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+              <span style="display: flex; align-items: baseline; justify-content: space-between; gap: 8px;">
+                <span style="display: inline-flex; align-items: baseline; gap: 8px; min-width: 0;">
+                  <span class="t-label" style="font-size: 17px; line-height: 24px;">{{u.name}}</span>
+                  <sc-if value="{{u.isNext}}" hint-placeholder-val="{{ false }}">
+                    <span class="t-caption" style="color: var(--brand);">Next</span>
+                  </sc-if>
+                </span>
+                <span class="t-label num" style="{{u.pctStyle}}">{{u.pctText}}</span>
+              </span>
+              <span class="bar" aria-hidden="true" style="display: block;">
+                <sc-if value="{{u.hasFill}}" hint-placeholder-val="{{ true }}">
+                  <span class="bar-fill" style="width: {{u.pct}}%;"></span>
+                </sc-if>
+                <sc-if value="{{u.isEstimate}}" hint-placeholder-val="{{ false }}">
+                  <span class="bar-est" style="width: {{u.pct}}%;"></span>
+                </sc-if>
+                <span class="bar-bench" style="left: 85%;"></span>
+              </span>
+              <sc-if value="{{u.hasMeta}}" hint-placeholder-val="{{ true }}">
+              <span style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                <sc-if value="{{u.isMastered}}" hint-placeholder-val="{{ false }}">
+                  <span class="chip chip-mastered">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12.5l5 5L19.5 7"></path></svg>
+                    Mastered
+                  </span>
+                </sc-if>
+                <sc-if value="{{u.isEstimate}}" hint-placeholder-val="{{ false }}">
+                  <span class="chip chip-estimate">Estimate</span>
+                </sc-if>
+                <sc-if value="{{u.isNone}}" hint-placeholder-val="{{ false }}">
+                  <span class="chip chip-none">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-dasharray="2 5.07"></circle></svg>
+                    Not started
+                  </span>
+                </sc-if>
+                <sc-if value="{{u.hasCritical}}" hint-placeholder-val="{{ true }}">
+                  <span class="tag num">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>
+                    {{u.critical}} critical
+                  </span>
+                </sc-if>
+              </span>
+              </sc-if>
+            </span>
+          </a>
+        </li>
+      </sc-for>
+    </ol>
+  </main>
+
+  <nav class="nav" aria-label="Main">
+    <a href="Today.dc.html"><span class="nav-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10l8-7 8 7v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"></path><path d="M10 21v-6h4v6"></path></svg></span>Today</a>
+    <a href="Path.dc.html" aria-current="page"><span class="nav-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="5" r="2"></circle><circle cx="18" cy="19" r="2"></circle><path d="M8 5h8a3 3 0 0 1 0 6H8a3 3 0 0 0 0 6h8"></path></svg></span>Path</a>
+    <a href="Profile.dc.html"><span class="nav-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="7" r="4"></circle><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path></svg></span>Profile</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"brand":{"editor":"enum","options":["default","plum"],"default":"default","section":"Theme"},"w":{"editor":"int","default":360,"section":"Frame"},"h":{"editor":"int","default":740,"section":"Frame"},"$preview":{"width":360,"height":740}}'>
+class Component extends DCLogic {
+  renderVals() {
+    // Path node (ADDITION): a 32px numbered circle on a 2px rail. The bar carries progress; the node
+    // carries kind only. in progress = solid border-strong; estimate = dashed; not started = dotted;
+    // mastered = check on brand-tint; locked = lock on sunken.
+    const ring = 'border: 2px %s var(--border-strong); background: var(--surface-page); color: var(--ink);';
+    const raw = [
+      { name: 'Receiving', pct: 82, kind: 'measured', critical: 3 },
+      { name: 'Picking', pct: 68, kind: 'measured', critical: 0, next: true },
+      { name: 'Scanning', pct: 74, kind: 'measured', critical: 0 },
+      { name: 'Safety', pct: 40, kind: 'estimate', critical: 3 },
+      { name: 'Returns', pct: 0, kind: 'none', critical: 0 }
+    ];
+    const last = raw.length - 1;
+    const units = raw.map((u, i) => {
+      const isMeasured = u.kind === 'measured';
+      const isEstimate = u.kind === 'estimate';
+      const isNone = u.kind === 'none';
+      const isMastered = isMeasured && u.pct >= 85;
+      const isLocked = u.kind === 'locked';
+      const statusWord = isMastered ? 'Mastered' : isMeasured ? 'Still learning' : isEstimate ? 'Placement estimate, not practised yet' : isLocked ? 'Locked' : 'Not started';
+      const pctText = isEstimate ? '~' + u.pct + '%' : u.pct + '%';
+      const lineStyle = i === 0 ? 'top: 50%; bottom: -8px;' : (i === last ? 'top: 0; bottom: 50%;' : 'top: 0; bottom: -8px;');
+      return {
+        n: i + 1,
+        name: u.name,
+        pct: u.pct,
+        pctText,
+        pctStyle: isEstimate || isNone ? 'color: var(--ink-muted);' : '',
+        isMeasured: isMeasured && !isMastered,
+        isEstimate,
+        isNone,
+        isMastered,
+        isLocked,
+        hasFill: isMeasured,
+        showNumber: !isMastered && !isLocked,
+        isNext: !!u.next,
+        // Current unit (the one Today names): brand ring and brand number.
+        nodeStyle: u.next ? 'border: 2px solid var(--brand); background: var(--surface-page); color: var(--brand);'
+          : isMastered ? 'background: var(--brand-tint); color: var(--brand);'
+          : isLocked ? 'background: var(--surface-sunken); color: var(--ink-muted);'
+          : ring.replace('%s', isEstimate ? 'dashed' : (isNone ? 'dotted' : 'solid')),
+        // Chips only where the state differs from the default (in progress).
+        hasMeta: isMastered || isEstimate || isNone || isLocked || u.critical > 0,
+        hasCritical: u.critical > 0,
+        critical: u.critical,
+        lineStyle,
+        aria: 'Unit ' + (i + 1) + ', ' + u.name + (u.next ? ', Next up' : '') + ': ' + (isEstimate ? 'about ' + u.pct + '%' : u.pct + '%') + ', ' + statusWord + (u.critical > 0 ? ', ' + u.critical + ' critical concepts' : '')
+      };
+    });
+    return {
+      theme: this.props.theme ?? 'light',
+      brand: this.props.brand ?? 'default',
+      w: this.props.w ?? 360,
+      h: this.props.h ?? 740,
+      units
+    };
+  }
+}
+</script>
+</body>
+</html>

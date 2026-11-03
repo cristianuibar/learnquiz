@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Today</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="lq.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" data-brand="{{brand}}" style="width: {{w}}px; height: {{h}}px; font-family: var(--font-sans); color: var(--ink);">
+
+  <header class="topbar" style="padding: var(--safe-top) 16px 0; justify-content: space-between;">
+    <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+      <span class="org-logo" aria-hidden="true">NW</span>
+      <p class="t-label">Northwind Logistics</p>
+    </div>
+    <h1 class="sr-only">Today</h1>
+    <sc-if value="{{showStreak}}" hint-placeholder-val="{{ true }}">
+      <span class="{{streakClass}}">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c3 3.5 6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 3-7.5 6-11z"></path><path d="M12 18a2.5 2.5 0 0 0 2.5-2.5c0-1.5-1.5-2.5-2.5-4-1 1.5-2.5 2.5-2.5 4A2.5 2.5 0 0 0 12 18z"></path></svg>
+        <span>{{streakDays}}<span class="sr-only"> in a row</span></span>
+      </span>
+    </sc-if>
+  </header>
+
+  <main class="scroll" style="padding: 8px 16px 24px; display: flex; flex-direction: column; gap: 24px;">
+
+    <sc-if value="{{isOffline}}" hint-placeholder-val="{{ false }}">
+      <div class="sunken" role="status" style="display: flex; flex-direction: column; gap: 12px; padding: 16px;">
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-top: 2px;"><path d="M3 3l18 18M8.5 16.5a5 5 0 0 1 7 0M5 12.5a10 10 0 0 1 4-2.3M19 12.5a10 10 0 0 0-2.6-1.8M2 8.8a15 15 0 0 1 4.3-2.6M22 8.8A15 15 0 0 0 10.6 5M12 20h.01"></path></svg>
+          <div style="display: flex; flex-direction: column;">
+            <p class="t-label">You’re offline</p>
+            <p class="t-body">Sessions need a connection.</p>
+          </div>
+        </div>
+        <a class="btn btn-secondary btn-block" href="Today.dc.html">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"></path></svg>
+          Try again
+        </a>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{showPlayCard}}" hint-placeholder-val="{{ true }}">
+      <section class="card" aria-labelledby="today-lead" style="display: flex; flex-direction: column; gap: 32px; padding: 24px 16px 16px; {{leadStyle}}">
+        <sc-if value="{{showMeta}}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <h2 id="today-lead" class="t-title2">{{leadTitle}}</h2>
+            <p class="t-body num" style="{{leadMetaStyle}}">{{leadMeta}}</p>
+          </div>
+        </sc-if>
+        <sc-if value="{{isGenerating}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <h2 id="today-lead" class="t-title2">Building your questions</h2>
+            <div role="progressbar" aria-label="Questions ready" aria-valuenow="28" aria-valuemin="0" aria-valuemax="42" aria-valuetext="28 of 42 topics ready" style="position: relative; height: 8px; border: 1px solid currentColor; border-radius: var(--radius-full);">
+              <span style="position: absolute; left: 0; top: 0; bottom: 0; width: 66.67%; border-radius: var(--radius-full); background: currentColor;"></span>
+            </div>
+            <p class="t-body num" role="status" aria-live="polite" style="{{leadMetaStyle}}">28 of 42 topics ready</p>
+          </div>
+        </sc-if>
+        <sc-if value="{{canPlay}}" hint-placeholder-val="{{ true }}">
+          <a class="btn btn-accent btn-lg btn-block num" href="QChoice.dc.html" style="{{leadBtnStyle}}">{{playLabel}}</a>
+        </sc-if>
+        <sc-if value="{{isOffline}}" hint-placeholder-val="{{ false }}">
+          <button class="btn btn-lg btn-block num" type="button" disabled>{{playLabel}}</button>
+        </sc-if>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{isDone}}" hint-placeholder-val="{{ false }}">
+      <section class="card" aria-labelledby="today-done" style="display: flex; flex-direction: column; gap: 24px; padding: 24px 16px 16px;">
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <h2 id="today-done" class="t-title2" style="display: flex; align-items: center; gap: 8px;">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--brand);"><path d="M4.5 12.5l5 5L19.5 7"></path></svg>
+            Done for today
+          </h2>
+          <p class="t-body muted">Next reviews tomorrow</p>
+        </div>
+        <a class="btn btn-secondary btn-block" href="QChoice.dc.html">Practise anyway</a>
+      </section>
+    </sc-if>
+
+    <section aria-labelledby="today-quest" style="display: flex; flex-direction: column; gap: 8px;">
+      <h2 id="today-quest" class="section-title">Daily quest</h2>
+      <ul class="card rows" style="padding: 0 16px;">
+        <sc-for list="{{quests}}" as="q" hint-placeholder-count="2">
+          <li class="row">
+            <sc-if value="{{q.done}}" hint-placeholder-val="{{ false }}">
+              <span role="img" aria-label="Done" style="flex: none; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: var(--radius-full); background: var(--brand-tint); color: var(--brand);">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12.5l5 5L19.5 7"></path></svg>
+              </span>
+            </sc-if>
+            <sc-if value="{{q.notDone}}" hint-placeholder-val="{{ true }}">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Not done" style="color: var(--ink-muted);"><circle cx="12" cy="12" r="9" stroke-dasharray="2 5.07"></circle></svg>
+            </sc-if>
+            <span class="t-body" style="flex: 1; min-width: 0;">{{q.label}}</span>
+            <sc-if value="{{q.hasCount}}" hint-placeholder-val="{{ true }}">
+              <span class="t-caption muted num">{{q.count}}</span>
+            </sc-if>
+          </li>
+        </sc-for>
+      </ul>
+    </section>
+
+    <a class="card row-link" href="Profile.dc.html" aria-label="{{roleLinkLabel}}" style="display: flex; flex-direction: column; gap: 12px;">
+      <span style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+        <span class="t-label">Warehouse picker</span>
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--ink-muted);"><path d="M9 6l6 6-6 6"></path></svg>
+      </span>
+      <span class="bar" role="progressbar" aria-label="Role mastery" aria-valuenow="{{rolePct}}" aria-valuemin="0" aria-valuemax="100" aria-valuetext="{{roleValueText}}" style="display: block;">
+        <sc-if value="{{roleStarted}}" hint-placeholder-val="{{ true }}">
+          <span class="bar-fill" style="width: {{rolePct}}%;"></span>
+        </sc-if>
+        <span class="bar-bench" style="left: 85%;"></span>
+      </span>
+      <span style="display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px;">
+        <sc-if value="{{roleStarted}}" hint-placeholder-val="{{ true }}">
+          <span class="t-label num">{{rolePct}}%<span class="muted" style="font-weight: 500;"> of 85% benchmark</span></span>
+        </sc-if>
+        <sc-if value="{{roleNotStarted}}" hint-placeholder-val="{{ false }}">
+          <span class="chip chip-none">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-dasharray="2 5.07"></circle></svg>
+              Not started
+            </span>
+        </sc-if>
+        <span class="t-caption muted num">{{dayLabel}}</span>
+      </span>
+    </a>
+  </main>
+
+  <nav class="nav" aria-label="Main">
+    <a href="Today.dc.html" aria-current="page"><span class="nav-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10l8-7 8 7v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"></path><path d="M10 21v-6h4v6"></path></svg></span>Today</a>
+    <a href="Path.dc.html"><span class="nav-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="5" r="2"></circle><circle cx="18" cy="19" r="2"></circle><path d="M8 5h8a3 3 0 0 1 0 6H8a3 3 0 0 0 0 6h8"></path></svg></span>Path</a>
+    <a href="Profile.dc.html"><span class="nav-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="7" r="4"></circle><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path></svg></span>Profile</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"brand":{"editor":"enum","options":["default","plum"],"default":"default","section":"Theme"},"w":{"editor":"int","default":360,"section":"Frame"},"h":{"editor":"int","default":740,"section":"Frame"},"state":{"editor":"enum","options":["normal","first","basics","done","generating","offline"],"default":"normal","section":"Variant"},"$preview":{"width":360,"height":740}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'light';
+    const s = this.props.state ?? 'normal';
+    const dark = theme === 'dark';
+    const isFirst = s === 'first';
+    const isDone = s === 'done';
+    const isGenerating = s === 'generating';
+    const isOffline = s === 'offline';
+    const isBasics = s === 'basics';
+    const isPetrol = s === 'normal' || isFirst || isBasics || isGenerating;
+
+    // Lead card ground. Light: petrol fill with on-brand text, the saffron button sits on it (3.8:1 edge).
+    // Dark: --brand turns light cyan, where saffron has no edge (1.0:1), so the same card uses the
+    // deep --brand-tint ground with ink text (saffron 6.7:1 on it). Offline: calm surface card.
+    let leadStyle = '';
+    let leadMetaStyle = 'color: var(--ink-muted);';
+    let leadBtnStyle = '';
+    if (isPetrol && !dark) {
+      leadStyle = 'background: var(--brand); border-color: var(--brand); color: var(--on-brand);';
+      leadMetaStyle = 'color: var(--on-brand);';
+      leadBtnStyle = 'outline-color: var(--on-brand);';
+    } else if (isPetrol && dark) {
+      leadStyle = 'background: var(--brand-tint); border-color: var(--brand-tint); color: var(--ink);';
+    }
+
+    // 6 reviews due today: 2 already cleared from pushes, 4 left in the session (the hero names those).
+    const reviewsCount = isDone ? '6 of 6' : '2 of 6';
+    const quests = [];
+    // Day 1 has nothing to review yet, so the quest is the session alone.
+    if (!isFirst) quests.push({ label: 'Clear your reviews', done: isDone, notDone: !isDone, count: reviewsCount, hasCount: true });
+    quests.push({ label: 'One session', done: isDone, notDone: !isDone, count: '', hasCount: false });
+
+    const rolePct = isFirst ? 0 : 66;
+    return {
+      theme,
+      brand: this.props.brand ?? 'default',
+      w: this.props.w ?? 360,
+      h: this.props.h ?? 740,
+      // Saffron = exactly one thing. normal/first/basics/generating: the Play button, so the pill is quiet
+      // (first has no streak). done: the extended streak is the reward and scales in once. offline: nothing bright.
+      showStreak: !isFirst,
+      streakClass: isDone ? 'streak pop-in num' : 'streak streak-quiet num',
+      streakDays: isDone ? '5 days' : '4 days',
+      isOffline,
+      isDone,
+      isGenerating,
+      showMeta: !isGenerating,
+      showPlayCard: isPetrol || isOffline,
+      canPlay: isPetrol,
+      leadStyle,
+      leadMetaStyle,
+      leadBtnStyle,
+      // The button carries the duration; the meta line never repeats it.
+      leadTitle: isFirst ? 'Your first session' : (isBasics ? 'Back to basics: Receiving' : '4 reviews, then Picking'),
+      leadMeta: isFirst ? 'Starts with Receiving' : (isBasics ? 'Full explanations · 20 questions' : '20 questions'),
+      playLabel: isGenerating ? 'Play Receiving · 5 min' : 'Play · 5 min',
+      quests,
+      rolePct,
+      roleStarted: !isFirst,
+      roleNotStarted: isFirst,
+      roleValueText: isFirst ? 'Not started, benchmark 85%' : '66% of 85% benchmark',
+      roleLinkLabel: isFirst ? 'Warehouse picker: not started, benchmark 85%, day 1 of 30' : 'Warehouse picker: 66% of 85% benchmark, day 16 of 30',
+      dayLabel: isFirst ? 'Day 1 of 30' : 'Day 16 of 30'
+    };
+  }
+}
+</script>
+</body>
+</html>

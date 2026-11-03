@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Session summary</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="lq.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" data-brand="{{brand}}" style="width: {{w}}px; height: {{h}}px; font-family: var(--font-sans); color: var(--ink);">
+  <main class="scroll" style="padding: 32px 16px 24px; display: flex; flex-direction: column; gap: 32px;">
+
+    <section aria-labelledby="sm-title" style="display: flex; flex-direction: column; gap: 16px;">
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <h1 id="sm-title" class="t-title1">Session done</h1>
+        <p class="t-body-lg num muted">16 of 20 correct · 4:52</p>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
+        <span class="xp">+180 XP</span>
+        <span class="streak streak-quiet pop-in">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c3 3.5 6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 3-7.5 6-11z"></path><path d="M12 18a2.5 2.5 0 0 0 2.5-2.5c0-1.5-1.5-2.5-2.5-4-1 1.5-2.5 2.5-2.5 4A2.5 2.5 0 0 0 12 18z"></path></svg>
+          <span class="num">5 days in a row</span>
+        </span>
+      </div>
+      <aside class="sunken" aria-label="Coach note" style="display: flex; gap: 12px; align-items: flex-start;">
+        <svg viewBox="0 0 64 64" width="20" height="20" aria-hidden="true" style="margin-top: 1px;"><mask id="lqm-summary" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="#fff"></rect><circle cx="48" cy="48" r="13"></circle></mask><circle cx="32" cy="32" r="19" fill="none" stroke="var(--brand)" stroke-width="14" mask="url(#lqm-summary)"></circle><circle cx="48" cy="48" r="9" fill="#F2A900"></circle></svg>
+        <p class="t-body">Tomorrow: 5 reviews, then pedestrian lanes. Damaged-pallet steps come back first.</p>
+      </aside>
+    </section>
+
+    <section aria-labelledby="sm-moved" style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="sm-moved" class="section-title">Mastery moved</h2>
+      <ul class="rows">
+        <sc-for list="{{moved}}" as="m" hint-placeholder-count="3">
+          <li style="display: flex; flex-direction: column; gap: 8px; padding: 12px 0;">
+            <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;">
+              <span class="t-body" style="min-width: 0;">{{m.name}}</span>
+              <span class="t-label num" style="white-space: nowrap;"><span class="muted" style="font-weight: 500;">{{m.beforeText}}</span> → {{m.afterText}}</span>
+            </div>
+            <div class="bar" role="progressbar" aria-label="{{m.ariaName}}" aria-valuenow="{{m.after}}" aria-valuemin="0" aria-valuemax="100" aria-valuetext="{{m.valueText}}">
+              <i class="bar-before" style="width: {{m.beforeW}};"></i>
+              <i class="bar-gain" style="left: {{m.beforeW}}; width: {{m.gainW}};"></i>
+              <i class="bar-bench" style="left: 85%;"></i>
+            </div>
+          </li>
+        </sc-for>
+      </ul>
+    </section>
+
+    <section aria-label="Mistakes" style="border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+      <button type="button" aria-expanded="{{mistakesExpanded}}" onClick="{{toggleMistakes}}" style="display: flex; align-items: center; gap: 12px; width: 100%; min-height: var(--target); padding: 0; border: 0; background: none; color: var(--ink); text-align: left; cursor: pointer;">
+        <span class="section-title" style="flex: 1;">Mistakes <span class="num">(4)</span></span>
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--ink-muted); transform: {{chevron}}; transition: transform var(--duration-fast) var(--ease-out);"><path d="M6 9l6 6 6-6"></path></svg>
+      </button>
+      <sc-if value="{{showMistakes}}" hint-placeholder-val="{{ false }}">
+        <ul class="rows" style="border-top: 1px solid var(--border);">
+          <sc-for list="{{mistakes}}" as="x" hint-placeholder-count="4">
+            <li>
+              <a class="row row-link" href="QChoice.dc.html" aria-label="{{x.aria}}" style="padding: 12px 0;">
+                <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+                  <span class="t-body">{{x.name}}</span>
+                  <sc-if value="{{x.sure}}" hint-placeholder-val="{{ false }}">
+                    <span class="t-caption muted">You were sure</span>
+                  </sc-if>
+                </span>
+                <span class="muted" style="display: inline-flex;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></span>
+              </a>
+            </li>
+          </sc-for>
+        </ul>
+      </sc-if>
+    </section>
+  </main>
+
+  <div class="dock" style="gap: 4px;">
+    <a class="btn btn-primary btn-lg btn-block" href="OptIn.dc.html">Continue</a>
+    <a class="link-btn" href="QChoice.dc.html" style="align-self: center;">Another session</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"brand":{"editor":"enum","options":["default","plum"],"default":"default","section":"Theme"},"w":{"editor":"int","default":360,"section":"Frame"},"h":{"editor":"int","default":740,"section":"Frame"},"$preview":{"width":360,"height":740}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { showMistakes: false };
+  }
+  renderVals() {
+    const moved = [
+      { name: 'Damaged pallet: record before moving', before: 58, after: 72 },
+      { name: 'Short picks', before: 55, after: 63 },
+      { name: 'Check digits', before: 58, after: 70 }
+    ].map((m) => ({
+      name: m.name,
+      after: m.after,
+      beforeText: m.before + '%',
+      afterText: m.after + '%',
+      beforeW: m.before + '%',
+      gainW: (m.after - m.before) + '%',
+      ariaName: m.name + ' mastery',
+      valueText: m.after + '%, up from ' + m.before + '%. Benchmark 85%'
+    }));
+    const mistakes = [
+      { name: 'Damaged pallet, what comes first', sure: true },
+      { name: 'Pick path order', sure: false },
+      { name: 'Double beep = wrong item', sure: false },
+      { name: '23 kg lift limit', sure: false }
+    ].map((x) => ({
+      name: x.name,
+      sure: x.sure,
+      aria: 'Review: ' + x.name + (x.sure ? '. You were sure' : '')
+    }));
+    const show = this.state.showMistakes;
+    return {
+      theme: this.props.theme ?? 'light',
+      brand: this.props.brand ?? 'default',
+      w: this.props.w ?? 360,
+      h: this.props.h ?? 740,
+      moved,
+      mistakes,
+      showMistakes: show,
+      mistakesExpanded: show ? 'true' : 'false',
+      chevron: show ? 'rotate(180deg)' : 'none',
+      toggleMistakes: () => this.setState({ showMistakes: !this.state.showMistakes })
+    };
+  }
+}
+</script>
+</body>
+</html>
