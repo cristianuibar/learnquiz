@@ -358,7 +358,8 @@ async function topUpFrontier(db: Db, learnerId: string, topic: TopicRow, reserve
     placing
       ? db.select({ concept: concepts }).from(concepts).innerJoin(units, eq(units.id, concepts.unitId))
         .where(and(eq(concepts.topicId, topic.id), lt(units.order, 2))).orderBy(asc(units.order), asc(concepts.order)).limit(5)
-      : loadFrontier(db, learnerId, topic.id).then((f) => f.slice(0, 4)),
+      // A session practises at most the first 4 frontier concepts, so the next 4 cover a session that masters them all.
+      : loadFrontier(db, learnerId, topic.id).then((f) => f.slice(0, 8)),
   ])
   const seen = new Set([...seenRows.map((r) => r.itemId), ...reserved])
   const targetDifficulty = targetFor(level)
