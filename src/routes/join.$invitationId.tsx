@@ -14,7 +14,7 @@ export const Route = createFileRoute('/join/$invitationId')({
 
 const closed: Record<string, string> = {
   expired: 'This invite has expired. Ask your company for a new one.',
-  canceled: 'This invite was cancelled. Ask your company for a new one.',
+  canceled: 'This invite was revoked. Ask your company for a new one.',
   accepted: 'This invite was already used.',
   rejected: 'This invite was declined. Ask your company for a new one.',
 }
