@@ -22,7 +22,7 @@ import { asItem, chunks, ensureConceptItems, httpError, loadPKnown, mean, target
 import { liveConcept } from '@/server/live-concept'
 import { requireLearnerId } from '@/server/session'
 import { assertWithinDailyCap } from '@/server/model-cap'
-import { learnerCanAccess, notFlaggedBy, openFlag, seedLearnerTopic } from '@/server/topic-access'
+import { learnerCanAccess, notFlaggedBy, openFlag, roleCompany, seedLearnerTopic } from '@/server/topic-access'
 
 // shortcut: 12 instead of the spec's 20 while generation is slow, raise it once items are generated ahead of play.
 export const SESSION_SIZE = 12
@@ -77,6 +77,12 @@ async function ownedTopic(db: Db, learnerId: string, topicId: string) {
 }
 
 // Role topics play stored items graded without a model, so short answers stay out.
+// A role topic with nothing to play yet names the company whose training is being prepared.
+async function preparingMessage(db: Db, jobRoleId: string) {
+  const company = await roleCompany(db, jobRoleId)
+  return company ? `Your training at ${company} is being prepared` : 'Your training is being prepared'
+}
+
 async function storedItems(db: Db, learnerId: string, topicId: string, conceptId: string) {
   const rows = await db.select().from(items)
     .where(and(eq(items.conceptId, conceptId), eq(items.topicId, topicId), eq(items.status, 'active'), ne(items.format, 'short'), notFlaggedBy(db, learnerId)))
@@ -197,7 +203,7 @@ export const startPlacement = createServerFn({ method: 'POST' })
         picks.map((c) => ensureConceptItems(db, learnerId, c, topic, { targetDifficulty: PLACEMENT.start, spread: true, sessionId })),
       )
     const pool = generated.flatMap((list, i) => list.map((it) => ({ id: it.id, conceptId: sources[i].id, difficulty: it.difficultyPrior })))
-    if (!pool.length && topic.jobRoleId !== null) throw httpError('Your training is being prepared', 409)
+    if (!pool.length && topic.jobRoleId !== null) throw httpError(await preparingMessage(db, topic.jobRoleId), 409)
     const first = pickNext(PLACEMENT.start, pool, [])
     if (!first) throw httpError('Could not generate placement questions', 502)
 
@@ -291,7 +297,7 @@ export const startSession = createServerFn({ method: 'POST' })
 
     const rulesQueue = composeSession({ size: SESSION_SIZE, due, frontier: frontierInput, closers, targetDifficulty })
     if (!rulesQueue.length) {
-      if (topic.jobRoleId !== null) throw httpError('Your training is being prepared. Try again in a few minutes.', 503)
+      if (topic.jobRoleId !== null) throw httpError(`${await preparingMessage(db, topic.jobRoleId)}. Try again in a few minutes.`, 503)
       throw httpError('Nothing to practice yet', 409)
     }
 

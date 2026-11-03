@@ -1236,7 +1236,7 @@ describe('employees training on their role topic', () => {
 
   it('asks the employee to wait while the role topic has no stored items', async () => {
     seedRoleTopic(0)
-    await expect(startPlacement({ data: { topicId: 'rt' } })).rejects.toMatchObject({ status: 409, message: 'Your training is being prepared' })
+    await expect(startPlacement({ data: { topicId: 'rt' } })).rejects.toMatchObject({ status: 409, message: 'Your training at o1 is being prepared' })
     expect(count('sessions')).toBe(0)
     expect(fetchModel).not.toHaveBeenCalled()
   })
@@ -1244,7 +1244,7 @@ describe('employees training on their role topic', () => {
   it('waits for the shared role questions, then starts a session on them without any model call', async () => {
     seedRoleTopic(0)
     raw.exec("UPDATE concepts SET gen_status = 'pending' WHERE topic_id = 'rt'")
-    await expect(startSession({ data: { topicId: 'rt' } })).rejects.toMatchObject({ status: 503, message: expect.stringContaining('being prepared') })
+    await expect(startSession({ data: { topicId: 'rt' } })).rejects.toMatchObject({ status: 503, message: 'Your training at o1 is being prepared. Try again in a few minutes.' })
     expect(count('sessions')).toBe(0)
     // The company queue stores the concept's questions; the next start plays them.
     const item = raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
