@@ -34,7 +34,6 @@ export function MultipleChoiceBody({ item, answer, onAnswer, marks, disabled }: 
             mark={marks?.[option.id]}
             disabled={disabled || marks !== null}
             tabIndex={Platform.OS === 'web' ? (index === active ? 0 : -1) : undefined}
-            onFocus={() => { if (!disabled && marks === null && Platform.OS === 'android') onAnswer({ optionId: option.id }) }}
             onPress={() => onAnswer({ optionId: option.id })}
             onKeyDown={Platform.OS === 'web' ? (event) => onKeyDown(event, index) : undefined}
           >

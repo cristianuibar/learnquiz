@@ -29,7 +29,7 @@ export function OptionRow({ ref, children, variant, selected, mark, disabled, st
       accessible
       accessibilityRole={variant === 'radio' ? 'radio' : 'checkbox'}
       accessibilityLabel={label ? `${children}, ${label}` : children}
-      accessibilityState={{ checked: selected, disabled: unavailable }}
+      accessibilityState={{ checked: selected, disabled: !!disabled && mark == null }}
       disabled={unavailable}
       focusable={!unavailable && props.tabIndex !== -1}
       tabIndex={unavailable ? -1 : props.tabIndex}

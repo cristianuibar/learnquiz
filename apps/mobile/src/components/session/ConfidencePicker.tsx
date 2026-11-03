@@ -53,7 +53,7 @@ export function ConfidencePicker({ value, onChange, disabled = false, compact = 
               focusable={!disabled}
               tabIndex={Platform.OS === 'web' ? (!disabled && index === active ? 0 : -1) : undefined}
               onPress={() => onChange(choice.value)}
-              onFocus={() => { setFocused(index); if (!disabled && Platform.OS === 'android') onChange(choice.value) }}
+              onFocus={() => setFocused(index)}
               onBlur={() => setFocused(null)}
               {...{ onKeyDown: Platform.OS === 'web' ? (event: NativeSyntheticEvent<{ key: string }>) => onKeyDown(event, index) : undefined }}
               style={({ pressed }) => ({

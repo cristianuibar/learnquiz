@@ -15,7 +15,7 @@ export function CheckButton({ mode = 'check', format, busy, ...props }: CheckBut
       size="lg"
       busy={busy}
       icon={mode === 'retry' ? RetryIcon : undefined}
-      accessibilityHint={props.accessibilityHint ?? 'Choose an answer and how sure you are'}
+      accessibilityHint={props.accessibilityHint ?? (mode === 'check' && props.disabled ? 'Choose an answer and how sure you are' : undefined)}
     >
       {mode === 'retry' ? 'Try again' : busy && format === 'short' ? 'Checking' : 'Check'}
     </Button>
