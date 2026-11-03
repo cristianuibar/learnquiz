@@ -303,6 +303,35 @@ it('keeps typing available when microphone permission is denied', async () => {
   } finally { await cleanup() }
 })
 
+it('focuses the blank again after a restored page or an in-place resync, but leaves Try again focused', async () => {
+  const { container, initial, cleanup } = await renderPlay(false)
+  try {
+    const blank = () => container.querySelector<HTMLInputElement>('input#answer')!
+    expect(document.activeElement).toBe(blank())
+    // A page restored from the browser cache locks the controls (browsers blur the disabled blank) and reloads the session.
+    let loaded!: (view: SessionView) => void
+    vi.mocked(getSession).mockReturnValue(new Promise<SessionView>((resolve) => { loaded = resolve }))
+    await act(async () => { window.dispatchEvent(Object.assign(new Event('pageshow'), { persisted: true })) })
+    blank().blur()
+    await act(async () => { loaded(initial) })
+    expect(document.activeElement).toBe(blank())
+    // The server already has an answer for this one (409): the next question replaces it in place.
+    vi.mocked(answerItem).mockRejectedValueOnce(Object.assign(new Error('Already answered. Continue to the next question.'), { status: 409 }))
+    vi.mocked(getSession).mockResolvedValue({ ...initial, progress: { position: 2, total: 2 }, item: { ...initial.item!, id: 'i2', stem: 'y - 1 = 2; y = ____' } })
+    await act(async () => type(blank(), '1'))
+    await pick(container, 'confidence', 'sure')
+    await click(button(container, 'Check'))
+    expect(container.querySelector('label[for="answer"]')!.textContent).toBe('y - 1 = 2; y = ')
+    expect(document.activeElement).toBe(blank())
+    // A failed check hands focus to Try again; the blank does not take it back.
+    vi.mocked(answerItem).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    await act(async () => type(blank(), '3'))
+    await pick(container, 'confidence', 'sure')
+    await click(button(container, 'Check'))
+    expect(document.activeElement).toBe(button(container, 'Try again'))
+  } finally { await cleanup() }
+})
+
 it('drops non-digits from a numeric blank, ignores a fourth digit, and sends "007" as typed', async () => {
   const { container, cleanup } = await renderPlay(false)
   try {

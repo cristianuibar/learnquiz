@@ -7,15 +7,25 @@ const BLANK = '____'
 export function ClozeQuestion({ item, choice, onChoice }: QuestionProps) {
   const numeric = Boolean(item.blank?.numeric)
   const input = useRef<HTMLInputElement>(null)
-  const focused = useRef(false)
+  const focusedItem = useRef<string | null>(null)
+  const wasLocked = useRef(true)
 
-  // The one focus exception to the heading rule: the field takes focus once it is enabled
-  // (the fieldset is disabled while the route loads, so this runs on every render until then).
+  // The one focus exception to the heading rule: the field takes focus for each new question, and again when
+  // its fieldset unlocks (route load, page restore, resync) while nothing else holds focus, so Try again keeps it.
   useEffect(() => {
     const el = input.current
-    if (focused.current || !el || el.matches(':disabled')) return
+    if (!el) return
+    if (el.disabled || el.closest('fieldset')?.disabled) {
+      wasLocked.current = true
+      return
+    }
+    const active = document.activeElement
+    const idle = !active || active === document.body || active instanceof HTMLHeadingElement
+    const refocus = focusedItem.current !== item.id || (wasLocked.current && idle)
+    wasLocked.current = false
+    if (!refocus) return
     el.focus()
-    focused.current = document.activeElement === el
+    focusedItem.current = item.id
   })
 
   const at = item.stem.indexOf(BLANK)
