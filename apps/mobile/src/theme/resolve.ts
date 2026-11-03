@@ -1,5 +1,5 @@
 import { brandProblem, deriveBrand } from '@learnquiz/tokens'
-import { themes, typography, space, radius, sizes } from '@learnquiz/tokens/native'
+import { themes, shadows, typography, space, radius, sizes } from '@learnquiz/tokens/native'
 
 export type Scheme = 'system' | 'light' | 'dark'
 
@@ -21,6 +21,7 @@ export function resolveTheme({
     space,
     radius,
     sizes,
+    shadow: shadows[resolved],
     scheme: resolved,
   }
 }
