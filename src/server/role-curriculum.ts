@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull, lt, or } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb, type Db } from '@/db'
 import { conceptEdges, concepts, jobRoles, sources, topics, units } from '@/db/schema'
@@ -7,7 +7,7 @@ import { chatJson, jobModel, LlmError } from '@/lib/llm/client'
 import { curriculumPrompt } from '@/lib/llm/prompts'
 import { CurriculumSkeleton } from '@/lib/llm/schemas'
 import { MAX_SOURCE_TEXT_CHARS } from '@/lib/limits'
-import { drainConceptQueue } from '@/server/concept-gen'
+import { drainConceptQueue, STALE_CLAIM_MS } from '@/server/concept-gen'
 import { runInBackground } from '@/server/env'
 import { chunks, httpError } from '@/server/helpers'
 import { assertWithinCompanyCap, assertWithinDailyCap } from '@/server/model-cap'
@@ -30,6 +30,17 @@ export function curriculumWrites(db: Db, topicId: string, valid: ValidatedSkelet
   ] as const
 }
 
+// A build claim outlives its request only when the request died mid call; claims from before the timestamp count as stale.
+const staleBuild = (now: number) =>
+  and(eq(topics.status, 'generating'), or(isNull(topics.genStartedAt), lt(topics.genStartedAt, now - STALE_CLAIM_MS)))
+
+// Marks an abandoned build failed so the role can be rebuilt and take documents again.
+export async function releaseStaleBuild(db: Db, topicId: string): Promise<boolean> {
+  const released = await db.update(topics).set({ status: 'failed' })
+    .where(and(eq(topics.id, topicId), staleBuild(Date.now()))).returning({ id: topics.id })
+  return released.length > 0
+}
+
 // Callers authenticate the actor; every query still scopes the role to its company.
 export async function buildRoleCurriculum({ orgId, ownerId, roleId }: { orgId: string; ownerId: string; roleId: string }): Promise<{ topicId: string }> {
   const db = getDb()
@@ -49,8 +60,9 @@ export async function buildRoleCurriculum({ orgId, ownerId, roleId }: { orgId: s
   await assertWithinDailyCap(db, ownerId)
   await assertWithinCompanyCap(db, orgId)
   // Claim once; a repeat request must not duplicate the path or overwrite learner progress.
-  const claimed = await db.update(topics).set({ status: 'generating' })
-    .where(and(eq(topics.id, topicId), inArray(topics.status, ['draft', 'failed'])))
+  const now = Date.now()
+  const claimed = await db.update(topics).set({ status: 'generating', genStartedAt: now })
+    .where(and(eq(topics.id, topicId), or(inArray(topics.status, ['draft', 'failed']), staleBuild(now))))
     .returning({ id: topics.id })
   if (!claimed.length) throw httpError('The curriculum is already generating or ready.', 409)
   try {
