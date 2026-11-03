@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // Native radios inside labels give arrow-key movement and one tab stop for free.
@@ -10,6 +11,7 @@ export function ChoiceGroup({
   onChange,
   className,
   itemClassName,
+  indicator = 'radio',
 }: {
   name: string
   legend: string
@@ -19,16 +21,21 @@ export function ChoiceGroup({
   onChange: (id: string) => void
   className?: string
   itemClassName?: string
+  indicator?: 'radio' | 'check'
 }) {
+  const check = indicator === 'check'
   return (
     <fieldset>
-      <legend className={cn('mb-3 p-0 text-sm font-medium', legendClassName)}>{legend}</legend>
+      <legend className={cn('mb-3 p-0 text-label text-ink', legendClassName)}>{legend}</legend>
       <div className={className}>
         {options.map((o) => (
           <label
             key={o.id}
             className={cn(
-              'flex min-h-12 cursor-pointer items-center rounded-lg border bg-background px-4 py-2 hover:bg-brand-tint has-checked:border-primary has-checked:bg-brand-tint has-checked:font-medium has-focus-visible:ring-[3px] has-focus-visible:ring-ring/50',
+              'group flex cursor-pointer items-center rounded-md border-2 border-border-strong bg-surface-card text-ink hover:bg-surface-sunken has-checked:border-brand has-checked:bg-brand-tint has-focus-visible:ring-2 has-focus-visible:ring-brand has-focus-visible:ring-offset-2',
+              check
+                ? 'min-h-12 justify-center gap-1.5 px-4 text-label font-semibold'
+                : 'min-h-14 gap-3 px-4 py-3 text-body-lg',
               itemClassName,
             )}
           >
@@ -40,7 +47,15 @@ export function ChoiceGroup({
               onChange={() => onChange(o.id)}
               className="sr-only"
             />
-            {o.text}
+            {check ? (
+              <Check aria-hidden className="hidden size-4 text-brand group-has-checked:block" />
+            ) : (
+              <span
+                aria-hidden
+                className="size-5 shrink-0 rounded-full border-2 border-border-strong group-has-checked:border-brand group-has-checked:bg-brand group-has-checked:shadow-[inset_0_0_0_3px_var(--color-brand-tint)]"
+              />
+            )}
+            <span>{o.text}</span>
           </label>
         ))}
       </div>

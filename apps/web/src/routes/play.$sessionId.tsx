@@ -2,19 +2,18 @@ import { useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { ChoiceGroup } from '@/components/choice-group'
-import { ConfidencePicker } from '@/components/confidence-picker'
 import { InlineError, RouteError, errorMessage } from '@/components/inline-error'
 import { ProgressHeader } from '@/components/progress-header'
 import { ModelLabel } from '@/components/model-label'
 import { RevealCard } from '@/components/reveal-card'
 import { ModelTrace } from '@/components/model-trace'
+import { QuestionScreen } from '@/components/question/question-screen'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Working } from '@/components/working'
-import { VoiceAnswer } from '@/components/voice-answer'
+import { stopSpeaking } from '@/lib/speech'
+import { isAnswerReady } from '@learnquiz/api'
 import type { Confidence, Reveal, SessionView } from '@learnquiz/api'
+import { checkFailedMessage } from '@learnquiz/api/system-copy'
 import { answerItem, endSession, getSession, nextItem, prepareNextSession, reportItem } from '@/server/play'
 
 export const Route = createFileRoute('/play/$sessionId')({
@@ -41,6 +40,13 @@ function isAnswerConflict(err: unknown): boolean {
     e?.status === 409 ||
     ['Already answered', 'This session has ended', 'That is not the current question', 'This question has been retired'].some((m) => e?.message?.includes(m))
   )
+}
+
+// A dropped connection, a timeout or a 5xx can succeed on retry; the answer is kept as a draft.
+function isRetryableCheckError(err: unknown): boolean {
+  const e = err as { status?: number; name?: string }
+  if (typeof e?.status === 'number') return e.status >= 500
+  return (typeof navigator !== 'undefined' && navigator.onLine === false) || err instanceof TypeError || e?.name === 'AbortError' || e?.name === 'TimeoutError'
 }
 
 // Unsent answers survive a reload; storage can be unavailable (private mode, quota), so failures are ignored.
@@ -98,7 +104,7 @@ function Play({ initial }: { initial: SessionView }) {
 
   const { item, progress } = view
   const placement = view.kind === 'placement'
-  const ready = choice.trim() !== '' && confidence !== null
+  const ready = Boolean(item && isAnswerReady(item.format, item.format === 'mcq' ? { optionId: choice } : { text: choice }, item.options.length)) && confidence !== null
 
   useEffect(() => {
     // Writes the next session's questions while this one (placement included) is played; the open request outlives waitUntil's window.
@@ -141,13 +147,13 @@ function Play({ initial }: { initial: SessionView }) {
     if (item && !reveal) writeDraft(draftKey(view.id, item.id), choice, confidence)
   }, [view.id, item, reveal, choice, confidence])
 
-  async function run(fn: () => Promise<void>) {
+  async function run(fn: () => Promise<void>, message: (err: unknown) => string = errorMessage) {
     setBusy(true)
     setError(null)
     try {
       await fn()
     } catch (err) {
-      setError({ message: errorMessage(err), retry: () => run(fn) })
+      setError({ message: message(err), retry: () => run(fn, message) })
     }
     setBusy(false)
   }
@@ -156,6 +162,14 @@ function Play({ initial }: { initial: SessionView }) {
     run(async () => {
       await end({ data: { sessionId: view.id } })
       await router.navigate({ to: '/play/$sessionId/done', params: { sessionId: view.id } })
+    })
+
+  // Answered items stay recorded; the learner returns to Today.
+  const leave = () =>
+    run(async () => {
+      stopSpeaking()
+      await end({ data: { sessionId: view.id } })
+      await router.navigate({ to: '/today' })
     })
 
   async function resync() {
@@ -174,6 +188,7 @@ function Play({ initial }: { initial: SessionView }) {
   function submitCheck() {
     if (!item || !ready || busy || voiceBusy || loading) return
     const responseMs = Date.now() - shownAt.current
+    stopSpeaking()
     void run(async () => {
       const answer = item.format === 'mcq' ? { optionId: choice } : { text: choice.trim() }
       try {
@@ -188,7 +203,13 @@ function Play({ initial }: { initial: SessionView }) {
           setError({ message: errorMessage(syncErr), retry: () => void run(resync) })
         }
       }
-    })
+    }, (err) => (isRetryableCheckError(err) ? checkFailedMessage(true, 'device') : errorMessage(err)))
+  }
+
+  // Changing the answer after a failed check offers Check again.
+  const edit = <T,>(set: (value: T) => void) => (value: T) => {
+    setError(null)
+    set(value)
   }
 
   function submitNext() {
@@ -209,104 +230,82 @@ function Play({ initial }: { initial: SessionView }) {
   const chosen = item?.options.find((o) => o.id === choice)?.text ?? (item?.format === 'mcq' ? null : choice.trim())
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col px-4 pt-4">
-      <ProgressHeader topicId={view.topicId} position={progress.position} total={progress.total} placement={placement} />
-      <div className="mt-6 flex flex-1 flex-col gap-6 pb-6">
-        {view.ended || !item ? (
-          !error && <Working label={placement ? 'Working out your level' : 'Wrapping up'} />
-        ) : reveal ? (
-          <>
-            <p className="text-xl font-semibold">{item.stem}</p>
-            <form
-              id="play"
-              onSubmit={(e) => {
-                e.preventDefault()
-                submitNext()
-              }}
-            >
-              <RevealCard reveal={reveal} chosen={chosen} why={why} onWhy={setWhy} model={item.generatedBy} />
-            </form>
-            {reported ? (
-              <p className="text-sm text-muted-foreground">Reported</p>
+    <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col px-4">
+      <ProgressHeader
+        position={progress.position}
+        total={progress.total}
+        onEnd={leave}
+        endDisabled={busy}
+        readAloud={item && !reveal && !loading ? [item.stem, ...item.options.map((o) => o.text)] : null}
+      />
+      {!view.ended && item && !reveal ? (
+        <QuestionScreen
+          item={item}
+          sessionId={view.id}
+          voiceEnabled={Boolean(view.voiceEnabled)}
+          choice={choice}
+          onChoice={edit(setChoice)}
+          busy={busy}
+          voiceBusy={voiceBusy}
+          onVoiceBusy={setVoiceBusy}
+          onEnd={leave}
+          headingRef={questionHeading}
+          loading={loading}
+          confidence={confidence}
+          onConfidence={edit(setConfidence)}
+          canCheck={ready && !busy && !voiceBusy && !loading}
+          error={error}
+          onCheck={submitCheck}
+        />
+      ) : (
+        <>
+          <div className="mt-6 flex flex-1 flex-col gap-6 pb-6">
+            {view.ended || !item ? (
+              !error && <Working label={placement ? 'Working out your level' : 'Wrapping up'} />
             ) : (
-              <Button
-                variant="link"
-                className="self-start px-0 text-muted-foreground"
-                disabled={busy}
-                onClick={() =>
-                  void run(async () => {
-                    await report({ data: { itemId: item.id } })
-                    setReported(true)
-                  })
-                }
-              >
-                Report this question
-              </Button>
+              <>
+                <p className="text-xl font-semibold">{item.stem}</p>
+                <form
+                  id="play"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    submitNext()
+                  }}
+                >
+                  <RevealCard reveal={reveal!} chosen={chosen} why={why} onWhy={setWhy} model={item.generatedBy} />
+                </form>
+                {reported ? (
+                  <p className="text-sm text-muted-foreground">Reported</p>
+                ) : (
+                  <Button
+                    variant="link"
+                    className="self-start px-0 text-muted-foreground"
+                    disabled={busy}
+                    onClick={() =>
+                      void run(async () => {
+                        await report({ data: { itemId: item.id } })
+                        setReported(true)
+                      })
+                    }
+                  >
+                    Report this question
+                  </Button>
+                )}
+                <ModelLabel model={item.generatedBy} />
+              </>
             )}
-          </>
-        ) : (
-          <form
-            id="play"
-            className="flex flex-col gap-6"
-            onSubmit={(e) => {
-              e.preventDefault()
-              submitCheck()
-            }}
-          >
-            <h1 ref={questionHeading} tabIndex={-1} className="text-xl leading-snug font-semibold">
-              {item.stem}
-            </h1>
-            <fieldset disabled={loading} aria-busy={loading} className="flex min-w-0 flex-col gap-6">
-              {item.format === 'mcq' ? (
-                <ChoiceGroup
-                  name="answer"
-                  legend={item.stem}
-                  legendClassName="sr-only"
-                  options={item.options}
-                  value={choice}
-                  onChange={setChoice}
-                  className="flex flex-col gap-2"
-                />
-              ) : (
-                <div className="flex flex-col gap-4">
-                  <Label htmlFor="answer" className="sr-only">
-                    {item.stem}
-                  </Label>
-                  <Input
-                    id="answer"
-                    value={choice}
-                    onChange={(e) => setChoice(e.target.value)}
-                    maxLength={1000}
-                    disabled={voiceBusy}
-                    autoComplete="off"
-                  />
-                  {view.voiceEnabled && (
-                    <VoiceAnswer key={item.id} sessionId={view.id} itemId={item.id} disabled={busy} onTranscript={setChoice} onBusyChange={setVoiceBusy} />
-                  )}
-                </div>
-              )}
-              <ConfidencePicker value={confidence} onChange={setConfidence} />
-            </fieldset>
-          </form>
-        )}
-        {item && <ModelLabel model={item.generatedBy} />}
-        {error && <InlineError message={error.message} onRetry={error.retry} />}
-        {!placement && <ModelTrace key={view.id} scope={{ scope: 'session', sessionId: view.id }} />}
-      </div>
-      {!view.ended && item && (
-        // Pinned to the bottom edge so the thumb reaches it; the key remounts it so autoFocus lands on Continue after a check.
-        <div className="sticky bottom-0 -mx-4 border-t bg-background px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <Button
-            key={reveal ? 'next' : 'check'}
-            type="submit"
-            form="play"
-            autoFocus={Boolean(reveal)}
-            disabled={busy || voiceBusy || (!reveal && (!ready || loading))}
-            className="w-full px-6"
-          >
-            {reveal ? (reveal.state === 'D' ? 'Got it' : 'Continue') : 'Check'}
-          </Button>
-        </div>
+            {error && <InlineError message={error.message} onRetry={error.retry} />}
+            {!placement && <ModelTrace key={view.id} scope={{ scope: 'session', sessionId: view.id }} />}
+          </div>
+          {!view.ended && item && reveal && (
+            // Pinned to the bottom edge so the thumb reaches it; autoFocus lands on Continue after a check.
+            <div className="sticky bottom-0 -mx-4 border-t bg-background px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+              <Button type="submit" form="play" autoFocus disabled={busy} className="w-full px-6">
+                {reveal.state === 'D' ? 'Got it' : 'Continue'}
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </main>
   )

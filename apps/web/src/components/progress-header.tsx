@@ -1,36 +1,51 @@
-import { Link } from '@tanstack/react-router'
 import { X } from 'lucide-react'
-import { Progress } from '@/components/ui/progress'
+import { ReadAloudButton } from '@/components/question/read-aloud-button'
 
 export function ProgressHeader({
-  topicId,
   position,
   total,
-  placement,
+  onEnd,
+  endDisabled,
+  readAloud,
 }: {
-  topicId: string
   position: number
   total: number
-  placement: boolean
+  onEnd: () => void
+  endDisabled?: boolean
+  readAloud: string[] | null
 }) {
+  const percent = total > 0 ? Math.min(100, (position / total) * 100) : 0
   return (
-    <div className="flex items-center gap-3">
-      <Link
-        to="/t/$topicId/path"
-        params={{ topicId }}
-        aria-label="Close"
-        className="-ml-3 flex size-12 shrink-0 items-center justify-center rounded-md outline-none hover:bg-brand-tint focus-visible:ring-[3px] focus-visible:ring-ring/50"
+    <div className="flex h-14 items-center gap-2">
+      <button
+        type="button"
+        aria-label="End session"
+        onClick={onEnd}
+        disabled={endDisabled}
+        className="-ml-3 flex size-12 shrink-0 items-center justify-center rounded-md text-ink outline-none hover:bg-surface-sunken focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:opacity-50"
       >
-        <X className="size-5" aria-hidden />
-      </Link>
-      <Progress
-        value={(position / total) * 100}
-        aria-label="Progress"
-        className="h-1.5 min-w-8 flex-1 *:motion-reduce:transition-none"
-      />
-      <span className="shrink-0 text-sm font-medium tabular-nums">
-        {placement ? `Finding your level, ${position} of up to ${total}` : `${position} / ${total}`}
-      </span>
+        <X className="size-6" aria-hidden />
+      </button>
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <div
+          role="progressbar"
+          aria-label="Session progress"
+          aria-valuemin={0}
+          aria-valuemax={total}
+          aria-valuenow={position}
+          aria-valuetext={`${position} of ${total}`}
+          className="h-2 min-w-8 flex-1 overflow-hidden rounded-full bg-surface-sunken"
+        >
+          <div
+            className="h-full bg-brand transition-[width] duration-fast ease-out motion-reduce:transition-none"
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+        <span aria-hidden className="shrink-0 text-overline text-ink-muted tabular-nums">
+          {position} of {total}
+        </span>
+      </div>
+      <ReadAloudButton texts={readAloud} />
     </div>
   )
 }

@@ -166,12 +166,14 @@ it('keeps the answer after an offline Check and submits it with Try again online
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
     vi.mocked(answerItem).mockRejectedValueOnce(new TypeError('Failed to fetch'))
     await act(async () => { container.querySelector<HTMLButtonElement>('button[form="play"]')!.click() })
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain("You're offline")
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe('Couldn’t check your answer. It’s saved on this device.')
+    const retry = document.activeElement as HTMLButtonElement
+    expect(retry.textContent?.trim()).toBe('Try again')
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
     vi.mocked(answerItem).mockResolvedValueOnce({
       attemptId: 'attempt', diagramConceptId: null, state: 'A', correct: true, score: 1, feedback: null, missingPoints: [], correctAnswer: '4', chosenFeedback: null, explanation: 'Two plus two is four.', sourceQuote: null, sourceTitle: null, mixUps: [], returnsThisSession: false, pKnownBefore: 0.1, pKnownAfter: 0.5, xp: 10, critical: false, correctOptionIds: ['four'], sourceVersion: null, detail: null,
     })
-    await act(async () => { container.querySelector<HTMLButtonElement>('[role="alert"] button')!.click() })
+    await act(async () => { retry.click() })
     expect(answerItem).toHaveBeenLastCalledWith({ data: expect.objectContaining({ itemId: 'item', answer: { optionId: 'four' }, confidence: 'sure' }) })
     expect(container.querySelector('[role="status"] h2')?.textContent).toBe('Correct, you were sure')
     expect(container.querySelector('[role="alert"]')).toBeNull()
