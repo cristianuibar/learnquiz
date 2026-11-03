@@ -11,6 +11,7 @@ import {
   playParams,
   shouldAnnounce,
   todayFixture,
+  useStreakPop,
   useToday,
   utcDay,
 } from './today'
@@ -166,6 +167,45 @@ describe('useToday', () => {
     await act(async () => { await current.refresh() })
     expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledTimes(1)
     expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledWith('33 of 42 topics ready')
+  })
+
+  test('a 20 s response still lands while polls arrive every 15 s', async () => {
+    jest.useFakeTimers()
+    jest.mocked(api).mockResolvedValueOnce(building(28))
+    await render(createElement(Probe))
+    expect(current.view?.hero).toMatchObject({ status: '28 of 42 topics ready' })
+
+    jest.mocked(api).mockImplementation(() => new Promise((resolve) => { setTimeout(() => resolve(building(35)), 20_000) }))
+    await act(async () => { await jest.advanceTimersByTimeAsync(BUILDING_POLL_MS) })
+    expect(api).toHaveBeenCalledTimes(2)
+    // The next poll and a manual refresh join the request still in flight.
+    await act(async () => { await jest.advanceTimersByTimeAsync(BUILDING_POLL_MS) })
+    void current.refresh()
+    expect(api).toHaveBeenCalledTimes(2)
+    await act(async () => { await jest.advanceTimersByTimeAsync(5_000) })
+    expect(current.view?.hero).toMatchObject({ status: '35 of 42 topics ready' })
+  })
+})
+
+describe('useStreakPop', () => {
+  let pop: boolean
+  function PopProbe({ reward }: { reward: boolean }) {
+    pop = useStreakPop(reward)
+    return null
+  }
+
+  test('pops once per UTC day, even across done, normal and done again', async () => {
+    jest.useFakeTimers({ now: Date.UTC(2032, 2, 1, 10, 0) })
+    const view = await render(createElement(PopProbe, { reward: true }))
+    expect(pop).toBe(true)
+    await view.rerender(createElement(PopProbe, { reward: false }))
+    expect(pop).toBe(false)
+    await view.rerender(createElement(PopProbe, { reward: true }))
+    expect(pop).toBe(false)
+
+    jest.setSystemTime(Date.UTC(2032, 2, 2, 0, 5))
+    await view.rerender(createElement(PopProbe, { reward: true }))
+    expect(pop).toBe(true)
   })
 })
 

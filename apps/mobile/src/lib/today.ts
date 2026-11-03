@@ -55,11 +55,14 @@ export function claimStreakPop(day: string): boolean {
 
 export function useStreakPop(reward: boolean): boolean {
   const decided = useRef<{ day: string; pop: boolean } | null>(null)
-  if (reward) {
-    const day = utcDay(Date.now())
-    if (decided.current?.day !== day) decided.current = { day, pop: claimStreakPop(day) }
+  if (!reward) {
+    // Leaving the done state uses up the pop, so coming back the same UTC day stays quiet.
+    if (decided.current) decided.current.pop = false
+    return false
   }
-  return reward && decided.current?.pop === true
+  const day = utcDay(Date.now())
+  if (decided.current?.day !== day) decided.current = { day, pop: claimStreakPop(day) }
+  return decided.current.pop
 }
 
 export function useToday(): { today: Today | null; view: TodayView | null; status: TodayStatus; refresh: () => Promise<void> } {
@@ -68,24 +71,42 @@ export function useToday(): { today: Today | null; view: TodayView | null; statu
   const [status, setStatus] = useState<TodayStatus>(fixture ? 'ready' : 'loading')
   const [focused, setFocused] = useState(false)
   const [active, setActive] = useState(AppState.currentState !== 'background')
-  const request = useRef(0)
+  const issued = useRef(0)
+  const applied = useRef(0)
+  const inFlight = useRef<Promise<void> | null>(null)
+  const mounted = useRef(true)
   const focusedRef = useRef(false)
 
-  const refresh = useCallback(async () => {
-    if (fixture) return
-    const current = ++request.current
-    try {
-      const next = await api<Today>('/today')
-      if (current !== request.current) return
-      setToday(next)
-      setStatus('ready')
-    } catch (error) {
-      // Keep the last value on screen; only the status changes.
-      if (current === request.current) setStatus(failureStatus(error))
-    }
+  // One request at a time: a poll, focus or foreground refetch that arrives
+  // while /today is still loading joins that request instead of replacing it,
+  // so a slow response still lands. A response is only dropped when a newer
+  // one has already been applied.
+  const refresh = useCallback((): Promise<void> => {
+    if (fixture) return Promise.resolve()
+    if (inFlight.current) return inFlight.current
+    const sequence = ++issued.current
+    const run: Promise<void> = api<Today>('/today').then(
+      (next) => {
+        if (!mounted.current || sequence <= applied.current) return
+        applied.current = sequence
+        setToday(next)
+        setStatus('ready')
+      },
+      (error: unknown) => {
+        // Keep the last value on screen; only the status changes.
+        if (mounted.current && sequence > applied.current) setStatus(failureStatus(error))
+      },
+    ).finally(() => {
+      if (inFlight.current === run) inFlight.current = null
+    })
+    inFlight.current = run
+    return run
   }, [fixture])
 
-  useEffect(() => () => { request.current++ }, [])
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
 
   useFocusEffect(useCallback(() => {
     focusedRef.current = true

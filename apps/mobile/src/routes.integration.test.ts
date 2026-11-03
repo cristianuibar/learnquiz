@@ -9,10 +9,11 @@ jest.mock('./lib/session-store', () => ({
   SessionProvider: ({ children }: { children: unknown }) => children,
   useSession: jest.fn(),
 }))
-// Screens reach the network and secure storage; keep the router test hermetic.
-jest.mock('./lib/api', () => ({ ApiError: class ApiError extends Error {}, api: jest.fn(() => new Promise(() => {})), mediaSource: jest.fn() }))
-jest.mock('./lib/auth', () => ({ signOut: jest.fn() }))
-jest.mock('expo-image', () => ({ Image: jest.fn(() => null) }))
+// The real Today screen loads /today; this file only checks that the route is reachable.
+jest.mock('./app/(tabs)/today', () => ({
+  __esModule: true,
+  default: () => require('react').createElement(require('react-native').Text, null, 'Today screen'),
+}))
 jest.mock('react-native-gesture-handler', () => ({ GestureHandlerRootView: 'View' }))
 jest.mock('react-native-keyboard-controller', () => ({ KeyboardProvider: 'View' }))
 jest.mock('expo-router/build/toolbar/native', () => ({ RouterToolbarHost: 'View', RouterToolbarItem: 'View' }))
@@ -68,6 +69,7 @@ test('the actual router keeps sign-in closed for a signed-in learner', async () 
   const navigation = renderRouter('src/app', { initialUrl: '/sign-in' })
   await navigation
   expect(navigation.getPathname()).toBe('/today')
+  expect(screen.getByText('Today screen')).toBeOnTheScreen()
   expect(screen.queryByText('Sign in')).toBeNull()
 })
 

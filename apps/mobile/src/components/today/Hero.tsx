@@ -45,7 +45,7 @@ export function Hero({ hero, onPlay }: HeroProps) {
               <Bar outline color={heroText} value={ready / total * 100} accessibilityLabel="Questions ready" accessibilityValue={{ text: hero.status ?? undefined }} />
             )}
             {hero.status !== null && (
-              <Text variant="body" num style={{ color: heroText }} accessibilityLiveRegion="polite">{hero.status}</Text>
+              <Text variant="body" num style={{ color: heroText }}>{hero.status}</Text>
             )}
           </>
         ) : (
