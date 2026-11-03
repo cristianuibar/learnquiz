@@ -1,5 +1,5 @@
 import { createSerializationAdapter } from '@tanstack/react-router'
-import { createStart } from '@tanstack/react-start'
+import { createCsrfMiddleware, createStart } from '@tanstack/react-start'
 
 // The router serializes only an error's message; keep the HTTP status so the client can tell a refusal from a failure.
 const statusErrorAdapter = createSerializationAdapter({
@@ -9,4 +9,7 @@ const statusErrorAdapter = createSerializationAdapter({
   fromSerializable: ({ message, status }) => Object.assign(new Error(message), { status }),
 })
 
-export const startInstance = createStart(() => ({ serializationAdapters: [statusErrorAdapter] }))
+// A custom start instance replaces Start's default, so its server function CSRF check is added back here.
+const csrfMiddleware = createCsrfMiddleware({ filter: (ctx) => ctx.handlerType === 'serverFn' })
+
+export const startInstance = createStart(() => ({ requestMiddleware: [csrfMiddleware], serializationAdapters: [statusErrorAdapter] }))
