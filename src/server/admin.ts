@@ -14,14 +14,14 @@ export const getStaffSession = createServerFn({ method: 'GET' }).handler(async (
   return { id: staff.id, name: staff.name }
 })
 
-// Activity and spend belong to learners; attribute them to their current company memberships.
+// Documents belong to the company's roles. Activity and spend belong to learners; attribute them to their current company memberships.
 // Nest SQL so Drizzle preserves qualified columns inside correlated subqueries.
 const metric = (query: SQL) => sql<number>`${query}`.mapWith(Number)
 const companyMetrics = () => ({
   members: metric(sql`(select count(*) from ${member} where ${member.organizationId} = ${organization.id})`),
   roles: metric(sql`(select count(*) from ${jobRoles} where ${jobRoles.orgId} = ${organization.id})`),
   documents: metric(sql`(select count(*) from ${sources} inner join ${topics} on ${topics.id} = ${sources.topicId}
-    where ${topics.learnerId} in (select ${member.userId} from ${member} where ${member.organizationId} = ${organization.id}))`),
+    inner join ${jobRoles} on ${jobRoles.id} = ${topics.jobRoleId} where ${jobRoles.orgId} = ${organization.id})`),
   activeLearners: metric(sql`(select count(distinct ${sessions.learnerId}) from ${sessions}
     where ${sessions.startedAt} >= ${Date.now() - 30 * 86_400_000}
     and ${sessions.learnerId} in (select ${member.userId} from ${member} where ${member.organizationId} = ${organization.id}))`),
@@ -51,9 +51,9 @@ export const getCompany = createServerFn({ method: 'GET' })
         .where(eq(member.organizationId, company.id)).orderBy(asc(user.name)),
       db.select({ id: jobRoles.id, name: jobRoles.name, status: jobRoles.status, benchmark: jobRoles.benchmark, onboardingDays: jobRoles.onboardingDays })
         .from(jobRoles).where(eq(jobRoles.orgId, company.id)).orderBy(asc(jobRoles.name)),
-      db.select({ id: sources.id, title: sources.title, kind: sources.kind, learner: user.name })
-        .from(sources).innerJoin(topics, eq(topics.id, sources.topicId)).innerJoin(user, eq(user.id, topics.learnerId))
-        .where(sql`${topics.learnerId} in (select ${member.userId} from ${member} where ${member.organizationId} = ${company.id})`)
+      db.select({ id: sources.id, title: sources.title, kind: sources.kind, role: jobRoles.name })
+        .from(sources).innerJoin(topics, eq(topics.id, sources.topicId)).innerJoin(jobRoles, eq(jobRoles.id, topics.jobRoleId))
+        .where(eq(jobRoles.orgId, company.id))
         .orderBy(desc(sources.createdAt)),
     ])
     return { ...company, members, roles, documents }
