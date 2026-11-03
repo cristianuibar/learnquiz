@@ -15,8 +15,8 @@ import { Science } from '../components/home/science'
 export const Route = createFileRoute('/')({
   head: () => ({
     meta: [
-      { title: 'Learn Quiz — Train every new hire on your own procedures.' },
-      { name: 'description', content: "Upload your SOPs. Each employee gets five-minute quiz sessions and one question during the shift, in your company's words, until they know the job." },
+      { title: 'Learn Quiz: onboarding from your own SOPs' },
+      { name: 'description', content: 'Upload a role’s SOPs. New hires practice them on their phone in five-minute sessions until they reach your benchmark. Every explanation quotes your document.' },
     ],
   }),
   component: MarketingPage,
