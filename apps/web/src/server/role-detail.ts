@@ -36,7 +36,7 @@ export const getRoleDetail = createServerFn({ method: 'GET' })
     const [documents, unitRows, conceptRows] = await Promise.all([
       db.select({ id: sources.id, title: sources.title, kind: sources.kind, version: sources.version, createdAt: sources.createdAt })
         .from(sources)
-        .where(and(eq(sources.topicId, role.topicId), isNull(sources.deletedAt)))
+        .where(and(eq(sources.topicId, role.topicId), isNull(sources.deletedAt), isNull(sources.retiredAt)))
         .orderBy(desc(sources.createdAt), desc(sources.id)),
       db.select({ id: units.id, name: units.name, summary: units.summary }).from(units).where(eq(units.topicId, role.topicId)).orderBy(asc(units.order)),
       db.select({ id: concepts.id, unitId: concepts.unitId, name: concepts.name, summary: concepts.summary, critical: concepts.critical, genStatus: concepts.genStatus, genError: concepts.genError })

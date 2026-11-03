@@ -197,6 +197,16 @@ it('records role proficiency by mean and critical concepts, and surfaces only cr
   expect(profile.confidentErrors.map((e) => [e.id, e.conceptId])).toEqual([['a4', 'c1'], ['a0', 'c1']])
 })
 
+it('leaves concepts of a retired document out of the profile curriculum and proficiency', async () => {
+  seedWeek()
+  raw.exec("UPDATE learner_concept SET p_known = 0.9; UPDATE attempts SET p_known_after = 0.9 WHERE id IN ('a5', 'a6')")
+  raw.exec(`INSERT INTO sources (id, topic_id, kind, title, body_text, created_at, retired_at) VALUES ('old-doc', 'training', 'text', 'Retired', '', 1, 2);
+    INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary, critical, source_id) VALUES ('dead', 'training', 'practice', 1, 'Old rule', '', 1, 'old-doc')`)
+  const profile = await getProfile({ data: {} })
+  expect(profile.proficiency).toEqual({ achievedAt: start + 6 * DAY + 3600_000, days: 7, estimatedDays: null, projectedAt: null })
+  expect(profile.units.flatMap((u) => u.concepts.map((c) => c.name))).toEqual(['Emergency exits', 'Reporting hazards'])
+})
+
 it('has no projection before training and refuses a target without a company', async () => {
   holder.user = { id: 'new-learner', name: 'New learner', isAnonymous: false }
   const profile = await getProfile({ data: {} })
