@@ -155,3 +155,17 @@ it('defers every concept to the next UTC day once the company has spent its dail
   await drainAll()
   expect(states().map((c) => c.gen_status)).toEqual(['ready', 'ready', 'ready'])
 })
+
+it('stores a nine-question top-up within the D1 parameter limit', async () => {
+  raw.exec("DELETE FROM concepts WHERE id <> 'c00'")
+  // The first self-check keeps three items, so a second round adds six more in one write.
+  let checks = 0
+  fetchModel.mockImplementation(async (url, init) => {
+    const schema = JSON.parse(init!.body as string).response_format.json_schema.name
+    if (schema !== 'self_check' || checks++) return answerModel(url, init)
+    return modelReply({ results: Array.from({ length: 6 }, (_, index) => ({ index, keep: index < 3, reasons: [] })) })
+  })
+  await drainAll()
+  expect(states()).toEqual([{ id: 'c00', gen_status: 'ready', gen_error: null }])
+  expect(one("SELECT COUNT(*) AS n FROM items WHERE concept_id = 'c00' AND status = 'active'")).toEqual({ n: 9 })
+})

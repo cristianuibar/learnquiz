@@ -150,7 +150,8 @@ export async function generateConceptItems(
     sourceVersion: source?.version ?? null,
     createdAt: now,
   }))
-  const [first, ...rest] = chunks(rows, 10).map((r) => db.insert(items).values(r))
+  // Each item binds 12 parameters including defaults; eight rows stay below D1's 100-parameter limit.
+  const [first, ...rest] = chunks(rows, 8).map((r) => db.insert(items).values(r))
   await db.batch([first, ...rest])
   return rows.map((r, i) => ({ id: r.id, format: r.format, difficultyPrior: r.difficultyPrior, payload: kept[i].payload, generatedBy: r.generatedBy }))
 }
