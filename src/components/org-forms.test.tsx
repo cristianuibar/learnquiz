@@ -77,7 +77,7 @@ it('shows a plain role-name message on the roles screen for whitespace-only inpu
 
 it('sends the entered whole percentage and shows the stored benchmark on the role card', async () => {
   vi.mocked(createRole).mockResolvedValue({ id: 'r' } as never)
-  const container = await mount('/org/$slug/roles', rolesRoute.options.component!, '/org/x/roles', () => ({ slug: 'x', name: 'Acme', roles: [{ id: 'r', name: 'Cashier', benchmark: 0.85, onboardingDays: 30, topicId: 't', topicStatus: 'draft' }] }))
+  const container = await mount('/org/$slug/roles', rolesRoute.options.component!, '/org/x/roles', () => ({ slug: 'x', name: 'Acme', roles: [{ id: 'r', name: 'Cashier', benchmark: 0.85, onboardingDays: 30, topicId: 't', topicStatus: 'ready' }] }))
   expect(container.textContent).toContain('Benchmark: 85%')
   await type(container.querySelector<HTMLInputElement>('#name')!, 'Cashier')
   await type(container.querySelector<HTMLInputElement>('#benchmark')!, '85')
