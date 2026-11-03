@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { ChoiceGroup } from '@/components/choice-group'
@@ -25,6 +26,8 @@ export const Route = createFileRoute('/play/$sessionId')({
     if (view.ended) throw redirect({ to: '/play/$sessionId/done', params })
     return view
   },
+  // Answering moves the position on the client only, so cached loader data is stale; Back then Forward must load the current question.
+  gcTime: 0,
   errorComponent: RouteError,
   component: () => {
     const view = Route.useLoaderData()
@@ -62,6 +65,15 @@ function writeDraft(key: string, choice: string, confidence: Confidence | null) 
   }
 }
 
+// Only a document's first screen can be replayed from the history cache with an old question.
+let documentChecked = false
+function openedFromHistory() {
+  if (documentChecked) return false
+  documentChecked = true
+  const nav = performance.getEntriesByType?.('navigation')[0] as PerformanceNavigationTiming | undefined
+  return nav?.type === 'back_forward'
+}
+
 function Play({ initial }: { initial: SessionView }) {
   const router = useRouter()
   const check = useServerFn(answerItem)
@@ -77,6 +89,8 @@ function Play({ initial }: { initial: SessionView }) {
   const [reported, setReported] = useState(false)
   const [busy, setBusy] = useState(false)
   const [voiceBusy, setVoiceBusy] = useState(false)
+  // Answer controls stay disabled until the current position is known; the server HTML renders them disabled too.
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<{ message: string; retry: () => void } | null>(null)
   const shownAt = useRef(Date.now())
   const questionHeading = useRef<HTMLHeadingElement>(null)
@@ -97,6 +111,25 @@ function Play({ initial }: { initial: SessionView }) {
     setChoice(draft.choice)
     setConfidence(draft.confidence)
   }, [initial])
+
+  // Back then Forward can restore a page showing an earlier question: reload the session before answering resumes.
+  useEffect(() => {
+    const reload = () =>
+      void run(async () => {
+        await resync()
+        setLoading(false)
+      })
+    if (openedFromHistory()) reload()
+    else setLoading(false)
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (!e.persisted) return
+      // Synchronous, so no keystroke reaches the restored question before the controls lock.
+      flushSync(() => setLoading(true))
+      reload()
+    }
+    window.addEventListener('pageshow', onPageShow)
+    return () => window.removeEventListener('pageshow', onPageShow)
+  }, [])
 
   useEffect(() => {
     if (item && !reveal) writeDraft(draftKey(view.id, item.id), choice, confidence)
@@ -123,8 +156,9 @@ function Play({ initial }: { initial: SessionView }) {
     const v = await sync({ data: { sessionId: view.id } })
     setView(v)
     if (v.ended) return finish()
-    setChoice('')
-    setConfidence(null)
+    const draft = v.item ? readDraft(draftKey(v.id, v.item.id)) : null
+    setChoice(draft?.choice ?? '')
+    setConfidence(draft?.confidence ?? null)
     setReveal(null)
     setWhy('')
     setReported(false)
@@ -132,7 +166,7 @@ function Play({ initial }: { initial: SessionView }) {
   }
 
   function submitCheck() {
-    if (!item || !ready || busy || voiceBusy) return
+    if (!item || !ready || busy || voiceBusy || loading) return
     const responseMs = Date.now() - shownAt.current
     void run(async () => {
       const answer = item.format === 'mcq' ? { optionId: choice } : { text: choice.trim() }
@@ -216,36 +250,38 @@ function Play({ initial }: { initial: SessionView }) {
             <h1 ref={questionHeading} tabIndex={-1} className="text-xl leading-snug font-semibold">
               {item.stem}
             </h1>
-            {item.format === 'mcq' ? (
-              <ChoiceGroup
-                name="answer"
-                legend={item.stem}
-                legendClassName="sr-only"
-                options={item.options}
-                value={choice}
-                onChange={setChoice}
-                className="flex flex-col gap-2"
-              />
-            ) : (
-              <div className="flex flex-col gap-4">
-                <Label htmlFor="answer" className="sr-only">
-                  {item.stem}
-                </Label>
-                <Input
-                  id="answer"
-                  className="h-12"
+            <fieldset disabled={loading} aria-busy={loading} className="flex min-w-0 flex-col gap-6">
+              {item.format === 'mcq' ? (
+                <ChoiceGroup
+                  name="answer"
+                  legend={item.stem}
+                  legendClassName="sr-only"
+                  options={item.options}
                   value={choice}
-                  onChange={(e) => setChoice(e.target.value)}
-                  maxLength={1000}
-                  disabled={voiceBusy}
-                  autoComplete="off"
+                  onChange={setChoice}
+                  className="flex flex-col gap-2"
                 />
-                {view.voiceEnabled && (
-                  <VoiceAnswer key={item.id} sessionId={view.id} itemId={item.id} disabled={busy} onTranscript={setChoice} onBusyChange={setVoiceBusy} />
-                )}
-              </div>
-            )}
-            <ConfidencePicker value={confidence} onChange={setConfidence} />
+              ) : (
+                <div className="flex flex-col gap-4">
+                  <Label htmlFor="answer" className="sr-only">
+                    {item.stem}
+                  </Label>
+                  <Input
+                    id="answer"
+                    className="h-12"
+                    value={choice}
+                    onChange={(e) => setChoice(e.target.value)}
+                    maxLength={1000}
+                    disabled={voiceBusy}
+                    autoComplete="off"
+                  />
+                  {view.voiceEnabled && (
+                    <VoiceAnswer key={item.id} sessionId={view.id} itemId={item.id} disabled={busy} onTranscript={setChoice} onBusyChange={setVoiceBusy} />
+                  )}
+                </div>
+              )}
+              <ConfidencePicker value={confidence} onChange={setConfidence} />
+            </fieldset>
           </form>
         )}
         {item && <ModelLabel model={item.generatedBy} />}
@@ -260,7 +296,7 @@ function Play({ initial }: { initial: SessionView }) {
             type="submit"
             form="play"
             autoFocus={Boolean(reveal)}
-            disabled={busy || voiceBusy || (!reveal && !ready)}
+            disabled={busy || voiceBusy || (!reveal && (!ready || loading))}
             className="h-12 w-full px-6"
           >
             {reveal ? (reveal.state === 'D' ? 'Got it' : 'Continue') : 'Check'}
