@@ -1095,6 +1095,12 @@ describe('employees training on their role topic', () => {
     }
     expect(await endSession({ data: { sessionId } })).toMatchObject({ kind: 'placement', levelLine: expect.stringContaining('landed at level'), levelLineModel: null })
     expect(count('placements')).toBe(1)
+    // See your path opens the shared role topic, whose learner_id is NULL.
+    const path = await getTopicPath({ data: { topicId: 'rt' } })
+    expect(path).toMatchObject({ topic: { id: 'rt', title: 'Support agent' }, company: 'o1', learner: { placed: true } })
+    const answered = raw.prepare("SELECT li.item_id AS id FROM learner_item li JOIN items i ON i.id = li.item_id WHERE li.learner_id = 'u1' AND i.concept_id = 'rc0'").all()
+    expect(answered.length).toBeGreaterThan(0)
+    expect((await getConceptItems({ data: { conceptId: 'rc0' } })).items.map((i) => i.id).sort()).toEqual(answered.map((r) => r.id).sort())
 
     const practice = await startSession({ data: { topicId: 'rt' } })
     expect((await getSession({ data: practice })).item).not.toBeNull()
