@@ -49,8 +49,8 @@ export async function sendDuePushes(now: number, db: Db = getDb()) {
       for (const subscription of subscriptions) {
         // Web pushes need VAPID; Expo tokens do not.
         if (!config && !EXPO_TOKEN.test(subscription.endpoint)) continue
-        await sendPush(db, subscription, config, { title: item.stem, body: 'Tap to answer.', url: `/play/quick/${item.itemId}` }, ttl)
-        sent++
+        const { outcome } = await sendPush(db, subscription, config, { title: item.stem, body: 'Tap to answer.', url: `/play/quick/${item.itemId}` }, ttl)
+        if (outcome !== 'skipped') sent++
       }
     } catch {
       // One learner's failure must not stop the others; the next run retries.
