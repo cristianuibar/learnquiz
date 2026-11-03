@@ -627,6 +627,17 @@ describe('learner practice and unit unlocks', () => {
       expect(scalar(raw, 'SELECT COUNT(*) AS n FROM sessions').n).toBe(0)
     },
   )
+
+  it('does not generate questions for a concept whose document was retired', async () => {
+    seedFrontier(raw, 1, false)
+    raw.prepare('INSERT INTO sources (id, topic_id, kind, title, body_text, retired_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run('src-old', 't1', 'text', 'Handbook', 'Old handbook.', Date.now(), 1)
+    raw.prepare("UPDATE concepts SET source_id = 'src-old' WHERE id = 'c1'").run()
+
+    await expect(startSession({ data: { topicId: 't1' } })).rejects.toMatchObject({ status: 409, message: 'Nothing to practise yet' })
+    expect(chatJson).not.toHaveBeenCalled()
+    expect(scalar(raw, 'SELECT COUNT(*) AS n FROM model_calls').n).toBe(0)
+  })
 })
 
 it('credits the session bonus once when two finishing nextItem calls race (practice)', async () => {

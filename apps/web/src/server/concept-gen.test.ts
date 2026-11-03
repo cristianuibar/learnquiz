@@ -203,6 +203,13 @@ it('retires questions when the document is replaced after generation read it but
   expect(raw.prepare("SELECT status, COUNT(*) AS n FROM items WHERE source_id = 'co-topic-src' GROUP BY status").all()).toEqual([{ status: 'retired', n: 6 }])
 })
 
+it('fails a concept whose document was retired without calling the model', async () => {
+  raw.exec("DELETE FROM concepts WHERE id <> 'c00'; UPDATE sources SET retired_at = 1 WHERE id = 'co-topic-src'")
+  await drainConceptQueue()
+  expect(fetchModel).not.toHaveBeenCalled()
+  expect(states()).toEqual([{ id: 'c00', gen_status: 'failed', gen_error: 'The document behind this concept was retired' }])
+})
+
 it('keeps a concept reset by a document replacement pending, then regenerates it from the new version', async () => {
   raw.exec("DELETE FROM concepts WHERE id <> 'c00'")
   beforeSql = {

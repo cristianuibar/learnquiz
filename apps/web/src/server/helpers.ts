@@ -60,6 +60,8 @@ export async function ensureConceptItems(
   // Six stored items are enough unless the learner has already seen them all.
   const fresh = opts.unseen ? existing.filter((r) => !opts.unseen!.has(r.id)).length : existing.length
   if (existing.length >= 6 && fresh > 0) return existing.map(asItem)
+  // A retired document gets no new questions; generating would only store them retired.
+  if (await sourceRetired(db, concept)) return existing.map(asItem)
   // Only a real generation spends the cap; stored items stay readable at the cap.
   await assertWithinDailyCap(db, learnerId)
   // One generation per concept: an atomic claim on the row; a concurrent caller joins the in-flight one.
@@ -100,6 +102,9 @@ export async function ensureConceptItems(
   }
 }
 
+const sourceRetired = async (db: Db, concept: typeof concepts.$inferSelect) => Boolean(concept.sourceId &&
+  (await db.select({ retiredAt: sources.retiredAt }).from(sources).where(eq(sources.id, concept.sourceId)))[0]?.retiredAt)
+
 // Generates and stores a batch of items for one concept; returns only the new ones. Callers own the cap pre-check.
 export async function generateConceptItems(
   db: Db,
@@ -111,7 +116,8 @@ export async function generateConceptItems(
   const misconceptions = JSON.parse(concept.misconceptionsJson) as string[]
 
   // One read of the source serves both the prompt and the version stamp.
-  const [source] = concept.sourceId ? await db.select({ version: sources.version, bodyText: sources.bodyText }).from(sources).where(eq(sources.id, concept.sourceId)) : []
+  const [source] = concept.sourceId ? await db.select({ version: sources.version, bodyText: sources.bodyText, retiredAt: sources.retiredAt }).from(sources).where(eq(sources.id, concept.sourceId)) : []
+  if (source?.retiredAt) throw httpError('The document behind this concept was retired', 409)
   const kept: { payload: ItemPayload; check: unknown }[] = []
   for (let round = 0; round < opts.maxRounds && kept.length < opts.want; round++) {
     try {
