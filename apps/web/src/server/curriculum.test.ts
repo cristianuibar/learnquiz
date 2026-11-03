@@ -72,6 +72,7 @@ const skeleton = () => ({ units: procedures.map((u) => ({
 const modelReply = (value: unknown) => Response.json({ choices: [{ message: { content: JSON.stringify(value) }, finish_reason: 'stop' }] })
 const fetchModel = vi.fn<typeof fetch>()
 let raw: DatabaseSync
+const beforeClaim: { hook: (() => void) | null } = { hook: null }
 let db: ReturnType<typeof drizzle>
 
 beforeAll(() => {
@@ -80,6 +81,7 @@ beforeAll(() => {
     raw.exec(readFileSync(`drizzle/${file}`, 'utf8').replaceAll('--> statement-breakpoint', ''))
   }
   const run = (sql: string, params: unknown[], method: string) => {
+    if (beforeClaim.hook && sql.startsWith('update "topics"')) { const hook = beforeClaim.hook; beforeClaim.hook = null; hook() }
     // Match D1's prepared-statement limit, which node:sqlite does not enforce.
     if (params.length > 100) throw new Error(`D1_ERROR: too many SQL variables (${params.length} > 100)`)
     const stmt = raw.prepare(sql)
@@ -123,6 +125,7 @@ afterAll(() => raw.close())
 beforeEach(() => {
   raw.exec('SAVEPOINT test')
   holder.userId = 'owner'
+  beforeClaim.hook = null
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))
   fetchModel.mockReset().mockImplementation(async () => modelReply(skeleton()))
@@ -267,6 +270,51 @@ it('refuses roles with no live document text before calling the model', async ()
   await expect(generate()).rejects.toMatchObject({ status: 422 })
   expect(topicState()).toEqual({ status: 'draft' })
   expect(fetchModel).not.toHaveBeenCalled()
+})
+
+it('builds from a document replaced between the first read and the claim, never from the retired one', async () => {
+  const revised = documents[0].replace('Preparation notes.', 'Revised preparation notes.')
+  beforeClaim.hook = () => {
+    raw.exec("UPDATE sources SET retired_at = 1 WHERE id = 'receiving'")
+    raw.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, created_at) VALUES ('receiving-v2', 'picker-topic', 'text', 'Receiving and picking', ?, 1)").run(revised)
+  }
+  await expect(generate()).resolves.toEqual({ topicId: 'picker-topic' })
+  const prompt = JSON.parse(fetchModel.mock.calls[0][1]!.body as string).messages[1].content as string
+  expect(prompt).toContain(revised)
+  expect(prompt).not.toContain(documents[0])
+  expect(raw.prepare("SELECT DISTINCT source_id FROM concepts WHERE topic_id = 'picker-topic' ORDER BY source_id").all())
+    .toEqual([{ source_id: 'packing' }, { source_id: 'receiving-v2' }])
+})
+
+const retireReceiving = () => raw.exec("UPDATE sources SET retired_at = 1 WHERE id = 'receiving'")
+const noPath = { units: { n: 0 }, concepts: { n: 0 }, edges: { n: 0 } }
+
+it('publishes nothing when the claim went stale and a replacement retired the document during the model call', async () => {
+  fetchModel.mockImplementation(async () => {
+    raw.exec("UPDATE topics SET status = 'failed' WHERE id = 'picker-topic'") // releaseStaleBuild
+    retireReceiving()
+    raw.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, created_at) VALUES ('receiving-v2', 'picker-topic', 'text', 'Receiving and picking', ?, 3)").run(documents[0])
+    return modelReply(skeleton())
+  })
+  await expect(generate()).rejects.toMatchObject({ status: 409, message: 'A document changed while the curriculum was generating. Build it again.' })
+  expect(storedPath()).toEqual(noPath)
+  expect(topicState()).toEqual({ status: 'failed' })
+})
+
+it('publishes nothing and fails the topic when a cited document is retired while the claim is still held', async () => {
+  fetchModel.mockImplementation(async () => { retireReceiving(); return modelReply(skeleton()) })
+  await expect(generate()).rejects.toMatchObject({ status: 409, message: 'A document changed while the curriculum was generating. Build it again.' })
+  expect(storedPath()).toEqual(noPath)
+  expect(topicState()).toEqual({ status: 'failed' })
+})
+
+it('does not let a stale build mark another build\'s ready topic failed', async () => {
+  fetchModel.mockImplementation(async () => {
+    raw.exec("UPDATE topics SET status = 'ready', gen_started_at = 42 WHERE id = 'picker-topic'") // a newer build finished
+    return modelReply({ units: [] })
+  })
+  await expect(generate()).rejects.toMatchObject({ status: 422 })
+  expect(topicState()).toEqual({ status: 'ready' })
 })
 
 // An employee trains on the role's shared curriculum; the topic has no personal owner.

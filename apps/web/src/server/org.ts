@@ -13,6 +13,7 @@ import { getAuth } from '@/server/auth'
 import { requireOrgAdmin, requireOrgReader } from '@/server/authz'
 import { getEnv } from '@/server/env'
 import { httpError, mean } from '@/server/helpers'
+import { liveConcept } from '@/server/live-concept'
 import { getSessionUser } from '@/server/session'
 
 const Slug = z.object({ slug: z.string().min(1).max(100) })
@@ -52,7 +53,7 @@ async function trainingOf(orgId: string) {
       .innerJoin(member, and(eq(member.userId, memberRoleAssignments.userId), eq(member.organizationId, memberRoleAssignments.orgId)))
       .innerJoin(jobRoles, and(eq(jobRoles.id, memberRoleAssignments.jobRoleId), eq(jobRoles.orgId, memberRoleAssignments.orgId), eq(jobRoles.status, 'active')))
       .leftJoin(topics, and(eq(topics.jobRoleId, jobRoles.id), eq(topics.status, 'ready')))
-      .leftJoin(concepts, eq(concepts.topicId, topics.id))
+      .leftJoin(concepts, and(eq(concepts.topicId, topics.id), liveConcept()))
       .leftJoin(learnerConcept, and(eq(learnerConcept.conceptId, concepts.id), eq(learnerConcept.learnerId, memberRoleAssignments.userId)))
       .where(eq(memberRoleAssignments.orgId, orgId)),
     db.selectDistinct({ userId: attempts.learnerId, itemId: attempts.itemId })

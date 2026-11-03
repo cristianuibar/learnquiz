@@ -1,9 +1,10 @@
-import { and, desc, eq, lt, or } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNotNull, lt, or, sql } from 'drizzle-orm'
 import type { Db } from '@/db'
 import { concepts, items, learnerConcept, sources, topics } from '@/db/schema'
 import { chatJson, jobModel, LlmError } from '@/lib/llm/client'
 import { ENABLED_FORMATS, itemsPrompt, selfCheckPrompt } from '@/lib/llm/prompts'
 import { ItemBatch, ItemPayload, SelfCheck } from '@/lib/llm/schemas'
+import { liveConcept } from '@/server/live-concept'
 import { assertWithinDailyCap } from '@/server/model-cap'
 
 // Server-only helpers shared by the server-function files. They live apart from them so no server-only import reaches the client bundle.
@@ -60,6 +61,8 @@ export async function ensureConceptItems(
   // Six stored items are enough unless the learner has already seen them all.
   const fresh = opts.unseen ? existing.filter((r) => !opts.unseen!.has(r.id)).length : existing.length
   if (existing.length >= 6 && fresh > 0) return existing.map(asItem)
+  // A retired document gets no new questions. This read only keeps the cap untouched; the claim below enforces it atomically.
+  if (await sourceRetired(db, concept)) return existing.map(asItem)
   // Only a real generation spends the cap; stored items stay readable at the cap.
   await assertWithinDailyCap(db, learnerId)
   // One generation per concept: an atomic claim on the row; a concurrent caller joins the in-flight one.
@@ -67,9 +70,12 @@ export async function ensureConceptItems(
   const claimed = await db
     .update(concepts)
     .set({ genStatus: 'generating', genStartedAt: now })
-    .where(and(eq(concepts.id, concept.id), or(eq(concepts.genStatus, 'ready'), and(eq(concepts.genStatus, 'generating'), lt(concepts.genStartedAt, now - STALE_CLAIM_MS)))))
+    .where(and(eq(concepts.id, concept.id), liveConcept(), or(eq(concepts.genStatus, 'ready'), and(eq(concepts.genStatus, 'generating'), lt(concepts.genStartedAt, now - STALE_CLAIM_MS)))))
     .returning({ id: concepts.id })
   if (!claimed.length) {
+    // A refused claim on a dead concept must not fall through to generating unclaimed.
+    const [dead] = await db.select({ id: concepts.id }).from(concepts).where(and(eq(concepts.id, concept.id), sql`not (${liveConcept()})`))
+    if (dead) return existing.map(asItem)
     const status = async () => (await db.select({ s: concepts.genStatus }).from(concepts).where(eq(concepts.id, concept.id)))[0]?.s
     if ((await status()) === 'generating') {
       // Wait for the in-flight writer, then read what it stored without spending the cap again.
@@ -100,6 +106,9 @@ export async function ensureConceptItems(
   }
 }
 
+const sourceRetired = async (db: Db, concept: typeof concepts.$inferSelect) => Boolean(concept.sourceId &&
+  (await db.select({ retiredAt: sources.retiredAt }).from(sources).where(eq(sources.id, concept.sourceId)))[0]?.retiredAt)
+
 // Generates and stores a batch of items for one concept; returns only the new ones. Callers own the cap pre-check.
 export async function generateConceptItems(
   db: Db,
@@ -110,6 +119,10 @@ export async function generateConceptItems(
   const { learnerId, orgId, avoidStems } = opts
   const misconceptions = JSON.parse(concept.misconceptionsJson) as string[]
 
+  // One read of the source serves both the prompt and the version stamp.
+  const [source] = concept.sourceId ? await db.select({ version: sources.version, bodyText: sources.bodyText, retiredAt: sources.retiredAt }).from(sources).where(eq(sources.id, concept.sourceId)) : []
+  // A retired document gets no questions and no model call; the learner path must not fail on it.
+  if (source?.retiredAt) return []
   const kept: { payload: ItemPayload; check: unknown }[] = []
   for (let round = 0; round < opts.maxRounds && kept.length < opts.want; round++) {
     try {
@@ -125,6 +138,8 @@ export async function generateConceptItems(
           targetDifficulty: opts.targetDifficulty,
           spread: opts.spread,
           sourceQuote: concept.sourceQuote,
+          // A replacement version always sends the document: a kept quote can still match while the revision changes its meaning.
+          sourceText: source && source.version > 1 ? source.bodyText : concept.sourceQuote ? null : source?.bodyText ?? null,
           avoidStems,
         }),
         maxTokens: 16000,
@@ -171,7 +186,6 @@ export async function generateConceptItems(
   }
   if (!kept.length) throw httpError('Could not generate items for this concept', 502)
 
-  const [source] = concept.sourceId ? await db.select({ version: sources.version }).from(sources).where(eq(sources.id, concept.sourceId)) : []
   const now = Date.now()
   const rows = kept.map(({ payload, check }) => ({
     id: crypto.randomUUID(),
@@ -187,7 +201,19 @@ export async function generateConceptItems(
     createdAt: now,
   }))
   // Each item binds 12 parameters including defaults; eight rows stay below D1's 100-parameter limit.
-  const [first, ...rest] = chunks(rows, 8).map((r) => db.insert(items).values(r))
-  await db.batch([first, ...rest])
-  return rows.map((r, i) => ({ id: r.id, format: r.format, difficultyPrior: r.difficultyPrior, payload: kept[i].payload, generatedBy: r.generatedBy }))
+  const inserts = chunks(rows, 8).map((r) => db.insert(items).values(r))
+  // A document replaced or retired mid-generation must not gain live items citing it. The retirement check runs in the
+  // same atomic batch as the insert, so a replacement committing at any earlier moment is seen here; a read beforehand could go stale.
+  const retire = concept.sourceId
+    ? chunks(rows.map((r) => r.id), 50).map((ids) =>
+        db.update(items).set({ status: 'retired' }).where(and(
+          inArray(items.id, ids),
+          inArray(items.sourceId, db.select({ id: sources.id }).from(sources).where(and(eq(sources.id, concept.sourceId!), isNotNull(sources.retiredAt)))),
+        )).returning({ id: items.id }),
+      )
+    : []
+  const [first, ...rest] = [...inserts, ...retire]
+  const results = (await db.batch([first, ...rest])) as unknown[]
+  const retired = new Set(results.slice(inserts.length).flatMap((r) => (r as { id: string }[]).map((x) => x.id)))
+  return rows.flatMap((r, i) => retired.has(r.id) ? [] : [{ id: r.id, format: r.format, difficultyPrior: r.difficultyPrior, payload: kept[i].payload, generatedBy: r.generatedBy }])
 }

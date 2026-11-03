@@ -363,6 +363,9 @@ it('stamps proficient_at once when a role topic meets its benchmark and never cl
   raw.prepare('UPDATE concepts SET critical = 1 WHERE id = ?').run('c1')
   raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un2', 't1', 1, 'Later')
   raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)').run('c2', 't1', 'un2', 0, 'Other', '')
+  // A critical concept of a retired document has no questions left, so it cannot hold the benchmark back.
+  raw.prepare('INSERT INTO sources (id, topic_id, kind, title, body_text, retired_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run('src-old', 't1', 'text', 'Old', 'Old.', 1, 1)
+  raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary, critical, source_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run('c3', 't1', 'un2', 1, 'Retired', '', 1, 'src-old')
   const learned = raw.prepare('INSERT INTO learner_concept (learner_id, concept_id, p_known, n_attempts, updated_at) VALUES (?, ?, ?, ?, ?)')
   learned.run('u1', 'c1', 0.3, 1, 1)
   learned.run('u1', 'c2', 0.9, 1, 1)
@@ -630,7 +633,7 @@ describe('learner practice and unit unlocks', () => {
     vi.mocked(requireLearnerId).mockResolvedValueOnce('u2')
     expect((await getTopicPath({ data: { topicId: 't1' } })).units.map((u) => u.unlocked)).toEqual([false, false])
     vi.mocked(requireLearnerId).mockResolvedValueOnce('u2')
-    await expect(startSession({ data: { topicId: 't1' } })).rejects.toMatchObject({ status: 409, message: 'Nothing to practise yet' })
+    await expect(startSession({ data: { topicId: 't1' } })).rejects.toMatchObject({ status: 409, message: 'Nothing to practice yet' })
     expect(scalar(raw, 'SELECT COUNT(*) AS n FROM sessions WHERE learner_id = ?', 'u2').n).toBe(0)
   })
 
@@ -669,6 +672,63 @@ describe('learner practice and unit unlocks', () => {
       expect(scalar(raw, 'SELECT COUNT(*) AS n FROM sessions').n).toBe(0)
     },
   )
+
+  it('does not generate questions for a concept whose document was retired', async () => {
+    seedFrontier(raw, 1, false)
+    raw.prepare('INSERT INTO sources (id, topic_id, kind, title, body_text, retired_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run('src-old', 't1', 'text', 'Handbook', 'Old handbook.', Date.now(), 1)
+    raw.prepare("UPDATE concepts SET source_id = 'src-old' WHERE id = 'c1'").run()
+
+    await expect(startSession({ data: { topicId: 't1' } })).rejects.toMatchObject({ status: 409, message: 'Nothing to practice yet' })
+    expect(chatJson).not.toHaveBeenCalled()
+    expect(scalar(raw, 'SELECT COUNT(*) AS n FROM model_calls').n).toBe(0)
+  })
+
+  const PAYLOAD = JSON.stringify({
+    format: 'cloze', stem: 'Solve x + 1 = 2: x = ____.', options: [], accepted_answers: ['1'], model_answer: '1',
+    explanation: 'Subtract 1 from both sides.', difficulty: 1, source_quote: null, grounded: false, bloom: 'apply',
+  })
+  const seedSources = () => {
+    const src = raw.prepare('INSERT INTO sources (id, topic_id, kind, title, body_text, retired_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    src.run('src-old', 't1', 'text', 'Old handbook', 'Old.', Date.now(), 1)
+    src.run('src-new', 't1', 'text', 'New handbook', 'New.', null, 1)
+  }
+  const seedConcept = (id: string, unit: string, order: number, source: string, itemIds: string[]) => {
+    raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary, source_id) VALUES (?, ?, ?, ?, ?, ?, ?)').run(id, 't1', unit, order, id, '', source)
+    for (const itemId of itemIds) {
+      raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run(itemId, id, 't1', 'cloze', PAYLOAD, 1, Date.now())
+    }
+  }
+
+  it('practises a live document when four retired-document concepts rank first in the frontier', async () => {
+    seedSources()
+    raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un1', 't1', 0, 'Basics')
+    raw.prepare('INSERT INTO learner_unit (learner_id, unit_id, unlocked_at) VALUES (?, ?, ?)').run('u1', 'un1', 1)
+    for (let i = 1; i <= 4; i++) seedConcept(`dead${i}`, 'un1', i, 'src-old', [])
+    seedConcept('live', 'un1', 5, 'src-new', ['l1', 'l2', 'l3'])
+
+    const { sessionId } = await startSession({ data: { topicId: 't1' } })
+    const plan = JSON.parse(scalar(raw, 'SELECT plan_json FROM sessions WHERE id = ?', sessionId).plan_json as string)
+    expect([...plan.queue].sort()).toEqual(['l1', 'l2', 'l3'])
+    expect(chatJson).not.toHaveBeenCalled()
+  })
+
+  it('places from live concepts when the first concept of every unit cites a retired document', async () => {
+    seedSources()
+    for (const [i, unit] of ['un1', 'un2', 'un3'].entries()) {
+      raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run(unit, 't1', i, unit)
+      seedConcept(`dead-${unit}`, unit, 0, 'src-old', [`d-${unit}`])
+      seedConcept(`live-${unit}`, unit, 1, 'src-new', [1, 2, 3, 4, 5, 6].map((n) => `l${n}-${unit}`))
+    }
+
+    const { sessionId } = await startPlacement({ data: { topicId: 't1' } })
+    const plan = JSON.parse(scalar(raw, 'SELECT plan_json FROM sessions WHERE id = ?', sessionId).plan_json as string)
+    const pool = plan.pool as { id: string; conceptId: string }[]
+    expect(pool).toHaveLength(18)
+    expect(new Set(pool.map((p) => p.conceptId))).toEqual(new Set(['live-un1', 'live-un2', 'live-un3']))
+    expect(chatJson).not.toHaveBeenCalled()
+  })
 })
 
 it('credits the session bonus once when two finishing nextItem calls race (practice)', async () => {
@@ -1136,5 +1196,72 @@ describe('employees training on their role topic', () => {
     expect(chatJson).not.toHaveBeenCalled()
     expect(fetchModel).not.toHaveBeenCalled()
     expect(count('model_calls')).toBe(0)
+  })
+})
+
+describe('replaying an identical answer', () => {
+  const ask = (sessionId: string, answer: { optionId: string }, confidence: 'sure' | 'unsure' = 'sure') =>
+    answerItem({ data: { sessionId, itemId: 'i1', answer, confidence, responseMs: 1000 } })
+  const xps = (sessionId: string) => ({
+    session: scalar(raw, 'SELECT xp FROM sessions WHERE id = ?', sessionId).xp,
+    topic: scalar(raw, 'SELECT xp FROM learner_topic').xp,
+    attempts: scalar(raw, 'SELECT COUNT(*) AS n FROM attempts').n,
+  })
+  beforeEach(() => {
+    seedTopicAndLearner(raw, 0)
+    seedFrontier(raw, 6, true)
+    const payload = JSON.parse(scalar(raw, 'SELECT payload_json FROM items WHERE id = ?', 'i1').payload_json as string)
+    const options = ['a', 'b', 'c'].map((id) => ({ id, text: id, is_correct: id === 'b', feedback: '' }))
+    raw.prepare("UPDATE items SET format = 'mcq', payload_json = ?").run(JSON.stringify({ ...payload, format: 'mcq', options }))
+  })
+
+  it('returns the original reveal without a second attempt, XP or mastery change', async () => {
+    const { sessionId } = await startSession({ data: { topicId: 't1' } })
+    const first = await ask(sessionId, { optionId: 'b' })
+    expect(first).toMatchObject({ correct: true, xp: 10 })
+    const before = { ...xps(sessionId), learner: scalar(raw, 'SELECT p_known, n_attempts FROM learner_concept'), item: scalar(raw, "SELECT due, stability, reps FROM learner_item WHERE item_id = 'i1'") }
+    expect(before).toMatchObject({ session: 10, topic: 10, attempts: 1 })
+
+    expect(await ask(sessionId, { optionId: 'b' })).toEqual(first)
+    expect({ ...xps(sessionId), learner: scalar(raw, 'SELECT p_known, n_attempts FROM learner_concept'), item: scalar(raw, "SELECT due, stability, reps FROM learner_item WHERE item_id = 'i1'") }).toEqual(before)
+  })
+
+  it('rejects a different option or a different confidence', async () => {
+    const { sessionId } = await startSession({ data: { topicId: 't1' } })
+    await ask(sessionId, { optionId: 'b' })
+    await expect(ask(sessionId, { optionId: 'a' })).rejects.toMatchObject({ status: 409 })
+    await expect(ask(sessionId, { optionId: 'b' }, 'unsure')).rejects.toMatchObject({ status: 409 })
+    expect(xps(sessionId)).toEqual({ session: 10, topic: 10, attempts: 1 })
+  })
+
+  it('rejects the same answer once the session has moved to the next question', async () => {
+    raw.prepare('UPDATE learner_item SET due = 1').run()
+    const { sessionId } = await startSession({ data: { topicId: 't1' } })
+    await ask(sessionId, { optionId: 'b' })
+    expect(await nextItem({ data: { sessionId } })).toMatchObject({ ended: false })
+    await expect(ask(sessionId, { optionId: 'b' })).rejects.toMatchObject({ status: 409, message: 'That is not the current question' })
+    expect(xps(sessionId).attempts).toBe(1)
+  })
+
+  it('rejects a retry of an ungraded short answer', async () => {
+    const payload = JSON.parse(scalar(raw, 'SELECT payload_json FROM items WHERE id = ?', 'i1').payload_json as string)
+    raw.prepare("UPDATE items SET format = 'short', payload_json = ? WHERE id = 'i1'").run(JSON.stringify({ ...payload, format: 'short', options: [], model_answer: 'Because.' }))
+    vi.mocked(chatJson).mockRejectedValue(new Error('grader down'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { sessionId } = await startMiniSession({ data: { itemId: 'i1' } })
+    const answer = { data: { sessionId, itemId: 'i1', answer: { text: 'because' }, confidence: 'sure' as const, responseMs: 1000 } }
+    expect(await answerItem(answer)).toMatchObject({ state: 'ungraded', attemptId: null })
+    await expect(answerItem(answer)).rejects.toMatchObject({ status: 409 })
+    expect(xps(sessionId)).toEqual({ session: 0, topic: 0, attempts: 0 })
+  })
+
+  it('keeps returnsThisSession true when replaying a missed question that was re-asked', async () => {
+    const { sessionId } = await startSession({ data: { topicId: 't1' } })
+    const first = await ask(sessionId, { optionId: 'a' })
+    expect(first).toMatchObject({ correct: false, returnsThisSession: true })
+    expect(JSON.parse(scalar(raw, 'SELECT plan_json FROM sessions WHERE id = ?', sessionId).plan_json as string).reinserted).toContain('i1')
+
+    expect(await ask(sessionId, { optionId: 'a' })).toEqual(first)
+    expect(xps(sessionId).attempts).toBe(1)
   })
 })
