@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, count, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm'
+import { and, asc, count, eq, gte, inArray, isNull, lte, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb, type Db } from '@/db'
 import { attempts, concepts, items, learnerConcept, learnerItem, learnerTopic, learnerUnit, placements, sessions, topics, units } from '@/db/schema'
@@ -75,12 +75,12 @@ async function loadLearnerTopic(db: Db, learnerId: string, topicId: string) {
 }
 
 // The topic scope keeps a forged item id from another topic out.
-async function loadItem(db: Db, topicId: string, itemId: string) {
+async function loadItem(db: Db, topicId: string, itemId: string, includeRetired = false) {
   const [row] = await db
     .select({ item: items, concept: concepts })
     .from(items)
     .innerJoin(concepts, eq(concepts.id, items.conceptId))
-    .where(and(eq(items.id, itemId), eq(items.topicId, topicId)))
+    .where(and(eq(items.id, itemId), eq(items.topicId, topicId), includeRetired ? undefined : ne(items.status, 'retired')))
   if (!row) throw httpError('Item not found', 404)
   return { ...row, payload: JSON.parse(row.item.payloadJson) as ItemPayload }
 }
@@ -114,12 +114,13 @@ async function unitMastery(db: Db, learnerId: string, topicId: string) {
   }))
 }
 
-async function viewOf(db: Db, session: SessionRow, topic: Pick<TopicRow, 'title'>, plan: Plan): Promise<SessionView> {
+async function viewOf(db: Db, session: SessionRow, topic: TopicRow, plan: PlacementPlan | QueuePlan): Promise<SessionView> {
   const ids = JSON.parse(session.itemIdsJson) as string[]
   const ended = session.endedAt !== null
   let item: ItemView | null = null
   if (!ended && ids[plan.position]) {
-    const { item: row, concept, payload } = await loadItem(db, session.topicId, ids[plan.position])
+    const { item: row, concept, payload } = await loadItem(db, session.topicId, ids[plan.position], true)
+    if (row.status === 'retired') return advance(db, session.learnerId, session, topic, plan)
     item = toItemView(
       { id: row.id, conceptId: concept.id, conceptName: concept.name, format: payload.format, difficultyPrior: row.difficultyPrior, payload },
       session.id + row.id,
@@ -327,7 +328,8 @@ export const answerItem = createServerFn({ method: 'POST' })
     if (plan.answered) throw httpError('Already answered. Continue to the next question.', 409)
     // shortcut: no row lock, two concurrent answers to one slot would both count; add a version check if the UI double-fires.
 
-    const { item, concept, payload } = await loadItem(db, session.topicId, data.itemId)
+    const { item, concept, payload } = await loadItem(db, session.topicId, data.itemId, true)
+    if (item.status === 'retired') throw httpError('This question has been retired', 409)
     const [[lc], [li]] = await Promise.all([
       db.select().from(learnerConcept).where(and(eq(learnerConcept.learnerId, learnerId), eq(learnerConcept.conceptId, concept.id))),
       db.select().from(learnerItem).where(and(eq(learnerItem.learnerId, learnerId), eq(learnerItem.itemId, item.id))),
@@ -463,15 +465,23 @@ export const answerItem = createServerFn({ method: 'POST' })
 
 async function advance(db: Db, learnerId: string, session: SessionRow, topic: TopicRow, plan: PlacementPlan | QueuePlan): Promise<SessionView> {
   const ids = JSON.parse(session.itemIdsJson) as string[]
+  // Recheck persisted queues and placement pools: an admin can retire an item after the session starts.
+  const candidates = 'pool' in plan ? plan.pool.map((p) => p.id) : ids.slice(plan.position + 1)
+  // Leave two of D1's 100 bindings for the topic and retired status.
+  const rows = await Promise.all(chunks(candidates, 98).map((ids) => db.select({ id: items.id }).from(items)
+    .where(and(eq(items.topicId, session.topicId), ne(items.status, 'retired'), inArray(items.id, ids)))))
+  const available = new Set(rows.flat().map((i) => i.id))
+  let position = plan.position + 1
   let nextId: string | null
   if ('log' in plan) {
     const conceptOf = new Map(plan.pool.map((p) => [p.id, p.conceptId]))
     nextId = ids.length >= PLACEMENT.max || shouldStop(plan.log)
       ? null
-      : pickNext(plan.workingLevel, plan.pool, ids.map((id) => ({ id, conceptId: conceptOf.get(id) ?? '' })))
+      : pickNext(plan.workingLevel, plan.pool.filter((p) => available.has(p.id)), ids.map((id) => ({ id, conceptId: conceptOf.get(id) ?? '' })))
     if (nextId) ids.push(nextId)
   } else {
-    nextId = ids[plan.position + 1] ?? null
+    while (position < ids.length && !available.has(ids[position])) position++
+    nextId = ids[position] ?? null
   }
 
   if (!nextId) {
@@ -479,7 +489,7 @@ async function advance(db: Db, learnerId: string, session: SessionRow, topic: To
     const done = await loadSession(db, learnerId, session.id)
     return viewOf(db, done.session, done.topic, plan)
   }
-  const advanced = { ...plan, position: plan.position + 1, answered: false }
+  const advanced = { ...plan, position, answered: false }
   await db
     .update(sessions)
     .set({ itemIdsJson: JSON.stringify(ids), planJson: JSON.stringify(advanced) })
@@ -528,7 +538,7 @@ export const reportItem = createServerFn({ method: 'POST' })
     const done = await db
       .update(items)
       .set({ status: 'reported' })
-      .where(and(eq(items.id, data.itemId), inArray(items.topicId, db.select({ id: topics.id }).from(topics).where(eq(topics.learnerId, learnerId)))))
+      .where(and(eq(items.id, data.itemId), ne(items.status, 'retired'), inArray(items.topicId, db.select({ id: topics.id }).from(topics).where(eq(topics.learnerId, learnerId)))))
       .returning({ id: items.id })
     if (!done.length) throw httpError('Item not found', 404)
     return { ok: true }

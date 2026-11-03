@@ -76,7 +76,9 @@ export const items = sqliteTable('items', {
   difficultyPrior: integer('difficulty_prior').notNull().default(3),
   eloDifficulty: real('elo_difficulty'),
   checkJson: text('check_json'),
-  status: text('status', { enum: ['active', 'rejected', 'reported'] }).notNull().default('active'),
+  status: text('status', { enum: ['active', 'rejected', 'reported', 'retired'] }).notNull().default('active'),
+  reviewedBy: text('reviewed_by'),
+  reviewedAt: integer('reviewed_at'),
   createdAt: integer('created_at').notNull(),
 })
 

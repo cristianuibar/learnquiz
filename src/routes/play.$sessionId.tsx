@@ -35,7 +35,7 @@ function isAnswerConflict(err: unknown): boolean {
   const e = err as { status?: number; message?: string }
   return (
     e?.status === 409 ||
-    ['Already answered', 'This session has ended', 'That is not the current question'].some((m) => e?.message?.includes(m))
+    ['Already answered', 'This session has ended', 'That is not the current question', 'This question has been retired'].some((m) => e?.message?.includes(m))
   )
 }
 
@@ -104,7 +104,7 @@ function Play({ initial }: { initial: SessionView }) {
         setReveal(await check({ data: { sessionId: view.id, itemId: item.id, answer, confidence, responseMs } }))
       } catch (err) {
         if (!isAnswerConflict(err)) throw err
-        // The answer already landed (its response was lost): resync instead of replaying it.
+        // The session changed or the answer already landed: resync instead of replaying it.
         try {
           await resync()
         } catch (syncErr) {
