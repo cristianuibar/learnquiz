@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Reveal</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="lq.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" data-brand="{{brand}}" style="width: {{w}}px; height: {{h}}px; font-family: var(--font-sans); color: var(--ink);">
+
+  <!-- The answered question, behind the sheet -->
+  <div inert="inert" aria-hidden="true" style="flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column;">
+    <header class="topbar">
+      <a class="icon-btn" href="Today.dc.html" aria-label="End session">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+      </a>
+      <div style="flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px;">
+        <div class="bar" role="progressbar" aria-label="Session progress" aria-valuenow="{{qNum}}" aria-valuemin="0" aria-valuemax="20" style="flex: 1;">
+          <div class="bar-fill" style="width: {{qPct}};"></div>
+        </div>
+        <span class="t-overline num muted">{{qCount}}</span>
+      </div>
+      <button class="icon-btn" type="button" aria-pressed="false" aria-label="Read aloud">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"></path><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"></path></svg>
+      </button>
+    </header>
+
+    <main class="scroll" style="padding-top: 16px; display: flex; flex-direction: column; gap: 24px;">
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <h1 class="t-title2">{{stem}}</h1>
+        <sc-if value="{{isPartial}}" hint-placeholder-val="{{ false }}">
+          <p class="t-caption muted">Choose all that apply</p>
+        </sc-if>
+      </div>
+      <div class="opt-list" role="list">
+        <sc-for list="{{opts}}" as="o" hint-placeholder-count="4">
+          <div class="opt {{o.cls}}" role="listitem">
+            <sc-if value="{{o.isCorrect}}" hint-placeholder-val="{{ false }}">
+              <span class="fb-mark" style="display: inline-flex;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></span>
+            </sc-if>
+            <sc-if value="{{o.isWrong}}" hint-placeholder-val="{{ false }}">
+              <span class="fb-mark" style="display: inline-flex;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+            </sc-if>
+            <sc-if value="{{o.isRest}}" hint-placeholder-val="{{ true }}">
+              <span class="{{o.markCls}}" aria-hidden="true"></span>
+            </sc-if>
+            <span class="opt-text">{{o.text}}</span>
+            <sc-if value="{{o.isCorrect}}" hint-placeholder-val="{{ false }}">
+              <span class="fb-word">Correct</span>
+            </sc-if>
+            <sc-if value="{{o.isWrong}}" hint-placeholder-val="{{ false }}">
+              <span class="fb-word">Not quite</span>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </main>
+  </div>
+
+  <div class="scrim" aria-hidden="true"></div>
+
+  <!-- Result sheet -->
+  <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="rv-result">
+    <div class="grabber" aria-hidden="true" style="position: absolute; top: 0; left: 0; right: 0;"></div>
+
+    <div class="sheet-band {{bandCls}}" role="status" aria-live="polite" style="padding: 24px 16px 16px; gap: 12px;">
+      <span aria-hidden="true" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--radius-full); background: var(--c); color: var(--on-feedback);">
+        <sc-if value="{{isRight}}" hint-placeholder-val="{{ true }}">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12.5l5 5L19.5 7"></path></svg>
+        </sc-if>
+        <sc-if value="{{isMiss}}" hint-placeholder-val="{{ false }}">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+        </sc-if>
+        <sc-if value="{{isPartial}}" hint-placeholder-val="{{ false }}">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none"></path><circle cx="12" cy="12" r="9"></circle></svg>
+        </sc-if>
+      </span>
+      <h2 id="rv-result" class="t-title2" style="flex: 1;">{{bandLabel}}</h2>
+      <sc-if value="{{isRight}}" hint-placeholder-val="{{ true }}">
+        <span class="xp xp-quiet">+10 XP</span>
+      </sc-if>
+      <sc-if value="{{isPartial}}" hint-placeholder-val="{{ false }}">
+        <span class="t-label num">1 of 2 found · 1 extra</span>
+      </sc-if>
+    </div>
+
+    <div class="sheet-body">
+
+      <!-- Correct (sure / unsure): the answer leads -->
+      <sc-if value="{{isPalletRight}}" hint-placeholder-val="{{ true }}">
+        <p class="t-body-lg">Photograph the damage and note it on the delivery receipt.</p>
+      </sc-if>
+
+      <!-- Correct, sure: the why on request -->
+      <sc-if value="{{isSureCorrect}}" hint-placeholder-val="{{ true }}">
+        <button class="link-btn" type="button" aria-expanded="{{whyExpanded}}" onClick="{{toggleWhy}}" style="align-self: flex-start; margin: -12px 0 0 -8px;">
+          Why
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform: {{chevron}}; transition: transform var(--duration-fast) var(--ease-out);"><path d="M6 9l6 6 6-6"></path></svg>
+        </button>
+      </sc-if>
+
+      <!-- Explanation + quote: open for unsure, on request for sure -->
+      <sc-if value="{{showPalletWhy}}" hint-placeholder-val="{{ false }}">
+        <p class="t-body">The receipt is your only proof against the carrier, so it is written before anything moves. Photo and note first, then Quarantine bay Q1.</p>
+        <figure class="quote">
+          <blockquote class="quote-text">“Before you sign or move anything, photograph the damage and write ‘received damaged, subject to inspection’ on the carrier’s delivery receipt. Then move the pallet to Quarantine bay Q1.”</blockquote>
+          <figcaption class="quote-src">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5M9 13h6M9 17h4"></path></svg>
+            Receiving SOP v3 · §2.3
+          </figcaption>
+        </figure>
+      </sc-if>
+
+      <!-- Not quite / sure and wrong: the answer next to the choice -->
+      <sc-if value="{{isMiss}}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; gap: 12px; align-items: flex-start;">
+          <span style="display: inline-flex; color: var(--feedback-correct); margin-top: 20px;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></span>
+          <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+            <p class="t-caption muted">The answer</p>
+            <p class="t-body-lg">Photograph the damage and note it on the delivery receipt</p>
+          </div>
+        </div>
+        <div style="display: flex; gap: 12px; align-items: flex-start;">
+          <span style="display: inline-flex; color: var(--feedback-wrong); margin-top: 20px;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+          <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+            <p class="t-caption muted">You chose</p>
+            <p class="t-body-lg">Move it straight to Quarantine bay&nbsp;Q1</p>
+            <sc-if value="{{isNotQuite}}" hint-placeholder-val="{{ false }}">
+              <p class="t-body" style="margin-top: 4px;">Quarantine is step two. Once the pallet moves, the carrier can say the damage happened in our building. Record first, then move.</p>
+            </sc-if>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- Sure and wrong only: critical row (neutral, no fill), then the misconception -->
+      <sc-if value="{{isSureWrong}}" hint-placeholder-val="{{ false }}">
+        <p class="t-caption" style="display: flex; align-items: center; gap: 8px; color: var(--ink);">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--ink);"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>
+          <span><strong style="font-weight: 700;">Critical step</strong> · Comes back first next session</span>
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <h3 class="t-label">Why it felt right</h3>
+          <p class="t-body">Quarantine gets the pallet out of the way, so it feels like the safe first move.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <h3 class="t-label">What actually matters</h3>
+          <p class="t-body">The receipt is your only proof against the carrier, so it’s written before anything moves.</p>
+        </div>
+        <div class="field">
+          <label class="field-label" for="rv-reflect">In one line: why record before moving? <span class="t-caption muted">Optional</span></label>
+          <input id="rv-reflect" class="input" type="text" autocomplete="off">
+        </div>
+      </sc-if>
+
+      <sc-if value="{{isMiss}}" hint-placeholder-val="{{ false }}">
+        <figure class="quote">
+          <blockquote class="quote-text">“Before you sign or move anything, photograph the damage and write ‘received damaged, subject to inspection’ on the carrier’s delivery receipt. Then move the pallet to Quarantine bay Q1.”</blockquote>
+          <figcaption class="quote-src">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5M9 13h6M9 17h4"></path></svg>
+            Receiving SOP v3 · §2.3
+          </figcaption>
+        </figure>
+      </sc-if>
+
+      <!-- Partial credit (multi-select): one line per item that was off -->
+      <sc-if value="{{isPartial}}" hint-placeholder-val="{{ false }}">
+        <ul style="display: flex; flex-direction: column; gap: 12px;">
+          <li style="display: flex; gap: 12px; align-items: flex-start;">
+            <span style="display: inline-flex; color: var(--feedback-correct); margin-top: 3px;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></span>
+            <p class="t-body-lg"><strong style="font-weight: 600;">Broken seal:</strong> needs sign-off. You missed it.</p>
+          </li>
+          <li style="display: flex; gap: 12px; align-items: flex-start;">
+            <span style="display: inline-flex; color: var(--feedback-wrong); margin-top: 3px;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+            <p class="t-body-lg"><strong style="font-weight: 600;">Mixed-SKU:</strong> no sign-off needed.</p>
+          </li>
+        </ul>
+        <figure class="quote">
+          <blockquote class="quote-text">“Hazmat-labeled cartons and cartons with a broken seal wait in staging for a lead’s sign-off before put-away.”</blockquote>
+          <figcaption class="quote-src">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5M9 13h6M9 17h4"></path></svg>
+            Receiving SOP v3 · §2.6
+          </figcaption>
+        </figure>
+      </sc-if>
+
+      <sc-if value="{{comesBack}}" hint-placeholder-val="{{ false }}">
+        <p class="t-body muted" style="display: flex; align-items: center; gap: 8px;">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"></path></svg>
+          This comes back later this session.
+        </p>
+      </sc-if>
+
+      <!-- Correct, no source: explanation without a quote -->
+      <sc-if value="{{isNoSource}}" hint-placeholder-val="{{ false }}">
+        <p class="t-body-lg">So the scanner knows which slot the item came from.</p>
+        <p class="t-body">The location scan tells the system which slot you are picking from. Scan the item first and the pick isn’t tied to a slot, so stock counts drift.</p>
+        <p class="t-caption muted" style="display: flex; align-items: center; gap: 8px;">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 16v-4M12 8h.01"></path></svg>
+          Not quoted from your SOP
+        </p>
+      </sc-if>
+    </div>
+
+    <div class="sheet-foot">
+      <a class="btn btn-primary btn-lg btn-block" href="{{nextHref}}">{{footLabel}}</a>
+      <a class="link-btn muted-link" href="Report.dc.html" style="align-self: center;">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>
+        Report this question
+      </a>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"brand":{"editor":"enum","options":["default","plum"],"default":"default","section":"Theme"},"w":{"editor":"int","default":360,"section":"Frame"},"h":{"editor":"int","default":740,"section":"Frame"},"variant":{"editor":"enum","options":["sureCorrect","unsureCorrect","notQuite","sureWrong","noSource","partial"],"default":"sureCorrect","section":"Variant"},"$preview":{"width":360,"height":740}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { whyOpen: false };
+  }
+  renderVals() {
+    const variants = ['sureCorrect', 'unsureCorrect', 'notQuite', 'sureWrong', 'noSource', 'partial'];
+    const v = variants.indexOf(this.props.variant) >= 0 ? this.props.variant : 'sureCorrect';
+    const isPartial = v === 'partial';
+    const isRight = v === 'sureCorrect' || v === 'unsureCorrect' || v === 'noSource';
+    const isMiss = v === 'notQuite' || v === 'sureWrong';
+
+    // ok = correct answer; picked = what Jordan chose
+    const pallet = [
+      { text: 'Re-wrap it and put it away as normal' },
+      { text: 'Photograph the damage and note it on the delivery receipt', ok: true, picked: isRight },
+      { text: 'Move it straight to Quarantine bay Q1', picked: isMiss },
+      { text: 'Sign the receipt, then tell your lead' }
+    ];
+    const scanning = [
+      { text: 'So the item’s barcode is checked twice' },
+      { text: 'So the scanner knows which slot the item came from', ok: true, picked: true },
+      { text: 'So the item’s weight is recorded' },
+      { text: 'So the location label stays readable' }
+    ];
+    const cartons = [
+      { text: 'Hazmat-labeled cartons', ok: true, picked: true },
+      { text: 'Cartons with a broken seal', ok: true, picked: false },
+      { text: 'Cartons over 23 kg' },
+      { text: 'Mixed-SKU cartons', picked: true }
+    ];
+    const list = isPartial ? cartons : (v === 'noSource' ? scanning : pallet);
+    const opts = list.map((o) => {
+      const isCorrect = !!o.ok;
+      const isWrong = !o.ok && !!o.picked;
+      const isRest = !isCorrect && !isWrong;
+      return {
+        text: o.text, isCorrect, isWrong, isRest,
+        cls: isCorrect ? 'is-correct' : (isWrong ? 'is-wrong' : 'is-rest'),
+        markCls: isPartial ? 'check' : 'radio'
+      };
+    });
+
+    const whyOpen = this.state.whyOpen;
+    const stems = {
+      pallet: 'A pallet’s shrink wrap is torn on arrival. What do you do first?',
+      noSource: 'Why scan the location label before the item?',
+      partial: 'Which inbound cartons need a lead’s sign-off before put-away?'
+    };
+    return {
+      theme: this.props.theme ?? 'light',
+      brand: this.props.brand ?? 'default',
+      w: this.props.w ?? 360,
+      h: this.props.h ?? 740,
+      qNum: isPartial ? 8 : 7,
+      qPct: isPartial ? '40%' : '35%',
+      qCount: isPartial ? '8 of 20' : '7 of 20',
+      stem: isPartial ? stems.partial : (v === 'noSource' ? stems.noSource : stems.pallet),
+      opts,
+      isRight,
+      isMiss,
+      isPartial,
+      isPalletRight: v === 'sureCorrect' || v === 'unsureCorrect',
+      isSureCorrect: v === 'sureCorrect',
+      showPalletWhy: v === 'unsureCorrect' || (v === 'sureCorrect' && whyOpen),
+      isNotQuite: v === 'notQuite',
+      isSureWrong: v === 'sureWrong',
+      isNoSource: v === 'noSource',
+      comesBack: isMiss || isPartial,
+      bandCls: isPartial ? 'fb-learning' : (isRight ? 'fb-correct' : 'fb-wrong'),
+      bandLabel: isPartial ? 'Partly right' :(isRight ? 'Correct' : 'Not quite'),
+      footLabel: v === 'sureWrong' ? 'Got it' : 'Continue',
+      nextHref: isPartial ? 'QCloze.dc.html' : 'QMulti.dc.html',
+      whyExpanded: whyOpen ? 'true' : 'false',
+      chevron: whyOpen ? 'rotate(180deg)' : 'none',
+      toggleWhy: () => this.setState({ whyOpen: !this.state.whyOpen })
+    };
+  }
+}
+</script>
+</body>
+</html>

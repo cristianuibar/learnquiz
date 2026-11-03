@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Learn Quiz notification</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="lq.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" data-brand="{{brand}}" style="width: {{w}}px; height: {{h}}px; font-family: var(--font-sans); color: var(--ink);">
+
+  <sc-if value="{{isLock}}" hint-placeholder-val="{{ true }}">
+    <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--os-ground); color: var(--os-ink); padding: 96px 16px 8px;">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 48px;">
+        <p class="num" style="font-size: 64px; line-height: 72px; font-weight: 400; letter-spacing: -0.02em; color: var(--os-ink);">9:41</p>
+        <p class="t-body-lg" style="color: var(--os-ink-muted);">Tuesday, November 3</p>
+      </div>
+
+      <a href="QuickQuestion.dc.html" aria-label="Learn Quiz, now: Your scanner double-beeps on a pick. What do you do first? Open question." style="display: flex; flex-direction: column; gap: 8px; background: var(--os-card); color: var(--os-ink); border-radius: var(--radius-lg); padding: 16px; text-decoration: none;">
+        <span style="display: flex; align-items: center; gap: 8px; color: var(--os-ink-muted);" aria-hidden="true">
+          <span style="width: 20px; height: 20px; border-radius: var(--radius-full); background: var(--brand); display: inline-flex; align-items: center; justify-content: center;">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><mask id="lqn-lock" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"></rect><circle cx="18" cy="18" r="6"></circle></mask><path fill="var(--on-brand)" fill-rule="evenodd" mask="url(#lqn-lock)" d="M11 1a10 10 0 1 0 0 20a10 10 0 1 0 0-20zm0 5a5 5 0 1 1 0 10a5 5 0 1 1 0-10z"></path><circle cx="18" cy="18" r="4" fill="var(--on-brand)"></circle></svg>
+          </span>
+          <span class="t-caption">Learn Quiz · now</span>
+        </span>
+        <span class="t-body" style="font-weight: 600; color: var(--os-ink);" aria-hidden="true">Your scanner double-beeps on a pick. What do you do first?</span>
+      </a>
+
+      <div style="flex: 1;"></div>
+      <div style="align-self: center; width: 108px; height: 4px; border-radius: var(--radius-full); background: var(--os-ink-muted); margin-bottom: 8px;" aria-hidden="true"></div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isHeadsup}}" hint-placeholder-val="{{ false }}">
+    <div style="flex: 1; min-height: 0; position: relative; background: var(--surface-sunken);">
+      <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 0 16px 32px; display: grid; grid-template-columns: repeat(4, 48px); justify-content: space-between; row-gap: 24px;" aria-hidden="true">
+        <span style="width: 48px; height: 48px; border-radius: 12px; background: var(--border);"></span><span style="width: 48px; height: 48px; border-radius: 12px; background: var(--border);"></span><span style="width: 48px; height: 48px; border-radius: 12px; background: var(--border);"></span><span style="width: 48px; height: 48px; border-radius: 12px; background: var(--border);"></span><span style="width: 48px; height: 48px; border-radius: 12px; background: var(--border);"></span><span style="width: 48px; height: 48px; border-radius: 12px; background: var(--border);"></span><span style="width: 48px; height: 48px; border-radius: 12px; background: var(--border);"></span><span style="width: 48px; height: 48px; border-radius: 12px; background: var(--border);"></span><span style="width: 48px; height: 48px; border-radius: 12px; background: var(--border);"></span><span style="width: 48px; height: 48px; border-radius: 12px; background: var(--border);"></span><span style="width: 48px; height: 48px; border-radius: 12px; background: var(--border);"></span><span style="width: 48px; height: 48px; border-radius: 12px; background: var(--border);"></span><span style="width: 48px; height: 48px; border-radius: 12px; background: var(--border);"></span><span style="width: 48px; height: 48px; border-radius: 12px; background: var(--border);"></span><span style="width: 48px; height: 48px; border-radius: 12px; background: var(--border);"></span><span style="width: 48px; height: 48px; border-radius: 12px; background: var(--border);"></span><span style="width: 48px; height: 48px; border-radius: 12px; background: var(--border);"></span><span style="width: 48px; height: 48px; border-radius: 12px; background: var(--border);"></span><span style="width: 48px; height: 48px; border-radius: 12px; background: var(--border);"></span><span style="width: 48px; height: 48px; border-radius: 12px; background: var(--border);"></span>
+      </div>
+
+      <a href="QuickQuestion.dc.html" aria-label="Learn Quiz, now: Your scanner double-beeps on a pick. What do you do first? Open question." style="position: absolute; top: 16px; left: 8px; right: 8px; display: flex; flex-direction: column; gap: 8px; background: var(--surface-card); color: var(--ink); border-radius: var(--radius-lg); padding: 16px; text-decoration: none; box-shadow: var(--shadow-raised);">
+        <span style="display: flex; align-items: center; gap: 8px; color: var(--ink-muted);" aria-hidden="true">
+          <span style="width: 20px; height: 20px; border-radius: var(--radius-full); background: var(--brand); display: inline-flex; align-items: center; justify-content: center;">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><mask id="lqn-head" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"></rect><circle cx="18" cy="18" r="6"></circle></mask><path fill="var(--on-brand)" fill-rule="evenodd" mask="url(#lqn-head)" d="M11 1a10 10 0 1 0 0 20a10 10 0 1 0 0-20zm0 5a5 5 0 1 1 0 10a5 5 0 1 1 0-10z"></path><circle cx="18" cy="18" r="4" fill="var(--on-brand)"></circle></svg>
+          </span>
+          <span class="t-caption">Learn Quiz · now</span>
+        </span>
+        <span class="t-body" style="font-weight: 600; color: var(--ink);" aria-hidden="true">Your scanner double-beeps on a pick. What do you do first?</span>
+      </a>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"brand":{"editor":"enum","options":["default","plum"],"default":"default","section":"Theme"},"view":{"editor":"enum","options":["lock","headsup"],"default":"lock","section":"Variant"},"w":{"editor":"int","default":360,"section":"Frame"},"h":{"editor":"int","default":740,"section":"Frame"},"$preview":{"width":360,"height":740}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const view = this.props.view ?? 'lock';
+    return {
+      theme: this.props.theme ?? 'light',
+      brand: this.props.brand ?? 'default',
+      w: this.props.w ?? 360,
+      h: this.props.h ?? 740,
+      isLock: view !== 'headsup',
+      isHeadsup: view === 'headsup'
+    };
+  }
+}
+</script>
+</body>
+</html>

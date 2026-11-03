@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Design-system additions</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="lq.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" data-brand="{{brand}}" style="width: {{w}}px; height: {{h}}px; font-family: var(--font-sans); color: var(--ink);">
+  <div id="ds-board" style="flex: 1; min-height: 0; padding: 32px 48px; display: flex; flex-direction: column; gap: 32px;">
+
+    <!-- ================= Page header ================= -->
+    <header style="display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: -8px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <svg viewBox="0 0 64 64" width="32" height="32" aria-hidden="true"><mask id="lqm-ds-head" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="#fff"></rect><circle cx="48" cy="48" r="13"></circle></mask><circle cx="32" cy="32" r="19" fill="none" stroke="var(--brand)" stroke-width="14" mask="url(#lqm-ds-head)"></circle><circle cx="48" cy="48" r="9" fill="#F2A900"></circle></svg>
+        <h1 class="t-title1">Learn Quiz learner app · design-system additions</h1>
+      </div>
+      <p class="t-body muted">Extends Petrol &amp; Saffron v1 past its five components. Every specimen is live lq.css.</p>
+    </header>
+
+    <!-- ================= Answer moment ================= -->
+    <section aria-labelledby="ds-sec-answer" style="display: flex; flex-direction: column; gap: 16px;">
+      <h2 id="ds-sec-answer" class="t-title2">Answer moment</h2>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px;">
+
+        <!-- 1. Confidence picker -->
+        <article class="card" aria-labelledby="ds-conf" style="grid-column: 1; grid-row: 1; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+          <header style="display: flex; flex-direction: column; gap: 4px;">
+            <h3 id="ds-conf" class="section-title">Confidence picker</h3>
+            <p class="t-body muted">Rates certainty before Check; it decides the reveal.</p>
+          </header>
+          <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 8px; background: var(--surface-page); border-radius: var(--radius-md); padding: 16px;">
+            <div aria-hidden="true" style="display: grid; grid-template-columns: 3fr 1fr; gap: 8px;">
+              <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;">
+                <p class="t-caption muted">Unselected</p>
+                <p class="t-caption muted">Selected</p>
+                <p class="t-caption muted">Focus</p>
+              </div>
+              <p class="t-caption muted">Disabled</p>
+            </div>
+            <div style="display: grid; grid-template-columns: 3fr 1fr; gap: 8px;">
+              <div class="conf" role="radiogroup" aria-label="How sure are you? Specimen">
+                <button class="conf-btn" type="button" role="radio" aria-checked="false"><span class="conf-tick" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></span>Sure</button>
+                <button class="conf-btn" type="button" role="radio" aria-checked="true"><span class="conf-tick" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></span>Unsure</button>
+                <button class="conf-btn is-focus" type="button" role="radio" aria-checked="false"><span class="conf-tick" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></span>Guessing</button>
+              </div>
+              <p class="t-caption muted" style="display: flex; align-items: center; justify-content: center; min-height: var(--target); border: 1px dashed var(--border-strong); border-radius: var(--radius-md);">N/A</p>
+            </div>
+          </div>
+          <dl class="t-caption" style="margin: 0; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 4px 12px;">
+            <dt class="muted">Tokens</dt>
+            <dd style="margin: 0;">border-strong · surface-card · brand · brand-tint · target</dd>
+            <dt class="muted">A11y</dt>
+            <dd style="margin: 0;">radiogroup of role=radio + aria-checked; tick, not tint alone</dd>
+          </dl>
+        </article>
+
+        <!-- 2. Check gating -->
+        <article class="card" aria-labelledby="ds-gate" style="grid-column: 1; grid-row: 2; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+          <header style="display: flex; flex-direction: column; gap: 4px;">
+            <h3 id="ds-gate" class="section-title">Check gating</h3>
+            <p class="t-body muted">Check unlocks once answer and confidence are set.</p>
+          </header>
+          <div style="flex: 1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: center; gap: 8px 16px; background: var(--surface-page); border-radius: var(--radius-md); padding: 16px;">
+            <p class="t-caption muted">Answer or confidence missing</p>
+            <p class="t-caption muted">Both set</p>
+            <button class="btn btn-lg btn-block" type="button" disabled>Check</button>
+            <a class="btn btn-primary btn-lg btn-block" href="Reveal.dc.html">Check</a>
+          </div>
+          <dl class="t-caption" style="margin: 0; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 4px 12px;">
+            <dt class="muted">Tokens</dt>
+            <dd style="margin: 0;">sunken, dashed, ink-muted 5.1:1 → brand, on-brand 7.7:1</dd>
+            <dt class="muted">A11y</dt>
+            <dd style="margin: 0;">Real disabled button, swapped in place; never hidden</dd>
+          </dl>
+        </article>
+
+        <!-- 3. Result sheet -->
+        <article class="card" aria-labelledby="ds-sheet" style="grid-column: 2 / 4; grid-row: 1 / 3; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+          <header style="display: flex; flex-direction: column; gap: 4px;">
+            <h3 id="ds-sheet" class="section-title">Result sheet</h3>
+            <p class="t-body muted">The answer reveal: the one expressive moment in a session.</p>
+          </header>
+          <div style="flex: 1; display: grid; grid-template-columns: 232px 312px minmax(0, 1fr); gap: 24px;">
+
+            <!-- anatomy -->
+            <div style="display: flex; flex-direction: column; gap: 8px; background: var(--surface-page); border-radius: var(--radius-md); padding: 16px;">
+              <p class="t-caption muted">Anatomy</p>
+              <div style="flex: 1; position: relative; min-height: 304px; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-page);">
+                <div aria-hidden="true" style="padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+                  <div class="skel" style="height: 8px;"></div>
+                  <div class="skel" style="height: 16px; width: 80%; margin-top: 8px;"></div>
+                  <div class="skel" style="height: 40px;"></div>
+                  <div class="skel" style="height: 40px;"></div>
+                </div>
+                <div class="scrim" aria-hidden="true"></div>
+                <span aria-hidden="true" style="position: absolute; top: 8px; right: 8px; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: var(--radius-full); background: var(--ink); color: var(--surface-card); font-size: 12px; line-height: 16px; font-weight: 600;">1</span>
+                <section class="sheet" aria-label="Result sheet specimen">
+                  <div class="grabber" aria-hidden="true"></div>
+                  <span aria-hidden="true" style="position: absolute; top: 1px; left: calc(50% + 26px); display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: var(--radius-full); background: var(--ink); color: var(--surface-card); font-size: 12px; line-height: 16px; font-weight: 600;">2</span>
+                  <div class="sheet-band fb-correct" role="status" aria-live="polite" style="gap: 8px; border-radius: 0;">
+                    <span aria-hidden="true" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--radius-full); background: var(--c); color: var(--on-feedback);"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></span>
+                    <p class="t-title2" style="flex: 1;">Correct</p>
+                    <span aria-hidden="true" style="display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: var(--radius-full); background: var(--ink); color: var(--surface-card); font-size: 12px; line-height: 16px; font-weight: 600;">3</span>
+                  </div>
+                  <div class="sheet-body" style="position: relative; padding-right: 32px;">
+                    <p class="t-body">Photograph the damage and note it on the receipt.</p>
+                    <span aria-hidden="true" style="position: absolute; top: 16px; right: 8px; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: var(--radius-full); background: var(--ink); color: var(--surface-card); font-size: 12px; line-height: 16px; font-weight: 600;">4</span>
+                  </div>
+                  <div class="sheet-foot" style="position: relative;">
+                    <a class="btn btn-primary btn-block" href="QMulti.dc.html">Continue</a>
+                    <span aria-hidden="true" style="position: absolute; top: -9px; right: 8px; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: var(--radius-full); background: var(--ink); color: var(--surface-card); font-size: 12px; line-height: 16px; font-weight: 600;">5</span>
+                  </div>
+                </section>
+              </div>
+            </div>
+
+            <!-- bands -->
+            <div style="display: flex; flex-direction: column; justify-content: space-between; gap: 12px; background: var(--surface-page); border-radius: var(--radius-md); padding: 16px;">
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <p class="t-caption muted">Correct, sure · answer; Why on request</p>
+                <div class="sheet-band fb-correct" style="gap: 12px;">
+                  <span aria-hidden="true" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--radius-full); background: var(--c); color: var(--on-feedback);"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></span>
+                  <p class="t-title2" style="flex: 1;">Correct</p>
+                  <span class="xp xp-quiet">+10 XP</span>
+                </div>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <p class="t-caption muted">Correct, unsure · reasoning shown unasked</p>
+                <div class="sheet-band fb-correct" style="gap: 12px;">
+                  <span aria-hidden="true" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--radius-full); background: var(--c); color: var(--on-feedback);"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></span>
+                  <p class="t-title2" style="flex: 1;">Correct</p>
+                  <span class="xp xp-quiet">+10 XP</span>
+                </div>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <p class="t-caption muted">Not quite · answer beside your choice</p>
+                <div class="sheet-band fb-wrong" style="gap: 12px;">
+                  <span aria-hidden="true" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--radius-full); background: var(--c); color: var(--on-feedback);"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+                  <p class="t-title2" style="flex: 1;">Not quite</p>
+                </div>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <p class="t-caption muted">Sure and wrong · same band; adds critical row and misconception</p>
+                <div class="sheet-band fb-wrong" style="gap: 12px;">
+                  <span aria-hidden="true" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--radius-full); background: var(--c); color: var(--on-feedback);"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+                  <p class="t-title2" style="flex: 1;">Not quite</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- parts, motion, meta -->
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <p class="t-caption muted">Parts</p>
+                <ol class="t-caption" style="display: flex; flex-direction: column; gap: 4px;">
+                  <li style="display: flex; gap: 8px;"><span aria-hidden="true" style="flex: none; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: var(--radius-full); background: var(--ink); color: var(--surface-card); font-size: 12px; line-height: 16px; font-weight: 600;">1</span><span><span class="sr-only">1. </span>Scrim · the question behind is inert</span></li>
+                  <li style="display: flex; gap: 8px;"><span aria-hidden="true" style="flex: none; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: var(--radius-full); background: var(--ink); color: var(--surface-card); font-size: 12px; line-height: 16px; font-weight: 600;">2</span><span><span class="sr-only">2. </span>Grabber · 36 × 4, border-strong</span></li>
+                  <li style="display: flex; gap: 8px;"><span aria-hidden="true" style="flex: none; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: var(--radius-full); background: var(--ink); color: var(--surface-card); font-size: 12px; line-height: 16px; font-weight: 600;">3</span><span><span class="sr-only">3. </span>Band · role=status, aria-live=polite</span></li>
+                  <li style="display: flex; gap: 8px;"><span aria-hidden="true" style="flex: none; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: var(--radius-full); background: var(--ink); color: var(--surface-card); font-size: 12px; line-height: 16px; font-weight: 600;">4</span><span><span class="sr-only">4. </span>Body · scrolls: answer, why, source</span></li>
+                  <li style="display: flex; gap: 8px;"><span aria-hidden="true" style="flex: none; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: var(--radius-full); background: var(--ink); color: var(--surface-card); font-size: 12px; line-height: 16px; font-weight: 600;">5</span><span><span class="sr-only">5. </span>Footer · fixed: Continue, Report</span></li>
+                </ol>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <p class="t-caption muted">Motion</p>
+                <svg viewBox="0 0 280 72" width="100%" height="72" role="img" aria-label="Easing curve cubic-bezier 0.2, 0, 0, 1 over 300 milliseconds: fast start, long gentle settle." style="display: block; overflow: visible;">
+                  <line x1="8" y1="56" x2="272" y2="56" stroke="var(--border-strong)" stroke-width="1"></line>
+                  <line x1="8" y1="56" x2="8" y2="4" stroke="var(--border-strong)" stroke-width="1"></line>
+                  <line x1="272" y1="4" x2="8" y2="4" stroke="var(--ink-muted)" stroke-width="1" stroke-dasharray="2 2"></line>
+                  <path d="M8 56 C60.8 56 8 4 272 4" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linecap="round"></path>
+                  <g font-size="12" fill="var(--ink-muted)" class="num">
+                    <text x="8" y="70">0</text>
+                    <text x="272" y="70" text-anchor="end">300 ms</text>
+                  </g>
+                </svg>
+                <dl class="t-caption" style="margin: 0; display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 4px 8px;">
+                  <dt class="muted">Enter</dt>
+                  <dd style="margin: 0;">Once · 300 ms · translateY 32 → 0 + opacity</dd>
+                  <dt class="muted">Easing</dt>
+                  <dd style="margin: 0;">ease-out, cubic-bezier(0.2, 0, 0, 1)</dd>
+                  <dt class="muted">Reduced</dt>
+                  <dd style="margin: 0;">No animation; the sheet is just there</dd>
+                  <dt class="muted">Haptics</dt>
+                  <dd style="margin: 0;">Light on Correct · warning on Not quite</dd>
+                </dl>
+              </div>
+              <dl class="t-caption" style="margin: 0; margin-top: auto; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 4px 12px;">
+                <dt class="muted">Tokens</dt>
+                <dd style="margin: 0;">scrim · radius-lg · shadow-raised · feedback-* + tint · on-feedback · duration-reveal · ease-out</dd>
+                <dt class="muted">More</dt>
+                <dd style="margin: 0;">Multi-select partial credit: “Partly right” on feedback-learning.</dd>
+                <dt class="muted">A11y</dt>
+                <dd style="margin: 0;">role=dialog + aria-modal. The band announces the result: icon + word, never color alone.</dd>
+              </dl>
+            </div>
+          </div>
+        </article>
+
+        <!-- 4. Source quote -->
+        <article class="card" aria-labelledby="ds-quote" style="grid-column: 1; grid-row: 3; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+          <header style="display: flex; flex-direction: column; gap: 4px;">
+            <h3 id="ds-quote" class="section-title">Source quote</h3>
+            <p class="t-body muted">The SOP passage behind the answer, with its reference.</p>
+          </header>
+          <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 8px; background: var(--surface-page); border-radius: var(--radius-md); padding: 16px;">
+            <p class="t-caption muted">With source</p>
+            <figure class="quote">
+              <blockquote class="quote-text">“A double beep means wrong item. Put the item back in its slot, then re-scan the location label before you pick again.”</blockquote>
+              <figcaption class="quote-src">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5M9 13h6M9 17h4"></path></svg>
+                Scanning SOP v2 · §3.2
+              </figcaption>
+            </figure>
+            <p class="t-caption muted" style="margin-top: 4px;">Without source</p>
+            <p class="t-caption muted" style="display: flex; align-items: center; gap: 8px;">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 16v-4M12 8h.01"></path></svg>
+              Not quoted from your SOP
+            </p>
+          </div>
+          <dl class="t-caption" style="margin: 0; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 4px 12px;">
+            <dt class="muted">Tokens</dt>
+            <dd style="margin: 0;">surface-sunken · ink 15.2:1 · ink-muted 5.1:1</dd>
+            <dt class="muted">A11y</dt>
+            <dd style="margin: 0;">figure + blockquote + figcaption; no source is said</dd>
+          </dl>
+        </article>
+
+        <!-- 5. Critical marker -->
+        <article class="card" aria-labelledby="ds-crit" style="grid-column: 2; grid-row: 3; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+          <header style="display: flex; flex-direction: column; gap: 4px;">
+            <h3 id="ds-crit" class="section-title">Critical marker</h3>
+            <p class="t-body muted">Flags safety-critical concepts in neutral ink, never red.</p>
+          </header>
+          <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 16px; background: var(--surface-page); border-radius: var(--radius-md); padding: 16px;">
+            <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; align-items: center;">
+              <p class="t-caption muted">Chip on a concept</p>
+              <p class="t-caption muted">Count on a unit row</p>
+              <span style="display: flex;"><span class="chip chip-critical"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>Critical</span></span>
+              <span class="tag num"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>3 critical</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <p class="t-caption muted">Call-out row on the reveal, sure and wrong</p>
+              <div style="display: flex; gap: 8px; align-items: flex-start; padding: 12px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--ink); margin-top: 1px;"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>
+                <p class="t-body"><strong style="font-weight: 600;">Critical step</strong> · This comes back first next session.</p>
+              </div>
+            </div>
+          </div>
+          <dl class="t-caption" style="margin: 0; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 4px 12px;">
+            <dt class="muted">Tokens</dt>
+            <dd style="margin: 0;">ink · border-strong · surface-card · surface-sunken</dd>
+            <dt class="muted">A11y</dt>
+            <dd style="margin: 0;">Word always printed, shield aria-hidden. Red = wrong answer only.</dd>
+          </dl>
+        </article>
+
+        <!-- 8. XP and quiet variants -->
+        <article class="card" aria-labelledby="ds-xp" style="grid-column: 3; grid-row: 3; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+          <header style="display: flex; flex-direction: column; gap: 4px;">
+            <h3 id="ds-xp" class="section-title">XP chip and quiet variants</h3>
+            <p class="t-body muted">Saffron marks one reward or one key action per screen.</p>
+          </header>
+          <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 16px; background: var(--surface-page); border-radius: var(--radius-md); padding: 16px;">
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <p class="t-caption muted">Reward leads (Summary): XP chip, quiet streak</p>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="xp">+180 XP</span>
+                <span class="streak streak-quiet"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c3 3.5 6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 3-7.5 6-11z"></path><path d="M12 18a2.5 2.5 0 0 0 2.5-2.5c0-1.5-1.5-2.5-2.5-4-1 1.5-2.5 2.5-2.5 4A2.5 2.5 0 0 0 12 18z"></path></svg><span class="num">5 days in a row</span></span>
+              </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <p class="t-caption muted">Action leads (Today): saffron button, rest quiet</p>
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <a class="btn btn-accent num" href="QChoice.dc.html">Play · 5 min</a>
+                <span class="streak streak-quiet"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c3 3.5 6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 3-7.5 6-11z"></path><path d="M12 18a2.5 2.5 0 0 0 2.5-2.5c0-1.5-1.5-2.5-2.5-4-1 1.5-2.5 2.5-2.5 4A2.5 2.5 0 0 0 12 18z"></path></svg><span class="num">4 days<span class="sr-only"> in a row</span></span></span>
+                <span class="xp xp-quiet">1,240 XP</span>
+              </div>
+            </div>
+          </div>
+          <dl class="t-caption" style="margin: 0; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 4px 12px;">
+            <dt class="muted">Tokens</dt>
+            <dd style="margin: 0;">accent · on-accent 8.9:1 · surface-card · border · ink-muted</dd>
+            <dt class="muted">A11y</dt>
+            <dd style="margin: 0;">Ink on saffron, never white. Quiet keeps the words, drops the fill.</dd>
+          </dl>
+        </article>
+      </div>
+    </section>
+
+    <!-- ================= Lower three columns ================= -->
+    <div style="flex: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px;">
+
+      <!-- ===== Progress ===== -->
+      <section aria-labelledby="ds-sec-progress" style="display: flex; flex-direction: column; gap: 16px;">
+        <h2 id="ds-sec-progress" class="t-title2">Progress</h2>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 24px;">
+
+          <!-- 6 + 7. Mastery bar additions -->
+          <article class="card" aria-labelledby="ds-bar" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+            <header style="display: flex; flex-direction: column; gap: 4px;">
+              <h3 id="ds-bar" class="section-title">Mastery bar additions</h3>
+              <p class="t-body muted">Measured vs estimated, the benchmark, and what moved.</p>
+            </header>
+            <div style="flex: 1; display: grid; grid-template-columns: 80px minmax(0, 1fr) 128px; align-items: center; align-content: center; gap: 12px; background: var(--surface-page); border-radius: var(--radius-md); padding: 16px;">
+              <p class="t-caption muted">Measured</p>
+              <div class="bar" role="progressbar" aria-label="Picking, measured" aria-valuenow="68" aria-valuemin="0" aria-valuemax="100" aria-valuetext="68%"><span class="bar-fill" style="width: 68%;"></span></div>
+              <span class="t-label num" style="text-align: right;">68%</span>
+
+              <p class="t-caption muted">Estimate</p>
+              <div class="bar" role="progressbar" aria-label="Safety, placement estimate" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100" aria-valuetext="About 40%, placement estimate"><span class="bar-est" style="width: 40%;"></span></div>
+              <span style="display: flex; align-items: center; justify-content: flex-end; gap: 8px;"><span class="t-label num muted">~40%</span><span class="chip chip-estimate">Estimate</span></span>
+
+              <p class="t-caption muted">Benchmark</p>
+              <div class="bar" role="progressbar" aria-label="Role mastery" aria-valuenow="66" aria-valuemin="0" aria-valuemax="100" aria-valuetext="66%, benchmark 85%"><span class="bar-fill" style="width: 66%;"></span><span class="bar-bench" style="left: 85%;"></span></div>
+              <span class="t-label num" style="text-align: right;">66%<span class="muted" style="font-weight: 500;"> / 85%</span></span>
+
+              <p class="t-caption muted">Moved</p>
+              <div class="bar" role="progressbar" aria-label="Damaged pallet: record before moving" aria-valuenow="72" aria-valuemin="0" aria-valuemax="100" aria-valuetext="72%, up from 58%"><i class="bar-before" style="width: 58%;"></i><i class="bar-gain" style="left: 58%; width: 14%;"></i><i class="bar-bench" style="left: 85%;"></i></div>
+              <span class="t-label num" style="text-align: right;"><span class="muted" style="font-weight: 500;">58% →</span> 72%</span>
+            </div>
+            <dl class="t-caption" style="margin: 0; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 4px 12px;">
+              <dt class="muted">Tokens</dt>
+              <dd style="margin: 0;">brand fill and gain · ink bench tick · ink-muted estimate dash and earlier value</dd>
+              <dt class="muted">A11y</dt>
+              <dd style="margin: 0;">aria-valuetext “72%, up from 58%”; value printed</dd>
+            </dl>
+          </article>
+
+          <!-- 9. Path node -->
+          <article class="card" aria-labelledby="ds-node" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+            <header style="display: flex; flex-direction: column; gap: 4px;">
+              <h3 id="ds-node" class="section-title">Path node</h3>
+              <p class="t-body muted">Unit marker on the rail: kind only; the bar shows progress.</p>
+            </header>
+            <ul style="flex: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: center; gap: 16px 8px; background: var(--surface-page); border-radius: var(--radius-md); padding: 16px;">
+              <li style="display: flex; align-items: center; gap: 8px;">
+                <span aria-hidden="true" style="flex: none; width: 32px; height: 32px; border-radius: var(--radius-full); display: inline-flex; align-items: center; justify-content: center; background: var(--brand-tint); color: var(--brand);"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></span>
+                <span class="t-caption muted">Mastered</span>
+              </li>
+              <li style="display: flex; align-items: center; gap: 8px;">
+                <span aria-hidden="true" style="flex: none; width: 32px; height: 32px; border-radius: var(--radius-full); display: inline-flex; align-items: center; justify-content: center; border: 2px solid var(--brand); background: var(--surface-page); color: var(--brand);"><span class="t-label num">2</span></span>
+                <span class="t-caption muted">Next up</span>
+              </li>
+              <li style="display: flex; align-items: center; gap: 8px;">
+                <span aria-hidden="true" style="flex: none; width: 32px; height: 32px; border-radius: var(--radius-full); display: inline-flex; align-items: center; justify-content: center; border: 2px solid var(--border-strong); background: var(--surface-page); color: var(--ink);"><span class="t-label num">3</span></span>
+                <span class="t-caption muted">In progress</span>
+              </li>
+              <li style="display: flex; align-items: center; gap: 8px;">
+                <span aria-hidden="true" style="flex: none; width: 32px; height: 32px; border-radius: var(--radius-full); display: inline-flex; align-items: center; justify-content: center; border: 2px dashed var(--border-strong); background: var(--surface-page); color: var(--ink);"><span class="t-label num">4</span></span>
+                <span class="t-caption muted">Estimate</span>
+              </li>
+              <li style="display: flex; align-items: center; gap: 8px;">
+                <span aria-hidden="true" style="flex: none; width: 32px; height: 32px; border-radius: var(--radius-full); display: inline-flex; align-items: center; justify-content: center; border: 2px dotted var(--border-strong); background: var(--surface-page); color: var(--ink);"><span class="t-label num">5</span></span>
+                <span class="t-caption muted">Not started</span>
+              </li>
+              <li style="display: flex; align-items: center; gap: 8px;">
+                <span aria-hidden="true" style="flex: none; width: 32px; height: 32px; border-radius: var(--radius-full); display: inline-flex; align-items: center; justify-content: center; background: var(--surface-sunken); color: var(--ink-muted);"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg></span>
+                <span class="t-caption muted">Locked</span>
+              </li>
+            </ul>
+            <dl class="t-caption" style="margin: 0; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 4px 12px;">
+              <dt class="muted">Tokens</dt>
+              <dd style="margin: 0;">32 px · 2 px border-strong · brand · brand-tint · sunken</dd>
+              <dt class="muted">A11y</dt>
+              <dd style="margin: 0;">aria-hidden; the row link names unit, % and status</dd>
+            </dl>
+          </article>
+
+          <!-- 10. Weekly trend chart -->
+          <article class="card" aria-labelledby="ds-trend" style="flex: 1; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+            <header style="display: flex; flex-direction: column; gap: 4px;">
+              <h3 id="ds-trend" class="section-title">Weekly trend chart</h3>
+              <p class="t-body muted">Weekly role mastery against the benchmark, with projection.</p>
+            </header>
+            <figure style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 12px; background: var(--surface-page); border-radius: var(--radius-md); padding: 16px;">
+              <svg viewBox="0 0 368 160" width="100%" height="160" role="img" aria-label="Line chart of weekly role mastery: 29% in the week of Oct 19, 48% in the week of Oct 26, 66% in the week of Nov 2. Projected to reach the 85% benchmark on Nov 12." style="display: block; overflow: visible;">
+                <g stroke="var(--border)" stroke-width="1">
+                  <line x1="40" y1="8.5" x2="368" y2="8.5"></line>
+                  <line x1="40" y1="72.5" x2="368" y2="72.5"></line>
+                  <line x1="40" y1="136.5" x2="368" y2="136.5"></line>
+                </g>
+                <line x1="40" y1="27.2" x2="368" y2="27.2" stroke="var(--ink-muted)" stroke-width="2" stroke-dasharray="4 4"></line>
+                <g font-size="12" text-anchor="end" fill="var(--ink-muted)" class="num">
+                  <text x="32" y="12.5">100%</text>
+                  <text x="32" y="31.2" fill="var(--ink)" font-weight="600">85%</text>
+                  <text x="32" y="76.5">50%</text>
+                  <text x="32" y="140.5">0%</text>
+                </g>
+                <polyline points="60,98.88 137,74.56 214,51.52" fill="none" stroke="var(--brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                <line x1="214" y1="51.52" x2="324" y2="27.2" stroke="var(--brand)" stroke-width="2" stroke-linecap="round" stroke-dasharray="6 6"></line>
+                <g fill="var(--brand)" stroke="var(--surface-page)" stroke-width="2">
+                  <circle cx="60" cy="98.88" r="5"></circle>
+                  <circle cx="137" cy="74.56" r="5"></circle>
+                  <circle cx="214" cy="51.52" r="5"></circle>
+                </g>
+                <circle cx="324" cy="27.2" r="4" fill="var(--surface-page)" stroke="var(--brand)" stroke-width="2"></circle>
+                <g font-size="12" font-weight="600" text-anchor="middle" fill="var(--ink)" class="num">
+                  <text x="60" y="88.88">29%</text>
+                  <text x="137" y="64.56">48%</text>
+                  <text x="214" y="41.52">66%</text>
+                  <text x="60" y="156">Oct 19</text>
+                  <text x="137" y="156">Oct 26</text>
+                  <text x="214" y="156">Nov 2</text>
+                  <text x="324" y="156">Nov 12</text>
+                </g>
+              </svg>
+              <figcaption class="t-caption muted" style="display: flex; flex-wrap: wrap; gap: 8px 16px;">
+                <span style="display: inline-flex; align-items: center; gap: 8px;"><svg viewBox="0 0 24 8" width="24" height="8" aria-hidden="true"><line x1="1" y1="4" x2="23" y2="4" stroke="var(--brand)" stroke-width="2" stroke-linecap="round"></line></svg>Measured</span>
+                <span style="display: inline-flex; align-items: center; gap: 8px;"><svg viewBox="0 0 24 8" width="24" height="8" aria-hidden="true"><line x1="1" y1="4" x2="23" y2="4" stroke="var(--brand)" stroke-width="2" stroke-linecap="round" stroke-dasharray="6 6"></line></svg>Projected</span>
+                <span style="display: inline-flex; align-items: center; gap: 8px;"><svg viewBox="0 0 24 8" width="24" height="8" aria-hidden="true"><line x1="0" y1="4" x2="24" y2="4" stroke="var(--ink-muted)" stroke-width="2" stroke-dasharray="4 4"></line></svg>Benchmark 85%</span>
+              </figcaption>
+              <table class="sr-only">
+                <caption>Role mastery by week</caption>
+                <thead><tr><th scope="col">Week of</th><th scope="col">Mastery</th></tr></thead>
+                <tbody>
+                  <tr><th scope="row">Oct 19</th><td>29%</td></tr>
+                  <tr><th scope="row">Oct 26</th><td>48%</td></tr>
+                  <tr><th scope="row">Nov 2</th><td>66%</td></tr>
+                  <tr><th scope="row">Nov 12 (projected)</th><td>85%</td></tr>
+                </tbody>
+              </table>
+            </figure>
+            <dl class="t-caption" style="margin: 0; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 4px 12px;">
+              <dt class="muted">Spec</dt>
+              <dd style="margin: 0;">2 px strokes · dash 6/6 projection, 4/4 benchmark · ≥ 12 px</dd>
+              <dt class="muted">Tokens</dt>
+              <dd style="margin: 0;">brand · ink · ink-muted · border; never saffron</dd>
+              <dt class="muted">A11y</dt>
+              <dd style="margin: 0;">role=img sentence + hidden table; dashes, not color</dd>
+            </dl>
+          </article>
+        </div>
+      </section>
+
+      <!-- ===== App shell and controls ===== -->
+      <section aria-labelledby="ds-sec-shell" style="display: flex; flex-direction: column; gap: 16px;">
+        <h2 id="ds-sec-shell" class="t-title2">App shell and controls</h2>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 24px;">
+
+          <!-- 11. Push notification -->
+          <article class="card" aria-labelledby="ds-push" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+            <header style="display: flex; flex-direction: column; gap: 4px;">
+              <h3 id="ds-push" class="section-title">Push notification</h3>
+              <p class="t-body muted">One question on the lock screen; one tap opens it.</p>
+            </header>
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 8px; background: var(--surface-page); border-radius: var(--radius-md); padding: 16px;">
+              <p class="t-caption muted">Android lock screen</p>
+              <div style="background: var(--os-ground); border-radius: var(--radius-md); padding: 16px;">
+                <a href="QuickQuestion.dc.html" aria-label="Learn Quiz, now: Your scanner double-beeps on a pick. What do you do first? Open question." style="display: flex; flex-direction: column; gap: 8px; background: var(--os-card); color: var(--os-ink); border-radius: var(--radius-lg); padding: 16px; text-decoration: none;">
+                  <span style="display: flex; align-items: center; gap: 8px; color: var(--os-ink-muted);" aria-hidden="true">
+                    <span style="width: 20px; height: 20px; border-radius: var(--radius-full); background: var(--brand); display: inline-flex; align-items: center; justify-content: center;">
+                      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><mask id="lqn-ds" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"></rect><circle cx="18" cy="18" r="6"></circle></mask><path fill="var(--on-brand)" fill-rule="evenodd" mask="url(#lqn-ds)" d="M11 1a10 10 0 1 0 0 20a10 10 0 1 0 0-20zm0 5a5 5 0 1 1 0 10a5 5 0 1 1 0-10z"></path><circle cx="18" cy="18" r="4" fill="var(--on-brand)"></circle></svg>
+                    </span>
+                    <span class="t-caption" style="flex: 1;">Learn Quiz · now</span>
+                    <span style="display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: var(--radius-full); background: var(--os-ink); color: var(--os-ground); font-size: 12px; line-height: 16px; font-weight: 600;">1</span>
+                  </span>
+                  <span style="display: flex; align-items: flex-start; gap: 8px;" aria-hidden="true">
+                    <span class="t-body" style="flex: 1; font-weight: 600; color: var(--os-ink);">Your scanner double-beeps on a pick. What do you do first?</span>
+                    <span style="flex: none; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; margin-top: 2px; border-radius: var(--radius-full); background: var(--os-ink); color: var(--os-ground); font-size: 12px; line-height: 16px; font-weight: 600;">2</span>
+                  </span>
+                </a>
+              </div>
+            </div>
+            <dl class="t-caption" style="margin: 0; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 4px 12px;">
+              <dt class="muted">1</dt>
+              <dd style="margin: 0;">OS header, drawn by Android: icon + “Learn Quiz · now”</dd>
+              <dt class="muted">2</dt>
+              <dd style="margin: 0;">Title = the question only, ≤ 60 chars (here 58); no body</dd>
+              <dt class="muted">Tap</dt>
+              <dd style="margin: 0;">Deep link /play/quick/:itemId · heads-up: same card, raised</dd>
+              <dt class="muted">Tokens</dt>
+              <dd style="margin: 0;">os-ground · os-card · os-ink 12.2:1 · os-ink-muted 7.3:1</dd>
+              <dt class="muted">A11y</dt>
+              <dd style="margin: 0;">One link, named with app, time and question</dd>
+            </dl>
+          </article>
+
+          <!-- 12. Bottom navigation -->
+          <article class="card" aria-labelledby="ds-nav" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+            <header style="display: flex; flex-direction: column; gap: 4px;">
+              <h3 id="ds-nav" class="section-title">Bottom navigation</h3>
+              <p class="t-body muted">Three destinations outside a session; hidden inside one.</p>
+            </header>
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 8px; background: var(--surface-page); border-radius: var(--radius-md); padding: 16px;">
+              <div aria-hidden="true" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); justify-items: center;">
+                <p class="t-caption muted">Active</p>
+                <p class="t-caption muted">Inactive</p>
+                <p class="t-caption muted">Inactive</p>
+              </div>
+              <div style="border: 1px solid var(--border); border-top: 0; border-radius: var(--radius-md); overflow: hidden;">
+                <nav class="nav" aria-label="Main, specimen">
+                  <a href="Today.dc.html" aria-current="page"><span class="nav-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10l8-7 8 7v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"></path><path d="M10 21v-6h4v6"></path></svg></span>Today</a>
+                  <a href="Path.dc.html"><span class="nav-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="5" r="2"></circle><circle cx="18" cy="19" r="2"></circle><path d="M8 5h8a3 3 0 0 1 0 6H8a3 3 0 0 0 0 6h8"></path></svg></span>Path</a>
+                  <a href="Profile.dc.html"><span class="nav-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="7" r="4"></circle><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path></svg></span>Profile</a>
+                </nav>
+              </div>
+            </div>
+            <dl class="t-caption" style="margin: 0; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 4px 12px;">
+              <dt class="muted">Size</dt>
+              <dd style="margin: 0;">nav-h 64 + safe-bottom · thirds · pill 56 × 30 · label 12/16</dd>
+              <dt class="muted">Tokens</dt>
+              <dd style="margin: 0;">surface-card · ink-muted → brand + brand-tint pill</dd>
+              <dt class="muted">A11y</dt>
+              <dd style="margin: 0;">aria-current=“page” on the active link; pill + color + label.</dd>
+            </dl>
+          </article>
+
+          <!-- 13. Switch and segmented control -->
+          <article class="card" aria-labelledby="ds-switch" style="flex: 1; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+            <header style="display: flex; flex-direction: column; gap: 4px;">
+              <h3 id="ds-switch" class="section-title">Switch and segmented control</h3>
+              <p class="t-body muted">An on/off setting, and one choice out of a few.</p>
+            </header>
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 16px; background: var(--surface-page); border-radius: var(--radius-md); padding: 16px;">
+              <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;">
+                <span style="display: flex; align-items: center; gap: 12px;"><button class="switch" type="button" role="switch" aria-checked="false" aria-label="Send me questions, specimen off"></button><span class="t-caption muted" aria-hidden="true">Off</span></span>
+                <span style="display: flex; align-items: center; gap: 12px;"><button class="switch" type="button" role="switch" aria-checked="true" aria-label="Send me questions, specimen on"></button><span class="t-caption muted" aria-hidden="true">On</span></span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <div aria-hidden="true" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;">
+                  <p class="t-caption muted">Segment off</p>
+                  <p class="t-caption muted">Segment on</p>
+                  <p class="t-caption muted">Segment off</p>
+                </div>
+                <div class="seg" role="radiogroup" aria-label="Appearance, specimen" style="grid-template-columns: repeat(3, minmax(0, 1fr));">
+                  <button class="seg-btn" type="button" role="radio" aria-checked="false">System</button>
+                  <button class="seg-btn" type="button" role="radio" aria-checked="true" style="display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 0;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12.5l5 5L19.5 7"></path></svg>Light</button>
+                  <button class="seg-btn" type="button" role="radio" aria-checked="false">Dark</button>
+                </div>
+              </div>
+            </div>
+            <dl class="t-caption" style="margin: 0; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 4px 12px;">
+              <dt class="muted">Tokens</dt>
+              <dd style="margin: 0;">border-strong · sunken → brand · on-brand · brand-tint</dd>
+              <dt class="muted">A11y</dt>
+              <dd style="margin: 0;">role=switch, 48 px hit · segments: radio or aria-pressed</dd>
+            </dl>
+          </article>
+        </div>
+      </section>
+
+      <!-- ===== Foundations ===== -->
+      <section aria-labelledby="ds-sec-found" style="display: flex; flex-direction: column; gap: 16px;">
+        <h2 id="ds-sec-found" class="t-title2">Foundations</h2>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 24px;">
+
+          <!-- 14. Tokens -->
+          <article class="card" aria-labelledby="ds-tokens" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+            <header style="display: flex; flex-direction: column; gap: 4px;">
+              <h3 id="ds-tokens" class="section-title">Added tokens</h3>
+              <p class="t-body muted">Scrim, OS chrome and layout constants, per theme.</p>
+            </header>
+            <table class="t-caption" style="width: 100%; border-collapse: collapse; text-align: left;">
+              <thead>
+                <tr class="muted">
+                  <th scope="col" style="font-weight: 500; padding: 0 8px 8px 0;">Token</th>
+                  <th scope="col" style="font-weight: 500; padding: 0 8px 8px 0;">Light</th>
+                  <th scope="col" style="font-weight: 500; padding: 0 8px 8px 0;">Dark</th>
+                  <th scope="col" style="font-weight: 500; padding: 0 0 8px 0;">Use</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="border-top: 1px solid var(--border);">
+                  <th scope="row" style="font-weight: 600; padding: 4px 8px 4px 0;">scrim</th>
+                  <td style="padding: 4px 8px 4px 0;"><span style="display: inline-flex; align-items: center; gap: 8px;"><span class="lq" data-theme="light" aria-hidden="true" style="display: block; width: 16px; height: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: linear-gradient(var(--scrim), var(--scrim)), var(--surface-card);"></span><span class="num">#14181F 48%</span></span></td>
+                  <td style="padding: 4px 8px 4px 0;"><span style="display: inline-flex; align-items: center; gap: 8px;"><span class="lq" data-theme="dark" aria-hidden="true" style="display: block; width: 16px; height: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: linear-gradient(var(--scrim), var(--scrim)), var(--surface-card);"></span><span class="num">#000 60%</span></span></td>
+                  <td class="muted" style="padding: 4px 0;">Behind sheets</td>
+                </tr>
+                <tr style="border-top: 1px solid var(--border);">
+                  <th scope="row" style="font-weight: 600; padding: 4px 8px 4px 0;">os-ground</th>
+                  <td style="padding: 4px 8px 4px 0;"><span style="display: inline-flex; align-items: center; gap: 8px;"><span aria-hidden="true" style="display: block; width: 16px; height: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--os-ground);"></span><span class="num">#1A1C1F</span></span></td>
+                  <td class="muted" style="padding: 4px 8px 4px 0;">Same</td>
+                  <td class="muted" style="padding: 4px 0;">Lock screen</td>
+                </tr>
+                <tr style="border-top: 1px solid var(--border);">
+                  <th scope="row" style="font-weight: 600; padding: 4px 8px 4px 0;">os-card</th>
+                  <td style="padding: 4px 8px 4px 0;"><span style="display: inline-flex; align-items: center; gap: 8px;"><span aria-hidden="true" style="display: block; width: 16px; height: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--os-card);"></span><span class="num">#2B2E33</span></span></td>
+                  <td class="muted" style="padding: 4px 8px 4px 0;">Same</td>
+                  <td class="muted" style="padding: 4px 0;">Notification</td>
+                </tr>
+                <tr style="border-top: 1px solid var(--border);">
+                  <th scope="row" style="font-weight: 600; padding: 4px 8px 4px 0;">os-ink</th>
+                  <td style="padding: 4px 8px 4px 0;"><span style="display: inline-flex; align-items: center; gap: 8px;"><span aria-hidden="true" style="display: block; width: 16px; height: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--os-ink);"></span><span class="num">#F1F2F4</span></span></td>
+                  <td class="muted" style="padding: 4px 8px 4px 0;">Same</td>
+                  <td class="muted" style="padding: 4px 0;">Title</td>
+                </tr>
+                <tr style="border-top: 1px solid var(--border);">
+                  <th scope="row" style="font-weight: 600; padding: 4px 8px 4px 0;">os-ink-muted</th>
+                  <td style="padding: 4px 8px 4px 0;"><span style="display: inline-flex; align-items: center; gap: 8px;"><span aria-hidden="true" style="display: block; width: 16px; height: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--os-ink-muted);"></span><span class="num">#B9BEC6</span></span></td>
+                  <td class="muted" style="padding: 4px 8px 4px 0;">Same</td>
+                  <td class="muted" style="padding: 4px 0;">OS header</td>
+                </tr>
+                <tr style="border-top: 1px solid var(--border);">
+                  <th scope="row" style="font-weight: 600; padding: 4px 8px 4px 0;">target</th>
+                  <td class="num" style="padding: 4px 8px 4px 0;">48 px</td>
+                  <td class="muted" style="padding: 4px 8px 4px 0;">Same</td>
+                  <td class="muted" style="padding: 4px 0;">Min touch target</td>
+                </tr>
+                <tr style="border-top: 1px solid var(--border);">
+                  <th scope="row" style="font-weight: 600; padding: 4px 8px 4px 0;">topbar-h</th>
+                  <td class="num" style="padding: 4px 8px 4px 0;">56 px</td>
+                  <td class="muted" style="padding: 4px 8px 4px 0;">Same</td>
+                  <td class="muted" style="padding: 4px 0;">Plus safe-top</td>
+                </tr>
+                <tr style="border-top: 1px solid var(--border);">
+                  <th scope="row" style="font-weight: 600; padding: 4px 8px 4px 0;">nav-h</th>
+                  <td class="num" style="padding: 4px 8px 4px 0;">64 px</td>
+                  <td class="muted" style="padding: 4px 8px 4px 0;">Same</td>
+                  <td class="muted" style="padding: 4px 0;">Plus safe-bottom</td>
+                </tr>
+                <tr style="border-top: 1px solid var(--border);">
+                  <th scope="row" style="font-weight: 600; padding: 4px 8px 4px 0;">safe-top</th>
+                  <td class="num" style="padding: 4px 8px 4px 0;">env(), 0 px</td>
+                  <td class="muted" style="padding: 4px 8px 4px 0;">Same</td>
+                  <td class="muted" style="padding: 4px 0;">Status bar inset</td>
+                </tr>
+                <tr style="border-top: 1px solid var(--border);">
+                  <th scope="row" style="font-weight: 600; padding: 4px 8px 0 0;">safe-bottom</th>
+                  <td class="num" style="padding: 4px 8px 0 0;">env(), min 8</td>
+                  <td class="muted" style="padding: 4px 8px 0 0;">Same</td>
+                  <td class="muted" style="padding: 4px 0 0;">Home indicator</td>
+                </tr>
+              </tbody>
+            </table>
+          </article>
+
+          <!-- 15. Icons -->
+          <article class="card" aria-labelledby="ds-icons" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+            <header style="display: flex; flex-direction: column; gap: 4px;">
+              <h3 id="ds-icons" class="section-title">New icons</h3>
+              <p class="t-body muted">24 grid, 2 px stroke, round caps, drawn in currentColor.</p>
+            </header>
+            <ul style="flex: 1; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); align-content: center; gap: 12px 4px; background: var(--surface-page); border-radius: var(--radius-md); padding: 16px;">
+              <li style="display: flex; flex-direction: column; align-items: center; gap: 8px;"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg><span class="t-caption muted" style="white-space: nowrap;">critical</span></li>
+              <li style="display: flex; flex-direction: column; align-items: center; gap: 8px;"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"></path><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"></path></svg><span class="t-caption muted" style="white-space: nowrap;">listen</span></li>
+              <li style="display: flex; flex-direction: column; align-items: center; gap: 8px;"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg><span class="t-caption muted" style="white-space: nowrap;">mic</span></li>
+              <li style="display: flex; flex-direction: column; align-items: center; gap: 8px;"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="6" r="1"></circle><circle cx="15" cy="6" r="1"></circle><circle cx="9" cy="12" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="9" cy="18" r="1"></circle><circle cx="15" cy="18" r="1"></circle></svg><span class="t-caption muted" style="white-space: nowrap;">drag</span></li>
+              <li style="display: flex; flex-direction: column; align-items: center; gap: 8px;"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18M8.5 16.5a5 5 0 0 1 7 0M5 12.5a10 10 0 0 1 4-2.3M19 12.5a10 10 0 0 0-2.6-1.8M2 8.8a15 15 0 0 1 4.3-2.6M22 8.8A15 15 0 0 0 10.6 5M12 20h.01"></path></svg><span class="t-caption muted" style="white-space: nowrap;">offline</span></li>
+              <li style="display: flex; flex-direction: column; align-items: center; gap: 8px;"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"></path></svg><span class="t-caption muted" style="white-space: nowrap;">retry</span></li>
+              <li style="display: flex; flex-direction: column; align-items: center; gap: 8px;"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg><span class="t-caption muted" style="white-space: nowrap;">flag</span></li>
+              <li style="display: flex; flex-direction: column; align-items: center; gap: 8px;"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M8 7l4-4 4 4M7 11H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-1"></path></svg><span class="t-caption muted" style="white-space: nowrap;">share</span></li>
+              <li style="display: flex; flex-direction: column; align-items: center; gap: 8px;"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"></rect><path d="M12 8v8M8 12h8"></path></svg><span class="t-caption muted" style="white-space: nowrap;">add-home</span></li>
+              <li style="display: flex; flex-direction: column; align-items: center; gap: 8px;"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg><span class="t-caption muted" style="white-space: nowrap;">eye</span></li>
+              <li style="display: flex; flex-direction: column; align-items: center; gap: 8px;"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="5" r="2"></circle><circle cx="18" cy="19" r="2"></circle><path d="M8 5h8a3 3 0 0 1 0 6H8a3 3 0 0 0 0 6h8"></path></svg><span class="t-caption muted" style="white-space: nowrap;">path</span></li>
+            </ul>
+            <dl class="t-caption" style="margin: 0; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 4px 12px;">
+              <dt class="muted">A11y</dt>
+              <dd style="margin: 0;">16 / 20 / 24 · aria-hidden by a label, else aria-label</dd>
+            </dl>
+          </article>
+
+          <!-- 16. White-label -->
+          <article class="card" aria-labelledby="ds-white" style="flex: 1; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+            <header style="display: flex; flex-direction: column; gap: 4px;">
+              <h3 id="ds-white" class="section-title">White-label rule</h3>
+              <p class="t-body muted">A customer color replaces brand; nothing else moves.</p>
+            </header>
+            <div style="flex: 1; display: grid; grid-template-columns: 88px minmax(0, 1fr) minmax(0, 1fr); align-content: center; align-items: center; gap: 8px 16px; background: var(--surface-page); border-radius: var(--radius-md); padding: 16px;">
+              <span style="display: flex; align-items: center; gap: 8px;">
+                <span class="lq" data-theme="{{theme}}" data-brand="default" aria-hidden="true" style="display: inline-flex; background: transparent; overflow: visible;"><svg viewBox="0 0 64 64" width="24" height="24"><mask id="lqm-ds-petrol" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="#fff"></rect><circle cx="48" cy="48" r="13"></circle></mask><circle cx="32" cy="32" r="19" fill="none" stroke="var(--brand)" stroke-width="14" mask="url(#lqm-ds-petrol)"></circle><circle cx="48" cy="48" r="9" fill="#F2A900"></circle></svg></span>
+                <span class="t-label">Petrol</span>
+              </span>
+              <span style="display: flex; flex-direction: column; gap: 4px;">
+                <span class="lq" data-theme="light" data-brand="default" aria-hidden="true" style="display: grid; grid-template-columns: 2fr 1fr 1fr; height: 32px; border-radius: var(--radius-md); border: 1px solid var(--border); background: transparent;">
+                  <span style="display: flex; align-items: center; padding-left: 8px; background: var(--brand); color: var(--on-brand); font-size: 13px; font-weight: 600;">Aa</span>
+                  <span style="background: var(--brand-hover);"></span>
+                  <span style="background: var(--brand-tint);"></span>
+                </span>
+                <span class="t-caption num"><span class="muted">Light</span> #0E5A73 · 7.7:1</span>
+              </span>
+              <span style="display: flex; flex-direction: column; gap: 4px;">
+                <span class="lq" data-theme="dark" data-brand="default" aria-hidden="true" style="display: grid; grid-template-columns: 2fr 1fr 1fr; height: 32px; border-radius: var(--radius-md); border: 1px solid var(--border); background: transparent;">
+                  <span style="display: flex; align-items: center; padding-left: 8px; background: var(--brand); color: var(--on-brand); font-size: 13px; font-weight: 600;">Aa</span>
+                  <span style="background: var(--brand-hover);"></span>
+                  <span style="background: var(--brand-tint);"></span>
+                </span>
+                <span class="t-caption num"><span class="muted">Dark</span> #6FC3DC · 9.2:1</span>
+              </span>
+
+              <span style="display: flex; align-items: center; gap: 8px;">
+                <span class="lq" data-theme="{{theme}}" data-brand="plum" aria-hidden="true" style="display: inline-flex; background: transparent; overflow: visible;"><svg viewBox="0 0 64 64" width="24" height="24"><mask id="lqm-ds-plum" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="#fff"></rect><circle cx="48" cy="48" r="13"></circle></mask><circle cx="32" cy="32" r="19" fill="none" stroke="var(--brand)" stroke-width="14" mask="url(#lqm-ds-plum)"></circle><circle cx="48" cy="48" r="9" fill="#F2A900"></circle></svg></span>
+                <span class="t-label">Plum</span>
+              </span>
+              <span style="display: flex; flex-direction: column; gap: 4px;">
+                <span class="lq" data-theme="light" data-brand="plum" aria-hidden="true" style="display: grid; grid-template-columns: 2fr 1fr 1fr; height: 32px; border-radius: var(--radius-md); border: 1px solid var(--border); background: transparent;">
+                  <span style="display: flex; align-items: center; padding-left: 8px; background: var(--brand); color: var(--on-brand); font-size: 13px; font-weight: 600;">Aa</span>
+                  <span style="background: var(--brand-hover);"></span>
+                  <span style="background: var(--brand-tint);"></span>
+                </span>
+                <span class="t-caption num">#5B2A6E · 10.5:1</span>
+              </span>
+              <span style="display: flex; flex-direction: column; gap: 4px;">
+                <span class="lq" data-theme="dark" data-brand="plum" aria-hidden="true" style="display: grid; grid-template-columns: 2fr 1fr 1fr; height: 32px; border-radius: var(--radius-md); border: 1px solid var(--border); background: transparent;">
+                  <span style="display: flex; align-items: center; padding-left: 8px; background: var(--brand); color: var(--on-brand); font-size: 13px; font-weight: 600;">Aa</span>
+                  <span style="background: var(--brand-hover);"></span>
+                  <span style="background: var(--brand-tint);"></span>
+                </span>
+                <span class="t-caption num">#D3AEE2 · 9.6:1</span>
+              </span>
+            </div>
+            <dl class="t-caption" style="margin: 0; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 4px 12px;">
+              <dt class="muted">Derive</dt>
+              <dd style="margin: 0;">hover −12% L · tint 92% L (dark: deep) · on-brand by contrast</dd>
+              <dt class="muted">Rule</dt>
+              <dd style="margin: 0;">Brand ≥ 4.5:1 to on-brand and surface-page, both themes</dd>
+              <dt class="muted">Fixed</dt>
+              <dd style="margin: 0;">Mark’s saffron dot · accent · neutrals · all feedback colors</dd>
+            </dl>
+          </article>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"brand":{"editor":"enum","options":["default","plum"],"default":"default","section":"Theme"},"w":{"editor":"int","default":1600,"section":"Frame"},"h":{"editor":"int","default":2400,"section":"Frame"},"$preview":{"width":1600,"height":2400}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      theme: this.props.theme ?? 'light',
+      brand: this.props.brand ?? 'default',
+      w: this.props.w ?? 1600,
+      h: this.props.h ?? 2400
+    };
+  }
+}
+</script>
+</body>
+</html>

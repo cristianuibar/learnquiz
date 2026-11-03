@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Training progress</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="lq.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" data-brand="{{brand}}" style="width: {{w}}px; height: {{h}}px; font-family: var(--font-sans); color: var(--ink);">
+  <main class="scroll" ref="{{scrollRef}}" style="padding: 8px 16px 32px; display: flex; flex-direction: column; gap: 24px;">
+
+    <header style="display: flex; flex-direction: column; gap: 4px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-right: -12px;">
+        <h1 class="t-title1">Training progress</h1>
+        <a class="icon-btn" href="Settings.dc.html" aria-label="Settings">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h10M18 18h2"></path><circle cx="15" cy="6" r="2"></circle><circle cx="9" cy="12" r="2"></circle><circle cx="16" cy="18" r="2"></circle></svg>
+        </a>
+      </div>
+      <p class="t-body">Jordan Reyes · Warehouse picker</p>
+      <p class="t-caption muted" style="display: flex; align-items: center; gap: 4px; margin-top: 4px;">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+        Your manager sees this same page.
+      </p>
+    </header>
+
+    <!-- ===== normal ===== -->
+    <sc-if value="{{isNormal}}" hint-placeholder-val="{{ true }}">
+
+      <section class="card" aria-labelledby="pf-mastery" style="display: flex; flex-direction: column; gap: 16px;">
+        <h2 id="pf-mastery" class="sr-only">Role mastery</h2>
+        <p style="display: flex; align-items: baseline; gap: 8px;">
+          <span class="t-display num">66%</span>
+          <span class="t-body muted">of 85% benchmark</span>
+        </p>
+        <div class="bar bar-lg" role="progressbar" aria-label="Role mastery" aria-valuenow="66" aria-valuemin="0" aria-valuemax="100" aria-valuetext="66%, benchmark 85%">
+          <span class="bar-fill" style="width: 66%;"></span>
+          <span class="bar-bench" style="left: 85%;"></span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding-top: 16px; border-top: 1px solid var(--border);">
+          <p class="t-label num">Day 16 of 30</p>
+          <p class="t-label num">Projected: Nov 12</p>
+        </div>
+      </section>
+
+      <section aria-labelledby="pf-trend" style="display: flex; flex-direction: column; gap: 12px;">
+        <h2 id="pf-trend" class="section-title">Weekly trend</h2>
+        <figure class="card">
+          <svg viewBox="0 0 294 188" width="100%" height="188" role="img" aria-label="Line chart of weekly role mastery: 29% in the week of Oct 19, 48% in the week of Oct 26, 66% in the week of Nov 2. Projected to reach the 85% benchmark on Nov 12." style="display: block; overflow: visible;">
+            <g stroke="var(--border)" stroke-width="1">
+              <line x1="64" y1="8.5" x2="294" y2="8.5"></line>
+              <line x1="64" y1="76.5" x2="294" y2="76.5"></line>
+              <line x1="64" y1="144.5" x2="294" y2="144.5"></line>
+            </g>
+            <line x1="64" y1="28.9" x2="294" y2="28.9" stroke="var(--ink-muted)" stroke-width="2" stroke-dasharray="4 4"></line>
+            <g font-size="12" text-anchor="end" fill="var(--ink-muted)" class="num">
+              <text x="56" y="12.5">100%</text>
+              <text x="56" y="32.4" fill="var(--ink)" font-weight="600">85%</text>
+              <text x="56" y="80.5">50%</text>
+              <text x="56" y="148.5">0%</text>
+            </g>
+            <polyline points="80,105.1 136,79.2 192,54.7" fill="none" stroke="var(--brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+            <line x1="192" y1="54.7" x2="272" y2="28.9" stroke="var(--brand)" stroke-width="2" stroke-linecap="round" stroke-dasharray="6 6"></line>
+            <g fill="var(--brand)" stroke="var(--surface-card)" stroke-width="2">
+              <circle cx="80" cy="105.1" r="5"></circle>
+              <circle cx="136" cy="79.2" r="5"></circle>
+              <circle cx="192" cy="54.7" r="5"></circle>
+            </g>
+            <circle cx="272" cy="28.9" r="4" fill="var(--surface-card)" stroke="var(--brand)" stroke-width="2"></circle>
+            <g font-size="12" font-weight="600" text-anchor="middle" fill="var(--ink)" class="num">
+              <text x="80" y="93">29%</text>
+              <text x="136" y="67">48%</text>
+              <text x="192" y="43">66%</text>
+            </g>
+            <g font-size="12" text-anchor="middle" class="num">
+              <text x="80" y="164" fill="var(--ink)" font-weight="600">Oct 19</text>
+              <text x="136" y="164" fill="var(--ink)" font-weight="600">Oct 26</text>
+              <text x="192" y="164" fill="var(--ink)" font-weight="600">Nov 2</text>
+              <text x="272" y="164" fill="var(--ink-muted)">Nov 12</text>
+            </g>
+            <text x="56" y="182" text-anchor="end" font-size="13" font-weight="500" fill="var(--ink-muted)">Sessions</text>
+            <g font-size="12" text-anchor="middle" fill="var(--ink)" class="num">
+              <text x="80" y="182">5</text>
+              <text x="136" y="182">6</text>
+              <text x="192" y="182">2</text>
+            </g>
+            <text x="200" y="182" font-size="12" fill="var(--ink-muted)">so far</text>
+          </svg>
+          <table class="sr-only">
+            <caption>Role mastery by week</caption>
+            <thead>
+              <tr><th scope="col">Week of</th><th scope="col">Mastery</th><th scope="col">Sessions</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">Oct 19</th><td>29%</td><td>5</td></tr>
+              <tr><th scope="row">Oct 26</th><td>48%</td><td>6</td></tr>
+              <tr><th scope="row">Nov 2</th><td>66%</td><td>2 so far</td></tr>
+              <tr><th scope="row">Nov 12 (projected)</th><td>85%</td><td>Not yet</td></tr>
+            </tbody>
+          </table>
+        </figure>
+      </section>
+
+      <section aria-labelledby="pf-units" style="display: flex; flex-direction: column; gap: 12px;">
+        <h2 id="pf-units" class="section-title">By unit</h2>
+        <ul class="card rows" style="padding: 0 16px;">
+          <sc-for list="{{units}}" as="u" hint-placeholder-count="5">
+            <li style="padding: 4px 0 16px;">
+              <h3 style="margin: 0; font-size: inherit;">
+                <button type="button" aria-expanded="{{u.expandedStr}}" aria-controls="unit-{{u.key}}" onClick="{{u.toggle}}" style="display: flex; align-items: center; gap: 8px; width: 100%; min-height: var(--target); padding: 0; border: 0; background: none; color: var(--ink); text-align: left; cursor: pointer;">
+                  <span class="t-body-lg" style="flex: 1; min-width: 0; font-weight: 600;">{{u.name}}</span>
+                  <span class="t-label num" style="min-width: 40px; text-align: right; {{u.pctStyle}}">{{u.pctText}}</span>
+                  <sc-if value="{{u.isEst}}" hint-placeholder-val="{{ false }}">
+                    <span class="sr-only">, placement estimate</span>
+                  </sc-if>
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--ink-muted); transform: rotate({{u.rot}}deg); transition: transform var(--duration-fast) var(--ease-out);"><path d="M6 9l6 6 6-6"></path></svg>
+                </button>
+              </h3>
+              <div class="bar" aria-hidden="true" style="margin-right: 28px;">
+                <sc-if value="{{u.isEst}}" hint-placeholder-val="{{ false }}">
+                  <span class="bar-est" style="width: {{u.pct}}%;"></span>
+                </sc-if>
+                <sc-if value="{{u.isMeasured}}" hint-placeholder-val="{{ true }}">
+                  <span class="bar-fill" style="width: {{u.pct}}%;"></span>
+                </sc-if>
+                <span class="bar-bench" style="left: 85%;"></span>
+              </div>
+              <sc-if value="{{u.isEst}}" hint-placeholder-val="{{ false }}">
+                <p style="display: flex; margin-top: 8px;" aria-hidden="true"><span class="chip chip-estimate">Estimate</span></p>
+              </sc-if>
+              <sc-if value="{{u.expanded}}" hint-placeholder-val="{{ true }}">
+                <div id="unit-{{u.key}}" style="display: flex; flex-direction: column; gap: 16px; margin-top: 16px;">
+                  <sc-if value="{{u.hasNote}}" hint-placeholder-val="{{ false }}">
+                    <p class="t-caption muted">{{u.note}}</p>
+                  </sc-if>
+                  <ul style="display: flex; flex-direction: column; gap: 16px;">
+                    <sc-for list="{{u.concepts}}" as="c" hint-placeholder-count="5">
+                      <li style="display: flex; flex-direction: column; gap: 8px;">
+                        <p class="t-body">{{c.name}}</p>
+                        <sc-if value="{{c.hasBar}}" hint-placeholder-val="{{ true }}">
+                          <div style="display: flex; align-items: center; gap: 12px;">
+                            <div class="bar" role="progressbar" aria-label="{{c.name}}" aria-valuenow="{{c.pct}}" aria-valuemin="0" aria-valuemax="100" style="flex: 1;">
+                              <span class="bar-fill" style="width: {{c.pct}}%;"></span>
+                              <span class="bar-bench" style="left: 85%;"></span>
+                            </div>
+                            <span class="t-label num" style="min-width: 40px; text-align: right;">{{c.pctText}}</span>
+                          </div>
+                        </sc-if>
+                        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                          <sc-if value="{{c.isM}}" hint-placeholder-val="{{ false }}">
+                            <span class="chip chip-mastered"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12.5l5 5L19.5 7"></path></svg>Mastered</span>
+                          </sc-if>
+                          <sc-if value="{{c.isL}}" hint-placeholder-val="{{ true }}">
+                            <span class="chip chip-learning"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none"></path><circle cx="12" cy="12" r="9"></circle></svg>Still learning</span>
+                          </sc-if>
+                          <sc-if value="{{c.isN}}" hint-placeholder-val="{{ false }}">
+                            <span class="chip chip-none"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-dasharray="2 5.07"></circle></svg>Not started</span>
+                          </sc-if>
+                          <sc-if value="{{c.critical}}" hint-placeholder-val="{{ false }}">
+                            <span class="chip chip-critical"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>Critical</span>
+                          </sc-if>
+                        </div>
+                      </li>
+                    </sc-for>
+                  </ul>
+                </div>
+              </sc-if>
+            </li>
+          </sc-for>
+        </ul>
+      </section>
+
+      <section aria-labelledby="pf-errors" style="display: flex; flex-direction: column; gap: 12px;">
+        <h2 id="pf-errors" class="section-title">Critical steps to recheck</h2>
+        <ul class="card rows" style="padding: 0 16px;">
+          <li style="display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px 0;">
+            <span class="chip chip-neutral num"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12.5l5 5L19.5 7"></path></svg>Corrected Oct 30</span>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <p class="t-body">Damaged pallet: record before moving</p>
+              <p class="t-caption muted num">Answered with confidence, missed Oct 28</p>
+            </div>
+          </li>
+          <li style="display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px 0;">
+            <span class="chip chip-neutral"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"></path></svg>Comes back first</span>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <p class="t-body">Hazmat cartons need sign-off</p>
+              <p class="t-caption muted num">Answered with confidence, missed Nov 2</p>
+            </div>
+          </li>
+        </ul>
+      </section>
+
+      <a class="btn btn-secondary btn-block" href="Report.dc.html">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>
+        Flag an unfair result
+      </a>
+
+    </sc-if>
+
+    <!-- ===== empty: before the first session ===== -->
+    <sc-if value="{{isEmpty}}" hint-placeholder-val="{{ false }}">
+      <section class="card" aria-labelledby="pf-mastery-empty" style="background: transparent; display: flex; flex-direction: column; gap: 16px;">
+        <h2 id="pf-mastery-empty" class="sr-only">Role mastery</h2>
+        <p class="t-title2 num">Day 1 of 30 · Benchmark 85%</p>
+        <div class="bar bar-lg" role="progressbar" aria-label="Role mastery" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-valuetext="No sessions yet, benchmark 85%">
+          <span class="bar-bench" style="left: 85%;"></span>
+        </div>
+        <p class="t-body">Your progress shows up after your first session.</p>
+      </section>
+    </sc-if>
+  </main>
+
+  <sc-if value="{{isEmpty}}" hint-placeholder-val="{{ false }}">
+    <div class="dock" style="padding-bottom: 12px;">
+      <a class="btn btn-primary btn-lg btn-block" href="QChoice.dc.html">Play first session</a>
+    </div>
+  </sc-if>
+
+  <nav class="nav" aria-label="Main">
+    <a href="Today.dc.html"><span class="nav-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10l8-7 8 7v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"></path><path d="M10 21v-6h4v6"></path></svg></span>Today</a>
+    <a href="Path.dc.html"><span class="nav-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="5" r="2"></circle><circle cx="18" cy="19" r="2"></circle><path d="M8 5h8a3 3 0 0 1 0 6H8a3 3 0 0 0 0 6h8"></path></svg></span>Path</a>
+    <a href="Profile.dc.html" aria-current="page"><span class="nav-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="7" r="4"></circle><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path></svg></span>Profile</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"brand":{"editor":"enum","options":["default","plum"],"default":"default","section":"Theme"},"w":{"editor":"int","default":360,"section":"Frame"},"h":{"editor":"int","default":740,"section":"Frame"},"state":{"editor":"enum","options":["normal","empty"],"default":"normal","section":"Variant"},"scroll":{"editor":"int","default":0,"section":"Variant"},"$preview":{"width":360,"height":740}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { open: { receiving: true } };
+    this.scrollEl = null;
+    this.scrollRef = (el) => {
+      const first = !this.scrollEl && el;
+      this.scrollEl = el;
+      if (first) this.applyScroll();
+    };
+  }
+  applyScroll() {
+    const y = this.props.scroll ?? 0;
+    if (this.scrollEl) this.scrollEl.scrollTop = y;
+  }
+  componentDidMount() {
+    this.applyScroll();
+  }
+  componentDidUpdate(prevProps) {
+    if (prevProps && prevProps.scroll !== this.props.scroll) this.applyScroll();
+  }
+  renderVals() {
+    const UNITS = [
+      { key: 'receiving', name: 'Receiving', pct: 82, concepts: [
+        ['Check the delivery against the ASN', 94, 'm', false],
+        ['Damaged pallet: record before moving', 72, 'l', true],
+        ['Count and label inbound cartons', 88, 'm', false],
+        ['Quarantine bay Q1', 79, 'l', true],
+        ['Hazmat cartons need sign-off', 77, 'l', true]
+      ] },
+      { key: 'picking', name: 'Picking', pct: 68, concepts: [
+        ['Read a pick-face label', 78, 'l', false],
+        ['Pick path order', 58, 'l', false],
+        ['Short picks', 63, 'l', false],
+        ['Two-hand carry', 73, 'l', false]
+      ] },
+      { key: 'scanning', name: 'Scanning', pct: 74, concepts: [
+        ['Scan location before item', 86, 'm', false],
+        ['Double beep = wrong item', 66, 'l', false],
+        ['Check digits', 70, 'l', false]
+      ] },
+      { key: 'safety', name: 'Safety', pct: 40, est: true, note: 'From your placement check. Not practised yet.', concepts: [
+        ['Lockout before clearing a jam', null, 'n', true],
+        ['Pedestrian lanes and forklift right of way', null, 'n', true],
+        ['23 kg lift limit', null, 'n', true]
+      ] },
+      { key: 'returns', name: 'Returns', pct: 0, concepts: [
+        ['Scan the return label', null, 'n', false],
+        ['Inspect the item', null, 'n', false],
+        ['Restock it or put it in the damage bin', null, 'n', false],
+        ['Close the return in the scanner', null, 'n', false]
+      ] }
+    ];
+    const open = this.state.open;
+    const units = UNITS.map((u) => {
+      const expanded = !!open[u.key];
+      return {
+        key: u.key,
+        name: u.name,
+        pct: u.pct,
+        pctText: (u.est ? '~' : '') + u.pct + '%',
+        pctStyle: u.est ? 'color: var(--ink-muted);' : '',
+        isEst: !!u.est,
+        isMeasured: !u.est,
+        hasNote: !!u.note,
+        note: u.note || '',
+        expanded,
+        expandedStr: expanded ? 'true' : 'false',
+        rot: expanded ? 180 : 0,
+        toggle: () => this.setState({ open: { ...this.state.open, [u.key]: !this.state.open[u.key] } }),
+        concepts: u.concepts.map(([name, pct, s, critical]) => ({
+          name,
+          pct: pct ?? 0,
+          pctText: pct == null ? '' : pct + '%',
+          hasBar: pct != null,
+          isM: s === 'm',
+          isL: s === 'l',
+          isN: s === 'n',
+          critical
+        }))
+      };
+    });
+    const state = this.props.state ?? 'normal';
+    return {
+      theme: this.props.theme ?? 'light',
+      brand: this.props.brand ?? 'default',
+      w: this.props.w ?? 360,
+      h: this.props.h ?? 740,
+      isNormal: state !== 'empty',
+      isEmpty: state === 'empty',
+      scrollRef: this.scrollRef,
+      units
+    };
+  }
+}
+</script>
+</body>
+</html>

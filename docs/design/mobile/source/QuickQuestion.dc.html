@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Quick question</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="lq.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" data-brand="{{brand}}" style="width: {{w}}px; height: {{h}}px; font-family: var(--font-sans); color: var(--ink);">
+
+  <header class="topbar">
+    <a class="icon-btn" href="Today.dc.html" aria-label="End session">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+    </a>
+    <p class="t-label num muted" style="flex: 1; min-width: 0;">1 question</p>
+    <button class="icon-btn" type="button" aria-label="Read aloud" aria-pressed="{{listenPressed}}" onClick="{{toggleListen}}">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"></path><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"></path></svg>
+    </button>
+  </header>
+
+  <main class="scroll" style="padding: 8px 16px 24px; display: flex; flex-direction: column; gap: 24px;">
+    <h1 id="qq-stem" class="t-title2">Your scanner double-beeps on a pick. What do you do first?</h1>
+    <div class="opt-list" role="radiogroup" aria-labelledby="qq-stem">
+      <sc-for list="{{options}}" as="o" hint-placeholder-count="4">
+        <button class="opt" type="button" role="radio" aria-checked="{{o.checked}}" onClick="{{o.pick}}">
+          <span class="radio" aria-hidden="true"></span>
+          <span class="opt-text">{{o.text}}</span>
+        </button>
+      </sc-for>
+    </div>
+  </main>
+
+  <div class="dock">
+    <fieldset>
+      <legend id="qq-conf-legend" class="conf-legend" style="padding: 0;">How sure are you?</legend>
+      <div class="conf" role="radiogroup" aria-labelledby="qq-conf-legend">
+        <sc-for list="{{confs}}" as="c" hint-placeholder-count="3">
+          <button class="conf-btn" type="button" role="radio" aria-checked="{{c.checked}}" onClick="{{c.pick}}">
+            <span class="conf-tick" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"></path></svg></span>
+            {{c.label}}
+          </button>
+        </sc-for>
+      </div>
+    </fieldset>
+
+    <sc-if value="{{showCheck}}" hint-placeholder-val="{{ false }}">
+      <a class="btn btn-primary btn-lg btn-block" href="QuickDone.dc.html">Check</a>
+    </sc-if>
+    <sc-if value="{{showDisabled}}" hint-placeholder-val="{{ true }}">
+      <button class="btn btn-lg btn-block" type="button" disabled>Check</button>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"},"brand":{"editor":"enum","options":["default","plum"],"default":"default","section":"Theme"},"w":{"editor":"int","default":360,"section":"Frame"},"h":{"editor":"int","default":740,"section":"Frame"},"$preview":{"width":360,"height":740}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { sel: null, conf: null, listen: false };
+  }
+  renderVals() {
+    const sel = this.state.sel;
+    const conf = this.state.conf;
+    const texts = ['Put the item back in its slot', 'Scan the item again', 'Tell your lead', 'Pick it and fix it at packing'];
+    const options = texts.map((text, i) => ({
+      text,
+      checked: sel === i ? 'true' : 'false',
+      pick: () => this.setState({ sel: i })
+    }));
+    const labels = { sure: 'Sure', unsure: 'Unsure', guessing: 'Guessing' };
+    const confs = ['sure', 'unsure', 'guessing'].map((k) => ({
+      label: labels[k],
+      checked: conf === k ? 'true' : 'false',
+      pick: () => this.setState({ conf: k })
+    }));
+    const ready = sel !== null && conf !== null;
+    return {
+      theme: this.props.theme ?? 'light',
+      brand: this.props.brand ?? 'default',
+      w: this.props.w ?? 360,
+      h: this.props.h ?? 740,
+      listenPressed: this.state.listen ? 'true' : 'false',
+      toggleListen: () => this.setState({ listen: !this.state.listen }),
+      options,
+      confs,
+      showCheck: ready,
+      showDisabled: !ready
+    };
+  }
+}
+</script>
+</body>
+</html>
