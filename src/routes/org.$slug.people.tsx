@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { renderSVG } from 'uqr'
 import { RouteError, useFocusInvalid } from '@/components/inline-error'
@@ -20,11 +20,23 @@ const date = (at: number) => new Date(at).toLocaleDateString('en-GB', { day: 'nu
 
 type Invite = ReturnType<typeof Route.useLoaderData>['invites'][number]
 
-function InviteRow({ invite, link, onRevoke }: { invite: Invite; link: string; onRevoke: () => Promise<void> }) {
+function InviteRow({ invite, link, isNew, onRevoke }: { invite: Invite; link: string; isNew: boolean; onRevoke: () => Promise<void> }) {
   const [copied, setCopied] = useState(false)
   const [qr, setQr] = useState(false)
+  const rowRef = useRef<HTMLLIElement>(null)
+  const copyRef = useRef<HTMLButtonElement>(null)
+  const qrRef = useRef<HTMLImageElement>(null)
+  // Bring a just-created invite's sharing controls into view and hand focus to Copy link.
+  useEffect(() => {
+    if (!isNew) return
+    rowRef.current?.scrollIntoView({ block: 'nearest' })
+    copyRef.current?.focus({ preventScroll: true })
+  }, [isNew])
+  useEffect(() => {
+    if (qr) qrRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [qr])
   return (
-    <li className="flex flex-col gap-2 rounded-lg border p-4">
+    <li ref={rowRef} className="scroll-m-4 flex flex-col gap-2 rounded-lg border p-4">
       <p className="font-medium">
         {invite.name} <span className="font-normal text-muted-foreground">{invite.email}</span>
       </p>
@@ -36,6 +48,7 @@ function InviteRow({ invite, link, onRevoke }: { invite: Invite; link: string; o
         {!invite.expired && (
           <>
             <Button
+              ref={copyRef}
               variant="outline"
               className="h-11 px-4"
               onClick={async () => {
@@ -76,7 +89,7 @@ function InviteRow({ invite, link, onRevoke }: { invite: Invite; link: string; o
           </DialogContent>
         </Dialog>
       </div>
-      {qr && <img alt={`QR code for the invite link of ${invite.name}`} className="size-56" src={`data:image/svg+xml,${encodeURIComponent(renderSVG(link))}`} />}
+      {qr && <img ref={qrRef} alt={`QR code for the invite link of ${invite.name}`} className="size-56 scroll-m-4" src={`data:image/svg+xml,${encodeURIComponent(renderSVG(link))}`} />}
     </li>
   )
 }
@@ -87,6 +100,7 @@ function People() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [fields, setFields] = useState<Record<string, string>>({})
+  const [newInviteId, setNewInviteId] = useState('')
   const formRef = useFocusInvalid(fields)
 
   async function invite(e: React.FormEvent<HTMLFormElement>) {
@@ -103,7 +117,7 @@ function People() {
     if (Object.keys(missing).length) return
     setBusy(true)
     // shortcut: no email service, so invites are links the partner copies or shows as a QR code; add magic links and invite emails when an email provider is chosen.
-    const { error } = await authClient.organization.inviteMember({
+    const { data, error } = await authClient.organization.inviteMember({
       organizationId: org.id,
       email,
       role: 'member',
@@ -117,6 +131,7 @@ function People() {
     if (error) return setError(error.message ?? 'Could not create the invite')
     form.reset()
     await router.invalidate()
+    setNewInviteId(data.id)
   }
 
   async function revoke(invitationId: string) {
@@ -169,7 +184,7 @@ function People() {
           <h2 className="text-xl font-semibold">Invited</h2>
           <ul className="mt-4 flex flex-col gap-3">
             {org.invites.map((i) => (
-              <InviteRow key={i.id} invite={i} link={`${org.baseUrl}/join/${i.id}`} onRevoke={() => revoke(i.id)} />
+              <InviteRow key={i.id} invite={i} link={`${org.baseUrl}/join/${i.id}`} isNew={i.id === newInviteId} onRevoke={() => revoke(i.id)} />
             ))}
           </ul>
         </section>
