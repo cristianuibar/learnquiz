@@ -18,7 +18,7 @@ vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn(async () => ({ user:
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => 't1' }))
 vi.mock('@/server/today', () => ({ getToday: vi.fn() }))
-vi.mock('@/server/play', () => ({ endSession: vi.fn(), startMiniSession: vi.fn(), startSession: vi.fn() }))
+vi.mock('@/server/play', () => ({ prepareNextSession: vi.fn(async () => ({ ok: true })), endSession: vi.fn(), startMiniSession: vi.fn(), startSession: vi.fn() }))
 vi.mock('@/server/push', () => ({ getPushSettings: vi.fn(), subscribe: vi.fn(), unsubscribe: vi.fn(), sendTestPush: vi.fn(), savePushPreferences: vi.fn() }))
 vi.mock('@/server/model-trace', () => ({ getModelTrace: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
