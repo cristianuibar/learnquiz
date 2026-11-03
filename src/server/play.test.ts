@@ -329,6 +329,63 @@ it.each(['session', 'placement'])('excludes retired questions from a new %s', as
 
 })
 
+it('stamps proficient_at once when a role topic meets its benchmark and never clears it', async () => {
+  const now = 1793620800000
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
+  seedTopicAndLearner(raw, 0)
+  raw.prepare('INSERT INTO user (id, name, email) VALUES (?, ?, ?)').run('u1', 'Learner', 'learner@example.test')
+  raw.prepare('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, ?)').run('org-a', 'Alpha', 'alpha', 1)
+  raw.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, ?)').run('m1', 'org-a', 'u1', 'member', 1)
+  raw.prepare('INSERT INTO job_roles (id, org_id, name, benchmark, created_at) VALUES (?, ?, ?, ?, ?)').run('role', 'org-a', 'Analyst', 0.5, 1)
+  raw.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES (?, ?, ?, ?)').run('u1', 'org-a', 'role', 1)
+  raw.prepare('UPDATE topics SET learner_id = NULL, job_role_id = ? WHERE id = ?').run('role', 't1')
+  raw.prepare('DELETE FROM learner_topic WHERE topic_id = ?').run('t1')
+  seedFrontier(raw, 7, true)
+  raw.prepare("DELETE FROM learner_item WHERE item_id <> 'i1'").run()
+  raw.prepare('UPDATE concepts SET critical = 1 WHERE id = ?').run('c1')
+  raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un2', 't1', 1, 'Later')
+  raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)').run('c2', 't1', 'un2', 0, 'Other', '')
+  const learned = raw.prepare('INSERT INTO learner_concept (learner_id, concept_id, p_known, n_attempts, updated_at) VALUES (?, ?, ?, ?, ?)')
+  learned.run('u1', 'c1', 0.3, 1, 1)
+  learned.run('u1', 'c2', 0.9, 1, 1)
+  const proficientAt = () => scalar(raw, 'SELECT proficient_at FROM member_role_assignments WHERE user_id = ?', 'u1').proficient_at
+  const { sessionId } = await startSession({ data: { topicId: 't1' } })
+  const answer = async (text: string) => {
+    const { item } = await getSession({ data: { sessionId } })
+    await answerItem({ data: { sessionId, itemId: item!.id, answer: { text }, confidence: 'sure', responseMs: 1000 } })
+  }
+
+  // c1: 0.3 -> 0.1870 (below 0.5) -> 0.8343 (met) -> 0.4441 (below again, still stamped).
+  await answer('0')
+  expect(proficientAt()).toBeNull()
+  clock.mockReturnValue(now + 1000)
+  await nextItem({ data: { sessionId } })
+  await answer('1')
+  expect(proficientAt()).toBe(now + 1000)
+  clock.mockReturnValue(now + 2000)
+  await nextItem({ data: { sessionId } })
+  await answer('0')
+  expect(scalar(raw, 'SELECT p_known < 0.5 AS low FROM learner_concept WHERE concept_id = ?', 'c1').low).toBe(1)
+  expect(proficientAt()).toBe(now + 1000)
+})
+
+it.each([
+  ['no assignment', "DELETE FROM member_role_assignments"],
+  ['an archived role', "UPDATE job_roles SET status = 'archived'"],
+  ['no member row', 'DELETE FROM member'],
+])('refuses a role topic to a learner with %s', async (_name, breakIt) => {
+  seedTopicAndLearner(raw, 0)
+  raw.prepare('INSERT INTO user (id, name, email) VALUES (?, ?, ?)').run('u1', 'Learner', 'learner@example.test')
+  raw.prepare('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, ?)').run('org-a', 'Alpha', 'alpha', 1)
+  raw.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, ?)').run('m1', 'org-a', 'u1', 'member', 1)
+  raw.prepare('INSERT INTO job_roles (id, org_id, name, benchmark, created_at) VALUES (?, ?, ?, ?, ?)').run('role', 'org-a', 'Analyst', 0.5, 1)
+  raw.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES (?, ?, ?, ?)').run('u1', 'org-a', 'role', 1)
+  raw.prepare('UPDATE topics SET learner_id = NULL, job_role_id = ? WHERE id = ?').run('role', 't1')
+  raw.prepare('DELETE FROM learner_topic WHERE topic_id = ?').run('t1')
+  raw.prepare(breakIt).run()
+  await expect(startSession({ data: { topicId: 't1' } })).rejects.toMatchObject({ status: 404, message: 'Topic not found' })
+})
+
 function seedFrontier(raw: DatabaseSync, itemCount: number, hasDue: boolean) {
   raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un1', 't1', 0, 'Basics')
   raw.prepare('INSERT INTO learner_unit (learner_id, unit_id, unlocked_at) VALUES (?, ?, ?)').run('u1', 'un1', 1)

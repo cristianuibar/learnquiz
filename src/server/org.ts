@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { getDb } from '@/db'
 import { invitation, member, organization, user } from '@/db/auth-schema'
 import { attempts, concepts, jobRoles, learnerConcept, memberRoleAssignments, topics } from '@/db/schema'
+import { benchmarkMet } from '@/lib/learning/profile'
 import { getAuth } from '@/server/auth'
 import { requireOrgAdmin, requireOrgReader } from '@/server/authz'
 import { getEnv } from '@/server/env'
@@ -42,7 +43,7 @@ async function trainingOf(orgId: string) {
   const now = Date.now()
   const correction = alias(attempts, 'correction')
   const [rows, errors] = await Promise.all([
-    db.select({ userId: memberRoleAssignments.userId, assignedAt: memberRoleAssignments.assignedAt, proficientAt: memberRoleAssignments.proficientAt, benchmark: jobRoles.benchmark, conceptId: concepts.id, pKnown: learnerConcept.pKnown })
+    db.select({ userId: memberRoleAssignments.userId, assignedAt: memberRoleAssignments.assignedAt, proficientAt: memberRoleAssignments.proficientAt, benchmark: jobRoles.benchmark, conceptId: concepts.id, critical: concepts.critical, pKnown: learnerConcept.pKnown })
       .from(memberRoleAssignments)
       .innerJoin(member, and(eq(member.userId, memberRoleAssignments.userId), eq(member.organizationId, memberRoleAssignments.orgId)))
       .innerJoin(jobRoles, and(eq(jobRoles.id, memberRoleAssignments.jobRoleId), eq(jobRoles.orgId, memberRoleAssignments.orgId), eq(jobRoles.status, 'active')))
@@ -62,18 +63,17 @@ async function trainingOf(orgId: string) {
         )),
       ))),
   ])
-  const progress = new Map<string, { assignedAt: number; proficientAt: number | null; conceptCount: number; allKnown: boolean }>()
+  const progress = new Map<string, { assignedAt: number; proficientAt: number | null; benchmark: number; list: { id: string; critical: boolean; pKnown: number }[] }>()
   for (const row of rows) {
-    const current = progress.get(row.userId) ?? { assignedAt: row.assignedAt, proficientAt: row.proficientAt, conceptCount: 0, allKnown: true }
+    const current = progress.get(row.userId) ?? { assignedAt: row.assignedAt, proficientAt: row.proficientAt, benchmark: row.benchmark, list: [] }
     if (row.conceptId !== null) {
-      current.conceptCount++
-      current.allKnown &&= (row.pKnown ?? 0) >= row.benchmark
+      current.list.push({ id: row.conceptId, critical: row.critical ?? false, pKnown: row.pKnown ?? 0 })
     }
     progress.set(row.userId, current)
   }
   const training = new Map<string, Training>()
   for (const [userId, progressRow] of progress) {
-    const proficient = progressRow.conceptCount > 0 && progressRow.allKnown
+    const proficient = benchmarkMet(progressRow.list, progressRow.benchmark)
     const reachedAt = progressRow.proficientAt
     training.set(userId, {
       stage: proficient ? 'proficient' : 'onboarding',
