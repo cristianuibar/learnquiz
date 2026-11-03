@@ -766,4 +766,14 @@ describe('employees training on their role topic', () => {
     expect(count('sessions')).toBe(0)
     expect(fetchModel).not.toHaveBeenCalled()
   })
+
+  it('places on a stored question outside the first concept of each unit', async () => {
+    seedRoleTopic(0)
+    raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)').run('rc-late', 'rt', 'ru0', 1, 'Later concept', '')
+    raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run('ri-late', 'rc-late', 'rt', 'mcq', mcq(2), 3, 1)
+    const { sessionId } = await startPlacement({ data: { topicId: 'rt' } })
+    expect((await getSession({ data: { sessionId } })).item?.id).toBe('ri-late')
+    expect(fetchModel).not.toHaveBeenCalled()
+  })
 })

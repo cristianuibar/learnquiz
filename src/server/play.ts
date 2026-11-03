@@ -185,13 +185,14 @@ export const startPlacement = createServerFn({ method: 'POST' })
     if (!picks.length) throw httpError('This topic has no concepts', 409)
 
     // A failed concept keeps the others' stored items, so a retry only regenerates what is missing.
-    // Role topics are never generated per learner: they play the stored items.
+    // Role topics are never generated per learner: they place on the stored items of every concept.
+    const sources = topic.jobRoleId !== null ? conceptRows : picks
     const generated = topic.jobRoleId !== null
-      ? await Promise.all(picks.map((c) => storedItems(db, topic.id, c.id)))
+      ? await Promise.all(sources.map((c) => storedItems(db, topic.id, c.id)))
       : await Promise.all(
         picks.map((c) => ensureConceptItems(db, learnerId, c, topic, { targetDifficulty: PLACEMENT.start, spread: true, sessionId })),
       )
-    const pool = generated.flatMap((list, i) => list.map((it) => ({ id: it.id, conceptId: picks[i].id, difficulty: it.difficultyPrior })))
+    const pool = generated.flatMap((list, i) => list.map((it) => ({ id: it.id, conceptId: sources[i].id, difficulty: it.difficultyPrior })))
     if (!pool.length && topic.jobRoleId !== null) throw httpError('Your training is being prepared', 409)
     const first = pickNext(PLACEMENT.start, pool, [])
     if (!first) throw httpError('Could not generate placement questions', 502)
