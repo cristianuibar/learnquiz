@@ -31,7 +31,11 @@ const click = (el: HTMLElement) => act(async () => { el.click() })
 const keydown = (el: Element, key: string) =>
   act(async () => { el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })) })
 
-function Harness({ onConfirm, reason }: { onConfirm: (r?: string) => void | Promise<void>; reason?: boolean }) {
+function Harness({ onConfirm, reason, consequences = [{ icon: Ban, text: 'Ana is signed out.' }] }: {
+  onConfirm: (r?: string) => void | Promise<void>
+  reason?: boolean
+  consequences?: { icon: typeof Ban; text: string }[]
+}) {
   const [open, setOpen] = useState(false)
   return (
     <>
@@ -40,7 +44,7 @@ function Harness({ onConfirm, reason }: { onConfirm: (r?: string) => void | Prom
         open={open}
         onOpenChange={setOpen}
         title="Ban Ana?"
-        consequences={[{ icon: Ban, text: 'Ana is signed out.' }]}
+        consequences={consequences}
         verb="Ban"
         object="user"
         reason={reason}
@@ -85,6 +89,20 @@ describe('dialogs and form controls', () => {
     })
     await click(button('Ban user'))
     expect(onConfirm).toHaveBeenCalledWith('Spam')
+  })
+
+  it('keeps a long consequence list in a keyboard-scrollable region apart from the confirm controls', async () => {
+    const many = Array.from({ length: 20 }, (_, i) => ({ icon: Ban, text: `Concept ${i + 1} is also in Site guide v2.` }))
+    await render(<Harness onConfirm={vi.fn()} consequences={many} />)
+    await click(button('Retire'))
+    const dialog = document.querySelector('[role="dialog"]')!
+    const list = [...dialog.querySelectorAll('ul')].find((u) => u.getAttribute('aria-label') === 'Consequences')!
+    expect(list.querySelectorAll('li')).toHaveLength(20)
+    expect(dialog.getAttribute('aria-describedby')).toBe(list.id)
+    expect(list.tabIndex).toBe(0)
+    await act(async () => { list.focus() })
+    expect(document.activeElement).toBe(list)
+    for (const name of ['Cancel', 'Ban user']) expect(list.contains(button(name))).toBe(false)
   })
 
   it('stays open and shows an alert when confirming fails', async () => {
