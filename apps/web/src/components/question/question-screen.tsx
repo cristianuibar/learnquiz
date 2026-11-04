@@ -67,7 +67,7 @@ export function QuestionScreen({
   const answerable = Body !== UnsupportedQuestion
   // Locked while a check is in flight, so Try again resubmits exactly the answer on screen.
   const locked = loading || props.busy
-  // A failed End session retries next to its message; only a failed check takes over the dock.
+  // Only a failed check replaces Check; a failed End session retries from its own alert.
   const failedCheck = error && !error.ending ? error : null
   return (
     <>
@@ -87,17 +87,20 @@ export function QuestionScreen({
           <Body {...props} busy={locked} />
         </fieldset>
       </form>
-      {error?.ending && (
-        <div className="pb-3">
-          <InlineError message={error.message} onRetry={error.retry} />
-        </div>
-      )}
       {answerable ? (
-        <QuestionDock confidence={confidence} onConfidence={onConfidence} locked={locked} canCheck={canCheck} error={failedCheck?.message ?? null} onRetry={failedCheck?.retry ?? onCheck} />
+        <QuestionDock
+          confidence={confidence}
+          onConfidence={onConfidence}
+          locked={locked}
+          canCheck={canCheck}
+          error={failedCheck?.message ?? null}
+          onRetry={failedCheck?.retry ?? onCheck}
+          endError={error?.ending ? error : null}
+        />
       ) : (
-        failedCheck && (
+        error && (
           <div className="pb-3">
-            <ErrorRow message={failedCheck.message} />
+            {error.ending ? <InlineError message={error.message} onRetry={error.retry} /> : <ErrorRow message={error.message} />}
           </div>
         )
       )}

@@ -519,8 +519,10 @@ it('keeps Check for the answer on screen when ending the session fails, and retr
     await pick(container, 'answer', 'b')
     await pick(container, 'confidence', 'sure')
     await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="End session"]')!.click() })
-    expect(container.querySelector('[role="alert"]')).not.toBeNull()
     expect(button(container, 'Check').disabled).toBe(false)
+    // The alert and its Try again share the sticky dock with Check, so a long question cannot push them below the fold.
+    expect(button(container, 'Check').parentElement!.contains(container.querySelector('[role="alert"]'))).toBe(true)
+    expect(button(container, 'Check').parentElement!.contains(button(container, 'Try again'))).toBe(true)
     await act(async () => { button(container, 'Check').click() })
     expect(answerItem).toHaveBeenCalledWith({ data: expect.objectContaining({ answer: { optionId: 'b' }, confidence: 'sure' }) })
     expect(endSession).toHaveBeenCalledTimes(1)
