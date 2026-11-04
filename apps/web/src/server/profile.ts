@@ -1,23 +1,27 @@
 import { createServerFn } from '@tanstack/react-start'
 import { and, asc, desc, eq } from 'drizzle-orm'
+import type { Profile } from '@learnquiz/api/progress'
 import { z } from 'zod'
 import { getDb } from '@/db'
 import { member, user } from '@/db/auth-schema'
-import { attempts, concepts, jobRoles, learnerConcept, memberRoleAssignments, sessions, topics, units } from '@/db/schema'
-import { benchmarkMet, onboardingDay } from '@/lib/learning/profile'
+import { attempts, concepts, jobRoles, learnerConcept, learnerUnit, memberRoleAssignments, placements, sessions, topics, units } from '@/db/schema'
+import { conceptStatus, roleMastery, unitState } from '@/lib/learning/path'
+import { benchmarkMet, masterySeries, onboardingDay, WEEK } from '@/lib/learning/profile'
 import { requireOrgAdmin } from '@/server/authz'
 import { httpError, mean } from '@/server/helpers'
 import { liveConcept } from '@/server/live-concept'
 import { requireLearnerId } from '@/server/session'
 
 const DAY = 86_400_000
+// 1970-01-01 was a Thursday, so UTC weeks start 4 days after a multiple of WEEK.
+const mondayOf = (at: number) => Math.floor((at - 4 * DAY) / WEEK) * WEEK + 4 * DAY
 const id = z.string().min(1).max(100)
 // A target always requires a company; the empty input can only read the caller.
 const ProfileInput = z.union([z.object({ org: id, learnerId: id }).strict(), z.object({}).strict()])
 
 export const getProfile = createServerFn({ method: 'GET' })
   .validator(ProfileInput)
-  .handler(async ({ data }) => {
+  .handler(async ({ data }): Promise<Profile> => {
     const db = getDb()
     let learnerId: string
     let orgId: string | undefined
@@ -50,8 +54,10 @@ export const getProfile = createServerFn({ method: 'GET' })
     const now = Date.now()
     const today = Math.floor(now / DAY) * DAY
     const weekStart = today - 6 * DAY
-    const [unitRows, conceptRows, history, sessionRows] = topic ? await Promise.all([
-      db.select({ id: units.id, name: units.name }).from(units).where(eq(units.topicId, topic.id)).orderBy(asc(units.order)),
+    const [unitRows, conceptRows, history, sessionRows, placement] = topic ? await Promise.all([
+      db.select({ id: units.id, name: units.name, unlockedAt: learnerUnit.unlockedAt }).from(units)
+        .leftJoin(learnerUnit, and(eq(learnerUnit.unitId, units.id), eq(learnerUnit.learnerId, learnerId)))
+        .where(eq(units.topicId, topic.id)).orderBy(asc(units.order)),
       db.select({ id: concepts.id, unitId: concepts.unitId, name: concepts.name, critical: concepts.critical, pKnown: learnerConcept.pKnown })
         .from(concepts)
         .leftJoin(learnerConcept, and(eq(learnerConcept.conceptId, concepts.id), eq(learnerConcept.learnerId, learnerId)))
@@ -61,7 +67,9 @@ export const getProfile = createServerFn({ method: 'GET' })
         .where(and(eq(attempts.learnerId, learnerId), eq(concepts.topicId, topic.id))).orderBy(asc(attempts.at), asc(attempts.id)),
       db.select({ endedAt: sessions.endedAt }).from(sessions)
         .where(and(eq(sessions.learnerId, learnerId), eq(sessions.topicId, topic.id))),
-    ]) : [[], [], [], []]
+      db.select({ id: placements.id }).from(placements)
+        .where(and(eq(placements.learnerId, learnerId), eq(placements.topicId, topic.id))).limit(1).get(),
+    ]) : [[], [], [], [], undefined]
 
     // Replay mastery so past days never use today's value for a practiced concept.
     const known = new Map(conceptRows.map((c) => [c.id, c.pKnown ?? 0]))
@@ -70,6 +78,7 @@ export const getProfile = createServerFn({ method: 'GET' })
       if (!seen.has(attempt.conceptId)) known.set(attempt.conceptId, attempt.before)
       seen.add(attempt.conceptId)
     }
+    const knownBefore = new Map(known)
     const startedAt = role?.assignedAt ?? topic?.createdAt ?? now
     // Replay up to role start: proficiency may already be met before any new attempts.
     const knownAtStart = new Map(known)
@@ -83,7 +92,7 @@ export const getProfile = createServerFn({ method: 'GET' })
     let achievedAt = role?.proficientAt ?? (proficientAtStart ? startedAt : null)
     const errors = new Map<string, { id: string; conceptId: string; at: number; correctedAt: number | null }>()
     let cursor = 0
-    const weekly = Array.from({ length: 7 }, (_, day) => {
+    const days = Array.from({ length: 7 }, (_, day) => {
       const date = weekStart + day * DAY
       let attemptCount = 0
       while (cursor < history.length && history[cursor].at < Math.min(date + DAY, now + 1)) {
@@ -106,9 +115,28 @@ export const getProfile = createServerFn({ method: 'GET' })
         sessions: sessionRows.filter((s) => s.endedAt !== null && s.endedAt >= date && s.endedAt < Math.min(date + DAY, now + 1)).length,
       }
     })
-    const gainPerDay = (weekly[0].gap - weekly[6].gap) / 6
-    const activeDays = weekly.filter((d) => d.attempts > 0).length
-    const estimatedDays = achievedAt === null && activeDays >= 2 && gainPerDay > 0 ? Math.ceil(weekly[6].gap / gainPerDay) : null
+    const gainPerDay = (days[0].gap - days[6].gap) / 6
+    const activeDays = days.filter((d) => d.attempts > 0).length
+    const estimatedDays = achievedAt === null && activeDays >= 2 && gainPerDay > 0 ? Math.ceil(days[6].gap / gainPerDay) : null
+
+    // Up to six Monday-aligned UTC weeks from the first attempt; the current week is still running.
+    const weeksFrom = history.length ? Math.max(mondayOf(history[0].at), mondayOf(now) - 5 * WEEK) : now
+    const series = masterySeries(conceptRows.map((c) => c.id), history.map((a) => ({ ...a, pKnownAfter: a.after })), weeksFrom, now, knownBefore)
+    const weeks = series.map(({ mastery }, k) => {
+      const from = weeksFrom + k * WEEK
+      return {
+        start: from,
+        mastery,
+        sessions: sessionRows.filter((s) => s.endedAt !== null && s.endedAt >= from && s.endedAt < from + WEEK && s.endedAt <= now).length,
+        partial: from + WEEK > now,
+      }
+    })
+    const practiced = new Set(history.map((a) => a.conceptId))
+    const conceptViews = conceptRows.map((c) => {
+      const pKnown = c.pKnown ?? 0
+      const measured = practiced.has(c.id)
+      return { id: c.id, unitId: c.unitId, name: c.name, critical: c.critical, pKnown, measured, status: conceptStatus(measured, pKnown, benchmark) }
+    })
 
     return {
       name: person?.name ?? '',
@@ -117,7 +145,17 @@ export const getProfile = createServerFn({ method: 'GET' })
       benchmark,
       started: history.length > 0,
       onboarding: role ? { day: onboardingDay(role.assignedAt, now, role.onboardingDays), days: role.onboardingDays } : null,
-      units: unitRows.map((unit) => ({ ...unit, concepts: conceptRows.filter((c) => c.unitId === unit.id).map((c) => ({ ...c, pKnown: c.pKnown ?? 0 })) })),
+      mastery: roleMastery(conceptViews.map((c) => ({ conceptId: c.id, pKnown: c.pKnown })), conceptViews.map((c) => c.id)),
+      units: unitRows.map((unit) => {
+        const unitConcepts = conceptViews.filter((c) => c.unitId === unit.id)
+        return {
+          id: unit.id,
+          name: unit.name,
+          mastery: mean(unitConcepts.map((c) => c.pKnown)),
+          state: unitState({ concepts: unitConcepts, placed: placement !== undefined, unlocked: unit.unlockedAt !== null, benchmark }),
+          concepts: unitConcepts,
+        }
+      }),
       proficiency: {
         achievedAt,
         days: achievedAt === null ? null : Math.max(0, Math.ceil((achievedAt - startedAt) / DAY)),
@@ -125,7 +163,7 @@ export const getProfile = createServerFn({ method: 'GET' })
         projectedAt: estimatedDays === null ? null : now + estimatedDays * DAY,
       },
       confidentErrors: [...errors.values()].sort((a, b) => b.at - a.at).map((error) => ({ ...error, concept: conceptRows.find((c) => c.id === error.conceptId)!.name })),
-      weekly: weekly.map(({ gap: _gap, ...day }) => day),
-      sessionCounts: { total: sessionRows.filter((s) => s.endedAt !== null && s.endedAt <= now).length, week: weekly.reduce((sum, d) => sum + d.sessions, 0) },
+      weeks,
+      sessionCounts: { total: sessionRows.filter((s) => s.endedAt !== null && s.endedAt <= now).length, week: days.reduce((sum, d) => sum + d.sessions, 0) },
     }
   })
