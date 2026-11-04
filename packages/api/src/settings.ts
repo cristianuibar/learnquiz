@@ -15,6 +15,13 @@ export function timeOptions(company: CompanyWindow | null, min: number, max: num
 	return options
 }
 
+// Saved hours can predate a narrower company window: pull both bounds inside it, at least 30 minutes apart.
+export function clampHours(company: CompanyWindow | null, startMinute: number, endMinute: number) {
+	if (!company) return { startMinute, endMinute }
+	const start = Math.min(Math.max(startMinute, company.startMinute), company.endMinute - 30)
+	return { startMinute: start, endMinute: Math.min(Math.max(endMinute, start + 30), company.endMinute) }
+}
+
 // ISO weekday (1 to 7) as a short name.
 export function weekdayLabel(isoDay: number) {
 	return WEEKDAYS[isoDay - 1]

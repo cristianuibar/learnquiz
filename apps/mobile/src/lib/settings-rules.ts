@@ -1,4 +1,4 @@
-import { canToggleDay, timeOptions, type CompanyWindow } from '@learnquiz/api/settings'
+import { canToggleDay, clampHours, timeOptions, type CompanyWindow } from '@learnquiz/api/settings'
 
 export type QuestionPreferences = { paused: boolean; startMinute: number; endMinute: number; days: number[]; timezone: string }
 export type PushSettings = { prefs: QuestionPreferences; company: CompanyWindow | null }
@@ -19,9 +19,7 @@ export function toggleSettingsDay(days: number[], day: number, workingDays: numb
 // can predate a narrower company window (#636).
 export function clampPreferences(prefs: QuestionPreferences, company: CompanyWindow | null, deviceTimezone: string): QuestionPreferences {
   if (!company) return { ...prefs, timezone: deviceTimezone }
-  const startMinute = Math.min(Math.max(prefs.startMinute, company.startMinute), company.endMinute - 30)
-  const endMinute = Math.min(Math.max(prefs.endMinute, startMinute + 30), company.endMinute)
-  return { ...prefs, startMinute, endMinute, timezone: company.timezone }
+  return { ...prefs, ...clampHours(company, prefs.startMinute, prefs.endMinute), timezone: company.timezone }
 }
 // The server rejects an empty days list but keeps the saved days when `days` is
 // omitted. Days are empty when the company dropped every day the learner chose (#669).
