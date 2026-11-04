@@ -146,6 +146,22 @@ afterEach(() => {
   raw.exec('ROLLBACK TO test; RELEASE test')
 })
 
+it.each([401, 429, 503])('explains a personal curriculum failure (%s) while retaining the input and technical call log', async (status) => {
+  fetchModel.mockResolvedValueOnce(new Response('Provider unavailable', { status }))
+  await expect(curriculum.createTopic({ data: {
+    topic: 'Warehouse picker', goal: 'Pick safely', sourceText: 'Scan every SKU.',
+  } })).rejects.toMatchObject({
+    status: 503,
+    message: 'Your learning path could not be prepared. Try again in a few minutes.',
+  })
+  expect(raw.prepare("SELECT title, goal, status FROM topics WHERE learner_id = 'owner'").all())
+    .toEqual([{ title: 'Warehouse picker', goal: 'Pick safely', status: 'failed' }])
+  expect(raw.prepare("SELECT body_text FROM sources JOIN topics ON topics.id = sources.topic_id WHERE topics.learner_id = 'owner'").all())
+    .toEqual([{ body_text: 'Scan every SKU.' }])
+  expect(raw.prepare("SELECT ok, error FROM model_calls WHERE purpose = 'curriculum'").all())
+    .toEqual([{ ok: 0, error: `HTTP ${status}: Provider unavailable` }])
+})
+
 it('retains critical safety and scanning concepts when creating a personal topic', async () => {
   const sourceText = procedures.flatMap((u) => u.steps.map((s) => s[1])).join('\n')
   const { topicId } = await curriculum.createTopic({ data: { topic: 'Warehouse picker', sourceText } })

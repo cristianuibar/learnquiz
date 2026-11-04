@@ -97,9 +97,16 @@ it('refuses a learner without access', async () => {
   expect(fetchModel).not.toHaveBeenCalled()
 })
 
-it('releases the claim when the model call fails', async () => {
-  fetchModel.mockResolvedValueOnce(new Response('unavailable', { status: 503 }))
-  await expect(getUnitProcedure({ data: { unitId: 'unit' } })).rejects.toThrow()
+it.each([401, 429, 503])('explains a procedure generation failure (%s), retains its source and technical log, and allows retry', async (status) => {
+  fetchModel.mockResolvedValueOnce(new Response('Provider unavailable', { status }))
+  await expect(getUnitProcedure({ data: { unitId: 'unit' } })).rejects.toMatchObject({
+    status: 503,
+    message: 'The procedure could not be prepared. Try again in a few minutes.',
+  })
+  expect(raw.prepare('SELECT body_text FROM sources').all())
+    .toEqual([{ body_text: 'Check stock. If available, pack and dispatch.' }])
+  expect(raw.prepare('SELECT ok, error FROM model_calls').all())
+    .toEqual([{ ok: 0, error: `HTTP ${status}: Provider unavailable` }])
   expect(raw.prepare('SELECT procedure_started_at AS s FROM units').get()).toEqual({ s: null })
   expect(await getUnitProcedure({ data: { unitId: 'unit' } })).toMatchObject({ status: 'ready' })
 })

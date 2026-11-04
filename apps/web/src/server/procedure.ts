@@ -4,11 +4,11 @@ import { and, asc, eq, isNull, lt, or } from 'drizzle-orm'
 import { z } from 'zod'
 import { type Db, getDb } from '@/db'
 import { concepts, sources, topics, units } from '@/db/schema'
-import { chatJson } from '@/lib/llm/client'
+import { chatJson, DailyCapError, LlmError } from '@/lib/llm/client'
 import { procedurePrompt } from '@/lib/llm/prompts'
 import { ProcedureGraph } from '@/lib/llm/schemas'
 import { httpError } from '@/server/helpers'
-import { assertWithinCompanyCap } from '@/server/model-cap'
+import { assertWithinCompanyCap, COMPANY_CAP_MESSAGE } from '@/server/model-cap'
 import { requireLearnerId } from '@/server/session'
 import { learnerCanAccess } from '@/server/topic-access'
 
@@ -98,6 +98,7 @@ export const getUnitProcedure = createServerFn({ method: 'GET' })
       return { status: 'ready', graph, source: meta }
     } catch (e) {
       await db.update(units).set({ procedureStartedAt: null }).where(claim).catch(() => {})
-      throw e
+      if (e instanceof DailyCapError || (e instanceof LlmError && e.message === COMPANY_CAP_MESSAGE)) throw httpError(e.message, 429)
+      throw httpError('The procedure could not be prepared. Try again in a few minutes.', 503)
     }
   })
