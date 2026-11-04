@@ -9,7 +9,7 @@ import { Route as quickRoute } from '@/routes/play.quick.$itemId'
 import { Route as signInRoute } from '@/routes/sign-in'
 import { Route as meRoute } from '@/routes/me.index'
 import { Route as optInRoute } from '@/routes/opt-in'
-import { answerItem, endSession, getSession, startMiniSession } from '@/server/play'
+import { answerItem, endSession, getSession, reportItem, startMiniSession } from '@/server/play'
 import { getPushSettings, savePushPreferences } from '@/server/push'
 import { getSessionFn } from '@/server/session-fn'
 import type { Reveal, SessionView, SummaryView } from '@learnquiz/api'
@@ -145,7 +145,7 @@ it('opens a notification deep link as an inline one-question screen without redi
   } finally { await cleanup() }
 })
 
-it('answers the quick question inline and offers the way back to Today', async () => {
+function mockQuickAnswer() {
   vi.mocked(startMiniSession).mockResolvedValue({ sessionId: 'mini-1' })
   vi.mocked(getSession).mockResolvedValue(quickView)
   vi.mocked(answerItem).mockResolvedValue({ attemptId: 'a0', diagramConceptId: null, score: 1, feedback: null, missingPoints: [], chosenFeedback: null, sourceQuote: null, sourceTitle: null,
@@ -153,12 +153,19 @@ it('answers the quick question inline and offers the way back to Today', async (
     correctOptionIds: null, sourceVersion: null, detail: null } as unknown as Reveal)
   vi.mocked(endSession).mockResolvedValue({ sessionId: 'mini-1', kind: 'mini', topicId: 't1', durationMs: 1000, correct: 1, total: 1, ungraded: 0, xp: 10,
     streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], benchmark: null, reviewsLeft: 3, nextLine: 'Come back soon.', endedEarly: false } as SummaryView)
+}
+async function checkQuick(container: HTMLElement) {
+  await pick(container, 'answer', 'b')
+  await pick(container, 'confidence', 'sure')
+  const check = [...document.body.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Check')!
+  await act(async () => check.click())
+}
+
+it('answers the quick question inline and offers the way back to Today', async () => {
+  mockQuickAnswer()
   const { container, router, cleanup } = await renderApp('/play/quick/i1?pushId=push-1')
   try {
-    await pick(container, 'answer', 'b')
-    await pick(container, 'confidence', 'sure')
-    const check = [...document.body.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Check')!
-    await act(async () => check.click())
+    await checkQuick(container)
     expect(answerItem).toHaveBeenCalledExactlyOnceWith({ data: { sessionId: 'mini-1', itemId: 'i1', answer: { optionId: 'b' }, confidence: 'sure', responseMs: expect.any(Number) } })
     expect(endSession).toHaveBeenCalledExactlyOnceWith({ data: { sessionId: 'mini-1' } })
     const text = document.body.textContent ?? ''
@@ -167,6 +174,36 @@ it('answers the quick question inline and offers the way back to Today', async (
     const back = [...document.body.querySelectorAll<HTMLAnchorElement>('a[href="/today"]')].find((a) => a.textContent?.trim() === 'Back to Today')!
     await act(async () => back.click())
     expect(router.state.location.pathname).toBe('/today')
+  } finally { await cleanup() }
+})
+
+it('announces Report sent on the result only after the report sheet stops hiding the page', async () => {
+  mockQuickAnswer()
+  vi.mocked(reportItem).mockResolvedValue({ ok: true } as never)
+  const { container, cleanup } = await renderApp('/play/quick/i1?pushId=push-1')
+  try {
+    await checkQuick(container)
+    const status = [...container.querySelectorAll('[role="status"]')].find((el) => el.classList.contains('sr-only'))!
+    await act(async () => [...container.querySelectorAll('button')].find((b) => b.textContent === 'Report this question')!.click())
+    expect(container.getAttribute('aria-hidden')).toBe('true')
+    await act(async () => [...document.body.querySelectorAll('button')].find((b) => b.textContent?.includes('The question is unclear'))!.click())
+    // Screen readers skip text written while the page is still aria-hidden, so the page must be unhidden first.
+    const records: MutationRecord[] = []
+    const observer = new MutationObserver((batch) => records.push(...batch))
+    observer.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['aria-hidden'], attributeOldValue: true })
+    await act(async () => [...document.body.querySelectorAll('button')].find((b) => b.textContent?.includes('Send report'))!.click())
+    records.push(...observer.takeRecords())
+    observer.disconnect()
+    const unhidden = records.findIndex((r) => r.type === 'attributes' && r.target === container && r.oldValue === 'true')
+    const announced = records.findIndex((r) => r.type !== 'attributes' && status.contains(r.target) && status.textContent === 'Report sent')
+    expect(unhidden).toBeGreaterThan(-1)
+    expect(announced).toBeGreaterThan(unhidden)
+    expect(reportItem).toHaveBeenCalledOnce()
+    expect(status.textContent).toBe('Report sent')
+    expect(status.closest('[aria-hidden="true"]')).toBeNull()
+    expect(container.querySelector('h1')?.textContent).toBe('Quick question done')
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 0)))
+    expect(document.activeElement?.textContent).toBe('Report this question')
   } finally { await cleanup() }
 })
 

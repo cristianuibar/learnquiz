@@ -90,6 +90,7 @@ function ResultView({ item, result }: { item: ItemView; result: Result }) {
   const reportId = useId()
   const [reporting, setReporting] = useState(false)
   const [announcement, setAnnouncement] = useState('')
+  const reportPending = useRef(false)
   const { reveal, chosen, reviewsLeft } = result
   const model = revealModel(reveal, { hasCompany: Boolean(branding) })
   const tone = TONE[model.tone]
@@ -99,6 +100,13 @@ function ResultView({ item, result }: { item: ItemView; result: Result }) {
   const counter = !graded || reviewsLeft === null ? null : reveal.correct ? `1 review cleared · ${leftToday(reviewsLeft)}` : leftToday(reviewsLeft)
 
   useEffect(() => heading.current?.focus(), [])
+
+  // Runs after the closed dialog has dropped aria-hidden from the page.
+  useEffect(() => {
+    if (reporting || !reportPending.current) return
+    reportPending.current = false
+    setAnnouncement('Report sent')
+  }, [reporting])
 
   const row = (label: string, value: string) => (
     <div className="flex flex-col gap-1">
@@ -147,29 +155,32 @@ function ResultView({ item, result }: { item: ItemView; result: Result }) {
           {revealCopy.report}
         </Button>
       </Dock>
-      <DialogPrimitive.Root open={reporting} onOpenChange={setReporting}>
-        <DialogPrimitive.Portal>
-          <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-scrim" />
-          <DialogPrimitive.Content
-            aria-labelledby={reportId}
-            aria-describedby={undefined}
-            onCloseAutoFocus={(e) => { e.preventDefault(); reportLink.current?.focus() }}
-            className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[calc(100dvh-48px)] max-w-md flex-col overflow-hidden rounded-t-lg bg-surface-card text-ink shadow-raised focus:outline-none"
-          >
-            <ReportSheet
-              itemId={item.id}
-              attemptId={reveal.attemptId}
-              company={branding?.name ?? null}
-              headingId={reportId}
-              onBack={() => setReporting(false)}
-              onSent={() => {
-                setReporting(false)
-                setAnnouncement('Report sent')
-              }}
-            />
-          </DialogPrimitive.Content>
-        </DialogPrimitive.Portal>
-      </DialogPrimitive.Root>
+      {/* Mounted only while open, so its aria-hidden is gone before the effect announces Report sent. */}
+      {reporting && (
+        <DialogPrimitive.Root open onOpenChange={setReporting}>
+          <DialogPrimitive.Portal>
+            <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-scrim" />
+            <DialogPrimitive.Content
+              aria-labelledby={reportId}
+              aria-describedby={undefined}
+              onCloseAutoFocus={(e) => { e.preventDefault(); reportLink.current?.focus() }}
+              className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[calc(100dvh-48px)] max-w-md flex-col overflow-hidden rounded-t-lg bg-surface-card text-ink shadow-raised focus:outline-none"
+            >
+              <ReportSheet
+                itemId={item.id}
+                attemptId={reveal.attemptId}
+                company={branding?.name ?? null}
+                headingId={reportId}
+                onBack={() => setReporting(false)}
+                onSent={() => {
+                  reportPending.current = true
+                  setReporting(false)
+                }}
+              />
+            </DialogPrimitive.Content>
+          </DialogPrimitive.Portal>
+        </DialogPrimitive.Root>
+      )}
     </>
   )
 }
