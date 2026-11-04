@@ -32,7 +32,7 @@
       "placement_line": { "provider": "fireworks", "model": "accounts/fireworks/models/muse-spark-open" }
     },
     "VOICE_ENABLED": "true",
-    "BETTER_AUTH_URL": "https://learnquiz.com"
+    "BETTER_AUTH_URL": "https://app.learnquiz.com"
   },
   "d1_databases": [
     {
