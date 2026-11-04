@@ -69,6 +69,7 @@ Route: not in spec · Disclosure
 Layout
 Scroll padding 48 / 16 / 16. h1 "Before you start".
 Three text blocks, no icons, gap 24; each a label heading + body (gap 4): What we record, Who sees it, What it’s for.
+What we record: "Your answers, how sure you were, how long you took, your progress, and anything you type in a reflection or a report note." Reflections and report notes are stored, and company admins see report notes.
 Sunken block "Never recorded", padding 16, lock icon (the only icon on the screen): "Camera, location, sensors or health data. The microphone only while you record a voice answer."
 "Read the full privacy notice" link (external URL). Dock: Got it.
 Components
@@ -435,7 +436,7 @@ Route: /me/profile · Profile, ProfileEmpty (state prop), ProfileErrors (scroll 
 States: normal · empty (before session 1).
 
 Layout
-Header: h1 "Training progress" + Settings gear; "Jordan Reyes · Warehouse picker"; eye caption "Your manager sees this same page."
+Header: h1 "Training progress" + Settings gear; "Jordan Reyes · Warehouse picker"; eye caption "Your company's training admins see this same page." Only company owners and admins can open a learner's page; there is no manager role.
 Mastery card: "66%" (display) + "of 85% benchmark", 12 px bar, two facts: "Day 16 of 30", "Projected: Nov 12 / Reaches 85% on day 25".
 Weekly trend: 188 px line chart, 3 weekly points, dashed projection to 85% on Nov 12, dashed benchmark line.
 By unit: accordion rows (Receiving open), bars, concept lists with chips. Safety: dashed estimate bar + Estimate chip under the bar, as on Path.
