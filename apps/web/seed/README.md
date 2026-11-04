@@ -2,9 +2,10 @@
 
 The seed creates the fictional Northwind Logistics company, its owner and the
 Warehouse picker role. It imports the original [warehouse SOP](northwind-sop.md)
-through the role curriculum pipeline, retaining grounded quotes and critical
-steps. Question generation and self-check build initial banks for three
-representative concepts, including a critical scanning step. Every model call
+through the role curriculum pipeline, retaining grounded quotes. The steps the
+SOP marks **Critical** become the role's critical concepts. Question generation
+and self-check build initial banks for three representative concepts, including
+the critical scan-mismatch step. Every model call
 uses the normal call log and daily limit. One authored multiple-choice question
 about a location label carries an SVG image, stored in the local `MEDIA` R2 bucket.
 
@@ -27,7 +28,7 @@ pass-cli run --env-file /path/to/northwind-references.env -- pnpm --filter @lear
 
 Configure the model provider and credentials as for the local app in `apps/web/.dev.vars`.
 The command also accepts model bindings supplied through the process environment.
-An invalid model response, missing critical scanning concept, exhausted daily
+An invalid model response, missing scan-mismatch concept, exhausted daily
 limit or database conflict stops the seed rather than substituting a generic
 curriculum. Retry after resolving the cause; a partially created marked demo can
 resume. A reserved account that already exists without the demo's ownership
@@ -44,7 +45,7 @@ Sign in as `owner@northwind.learnquiz.test` with the owner password and open
 | Employee | Account | Initial state |
 | --- | --- | --- |
 | Alex Rivera | `invited@northwind.learnquiz.test` | Pending invite, no user account |
-| Morgan Chen | `onboarding@northwind.learnquiz.test` | Onboarding, confident error on a critical scanning step |
+| Morgan Chen | `onboarding@northwind.learnquiz.test` | Onboarding, confident error on the critical scan-mismatch step |
 | Sam Patel | `proficient@northwind.learnquiz.test` | Proficient, reached the benchmark in 6 days |
 
 The company overview shows one proficient employee and 6 days to proficiency.
@@ -55,3 +56,7 @@ invitation state and generated content. They do not reset the scenario or renew
 expired invites. A changed SOP or an unrelated company using the reserved slug
 is refused. Use the app's normal invitation and learning actions to continue an
 existing demo.
+
+The background queue generates questions for the remaining concepts after the
+seed finishes. Rerun the seed once question generation finishes to record
+practice on the remaining concepts. Learning progress stays unchanged.
