@@ -52,10 +52,8 @@ function FlagsCard({ flags, firstName }: { flags: MemberFlag[]; firstName: strin
 export function Person({ profile, flags }: { profile: Profile; flags: MemberFlag[] }) {
   const links = usePortalLinks()
   const firstName = profile.name.split(/\s+/)[0] ?? profile.name
-  const { achievedAt } = profile.proficiency
-  // A proficient trend ends on the date reached; reached before the shown weeks, they all stay.
-  const upTo = achievedAt === null ? [] : profile.weeks.filter((w) => w.start <= achievedAt)
-  const shown = upTo.length === 0 ? profile : { ...profile, weeks: upTo }
+  // A proficient trend ends on the week reached; with no practice before then, the recent weeks stay.
+  const shown = profile.reachedWeeks?.length ? { ...profile, weeks: profile.reachedWeeks } : profile
   const unitNames: Record<string, string> = {}
   for (const unit of profile.units) for (const concept of unit.concepts) unitNames[concept.id] = unit.name
   const hasErrors = profile.confidentErrors.length > 0

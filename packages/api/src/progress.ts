@@ -62,6 +62,7 @@ export type Profile = {
   proficiency: { achievedAt: number | null; days: number | null; estimatedDays: number | null; projectedAt: number | null }
   confidentErrors: { id: string; conceptId: string; concept: string; at: number; correctedAt: number | null }[]
   weeks: WeekPoint[]
+  reachedWeeks: WeekPoint[] | null
   sessionCounts: { total: number; week: number }
 }
 

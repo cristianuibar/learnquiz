@@ -151,18 +151,21 @@ export const getProfile = createServerFn({ method: 'GET' })
     const activeDays = days.filter((d) => d.attempts > 0).length
     const estimatedDays = achievedAt === null && activeDays >= 2 && gainPerDay > 0 ? Math.ceil(days[6].gap / gainPerDay) : null
 
-    // Up to six Monday-aligned UTC weeks from the first attempt; the current week is still running.
-    const weeksFrom = history.length ? Math.max(mondayOf(history[0].at), mondayOf(now) - 5 * WEEK) : now
-    const series = masterySeries(conceptRows.map((c) => c.id), history.map((a) => ({ ...a, pKnownAfter: a.after })), weeksFrom, now, knownBefore)
-    const weeks = series.map(({ mastery }, k) => {
-      const from = weeksFrom + k * WEEK
-      return {
-        start: from,
-        mastery,
-        sessions: sessionRows.filter((s) => s.endedAt !== null && s.endedAt >= from && s.endedAt < from + WEEK && s.endedAt <= now).length,
-        partial: from + WEEK > now,
-      }
-    })
+    // Up to six Monday-aligned UTC weeks from the first attempt to `end`; a week past `end` is still running.
+    const weeksUntil = (end: number) => {
+      const weeksFrom = history.length ? Math.max(mondayOf(history[0].at), mondayOf(end) - 5 * WEEK) : end
+      const series = masterySeries(conceptRows.map((c) => c.id), history.map((a) => ({ ...a, pKnownAfter: a.after })), weeksFrom, end, knownBefore)
+      return series.map(({ mastery }, k) => {
+        const from = weeksFrom + k * WEEK
+        return {
+          start: from,
+          mastery,
+          sessions: sessionRows.filter((s) => s.endedAt !== null && s.endedAt >= from && s.endedAt < from + WEEK && s.endedAt <= end).length,
+          partial: from + WEEK > end,
+        }
+      })
+    }
+    const weeks = weeksUntil(now)
     const practiced = new Set(history.map((a) => a.conceptId))
     const conceptViews = conceptRows.map((c) => {
       const pKnown = c.pKnown ?? 0
@@ -196,6 +199,8 @@ export const getProfile = createServerFn({ method: 'GET' })
       },
       confidentErrors: [...errors.values()].sort((a, b) => b.at - a.at).map((error) => ({ ...error, concept: conceptRows.find((c) => c.id === error.conceptId)!.name })),
       weeks,
+      // The weeks up to and including the one proficiency was reached in, however long ago.
+      reachedWeeks: achievedAt === null ? null : weeksUntil(Math.min(now, mondayOf(achievedAt) + WEEK)),
       sessionCounts: { total: sessionRows.filter((s) => s.endedAt !== null && s.endedAt <= now).length, week: days.reduce((sum, d) => sum + d.sessions, 0) },
     }
   })
