@@ -59,6 +59,8 @@ export function ConceptRow({ concept, slug, readOnly, critHeaderId }: { concept:
         if (seq !== latest.current) return
         setCritical(saved.current)
         setError(errorMessage(err))
+        // A superseded save may have landed without a reload, so refresh the counts.
+        await router.invalidate().catch(() => {})
       }
     })
   }
