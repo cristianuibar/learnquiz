@@ -278,10 +278,10 @@ it('leaves attempts on retired concepts out of the week chart and the day estima
   raw.prepare('INSERT INTO attempts (id, learner_id, item_id, concept_id, at, answer_json, correct, score, confidence, response_ms, rating, p_known_before, p_known_after) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
     .run('dead-attempt', 'learner-a', 'i9', 'dead', start + 6 * DAY + 7200_000, '"answer"', 0, 0, 'guess', 1000, 3, 0, 0.2)
   const profile = await getProfile({ data: {} })
-  expect(profile.weekly.map((d) => Math.round(d.mastery * 1000))).toEqual([300, 350, 425, 500, 600, 650, 750])
+  expect(profile.weeks).toEqual([{ start, mastery: 0.75, sessions: 7, partial: true }])
   expect(profile.proficiency).toEqual({ achievedAt: null, days: null, estimatedDays: 2, projectedAt: now + 2 * DAY })
-  raw.exec("UPDATE attempts SET p_known_after = 0.9 WHERE id IN ('a5', 'a6')")
-  expect((await getProfile({ data: {} })).weekly[6].mastery).toBe(0.9)
+  raw.exec("UPDATE learner_concept SET p_known = 0.9; UPDATE attempts SET p_known_after = 0.9 WHERE id IN ('a5', 'a6')")
+  expect((await getProfile({ data: {} })).weeks[0].mastery).toBe(0.9)
 })
 
 it('has no projection before training and refuses a target without a company', async () => {
