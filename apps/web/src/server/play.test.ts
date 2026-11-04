@@ -857,6 +857,18 @@ describe('learner practice and unit unlocks', () => {
     expect(scalar(raw, 'SELECT COUNT(*) AS n FROM model_calls').n).toBe(20)
   })
 
+  it('refuses both overlapping Starts at the daily cap with 429 when only seen items are stored', async () => {
+    seedFrontier(raw, 6, false)
+    const log = raw.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    for (let i = 0; i < 20; i++) log.run(`call-${i}`, 'u1', 'items', 'muse-spark-1.3', 0, 1, Date.now())
+
+    const results = await Promise.allSettled([startSession({ data: { topicId: 't1' } }), startSession({ data: { topicId: 't1' } })])
+    expect(results).toMatchObject([{ status: 'rejected', reason: { status: 429 } }, { status: 'rejected', reason: { status: 429 } }])
+    expect(scalar(raw, "SELECT gen_status AS s FROM concepts WHERE id = 'c1'").s).toBe('ready')
+    expect(scalar(raw, 'SELECT COUNT(*) AS n FROM sessions').n).toBe(0)
+    expect(chatJson).not.toHaveBeenCalled()
+  })
+
   it('joins a preparation that reserved the final cap slot instead of refusing Start', async () => {
     seedFrontier(raw, 1, false)
     const log = raw.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, error, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
