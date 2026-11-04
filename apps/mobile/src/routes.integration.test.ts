@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react'
 import { todayFixtures } from '@learnquiz/api/today'
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 import { router } from 'expo-router'
-import { api } from './lib/api'
+import { api, authCall } from './lib/api'
 import { acceptInvitation, getToken, signIn, signUp } from './lib/auth'
 import { useSession } from './lib/session-store'
 import { holdTarget, peekHeldTarget, releaseReplayHolds, takeHeldTarget, takeReplayTarget } from './lib/held-target'
@@ -21,7 +21,7 @@ jest.mock('./lib/session-store', () => ({
   SessionProvider: ({ children }: { children: unknown }) => children,
   useSession: jest.fn(),
 }))
-jest.mock('./lib/api', () => ({ ...jest.requireActual('./lib/api'), api: jest.fn() }))
+jest.mock('./lib/api', () => ({ ...jest.requireActual('./lib/api'), api: jest.fn(), authCall: jest.fn(async () => ({ data: { user: { email: 'learner@example.com' } }, token: null })) }))
 // Authentication and Profile's sign-out need the native secure store.
 jest.mock('./lib/auth', () => ({
   signIn: jest.fn(), signUp: jest.fn(), signOut: jest.fn(), acceptInvitation: jest.fn(),
@@ -58,6 +58,8 @@ jest.mock('expo-constants', () => ({
   __esModule: true, default: { executionEnvironment: 'standalone', expoConfig: { scheme: 'learnquiz' } },
 }))
 
+const settingsFixture = { prefs: { paused: false, startMinute: 420, endMinute: 930, days: [1, 2], timezone: 'UTC' }, company: null }
+
 const signedOut = { status: 'signedOut' as const, user: null, needsDisclosure: false, branding: null,
   refresh: jest.fn(), setDisclosed: jest.fn() }
 const ready = { ...signedOut, status: 'ready' as const, user: { id: 'u1', name: 'Learner', isAnonymous: false } }
@@ -67,6 +69,8 @@ const invite = {
 }
 
 beforeEach(() => {
+  // expo-router installs its Reanimated mock after imports; supply the missing native hook.
+  require('react-native-reanimated').useReducedMotion = () => true
   releaseReplayHolds()
   takeHeldTarget()
   jest.mocked(api).mockReset()
@@ -326,21 +330,24 @@ test('Got it sends one acknowledge while the first tap is pending', async () => 
   expect(navigation.getPathname()).toBe('/today')
 })
 
-test('review mode from Profile shows the branded copy and Got it returns without acknowledging', async () => {
+test('review mode from Settings shows the branded copy and Got it returns without acknowledging', async () => {
   jest.mocked(getToken).mockReturnValue('token-a')
-  jest.mocked(api).mockResolvedValue({ name: 'Learner', role: null, started: true, mastery: 0.66, benchmark: 0.85,
-    onboarding: { day: 16, days: 30 }, proficiency: { achievedAt: null, projectedAt: null }, weeks: [], units: [], confidentErrors: [] })
+  jest.mocked(api).mockResolvedValueOnce({ name: 'Learner', role: null, started: true, mastery: 0.66, benchmark: 0.85,
+    onboarding: { day: 16, days: 30 }, proficiency: { achievedAt: null, projectedAt: null }, weeks: [], units: [], confidentErrors: [] }).mockResolvedValue(settingsFixture)
   jest.mocked(useSession).mockReturnValue({ ...ready, branding: { name: 'Northwind', accent: null, logoUrl: null } })
   const navigation = renderRouter('src/app', { initialUrl: '/profile' })
   await navigation
+  expect(screen.queryByRole('link', { name: 'What we record' })).toBeNull()
+  await fireEvent.press(screen.getByRole('button', { name: 'Settings' }))
   await fireEvent.press(screen.getByRole('link', { name: 'What we record' }))
   expect(navigation.getPathname()).toBe('/welcome')
   expect(screen.getByText('You and Northwind’s training admins.')).toBeOnTheScreen()
   await fireEvent.press(screen.getByRole('button', { name: 'Got it' }))
   expect(api).toHaveBeenCalledWith('/me/profile', expect.objectContaining({ signal: expect.any(AbortSignal) }))
-  expect(jest.mocked(api).mock.calls.every(([path]) => path === '/me/profile')).toBe(true)
-  expect(navigation.getPathname()).toBe('/profile')
-  expect(screen.getByRole('header', { name: 'Training progress' })).toBeOnTheScreen()
+  expect(jest.mocked(api).mock.calls.map(([path]) => path)).toEqual(['/me/profile', '/push/settings'])
+  expect(authCall).toHaveBeenCalledWith('/get-session', undefined, expect.objectContaining({ signal: expect.any(AbortSignal) }))
+  expect(navigation.getPathname()).toBe('/settings')
+  expect(screen.getByRole('header', { name: 'Settings' })).toBeOnTheScreen()
 })
 
 test('Profile keeps loaded mastery visible during a return-from-Settings refetch', async () => {
@@ -350,14 +357,15 @@ test('Profile keeps loaded mastery visible during a return-from-Settings refetch
   const pending = new Promise((done) => { resolve = done })
   jest.mocked(getToken).mockReturnValue('token-a')
   jest.mocked(useSession).mockReturnValue(ready)
-  jest.mocked(api).mockResolvedValueOnce(profile).mockReturnValueOnce(pending)
+  jest.mocked(api).mockResolvedValueOnce(profile).mockResolvedValueOnce(settingsFixture).mockReturnValueOnce(pending)
   const navigation = renderRouter('src/app', { initialUrl: '/profile' })
   await navigation
   expect(await screen.findByLabelText('66% of 85% benchmark')).toBeOnTheScreen()
   expect(screen.queryByText('Projected')).toBeNull()
   await fireEvent.press(screen.getByRole('button', { name: 'Settings' }))
   await act(async () => { router.back() })
-  expect(api).toHaveBeenCalledTimes(2)
+  expect(api).toHaveBeenCalledTimes(3)
+  expect(jest.mocked(api).mock.calls.filter(([path]) => path === '/me/profile')).toHaveLength(2)
   expect(screen.getByLabelText('66% of 85% benchmark')).toBeOnTheScreen()
   await act(async () => { resolve({ ...profile, mastery: 0.72 }) })
   expect(await screen.findByLabelText('72% of 85% benchmark')).toBeOnTheScreen()
@@ -370,7 +378,7 @@ test('Profile ignores an earlier request that answers after the refetch that rep
   const first = new Promise((done) => { resolveFirst = done })
   jest.mocked(getToken).mockReturnValue('token-a')
   jest.mocked(useSession).mockReturnValue(ready)
-  jest.mocked(api).mockReturnValueOnce(first).mockResolvedValueOnce({ ...profile, mastery: 0.72 })
+  jest.mocked(api).mockReturnValueOnce(first).mockResolvedValueOnce(settingsFixture).mockResolvedValueOnce({ ...profile, mastery: 0.72 })
   await renderRouter('src/app', { initialUrl: '/profile' })
   // Leaving and coming back replaces the first request with a refetch, which answers first.
   await fireEvent.press(await screen.findByRole('button', { name: 'Settings' }))
@@ -462,4 +470,55 @@ test('the actual router keeps an open invitation mounted while the session reloa
   await act(async () => { session.set({ ...signedOut, status: 'loading' }) })
   expect(navigation.getPathname()).toBe('/join/invitation-1')
   expect(screen.getByRole('header', heading)).toBeOnTheScreen()
+})
+
+test('Settings ignores a failed save and queued edits after the current token changes', async () => {
+  jest.useFakeTimers()
+  jest.mocked(getToken).mockReturnValue('token-a')
+  const session = liveSession(ready)
+  let reject!: (error: Error) => void
+  const pending = new Promise((_yes, no) => { reject = no })
+  let loaded = settingsFixture
+  jest.mocked(api).mockImplementation((path) => path === '/push/preferences' ? pending : Promise.resolve(loaded))
+  await renderRouter('src/app', { initialUrl: '/settings' })
+  await screen.findByText('learner@example.com')
+  await fireEvent.press(screen.getByRole('togglebutton', { name: 'Monday' }))
+  await fireEvent.press(screen.getByRole('togglebutton', { name: 'Wednesday' }))
+  loaded = { ...settingsFixture, prefs: { ...settingsFixture.prefs, days: [3, 4] } }
+  await act(async () => {
+    jest.mocked(getToken).mockReturnValue('token-b')
+    session.set({ ...ready, user: { ...ready.user, name: 'Current learner' } })
+  })
+  await act(async () => { reject(new Error('old request failed')) })
+  expect(screen.getByRole('togglebutton', { name: 'Wednesday' })).toHaveProp('accessibilityState', expect.objectContaining({ checked: true }))
+  expect(screen.getByRole('togglebutton', { name: 'Monday' })).toHaveProp('accessibilityState', expect.objectContaining({ checked: false }))
+  expect(screen.queryByText(require('@learnquiz/api/system-copy').settingsSaveFailed)).toBeNull()
+  expect(jest.mocked(api).mock.calls.filter(([path]) => path === '/push/preferences')).toHaveLength(1)
+})
+
+test('a replacement token can enable notifications while an old registration is pending', async () => {
+  jest.useFakeTimers()
+  const push = require('./lib/push')
+  jest.spyOn(push, 'pushStatus').mockResolvedValue({ registered: false, permission: 'granted', token: null })
+  let finishOld!: (result: string) => void
+  const enable = jest.spyOn(push, 'enablePush').mockImplementationOnce(() => new Promise((resolve) => { finishOld = resolve }))
+    .mockResolvedValue('unavailable')
+  jest.mocked(getToken).mockReturnValue('token-a')
+  const session = liveSession(ready)
+  jest.mocked(api).mockResolvedValue(settingsFixture)
+  await renderRouter('src/app', { initialUrl: '/settings' })
+  await screen.findByText('learner@example.com')
+  await fireEvent.press(screen.getByRole('switch', { name: 'Send me questions' }))
+  expect(screen.getByRole('switch', { name: 'Send me questions' })).toBeDisabled()
+  await act(async () => {
+    jest.mocked(getToken).mockReturnValue('token-b')
+    session.set({ ...ready, user: { ...ready.user, name: 'Current learner' } })
+  })
+  expect(screen.getByRole('switch', { name: 'Send me questions' })).toBeEnabled()
+  await act(async () => { finishOld('granted') })
+  expect(screen.getByRole('switch', { name: 'Send me questions' })).not.toBeChecked()
+  expect(screen.queryByText(require('@learnquiz/api/system-copy').settingsSaveFailed)).toBeNull()
+  await fireEvent.press(screen.getByRole('switch', { name: 'Send me questions' }))
+  expect(enable).toHaveBeenCalledTimes(2)
+  expect(jest.mocked(api).mock.calls.filter(([path]) => path === '/push/preferences')).toHaveLength(0)
 })
