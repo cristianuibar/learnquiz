@@ -18,6 +18,7 @@ vi.mock('@tanstack/react-start', () => ({
     })
     return builder()
   },
+  createServerOnlyFn: (fn: unknown) => fn,
 }))
 vi.mock('@tanstack/react-start/server', () => ({ getRequestHeaders: () => new Headers() }))
 vi.mock('@/db', () => ({ getDb: () => state.db }))
@@ -28,6 +29,7 @@ vi.mock('@/server/auth', () => ({ getAuth: () => ({ api: { getSession: async () 
 
 import { MAX_ROLE_DOCUMENT_BYTES, MAX_ROLE_DOCUMENT_CHARS } from '@/lib/limits'
 import { Route } from '@/routes/api/org.$orgId.roles.$roleId.documents'
+import { listRoles } from './org'
 import { previewRetireRoleDocument, removeRoleDocument, retireRoleDocument, uploadRoleDocument } from './role-documents'
 
 let sqlite: DatabaseSync
@@ -292,6 +294,15 @@ it('retires a document and its items without touching other items', async () => 
   expect(sqlite.prepare("SELECT gen_status, gen_error, gen_started_at FROM concepts WHERE id = 'con-1'").get())
     .toEqual({ gen_status: 'failed', gen_error: 'The document behind this concept was retired', gen_started_at: null })
   await expect(retireRoleDocument({ data: { slug: 'acme', roleId: 'role-a', sourceId: 'src-1' } })).rejects.toMatchObject({ status: 404 })
+})
+
+it('counts only the failed scan once the last readable document of a ready role is retired', async () => {
+  seedV1()
+  sqlite.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, version, status, created_at) VALUES ('src-scan', 'topic-role-a', 'pdf', 'Scan', '', 1, 'failed', 2)").run()
+  await retireRoleDocument({ data: { slug: 'acme', roleId: 'role-a', sourceId: 'src-1' } })
+  expect((await listRoles({ data: { slug: 'acme' } })).roles).toEqual([
+    expect.objectContaining({ id: 'role-a', topicStatus: 'ready', documentCount: 1, failedDocuments: 1 }),
+  ])
 })
 
 it('refuses retiring a document for a plain member', async () => {

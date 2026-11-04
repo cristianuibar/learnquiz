@@ -4,19 +4,41 @@
 
 Learn Quiz helps companies onboard new hires through quiz practice with their training
 material. A company owner creates a job role and invites teammates with a link or QR
-code. Each learner pastes the material they need to learn, takes a placement quiz, and
-practises with questions matched to their level and due for review.
+code. The owner uploads role documents and builds a shared curriculum. Learners take
+a placement quiz and practise with questions matched to their level and due for review.
 
 The company portal currently covers setup, job-role membership, invitations and
 employee progress. **People** shows each person's status (invited, active or
 proficient), progress toward the role benchmark and last activity; the **Overview**
 counts employees, proficient employees, average days to proficiency and critical-step
-errors this week. Learning paths belong to individual learners: shared company
-document libraries and automatic role-to-curriculum assignment are not yet
-shipped.
+errors this week. Each role has a shared curriculum and question bank; each learner
+has their own progress. Personal topics are also available at `/start`.
 
 Built solo by Cristian Uibar for the Meta Global AI Developer Hackathon
 (Oct 27 to Nov 4, 2026), Indie Developer track. The web app and API are live at https://app.learnquiz.com; the marketing site is at https://learnquiz.com.
+
+## Try it
+
+- **Web:** at https://app.learnquiz.com/sign-in choose **Create an account** with
+  email and password, then open https://app.learnquiz.com/start. Enter a topic,
+  optionally paste your material, and choose **Find my level**. An account has a
+  higher daily model-call cap than a guest.
+- **Company portal:** on https://learnquiz.com choose **Create a company account**,
+  create the company and its first role, then open the role under **Roles**. Upload
+  a PDF or paste text and choose **Build curriculum**. Invite learners by link or
+  QR code from **People**; their training uses the role's shared curriculum.
+- **Android:** follow the [Android app](#android-app) instructions below.
+
+Use email to sign in. Facebook login is in Meta's Development mode and works only
+for the app's roles and test users.
+
+## Android app
+
+Install the [Android APK](https://github.com/cristianuibar/learnquiz/releases/latest/download/learnquiz.apk).
+Sign in with an account created on the web, or open a company invite on your phone
+and tap **Open in the app** below the web form to create the invited account in
+Android. The Android sign-in screen has no sign-up option; use the invite's app
+link before completing the web join form if you want to create the account in Android.
 
 ## What works today
 
@@ -24,12 +46,16 @@ Built solo by Cristian Uibar for the Meta Global AI Developer Hackathon
   role, and invitations tied to that role. Admins share invite links or QR codes from
   **People**; invitations are not emailed. Joining members acknowledge the training
   data disclosure before continuing.
-- **Learning from text:** a topic, optional goal and optional pasted source become a
-  curriculum with units, concepts and prerequisites. Pasted material is limited to
-  20,000 characters; document uploads and URL import are not available yet.
+- **Learning from documents and text:** company roles accept PDFs with a text layer
+  (up to 10 MB per file) or pasted text. Each role document is limited to 60,000
+  characters, including extracted PDF text. Personal topics accept a topic,
+  optional goal and up to 20,000 pasted characters to build a curriculum with
+  units, concepts and prerequisites.
 - **Practice:** placement, multiple-choice, fill-in-the-blank and short written
   answers, confidence ratings, corrective feedback, spaced review (FSRS) and concept
-  mastery estimates (BKT). Session selection and difficulty adjustment run in code.
+  mastery estimates (BKT). Short written answers and voice input are for personal
+  topics. Code selects session items and adjusts difficulty; Wonder can order
+  personal-topic sessions, with a rules fallback.
 - **Staff administration:** the separate `/admin` area lists companies, members,
   roles, member learning documents, active learners and model spend. Staff can inspect
   company portals read-only, search users, and ban or unban accounts. This requires
@@ -40,17 +66,18 @@ Built solo by Cristian Uibar for the Meta Global AI Developer Hackathon
 | Model | Job | Status |
 | --- | --- | --- |
 | Muse Spark 1.3 (`muse-spark-1.3`) | Curriculum skeleton, question generation and item self-check | Shipped; default Meta Model API model with JSON-schema output |
-| Muse Spark 1.3 | Short-answer grading | Shipped |
-| Muse Spark Open on Fireworks (`accounts/fireworks/models/muse-spark-open`) | Placement result text (`placement_line`) | Shipped; falls back to Muse Spark 1.3 when Fireworks fails or times out, then to a template |
-| Muse Voice Transcribe 1.0 (`muse-voice-transcribe-1.0`) | Transcribe spoken text answers for editing before submission | Implemented, opt-in; disabled in the checked-in configuration |
-| Muse Wonder 1.0 | Session planning with tools (coach) | Planned; current sessions use the code-based planner |
-| Muse Image 1.0 | Procedure diagrams | Shipped; generated once per visual concept and shown on answer reveals and Path |
+| Muse Spark 1.3 | Short-answer grading | Shipped for personal topics |
+| Muse Spark Open on Fireworks (`accounts/fireworks/models/muse-spark-open`) | Placement result text (`placement_line`) for personal topics | Configured; falls back to Muse Spark 1.3 when Fireworks fails or times out, then to a template; company roles use a template |
+| Muse Voice Transcribe 1.0 (`muse-voice-transcribe-1.0`) | Transcribe spoken answers for editing before submission | Shipped for personal-topic written answers; `VOICE_ENABLED=true` in the checked-in configuration |
+| Muse Wonder 1.0 (`muse-wonder-1.0`) | Order selected session items and explain the order | Optional for personal topics, with a rules fallback; company roles use the rules planner |
+| Muse Image 1.0 | Diagrams for visual concepts | Shipped for personal topics; company role topics do not generate diagrams |
 
-Every model call is logged to the `model_calls` table. Open **Model trace** on a
-session summary or the Path screen to see each call's purpose, model, latency,
-tokens and estimated USD cost, plus the total. Generated paths, questions and placement
+Every model call is logged to the `model_calls` table. For personal topics on the
+web, open **Model trace** on a session summary or the Path screen to see each call's
+purpose, model, latency, tokens and estimated USD cost, plus the total. Generated paths, questions and placement
 feedback name the model that wrote them. Traces are private to the learner.
-Topic links and model labels are recorded for newly generated content.
+Topic links and model labels are recorded for newly generated content. Android
+shows model attribution but has no model-call trace.
 
 Cost estimates use the configured token price table for Spark 1.3. Models without
 a known price, including Wonder, Image and voice, record `cost_usd = null` and show
@@ -58,10 +85,10 @@ a known price, including Wonder, Image and voice, record `cost_usd = null` and s
 monetary charge and still count toward the daily model-call cap. Billing rates and
 units for these models will be added separately.
 
-With `VOICE_ENABLED=true` and the voice job mapped to Meta's Muse Voice Transcribe
-1.0, text-answer questions offer a
-hold-to-talk button. Allow microphone access, hold to speak (up to one minute), then
-release. Edit the transcript before choosing confidence and pressing Check.
+With the checked-in `VOICE_ENABLED=true` and the voice job mapped to Meta's Muse
+Voice Transcribe 1.0, personal-topic written-answer questions on the web offer a
+record button. Allow microphone access, tap to record (up to one minute), then tap
+to stop. Edit the transcript before choosing confidence and pressing Check.
 Recordings are converted locally to mono 16-bit 24 kHz WAV and sent to
 `/v1/asr/transcribe`; recordings are not stored. Each transcription counts toward the
 daily model-call cap and logs a `voice` call. Typing remains available when recording
@@ -79,24 +106,27 @@ require a preloaded demo account or a seed script.
 
 1. Sign up at `/sign-in`, then open `/org/new`. Enter the company and first job role,
    and acknowledge **Before you start** when prompted.
-2. Open **People**, enter a teammate's name and email, select the role, and choose
-   **Create invite link**. Share the link or its QR code with that teammate.
-3. The teammate opens the invite, creates an account or signs in with the invited
+2. Open the role under **Roles**. Upload a PDF with a text layer or paste a fictional
+   support handbook, then choose **Build curriculum**. Questions generate in the
+   background for the role.
+3. Open **People**, choose **Invite people**, enter a teammate's name and email,
+   select their job role, and choose **Create invite links**. Share the link or its
+   QR code with that teammate.
+4. The teammate opens the invite, creates an account or signs in with the invited
    email, joins the company and acknowledges **Before you start**.
-4. On `/start`, enter **Acme Support onboarding** as the topic and paste your sample
-   support handbook into **Paste your material (optional)**. Choose **Find my level**
-   to generate the curriculum and begin placement. A working model API key is required.
-5. After placement, use **Path** to inspect the curriculum and **Model trace** to
-   inspect generation calls. Use **Today** for subsequent practice sessions.
+5. Once the role's training is ready, the teammate opens **Today** to begin placement
+   and practice. Use **Path** to inspect the curriculum and **Today** for subsequent
+   sessions. A working model API key is required to generate training content.
 
-Use fictional training material for this walkthrough. The company portal does not
-automatically distribute the learner's pasted handbook to other members.
+Use fictional training material for this walkthrough. The company role curriculum
+is shared; a personal topic created at `/start` belongs to its learner.
 
 ## Stack
 
 TanStack Start (React 19) on one Cloudflare Worker, D1 (SQLite) through Drizzle,
 Better Auth (guest login, email and password, organizations and invites, Facebook
-login when configured), shadcn/ui and Tailwind 4. R2 stores generated procedure diagrams.
+login when configured), shadcn/ui and Tailwind 4. The Android app uses Expo and
+React Native. R2 stores original role PDFs and generated diagrams.
 
 ## Run locally
 
@@ -135,8 +165,8 @@ model configuration is in `apps/web/wrangler.jsonc`. Local D1 data is separate f
 `grade`, `image`, `voice`, and the placement result's `placement_line` to a provider
 and model. For example, set `self_check` to
 `{ "provider": "baseten", "model": "muse-spark-open" }` and supply `BASETEN_API_KEY`
-to use a second model for checking questions. Session planning remains a reserved
-job for the planned coach feature. Only the Meta models listed in
+to use a second model for checking questions. The `plan` job can order personal-topic
+sessions; company roles use the rules planner. Only the Meta models listed in
 `apps/web/src/lib/llm/models.ts` are accepted. Fireworks may prefix a model ID with
 `accounts/fireworks/models/`.
 
@@ -227,9 +257,9 @@ pnpm --filter @learnquiz/web deploy
 
 Set `FACEBOOK_APP_ID` and `FACEBOOK_APP_SECRET` as well if using Facebook login.
 In the Cloudflare dashboard, add a WAF rate limiting rule for your zone: POST
-requests to the app hostname, 10 per minute per IP, block. The Worker also caps each
-learner at 20 model calls per UTC day, including retries, voice transcriptions and
-image generations.
+requests to the app hostname, 10 per minute per IP, block. The Worker also caps model
+calls per UTC day: **20 per guest**, **150 per account**, and **400 per company**.
+Retries, voice transcriptions and image generations count toward the applicable caps.
 
 ### Apex domain cutover
 
@@ -257,8 +287,8 @@ that queues concepts drains them itself. The queue handler is empty.
 All code in this repository was written during the hackathon window, starting
 Oct 27, 2026. Before the kickoff only the name, the domain and an unused visual mood
 board existed; that mood board was derived from a third-party site and none of its
-assets, colours or copy ship here. Coding agents (Claude Code and Codex) were used
-to write code under the author's direction, and Gemini and Grok agents reviewed it.
+assets, colours or copy ship here. Claude Code and Codex agents wrote and reviewed
+the code under Cristian Uibar's direction, with Grok as a fallback and second reviewer.
 
 ## Licence
 

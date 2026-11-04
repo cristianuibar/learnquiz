@@ -40,7 +40,11 @@ export function RoleCard({ role, onPress }: RoleCardProps) {
         </View>
         <Bar accessible={false} value={role.started ? role.pct ?? 0 : 0} benchmark={role.benchmarkPct} />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', minHeight: space[6] + space[1], gap: space[2] }}>
-          {role.chip ? <Chip variant="none" accessible={false} style={{ maxWidth: '100%' }}>{role.chip}</Chip> : <Text variant="label" num style={{ maxWidth: '100%', flexShrink: 1 }}>{role.progressLabel}</Text>}
+          {role.chip ? <Chip variant="none" accessible={false} style={{ maxWidth: '100%' }}>{role.chip}</Chip> : (
+            <Text variant="label" num style={{ maxWidth: '100%', flexShrink: 1 }}>
+              {role.pct}%<Text variant="label" muted style={{ fontFamily: 'Inter_500Medium' }}>{` of ${role.benchmarkPct}% benchmark`}</Text>
+            </Text>
+          )}
           <Text variant="caption" muted num style={{ maxWidth: '100%', flexShrink: 1 }}>{role.dayLabel}</Text>
         </View>
       </View>

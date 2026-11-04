@@ -156,15 +156,31 @@ export const listRoles = createServerFn({ method: 'GET' })
     return { name: org.name, slug: org.slug, readOnly, roles: roles.map(({ people, documents, ...role }) => ({ ...role, peopleCount: people, documentCount: documents })) }
   })
 
+// Partners pick roles by name, so two active roles in one company must not share a name.
+async function assertRoleNameFree(orgId: string, name: string, exceptRoleId?: string) {
+  const key = name.trim().toLowerCase()
+  const roles = await getDb().select({ id: jobRoles.id, name: jobRoles.name }).from(jobRoles).where(and(eq(jobRoles.orgId, orgId), eq(jobRoles.status, 'active')))
+  if (roles.some((r) => r.id !== exceptRoleId && r.name.trim().toLowerCase() === key)) throw httpError(JSON.stringify([{ code: 'custom', path: ['name'], message: 'A role with this name already exists' }]), 409)
+}
+
 export const createRole = createServerFn({ method: 'POST' })
   .validator(Slug.extend(Role.shape))
   .handler(async ({ data: { slug, ...role } }) => {
     const { org } = await requireOrgAdmin(slug)
-    // Partners pick roles by name, so two active roles in one company must not share a name.
-    const key = role.name.trim().toLowerCase()
-    const roles = await getDb().select({ name: jobRoles.name }).from(jobRoles).where(and(eq(jobRoles.orgId, org.id), eq(jobRoles.status, 'active')))
-    if (roles.some((r) => r.name.trim().toLowerCase() === key)) throw httpError(JSON.stringify([{ code: 'custom', path: ['name'], message: 'A role with this name already exists' }]), 409)
+    await assertRoleNameFree(org.id, role.name)
     return insertRole(org.id, role)
+  })
+
+export const updateRole = createServerFn({ method: 'POST' })
+  .validator(Slug.extend({ roleId: z.string().min(1).max(100) }).extend(Role.shape))
+  .handler(async ({ data: { slug, roleId, ...role } }) => {
+    const { org } = await requireOrgAdmin(slug)
+    const db = getDb()
+    const own = and(eq(jobRoles.id, roleId), eq(jobRoles.orgId, org.id), eq(jobRoles.status, 'active'))
+    if (!(await db.select({ id: jobRoles.id }).from(jobRoles).where(own).get())) throw httpError('Role not found', 404)
+    await assertRoleNameFree(org.id, role.name, roleId)
+    await db.batch([db.update(jobRoles).set(role).where(own), db.update(topics).set({ title: role.name }).where(eq(topics.jobRoleId, roleId))])
+    return { id: roleId }
   })
 
 export const getOrgOverview = createServerFn({ method: 'GET' })

@@ -31,7 +31,7 @@ export function MultipleChoiceBody({ item, answer, onAnswer, marks, disabled }: 
             ref={(ref) => { refs.current[index] = ref }}
             variant="radio"
             selected={answer.optionId === option.id}
-            mark={marks?.[option.id]}
+            mark={marks ? (marks[option.id] ?? 'rest') : undefined}
             disabled={disabled || marks !== null}
             tabIndex={Platform.OS === 'web' ? (index === active ? 0 : -1) : undefined}
             onPress={() => onAnswer({ optionId: option.id })}

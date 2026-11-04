@@ -8,7 +8,7 @@ import { Route as newRoute } from '@/routes/org.new'
 import { Route as rolesRoute } from '@/routes/org.$slug.roles'
 import { createCompany, createRole } from '@/server/org'
 
-vi.mock('@/server/org', () => ({ createCompany: vi.fn(), createRole: vi.fn() }))
+vi.mock('@/server/org', () => ({ createCompany: vi.fn(), createRole: vi.fn(), updateRole: vi.fn() }))
 vi.mock('@/server/role-documents', () => ({ uploadRoleDocument: vi.fn() }))
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
 
@@ -182,14 +182,16 @@ it('shows a duplicate role name under the Name field', async () => {
 it.each([
   ['no documents', role(), ['No documents yet', 'Upload SOP']],
   ['preparing', role({ topicStatus: 'generating', preparing: true, documentCount: 1, conceptsReady: 9, conceptsTotal: 24 }), ['Preparing training', '9 of 24 concepts']],
-  ['ready', role({ topicStatus: 'ready', documentCount: 1 }), ['Ready']],
+  ['ready', role({ topicStatus: 'ready', preparing: false, documentCount: 1 }), ['Ready'], ['Preparing training']],
+  ['ready topic still generating questions', role({ topicStatus: 'ready', preparing: true, documentCount: 1, conceptsReady: 1, conceptsTotal: 2 }), ['Preparing training', '1 of 2 concepts'], ['Ready']],
   ['failed topic', role({ topicStatus: 'failed', documentCount: 1 }), ['Training failed']],
   ['failed documents', role({ failedDocuments: 2, documentCount: 2 }), ['Training failed']],
   ['ready topic with only failed documents left', role({ topicStatus: 'ready', failedDocuments: 1, documentCount: 1 }), ['Training failed']],
   ['documents added', role({ documentCount: 1 }), ['Documents added']],
-])('words the training state: %s', async (_name, r, words) => {
+])('words the training state: %s', async (_name, r, words, absent: string[] = []) => {
   const container = await mountRoles([r])
   for (const w of words) expect(container.textContent).toContain(w)
+  for (const w of absent) expect(container.textContent).not.toContain(w)
   expect(container.textContent).not.toContain(' · draft')
 })
 
@@ -201,5 +203,16 @@ it.each([
   const alert = container.querySelector('[role="alert"]')!
   expect(alert.textContent).toContain('2 documents have no selectable text')
   expect(alert.querySelector('a')!.textContent).toBe('Fix documents')
+  expect(alert.querySelector('a')!.getAttribute('href')).toBe('/org/x/roles/r1')
+})
+
+it.each([
+  ['readable documents', role({ topicStatus: 'failed', documentCount: 1 }), 'The curriculum build did not finish. Build the curriculum again.', 'Open role'],
+  ['no documents', role({ topicStatus: 'failed' }), 'Add a document to build the curriculum.', 'Upload SOP'],
+])('does not ask to fix documents when a build failed with %s', async (_name, r, text, link) => {
+  const container = await mountRoles([r])
+  const alert = container.querySelector('[role="alert"]')!
+  expect(alert.textContent).toContain(text)
+  expect(alert.querySelector('a')!.textContent).toBe(link)
   expect(alert.querySelector('a')!.getAttribute('href')).toBe('/org/x/roles/r1')
 })

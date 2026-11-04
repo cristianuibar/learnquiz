@@ -19,6 +19,7 @@ import { prepareNext, sessionToPrepare } from '@/lib/prepare-next'
 import { answerBody, answerError } from '@/lib/session/answer'
 import { deleteDraft, draftForView, writeDraft } from '@/lib/session/draft'
 import { sessionRefetchError, type SessionError } from '@/lib/session/error'
+import { MULTI_CAPTION } from '@/lib/session/multi'
 import { canAdvance, canLoadSession, noticeFor, revealMarks, type ContinueRequest } from '@/lib/session/overlay'
 import { createReadyAnnouncement } from '@/lib/session/ready'
 import { voiceSessionId } from '@/lib/session/voice'
@@ -340,7 +341,12 @@ function SessionQuestion({ item, notice, marks, answer, onAnswer, disabled, onSu
   return (
     <View style={{ gap: space[6] }}>
       {notice ? <Text variant="caption" muted>{notice}</Text> : null}
-      {item.format !== 'cloze' ? <SessionStem stem={item.stem} /> : null}
+      {item.format !== 'cloze' ? (
+        <View style={{ gap: space[1] }}>
+          <SessionStem stem={item.stem} />
+          {item.format === 'multi' ? <Text variant="caption" muted>{MULTI_CAPTION}</Text> : null}
+        </View>
+      ) : null}
       <QuestionBody key={item.id} item={item} answer={answer} onAnswer={onAnswer} marks={marks} disabled={disabled} onSubmit={onSubmit} voiceSessionId={voiceSessionId} onVoiceCapture={onVoiceCapture} />
     </View>
   )
