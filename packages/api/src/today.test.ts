@@ -22,6 +22,7 @@ const baseTopic: Topic = {
   due: 4,
   xp: 100,
   streak: 3,
+  streakEarned: false,
 }
 const baseRole: Role = {
   name: 'Warehouse picker',
@@ -315,6 +316,14 @@ describe('todayView streak', () => {
 
   it('is null with no topic', () => {
     expect(todayView(base({ topic: null }), now).streak).toBeNull()
+  })
+
+  it.each([
+    ['a done day the streak credited', { streakEarned: true }, { state: 'done', sessionDone: true }, true],
+    ['a done day the streak did not credit', { streakEarned: false }, { state: 'done', sessionDone: true }, false],
+    ['a credited day still in progress', { streakEarned: true }, { state: 'normal' }, false],
+  ] as const)('rewards the pill on %s', (_name, topic, plan, reward) => {
+    expect(todayView(base({ topic, plan }), now).streakReward).toBe(reward)
   })
 
   it('still shows with no plan', () => {

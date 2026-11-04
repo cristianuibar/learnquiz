@@ -1,6 +1,8 @@
 export type TodayState = 'first' | 'normal' | 'basics' | 'done'
 export type Today = {
-  topic: { id: string; title: string; placed: boolean; placeable: boolean; due: number; xp: number; streak: number } | null
+  topic: { id: string; title: string; placed: boolean; placeable: boolean; due: number; xp: number; streak: number
+           // The streak was credited today (a session of 10 answers, or a finished reviews-only queue).
+           streakEarned: boolean } | null
   role: { name: string; company: string; topicTitle: string; preparing: boolean; mastery: number | null; benchmark: number
           day: number; days: number; building: { ready: number; total: number } | null } | null
   plan: { state: TodayState; start: 'session' | 'placement'; nextUnit: string | null; reviewsLeft: number
@@ -21,7 +23,7 @@ export type TodayRoleView = {
   name: string; pct: number | null; benchmarkPct: number; started: boolean; chip: 'Not started' | null
   progressLabel: string; dayLabel: string; accessibleLabel: string
 }
-export type TodayView = { streak: TodayStreak | null; hero: TodayHero; quests: TodayQuest[]; role: TodayRoleView | null }
+export type TodayView = { streak: TodayStreak | null; streakReward: boolean; hero: TodayHero; quests: TodayQuest[]; role: TodayRoleView | null }
 
 const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -142,7 +144,11 @@ function streakView(today: Today): TodayStreak | null {
 }
 
 export function todayView(today: Today, now: Date): TodayView {
-  return { streak: streakView(today), hero: heroView(today, now), quests: questsView(today), role: roleView(today) }
+  const hero = heroView(today, now)
+  const streak = streakView(today)
+  // A finished short session can show "Done for today" before the streak counts the day; the pill stays quiet then.
+  const streakReward = hero.kind === 'done' && streak !== null && today.topic?.streakEarned === true
+  return { streak, streakReward, hero, quests: questsView(today), role: roleView(today) }
 }
 
 export const todayFixtureNow = new Date(2026, 10, 3, 12, 0)
@@ -152,27 +158,27 @@ const fixtureTopic = { id: 'topic-warehouse', title: 'Warehouse operations' }
 
 export const todayFixtures: Record<'first' | 'normal' | 'done' | 'building' | 'basics' | 'preparing', Today> = {
   first: {
-    topic: { ...fixtureTopic, placed: false, placeable: false, due: 0, xp: 0, streak: 0 },
+    topic: { ...fixtureTopic, placed: false, placeable: false, due: 0, xp: 0, streak: 0, streakEarned: false },
     role: { ...fixtureRole, preparing: false, mastery: null, day: 1, building: null },
     plan: { state: 'first', start: 'session', nextUnit: 'Receiving', reviewsLeft: 0, reviewsCleared: 0, sessionDone: false, sessionSize: 20, playable: true, nextReviewAt: null },
   },
   normal: {
-    topic: { ...fixtureTopic, placed: true, placeable: true, due: 4, xp: 1240, streak: 4 },
+    topic: { ...fixtureTopic, placed: true, placeable: true, due: 4, xp: 1240, streak: 4, streakEarned: false },
     role: { ...fixtureRole, preparing: false, mastery: 0.66, day: 16, building: null },
     plan: { state: 'normal', start: 'session', nextUnit: 'Picking', reviewsLeft: 4, reviewsCleared: 2, sessionDone: false, sessionSize: 20, playable: true, nextReviewAt: null },
   },
   done: {
-    topic: { ...fixtureTopic, placed: true, placeable: true, due: 0, xp: 1420, streak: 5 },
+    topic: { ...fixtureTopic, placed: true, placeable: true, due: 0, xp: 1420, streak: 5, streakEarned: true },
     role: { ...fixtureRole, preparing: false, mastery: 0.68, day: 16, building: null },
     plan: { state: 'done', start: 'session', nextUnit: 'Picking', reviewsLeft: 0, reviewsCleared: 6, sessionDone: true, sessionSize: 20, playable: true, nextReviewAt: new Date(2026, 10, 4, 9, 0).getTime() },
   },
   building: {
-    topic: { ...fixtureTopic, placed: true, placeable: true, due: 0, xp: 120, streak: 2 },
+    topic: { ...fixtureTopic, placed: true, placeable: true, due: 0, xp: 120, streak: 2, streakEarned: false },
     role: { ...fixtureRole, preparing: false, mastery: 0.12, day: 3, building: { ready: 28, total: 42 } },
     plan: { state: 'normal', start: 'session', nextUnit: 'Receiving', reviewsLeft: 0, reviewsCleared: 0, sessionDone: false, sessionSize: 20, playable: true, nextReviewAt: null },
   },
   basics: {
-    topic: { ...fixtureTopic, placed: true, placeable: true, due: 2, xp: 610, streak: 3 },
+    topic: { ...fixtureTopic, placed: true, placeable: true, due: 2, xp: 610, streak: 3, streakEarned: false },
     role: { ...fixtureRole, preparing: false, mastery: 0.41, day: 9, building: null },
     plan: { state: 'basics', start: 'session', nextUnit: 'Receiving', reviewsLeft: 2, reviewsCleared: 0, sessionDone: false, sessionSize: 20, playable: true, nextReviewAt: null },
   },

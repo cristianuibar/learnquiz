@@ -51,7 +51,7 @@ export default function TodayScreen() {
   }, [status, refreshing])
 
   // A cached done plan stays quiet until the network confirms the reward.
-  const reward = view?.hero.kind === 'done' && status === 'ready'
+  const reward = view?.streakReward === true && status === 'ready'
   const popIn = useStreakPop(reward)
 
   const play = useCallback(() => {
