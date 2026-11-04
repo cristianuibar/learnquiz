@@ -44,7 +44,7 @@ export async function sendDuePushes(now: number, db: Db = getDb()) {
       const { company, role } = await pushContext(db, prefs.userId)
       const window = effectiveWindow(company, prefs)
       if (!inWindow(window, now)) continue
-      const { seconds, dayStart } = localDay(window.timezone, now)
+      const { dayStart } = localDay(window.timezone, now)
       // One push fans out to several devices, each writing a row, so count distinct items.
       const today = await db.select({ pushes: sql<number>`count(distinct ${pushLog.itemId})` }).from(pushLog)
         .where(and(eq(pushLog.userId, prefs.userId), eq(pushLog.outcome, 'accepted'), sql`${pushLog.createdAt} >= ${dayStart}`)).get()
@@ -58,8 +58,8 @@ export async function sendDuePushes(now: number, db: Db = getDb()) {
       for (const subscription of subscriptions) {
         // Web pushes need VAPID; Expo tokens do not.
         if (!config && !EXPO_TOKEN.test(subscription.endpoint)) continue
-        // Sends run one after another, so take off the time already spent to keep each device inside the window end.
-        const ttl = Math.min(MAX_TTL_SECONDS, window.endMinute * 60 - seconds - Math.floor((Date.now() - now) / 1000))
+        // Sends run one after another (possibly past local midnight), so measure each device's window end from its own send time.
+        const ttl = Math.min(MAX_TTL_SECONDS, window.endMinute * 60 - localDay(window.timezone, Date.now()).seconds)
         const { outcome } = await sendPush(db, subscription, config, { title: item.stem, body: 'Tap to answer.', url: `/play/quick/${item.itemId}` }, ttl)
         if (outcome !== 'skipped') sent++
       }
