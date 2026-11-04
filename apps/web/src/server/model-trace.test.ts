@@ -71,6 +71,9 @@ it('returns every owned session call and exact costs, with generation scoped to 
     ['line', 'u1', 's1', 't1', 'placement_line', 0.05, 1, 5],
     ['voice', 'u1', 's1', 't1', 'voice', null, 1, 6],
     ['later', 'u1', 's2', 't1', 'items', 0.06, 1, 7],
+    ['procedure', 'u1', null, 't1', 'procedure', 0.125, 1, 8],
+    ['grade', 'u1', 's2', 't1', 'grade', 2, 1, 9],
+    ['plan', 'u1', 's2', 't1', 'plan', 3, 1, 10],
     ['other-topic', 'u1', null, 't2', 'curriculum', 1, 1, 8],
     ['other-learner', 'u2', 's1', 't1', 'items', 9, 1, 9],
     ['anonymous', null, 's1', 't1', 'items', 9, 1, 10],
@@ -84,8 +87,9 @@ it('returns every owned session call and exact costs, with generation scoped to 
   expect(trace.totalCostUsd).toBe(trace.calls.reduce((sum, c) => sum + (c.costUsd ?? 0), 0))
   expect(trace.totalCostUsd).toBeCloseTo(0.14, 12)
   const generation = await getModelTrace({ data: { scope: 'topic', topicId: 't1' } })
-  expect(generation.calls.map((c) => c.id)).toEqual(['curriculum', 'retry', 'items', 'check', 'later'])
-  expect(generation.totalCostUsd).toBe(0.16)
+  expect(generation.calls.map((c) => c.id)).toEqual(['curriculum', 'retry', 'items', 'check', 'later', 'procedure'])
+  expect(generation.calls.find((c) => c.id === 'procedure')).toEqual({ id: 'procedure', purpose: 'procedure', model: 'muse-spark-1.3', latencyMs: 123, promptTokens: 100, completionTokens: 200, reasoningTokens: 20, costUsd: 0.125, ok: true, createdAt: 8 })
+  expect(generation.totalCostUsd).toBeCloseTo(0.285, 12)
   await expect(getModelTrace({ data: { scope: 'topic', topicId: 't2' } })).resolves.toMatchObject({ totalCostUsd: 1 })
   for (const data of [
     { scope: 'session', sessionId: 's3' }, { scope: 'session', sessionId: 'transferred' },
