@@ -9,11 +9,11 @@ import { Route as appRootRoute } from '@/routes/__root'
 import { Route as profileRoute } from '@/routes/me.profile'
 import { Route as orgRoute } from '@/routes/org.$slug'
 import { Route as personRoute } from '@/routes/org.$slug.people_.$id'
-import { getProfile } from '@/server/profile'
+import { getMemberFlags, getProfile, type MemberFlag } from '@/server/profile'
 import { getSessionFn } from '@/server/session-fn'
 import { getToday } from '@/server/today'
 
-vi.mock('@/server/profile', () => ({ getProfile: vi.fn() }))
+vi.mock('@/server/profile', () => ({ getProfile: vi.fn(), getMemberFlags: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => null }))
@@ -50,6 +50,8 @@ let root: ReturnType<typeof createRoot>
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   vi.mocked(getProfile).mockReset()
+  vi.mocked(getMemberFlags).mockReset()
+  vi.mocked(getMemberFlags).mockResolvedValue([])
   vi.mocked(getToday).mockReset()
   vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'learner', name: 'Learner', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, companyMember: true, adminCompanies: [{ name: 'Acme', slug: 'acme' }] })
   container = document.createElement('div')
@@ -69,8 +71,9 @@ async function mount(path: '/me/profile' | '/me/profile?status=flag-sent' | '/or
   const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, component: PortalRoot })
   const person = createRoute({ getParentRoute: () => org, path: '/people/$id', loader: personRoute.options.loader as (ctx: { params: { slug: string; id: string } }) => unknown, component: personRoute.options.component })
   const people = createRoute({ getParentRoute: () => org, path: '/people', component: () => <h1>People</h1> })
+  const questions = createRoute({ getParentRoute: () => org, path: '/questions', component: () => <h1>Questions</h1> })
   const loading = createRoute({ getParentRoute: () => rootRoute, path: '/play/loading', component: () => <h1>Loading</h1> })
-  const router = createRouter({ routeTree: rootRoute.addChildren([me, org.addChildren([person, people]), loading]), history: createMemoryHistory({ initialEntries: [path] }) })
+  const router = createRouter({ routeTree: rootRoute.addChildren([me, org.addChildren([person, people, questions]), loading]), history: createMemoryHistory({ initialEntries: [path] }) })
   await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
   return router
 }
@@ -140,12 +143,47 @@ describe('Training progress', () => {
     expect(container.querySelector('button')).toBeNull()
   })
 
-  it('shows a partner the empty card without a button', async () => {
+  it('shows a partner a not-started person only the empty card', async () => {
     vi.mocked(getProfile).mockResolvedValue(emptyProfile())
     await mount('/org/acme/people/learner')
     expect(text()).toContain('Day 1 of 30 · Benchmark 85%')
+    expect(text()).toContain("Progress shows after Dana's first session.")
+    expect(container.querySelector('[role="img"]')).toBeNull()
+    expect(text()).not.toContain('Weekly trend')
+    expect(text()).not.toContain('0%')
     expect(container.querySelector('button')).toBeNull()
     expect(getToday).not.toHaveBeenCalled()
+  })
+
+  it('shows a partner the benchmark card, heading and crumb', async () => {
+    vi.mocked(getProfile).mockResolvedValue(profile())
+    await mount('/org/acme/people/learner')
+    expect(container.querySelector('h1')?.textContent).toBe('Training progress')
+    const crumb = [...container.querySelectorAll('nav[aria-label="Breadcrumb"] a')].find((a) => a.textContent === 'People')
+    expect(crumb?.getAttribute('href')).toBe('/org/acme/people')
+    const card = section('Role mastery').textContent!
+    for (const part of ['66%', 'of 85% benchmark', 'Day 1 of 30', 'Projected: Nov 10', 'Sessions: 7 this week · 7 total']) expect(card).toContain(part)
+    expect(text()).toContain('Dana sees this same page in the app.')
+  })
+
+  it('lists the flags a person raised with a link into Questions', async () => {
+    const flag: MemberFlag = { id: 'f1', label: 'The answer looks incorrect', note: 'See the manual', concept: 'Check the seal', unit: 'Receiving', stem: 'Which seal?', roleId: 'r1', itemId: 'i1', createdAt: start, resolvedAt: null }
+    vi.mocked(getProfile).mockResolvedValue(profile())
+    vi.mocked(getMemberFlags).mockResolvedValue([flag])
+    await mount('/org/acme/people/learner')
+    const card = section('Flags from Dana · progress unchanged')
+    expect(card.textContent).toContain('Flagged a question · Nov 2')
+    expect(card.textContent).toContain('Open')
+    expect(card.textContent).toContain('Receiving · Which seal?')
+    expect(card.textContent).toContain('Flags never change progress.')
+    expect([...card.querySelectorAll('a')].find((a) => a.textContent === 'Open in Questions')?.getAttribute('href')).toBe('/org/acme/questions?role=r1&item=i1')
+    expect(getMemberFlags).toHaveBeenCalledWith({ data: { org: 'acme', learnerId: 'learner' } })
+  })
+
+  it('omits the flags card without flags', async () => {
+    vi.mocked(getProfile).mockResolvedValue(profile())
+    await mount('/org/acme/people/learner')
+    expect(text()).not.toContain('Flags from')
   })
 
   it('draws the weekly trend rules to the chart edge and its markers in the card fill', async () => {
@@ -215,7 +253,7 @@ describe('Training progress', () => {
     expect(panelOf(safety).textContent).toContain('Not started')
   })
 
-  it('lists critical steps unresolved first with neutral chips', async () => {
+  it('lists critical steps unresolved first with status chips', async () => {
     const oct = (d: number) => Date.UTC(2026, 9, d)
     const confidentErrors = [
       { id: 'e1', conceptId: 'c1', concept: 'Damaged pallet: record before moving', at: oct(28), correctedAt: oct(30) },
@@ -224,9 +262,8 @@ describe('Training progress', () => {
     ]
     vi.mocked(getProfile).mockResolvedValue(profile({ confidentErrors }))
     await mount('/org/acme/people/learner')
-    const rows = [...section('Critical steps to recheck').querySelectorAll('li')]
-    expect(rows.map((r) => r.querySelector('[data-slot="badge"]')?.textContent)).toEqual(['Comes back first', 'Comes back first', 'Corrected Oct 30'])
-    expect(rows.map((r) => r.querySelector('[data-slot="badge"]')?.getAttribute('data-variant'))).toEqual(['neutral', 'neutral', 'neutral'])
+    const rows = [...section('Confident errors on critical steps').querySelectorAll('li')]
+    expect(rows.map((r) => r.querySelector('[data-slot="status-chip"]')?.textContent)).toEqual(['Awaiting correction', 'Awaiting correction', 'Corrected Oct 30'])
     expect(rows[0].textContent).toContain('Hazmat cartons need sign-off')
     expect(rows[2].textContent).toContain('Damaged pallet: record before moving')
     expect(rows[2].textContent).toContain('Answered with confidence, missed Oct 28')
