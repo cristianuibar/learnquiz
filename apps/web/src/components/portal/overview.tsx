@@ -29,7 +29,11 @@ const ROLE_LINK = 'inline-flex min-h-11 items-center font-medium text-ink underl
 function useBuildAnnouncement(roles: RoleRow[]) {
   const tracked = useRef<{ id: string; bucket: number } | null>(null)
   const [text, setText] = useState('')
-  const role = roles.find((r) => r.preparing) ?? roles.find((r) => r.id === tracked.current?.id)
+  const prev = roles.find((r) => r.id === tracked.current?.id)
+  // A tracked role that just finished keeps the region until its end is announced,
+  // even when another role is still preparing.
+  const finished = prev && tracked.current?.bucket !== -1 && prev.conceptsTotal > 0 && prev.conceptsReady === prev.conceptsTotal
+  const role = (finished ? prev : undefined) ?? roles.find((r) => r.preparing) ?? prev
   const id = role?.id
   const ready = role?.conceptsReady
   const total = role?.conceptsTotal
