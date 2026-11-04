@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet, RouterProvider } from '@tanstack/react-router'
+import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet, RouterProvider, useParams } from '@tanstack/react-router'
+import { PortalProvider } from '@/components/portal/portal-context'
 import { expect, it, vi } from 'vitest'
 import { Route as roleDetailRoute } from '@/routes/org.$slug.roles_.$roleId'
 import { retireRoleDocument } from '@/server/role-documents'
@@ -11,6 +12,12 @@ vi.mock('@/server/role-detail', () => ({ getRoleDetail: vi.fn(), updateRoleConce
 vi.mock('@/server/curriculum', () => ({ generateRoleCurriculum: vi.fn(), retryConceptGeneration: vi.fn() }))
 vi.mock('@/server/role-documents', () => ({ uploadRoleDocument: vi.fn(), retireRoleDocument: vi.fn() }))
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
+
+// The portal layout provides the link context; screens are rendered under it here.
+function PortalRoot() {
+  const { slug } = useParams({ strict: false })
+  return <PortalProvider slug={slug ?? ''} base="org" readOnly={false}><Outlet /></PortalProvider>
+}
 
 it('shows a role with its documents and concepts and saves the Critical toggle', async () => {
   const detail = {
@@ -29,7 +36,7 @@ it('shows a role with its documents and concepts and saves the Critical toggle',
   vi.mocked(getRoleDetail).mockResolvedValue(detail as never)
   vi.mocked(updateRoleConcept).mockResolvedValue({ ok: true })
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
-  const rootRoute = createRootRoute({ component: Outlet })
+  const rootRoute = createRootRoute({ component: PortalRoot })
   const page = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug/roles/$roleId', loader: roleDetailRoute.options.loader as (ctx: { params: { slug: string; roleId: string } }) => ReturnType<typeof getRoleDetail>, component: roleDetailRoute.options.component })
   const router = createRouter({ routeTree: rootRoute.addChildren([page]), history: createMemoryHistory({ initialEntries: ['/org/x/roles/r1'] }) })
   const container = document.createElement('div')
@@ -68,7 +75,7 @@ it('retires a document after confirmation', async () => {
   const confirm = vi.fn(() => true)
   vi.stubGlobal('confirm', confirm)
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
-  const rootRoute = createRootRoute({ component: Outlet })
+  const rootRoute = createRootRoute({ component: PortalRoot })
   const page = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug/roles/$roleId', loader: roleDetailRoute.options.loader as (ctx: { params: { slug: string; roleId: string } }) => ReturnType<typeof getRoleDetail>, component: roleDetailRoute.options.component })
   const router = createRouter({ routeTree: rootRoute.addChildren([page]), history: createMemoryHistory({ initialEntries: ['/org/x/roles/r1'] }) })
   const container = document.createElement('div')

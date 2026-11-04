@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet, RouterProvider } from '@tanstack/react-router'
+import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet, RouterProvider, useParams } from '@tanstack/react-router'
+import { PortalProvider } from '@/components/portal/portal-context'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Profile } from '@learnquiz/api/progress'
 import { Route as appRootRoute } from '@/routes/__root'
@@ -17,11 +18,18 @@ vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => null }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
+vi.mock('@/server/org-shell', () => ({ getPortalShell: vi.fn() }))
 vi.mock('@/server/today', () => ({ getToday: vi.fn() }))
 
 const day = 86_400_000
 const start = Date.UTC(2026, 10, 2)
 const onboarding = { day: 1, days: 30 } as Profile['onboarding']
+
+// The portal layout provides the link context; screens are rendered under it here.
+function PortalRoot() {
+  const { slug } = useParams({ strict: false })
+  return <PortalProvider slug={slug ?? ''} base="org" readOnly={false}><Outlet /></PortalProvider>
+}
 
 function profile(over: Partial<Profile> = {}): Profile {
   return {
@@ -58,7 +66,7 @@ afterEach(async () => {
 async function mount(path: '/me/profile' | '/me/profile?status=flag-sent' | '/org/acme/people/learner') {
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
   const me = createRoute({ getParentRoute: () => rootRoute, path: '/me/profile', validateSearch: profileRoute.options.validateSearch, beforeLoad: profileRoute.options.beforeLoad, loader: profileRoute.options.loader, component: profileRoute.options.component })
-  const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, component: Outlet })
+  const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, component: PortalRoot })
   const person = createRoute({ getParentRoute: () => org, path: '/people/$id', loader: personRoute.options.loader as (ctx: { params: { slug: string; id: string } }) => unknown, component: personRoute.options.component })
   const people = createRoute({ getParentRoute: () => org, path: '/people', component: () => <h1>People</h1> })
   const loading = createRoute({ getParentRoute: () => rootRoute, path: '/play/loading', component: () => <h1>Loading</h1> })

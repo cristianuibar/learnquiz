@@ -11,6 +11,8 @@ import { PortalMasteryBar } from '@/components/portal-mastery-bar'
 import { authClient } from '@/lib/auth-client'
 import { plural } from '@/lib/utils'
 import { getPeople } from '@/server/org'
+import { Page, PageHeader } from '@/components/admin/page'
+import { usePortalLinks } from '@/components/portal/portal-context'
 
 export const Route = createFileRoute('/org/$slug/people')({
   loader: ({ params }) => getPeople({ data: { slug: params.slug } }),
@@ -98,6 +100,7 @@ function InviteRow({ invite, link, isNew, onRevoke }: { invite: Invite; link: st
 
 function People() {
   const org = Route.useLoaderData()
+  const links = usePortalLinks()
   const router = useRouter()
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -143,10 +146,10 @@ function People() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-[1120px] px-4 pt-8 pb-16">
-      <h1 className="text-title-1 text-ink">People at {org.name}</h1>
-      {org.readOnly && <p className="mt-4 text-body text-ink-muted">Staff view · Read only</p>}
-      {!org.readOnly && <form className="mt-8 flex max-w-xl flex-col gap-6" ref={formRef} onSubmit={invite}>
+    <Page>
+      <PageHeader title={<>People at {org.name}</>} />
+      {org.readOnly && <p className="text-body text-ink-muted">Staff view · Read only</p>}
+      {!org.readOnly && <form className="flex max-w-xl flex-col gap-6" ref={formRef} onSubmit={invite}>
         <div className="flex flex-col gap-2">
           <Label htmlFor="name">Name</Label>
           <Input id="name" name="name" maxLength={80} required {...fieldProps('name', fields.name)} />
@@ -182,7 +185,7 @@ function People() {
         </Button>
       </form>}
       {org.invites.length > 0 && (
-        <section className="mt-8">
+        <section>
           <h2 className="text-title-2">Invited</h2>
           <ul className="mt-4 flex flex-col gap-3">
             {org.invites.map((i) => (
@@ -191,7 +194,7 @@ function People() {
           </ul>
         </section>
       )}
-      <section className="mt-8">
+      <section>
         <h2 className="text-title-2">Members</h2>
         {!org.members.some((m) => m.training) && (
           <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -202,7 +205,7 @@ function People() {
         <ul className="mt-4 divide-y divide-border rounded-lg border border-border bg-surface-card">
           {org.members.map((m) => {
             const name = org.readOnly ? m.name : (
-              <Link to="/org/$slug/people/$id" params={{ slug: org.slug, id: m.userId }} className="inline-flex min-h-11 items-center text-primary underline focus-visible:outline-2">
+              <Link {...links.person(m.userId)} className="inline-flex min-h-11 items-center text-primary underline focus-visible:outline-2">
                 {m.name}
               </Link>
             )
@@ -227,6 +230,6 @@ function People() {
           })}
         </ul>
       </section>
-    </main>
+    </Page>
   )
 }

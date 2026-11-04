@@ -2,22 +2,27 @@
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet, RouterProvider } from '@tanstack/react-router'
-import { expect, it, vi } from 'vitest'
+import { beforeEach, expect, it, vi } from 'vitest'
 import { Route as appRootRoute } from '@/routes/__root'
 import { Route as orgRoute } from '@/routes/org.$slug'
 import { Route as indexRoute } from '@/routes/org.$slug.index'
 import { Route as peopleRoute } from '@/routes/org.$slug.people'
 import { Route as signInRoute } from '@/routes/sign-in'
 import { getOrgOverview, getPeople } from '@/server/org'
+import { getPortalShell } from '@/server/org-shell'
 import { getSessionFn } from '@/server/session-fn'
 
 vi.mock('@/server/org', () => ({ getPeople: vi.fn(), getOrgOverview: vi.fn() }))
 const { cancelInvitation, inviteMember } = vi.hoisted(() => ({ cancelInvitation: vi.fn(), inviteMember: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: { organization: { cancelInvitation, inviteMember } } }))
+vi.mock('@/server/org-shell', () => ({ getPortalShell: vi.fn() }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => null }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
 vi.mock('@/components/credentials-form', () => ({ CredentialsForm: ({ onDone }: { onDone: () => void }) => <button onClick={onDone}>Sign in</button> }))
+
+const shell = { orgId: 'org', name: 'Acme', slug: 'x', logoUrl: null, userName: 'Dana Whitaker', role: 'owner' as 'owner' | 'admin' | null, readOnly: false }
+beforeEach(() => { vi.mocked(getPortalShell).mockResolvedValue(shell) })
 
 it('sends signed-out visitors on a portal page to sign-in and back after login', async () => {
   vi.mocked(getPeople).mockResolvedValue({ id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles: [], members: [], readOnly: false, invites: [] } as never)
@@ -25,7 +30,7 @@ it('sends signed-out visitors on a portal page to sign-in and back after login',
   let user: { id: string; name: string; isAnonymous: boolean; role: string } | null = null
   vi.mocked(getSessionFn).mockImplementation(async () => ({ user, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] }))
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
-  const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, component: orgRoute.options.component })
+  const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, loader: orgRoute.options.loader as (ctx: { params: { slug: string } }) => unknown, errorComponent: orgRoute.options.errorComponent, component: orgRoute.options.component })
   const people = createRoute({ getParentRoute: () => org, path: '/people', loader: peopleRoute.options.loader as (ctx: { params: { slug: string } }) => ReturnType<typeof getPeople>, component: peopleRoute.options.component })
   const signIn = createRoute({ getParentRoute: () => rootRoute, path: '/sign-in', validateSearch: signInRoute.options.validateSearch, beforeLoad: signInRoute.options.beforeLoad, component: signInRoute.options.component })
   const router = createRouter({ routeTree: rootRoute.addChildren([org.addChildren([people]), signIn]), history: createMemoryHistory({ initialEntries: ['/org/x/people'] }) })
@@ -48,33 +53,47 @@ it('sends signed-out visitors on a portal page to sign-in and back after login',
   }
 })
 
-it('shows the company nav on portal pages, trimmed for Learn Quiz staff', async () => {
+it('shows the portal nav on portal pages, trimmed for Learn Quiz staff, with a working mobile menu', async () => {
   vi.mocked(getPeople).mockResolvedValue({ id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles: [], members: [], readOnly: false, invites: [] } as never)
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
-  let role = 'user'
-  vi.mocked(getSessionFn).mockImplementation(async () => ({ user: { id: 'u', name: 'U', isAnonymous: false, role }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] }))
+  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'u', name: 'U', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] } as never)
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
-  const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, component: orgRoute.options.component })
+  const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, loader: orgRoute.options.loader as (ctx: { params: { slug: string } }) => unknown, errorComponent: orgRoute.options.errorComponent, component: orgRoute.options.component })
   const index = createRoute({ getParentRoute: () => org, path: '/', component: () => <p>Overview page</p> })
   const people = createRoute({ getParentRoute: () => org, path: '/people', loader: peopleRoute.options.loader as (ctx: { params: { slug: string } }) => ReturnType<typeof getPeople>, component: peopleRoute.options.component })
   const router = createRouter({ routeTree: rootRoute.addChildren([org.addChildren([index, people])]), history: createMemoryHistory({ initialEntries: ['/org/x/people'] }) })
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
-  const links = () => [...container.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Company"] a')]
+  const links = () => [...container.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Acme portal"] a')]
+  const signOut = () => container.querySelector('button[aria-label="Sign out"]')
+  const menu = () => container.querySelector<HTMLButtonElement>('button[aria-label="Menu"]')!
   try {
     await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
     expect(links().map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
-      ['Overview', '/org/x'], ['Roles', '/org/x/roles'], ['People', '/org/x/people'], ['Question review', '/org/x/questions'], ['Settings', '/org/x/settings'],
+      ['Overview', '/org/x'], ['Roles', '/org/x/roles'], ['Questions', '/org/x/questions'], ['People', '/org/x/people'], ['Settings', '/org/x/settings'],
     ])
     expect(links().filter((a) => a.getAttribute('aria-current') === 'page').map((a) => a.textContent)).toEqual(['People'])
     await act(async () => { links()[0].click() })
     await vi.waitFor(() => expect(router.state.location.pathname).toBe('/org/x'))
     expect(links()[0].getAttribute('aria-current')).toBe('page')
+    expect(container.querySelector('nav[aria-label="Acme portal"]')!.textContent).toContain('Owner')
+    expect(signOut()).not.toBeNull()
 
-    role = 'admin'
+    expect(menu().getAttribute('aria-expanded')).toBe('false')
+    expect(document.getElementById(menu().getAttribute('aria-controls')!)).not.toBeNull()
+    await act(async () => { menu().click() })
+    expect(menu().getAttribute('aria-expanded')).toBe('true')
+    await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
+    expect(menu().getAttribute('aria-expanded')).toBe('false')
+    expect(document.activeElement).toBe(menu())
+
+    vi.mocked(getPortalShell).mockResolvedValue({ ...shell, role: null, readOnly: true })
     await act(async () => { await router.invalidate() })
     expect(links().map((a) => a.textContent)).toEqual(['Overview', 'People'])
+    expect(container.textContent).toContain('Read only')
+    expect(container.textContent).toContain('Staff view')
+    expect(signOut()).toBeNull()
   } finally {
     await act(async () => root.unmount())
     container.remove()
@@ -90,7 +109,7 @@ it('asks before revoking an invite and keeps it pending when dismissed', async (
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'u', name: 'U', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] } as never)
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
-  const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, component: orgRoute.options.component })
+  const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, loader: orgRoute.options.loader as (ctx: { params: { slug: string } }) => unknown, errorComponent: orgRoute.options.errorComponent, component: orgRoute.options.component })
   const people = createRoute({ getParentRoute: () => org, path: '/people', loader: peopleRoute.options.loader as (ctx: { params: { slug: string } }) => ReturnType<typeof getPeople>, component: peopleRoute.options.component })
   const router = createRouter({ routeTree: rootRoute.addChildren([org.addChildren([people])]), history: createMemoryHistory({ initialEntries: ['/org/x/people'] }) })
   const container = document.createElement('div')
@@ -123,7 +142,7 @@ async function renderAt(path: string, leaf: { path: string; loader: (ctx: { para
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'u', name: 'U', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] } as never)
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
-  const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, component: orgRoute.options.component })
+  const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, loader: orgRoute.options.loader as (ctx: { params: { slug: string } }) => unknown, errorComponent: orgRoute.options.errorComponent, component: orgRoute.options.component })
   const router = createRouter({ routeTree: rootRoute.addChildren([org.addChildren([createRoute({ getParentRoute: () => org, ...leaf })])]), history: createMemoryHistory({ initialEntries: [path] }) })
   const container = document.createElement('div')
   document.body.appendChild(container)
@@ -231,7 +250,7 @@ it('focuses the invalid field on the invite form and ties its message to it', as
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   vi.mocked(getSessionFn).mockImplementation(async () => ({ user: { id: 'u', name: 'U', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] }))
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
-  const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, component: orgRoute.options.component })
+  const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, loader: orgRoute.options.loader as (ctx: { params: { slug: string } }) => unknown, errorComponent: orgRoute.options.errorComponent, component: orgRoute.options.component })
   const people = createRoute({ getParentRoute: () => org, path: '/people', loader: peopleRoute.options.loader as (ctx: { params: { slug: string } }) => ReturnType<typeof getPeople>, component: peopleRoute.options.component })
   const router = createRouter({ routeTree: rootRoute.addChildren([org.addChildren([people])]), history: createMemoryHistory({ initialEntries: ['/org/x/people'] }) })
   const container = document.createElement('div')
@@ -285,7 +304,7 @@ it('brings a new invite\'s Copy link and its expanded QR code into view', async 
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   vi.mocked(getSessionFn).mockImplementation(async () => ({ user: { id: 'u', name: 'U', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] }))
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
-  const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, component: orgRoute.options.component })
+  const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, loader: orgRoute.options.loader as (ctx: { params: { slug: string } }) => unknown, errorComponent: orgRoute.options.errorComponent, component: orgRoute.options.component })
   const people = createRoute({ getParentRoute: () => org, path: '/people', loader: peopleRoute.options.loader as (ctx: { params: { slug: string } }) => ReturnType<typeof getPeople>, component: peopleRoute.options.component })
   const router = createRouter({ routeTree: rootRoute.addChildren([org.addChildren([people])]), history: createMemoryHistory({ initialEntries: ['/org/x/people'] }) })
   const container = document.createElement('div')

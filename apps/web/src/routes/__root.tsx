@@ -65,7 +65,7 @@ function Root() {
   const { user } = Route.useRouteContext()
   const { latestTopicId, branding } = Route.useLoaderData()
   const { pathname } = useLocation()
-  const bare = /^\/(?:join\/.*|welcome|sign-in|today|me\/profile|me\/flag|me\/settings|play(?:\/.*)?|opt-in|t\/.*)\/?$/.test(pathname) // screens that bring their own header
+  const bare = /^\/(?:join\/.*|welcome|sign-in|today|me\/profile|me\/flag|me\/settings|play(?:\/.*)?|opt-in|t\/.*|org\/.*|admin(?:\/.*)?)\/?$/.test(pathname) // screens that bring their own header
   const nav = user && /^\/(?:today|t\/[^/]+\/path|me|me\/profile)\/?$/.test(pathname) // the four bottom-nav screens
   const resolved = useRouterState({ select: (s) => s.resolvedLocation?.pathname })
   const first = useRef(true)

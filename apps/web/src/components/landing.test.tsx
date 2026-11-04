@@ -96,7 +96,7 @@ afterAll(() => sqlite.close())
 
 async function renderApp(initialEntry = '/sign-in') {
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, component: appRootRoute.options.component, loader: appRootRoute.options.loader })
-  const orgLayout = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgLayoutRoute.options.beforeLoad, component: orgLayoutRoute.options.component })
+  const orgLayout = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgLayoutRoute.options.beforeLoad, loader: orgLayoutRoute.options.loader as (ctx: { params: { slug: string } }) => unknown, errorComponent: orgLayoutRoute.options.errorComponent, component: orgLayoutRoute.options.component })
   const routes = [
     createRoute({ getParentRoute: () => rootRoute, path: '/', beforeLoad: indexRoute.options.beforeLoad, component: indexRoute.options.component }),
     createRoute({ getParentRoute: () => rootRoute, path: '/sign-in', beforeLoad: signInRoute.options.beforeLoad, validateSearch: signInRoute.options.validateSearch, component: signInRoute.options.component }),
@@ -168,21 +168,18 @@ it('prefills an editable email from the sign-in link and returns to the redirect
   } finally { await cleanup() }
 })
 
-it('lets an owner leave the portal to train and return to a portal', async () => {
+it('sends an owner home to their portal, drawn in the company nav instead of the learner top bar', async () => {
   sqlite.prepare('INSERT INTO org_settings (org_id, company_name, working_hours_json, logo_key, accent) VALUES (?, ?, ?, ?, ?)').run('northwind', 'Northwind', JSON.stringify({ days: [1, 2, 3, 4, 5], start: '09:00', end: '17:00' }), 'northwind-logo', '#543189')
   vi.mocked(getSessionUser).mockResolvedValue({ id: 'owner', name: 'Owner', isAnonymous: false, role: 'admin' } as never)
   const { container, router, cleanup } = await renderApp('/')
   try {
     expect(router.state.location.pathname).toBe('/org/northwind')
-    expect(container.querySelector('header img')?.getAttribute('alt')).toBe('Northwind')
+    expect(container.querySelector('nav[aria-label="Northwind portal"] img')?.getAttribute('src')).toBe('/api/org/northwind/logo?v=northwind-logo')
+    expect(container.querySelector('a[href="/today"], a[href="/"]')).toBeNull()
     expect(container.querySelector('h1')?.textContent).toBe('Northwind')
-    await act(async () => { container.querySelector<HTMLAnchorElement>('header a')!.click(); await router.load() })
-    expect(router.state.location.pathname).toBe('/start')
-    expect(container.querySelector('h1')?.textContent).toBe('What do you want to learn?')
     await act(async () => { await router.navigate({ to: '/org/$slug', params: { slug: 'contoso' } }) })
     expect(container.querySelector('h1')?.textContent).toBe('Contoso')
-    await act(async () => { container.querySelector<HTMLAnchorElement>('header a')!.click(); await router.load() })
-    expect(router.state.location.pathname).toBe('/start')
+    expect(container.querySelector('nav[aria-label="Contoso portal"]')).not.toBeNull()
   } finally { await cleanup() }
 })
 
@@ -264,7 +261,7 @@ it('lists job roles linking to their detail pages and to no page that does not e
   vi.mocked(getSessionUser).mockResolvedValue({ id: 'owner', name: 'Owner', isAnonymous: false } as never)
   const { container, router, cleanup } = await renderApp('/org/northwind')
   try {
-    await act(async () => { container.querySelector<HTMLAnchorElement>('nav[aria-label="Company"] a[href="/org/northwind/roles"]')!.click(); await router.load() })
+    await act(async () => { container.querySelector<HTMLAnchorElement>('nav[aria-label="Northwind portal"] a[href="/org/northwind/roles"]')!.click(); await router.load() })
     expect(container.querySelector('h1')?.textContent).toBe('Job roles')
     expect(container.querySelector('main li')?.textContent).toContain('Barista')
     expect(container.querySelector('main li a')?.getAttribute('href')).toBe('/org/northwind/roles/barista')
