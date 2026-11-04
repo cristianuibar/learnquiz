@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, isNotNull, sql } from 'drizzle-orm'
 import type { Db } from '@/db'
-import { attempts, concepts, sessions, units } from '@/db/schema'
+import { attempts, concepts, learnerUnit, sessions, units } from '@/db/schema'
 import { loadPKnown, mean } from '@/server/helpers'
 
 const BASICS_ACCURACY = 0.55
@@ -20,7 +20,7 @@ export async function unitMastery(db: Db, learnerId: string, topicId: string) {
 }
 
 // Back to basics: the last three ended sessions on the topic each scored under 55 % (correct / answered).
-// The weak units are those under 0.6 mastery, earliest first.
+// The weak units are the unlocked ones under 0.6 mastery, earliest first.
 export async function basicsUnits(db: Db, learnerId: string, topicId: string): Promise<string[] | null> {
   const recent = await db
     .select({ answered: count(attempts.id), correct: sql<number>`coalesce(sum(${attempts.correct}), 0)` })
@@ -31,6 +31,11 @@ export async function basicsUnits(db: Db, learnerId: string, topicId: string): P
     .orderBy(desc(sessions.endedAt))
     .limit(3)
   if (recent.length < 3 || recent.some((r) => r.correct / r.answered >= BASICS_ACCURACY)) return null
-  const weak = (await unitMastery(db, learnerId, topicId)).filter((u) => u.mastery < BASICS_MASTERY).map((u) => u.unitId)
+  const [mastery, unlocked] = await Promise.all([
+    unitMastery(db, learnerId, topicId),
+    db.select({ unitId: learnerUnit.unitId }).from(learnerUnit).where(eq(learnerUnit.learnerId, learnerId)),
+  ])
+  const open = new Set(unlocked.map((u) => u.unitId))
+  const weak = mastery.filter((u) => open.has(u.unitId) && u.mastery < BASICS_MASTERY).map((u) => u.unitId)
   return weak.length ? weak : null
 }

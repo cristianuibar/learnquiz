@@ -326,13 +326,14 @@ describe('getToday', () => {
 
   describe('back to basics', () => {
     it.each([
-      ['three weak sessions', [3, 3, 3], 'basics', 'Unit un2'],
-      ['two weak sessions', [3, 3], 'normal', 'Unit un1'],
-      ['a good recent session', [3, 3, 9], 'normal', 'Unit un1'],
-    ])('%s', async (_name, corrects, state, nextUnit) => {
+      ['three weak sessions', [3, 3, 3], true, 'basics', 'Unit un2'],
+      ['two weak sessions', [3, 3], true, 'normal', 'Unit un1'],
+      ['a good recent session', [3, 3, 9], true, 'normal', 'Unit un1'],
+      ['three weak sessions with the weak unit locked', [3, 3, 3], false, 'normal', 'Unit un1'],
+    ])('%s', async (_name, corrects, un2Unlocked, state, nextUnit) => {
       personal()
       unit('un1', 0)
-      unit('un2', 1)
+      unit('un2', 1, un2Unlocked)
       concept('c1', 'un1')
       concept('c2', 'un2')
       item('i1', 'c1')
