@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react'
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 import { router } from 'expo-router'
 import { api } from './lib/api'
-import { acceptInvitation, signIn, signUp } from './lib/auth'
+import { acceptInvitation, getToken, signIn, signUp } from './lib/auth'
 import { useSession } from './lib/session-store'
 import { holdTarget, peekHeldTarget, releaseReplayHolds, takeHeldTarget, takeReplayTarget } from './lib/held-target'
 
@@ -18,11 +18,12 @@ jest.mock('./lib/session-store', () => ({
   SessionProvider: ({ children }: { children: unknown }) => children,
   useSession: jest.fn(),
 }))
-jest.mock('./lib/api', () => ({ api: jest.fn() }))
+jest.mock('./lib/api', () => ({ ...jest.requireActual('./lib/api'), api: jest.fn() }))
 // Authentication and Profile's sign-out need the native secure store.
 jest.mock('./lib/auth', () => ({
   signIn: jest.fn(), signUp: jest.fn(), signOut: jest.fn(), acceptInvitation: jest.fn(),
   subscribeAuth: jest.fn(() => () => {}),
+  getToken: jest.fn(() => null),
 }))
 // The real Today screen loads /today; this file only checks that the route is reachable.
 jest.mock('./app/(tabs)/today', () => ({
@@ -57,6 +58,7 @@ beforeEach(() => {
   releaseReplayHolds()
   takeHeldTarget()
   jest.mocked(api).mockReset()
+  jest.mocked(getToken).mockReturnValue(null)
   jest.mocked(signIn).mockReset()
   jest.mocked(signUp).mockReset()
   jest.mocked(acceptInvitation).mockReset()
@@ -310,6 +312,9 @@ test('Got it sends one acknowledge while the first tap is pending', async () => 
 })
 
 test('review mode from Profile shows the branded copy and Got it returns without acknowledging', async () => {
+  jest.mocked(getToken).mockReturnValue('token-a')
+  jest.mocked(api).mockResolvedValue({ name: 'Learner', role: null, started: true, mastery: 0.66, benchmark: 0.85,
+    onboarding: { day: 16, days: 30 }, proficiency: { achievedAt: null, projectedAt: null }, weeks: [] })
   jest.mocked(useSession).mockReturnValue({ ...ready, branding: { name: 'Northwind', accent: null, logoUrl: null } })
   const navigation = renderRouter('src/app', { initialUrl: '/profile' })
   await navigation
@@ -317,7 +322,8 @@ test('review mode from Profile shows the branded copy and Got it returns without
   expect(navigation.getPathname()).toBe('/welcome')
   expect(screen.getByText('You and Northwind’s training admins.')).toBeOnTheScreen()
   await fireEvent.press(screen.getByRole('button', { name: 'Got it' }))
-  expect(api).not.toHaveBeenCalled()
+  expect(api).toHaveBeenCalledWith('/me/profile', expect.objectContaining({ signal: expect.any(AbortSignal) }))
+  expect(jest.mocked(api).mock.calls.every(([path]) => path === '/me/profile')).toBe(true)
   expect(navigation.getPathname()).toBe('/profile')
   expect(screen.getByRole('header', { name: 'Training progress' })).toBeOnTheScreen()
 })
