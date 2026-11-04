@@ -4,18 +4,21 @@ import { Check } from 'lucide-react-native'
 import { Text } from '../ui/Text'
 import { useTheme } from '@/theme/ThemeProvider'
 
-export function Segment({ label, accessibilityLabel = label, selected, radio, onPress }: {
-  label: string; accessibilityLabel?: string; selected: boolean; radio?: boolean; onPress(): void
+export function Segment({ label, accessibilityLabel = label, selected, radio, equalWidth = false, onPress }: {
+  label: string; accessibilityLabel?: string; selected: boolean; radio?: boolean; equalWidth?: boolean; onPress(): void
 }) {
   const { colors, space, radius, sizes, typography } = useTheme()
   // The check and its gap are part of a selected option's width, so it shows at every font scale (#669).
   const { fontScale } = useWindowDimensions()
+  // Appearance uses equal columns at standard text size. Enlarged text keeps
+  // the existing content widths and wrapping, including the #669 check allowance.
+  const column = equalWidth && fontScale <= 1
   const [focused, setFocused] = useState(false)
   return (
     <Pressable accessible focusable accessibilityRole={radio ? 'radio' : 'togglebutton'} accessibilityLabel={accessibilityLabel}
       accessibilityState={{ checked: selected }}
       onPress={onPress} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-      style={{ flexGrow: 1, flexBasis: 'auto', flexShrink: 0, minWidth: Math.max(sizes.target, label.length * typography.label.fontSize * fontScale + space[4] + (selected ? space[4] + space[1] : 0)), minHeight: sizes.target, borderWidth: 2,
+      style={{ flexGrow: 1, flexBasis: column ? 0 : 'auto', flexShrink: 0, minWidth: column ? sizes.target : Math.max(sizes.target, label.length * typography.label.fontSize * fontScale + space[4] + (selected ? space[4] + space[1] : 0)), minHeight: sizes.target, borderWidth: 2,
         borderColor: selected ? colors.brand : colors.borderStrong, borderRadius: radius.md,
         backgroundColor: selected ? colors.brandTint : colors.surfaceCard, paddingHorizontal: space[1], paddingVertical: space[2],
         flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'center', justifyContent: 'center', gap: space[1],
@@ -25,12 +28,12 @@ export function Segment({ label, accessibilityLabel = label, selected, radio, on
     </Pressable>
   )
 }
-export function Segmented<T extends string>({ value, options, onChange }: {
-  value: T; options: { value: T; label: string }[]; onChange(value: T): void
+export function Segmented<T extends string>({ value, options, equalWidth = false, onChange }: {
+  value: T; options: { value: T; label: string }[]; equalWidth?: boolean; onChange(value: T): void
 }) {
   const { space } = useTheme()
   // Keep the child radios individually reachable by TalkBack.
   return <View accessible={false} accessibilityRole="radiogroup" accessibilityLabel="Appearance" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
-    {options.map((option) => <Segment key={option.value} label={option.label} selected={option.value === value} radio onPress={() => onChange(option.value)} />)}
+    {options.map((option) => <Segment key={option.value} label={option.label} selected={option.value === value} radio equalWidth={equalWidth} onPress={() => onChange(option.value)} />)}
   </View>
 }

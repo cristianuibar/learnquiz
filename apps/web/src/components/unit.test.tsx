@@ -75,6 +75,11 @@ it('links open rows on the Path to their unit page and leaves locked rows plain'
     await click(link)
     expect(router.state.location.pathname).toBe('/t/t1/u/u1')
     expect(container.querySelector('h1')?.textContent).toBe('Unit u1')
+    const back = container.querySelector('a[aria-label="Back to Path"]')
+    expect(back?.getAttribute('href')).toBe('/t/t1/path#unit-u1')
+    await click(back)
+    expect(router.state.location.pathname).toBe('/t/t1/path')
+    expect(document.activeElement).toBe(container.querySelector('#unit-u1'))
   } finally {
     await cleanup()
   }
@@ -111,8 +116,7 @@ it('shows Not found with a way back for an unknown unit', async () => {
   const { container, cleanup } = await render(topic(), '/t/t1/u/nope')
   try {
     expect(container.querySelector('h1')?.textContent).toBe('Not found')
-    expect(container.querySelector('a')?.textContent).toContain('Back to Path')
-    expect(container.querySelector('a')?.getAttribute('href')).toBe('/t/t1/path#unit-nope')
+    expect(container.querySelector('a[aria-label="Back to Path"]')?.getAttribute('href')).toBe('/t/t1/path#unit-nope')
     expect(container.textContent).not.toContain('Practice')
   } finally {
     await cleanup()

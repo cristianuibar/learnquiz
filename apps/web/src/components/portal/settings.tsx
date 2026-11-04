@@ -77,7 +77,7 @@ function Section({ id, title, children }: { id: string; title: string; children:
   return (
     <section aria-labelledby={id} className="flex flex-wrap gap-x-12 gap-y-4 p-6">
       <h2 id={id} className="basis-[200px] text-title-2 text-ink">{title}</h2>
-      <div className="flex max-w-[560px] flex-[1_1_400px] flex-col gap-6">{children}</div>
+      <div className="flex min-w-0 max-w-[560px] flex-[1_1_400px] flex-col gap-6">{children}</div>
     </section>
   )
 }
@@ -433,6 +433,7 @@ function CompanyForm({ settings, onSaved }: FormProps) {
               <div ref={daysRef}>
                 <Segmented
                   mode="toggle"
+                  className="max-w-full flex-wrap"
                   aria-labelledby={daysLabelId}
                   value={days}
                   onValueChange={(v) => { edit(); setDays(v) }}

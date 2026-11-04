@@ -369,3 +369,73 @@ test('at font scale 2, selected days, Appearance and time options show the check
   expect(within(screen.getByRole('radio', { name: '4:00 PM' })).queryByTestId('selected-check')).toBeNull()
   expect(minWidth(selectedTime)).toBe(minWidth(screen.getByRole('radio', { name: '4:00 PM' })) + 20)
 })
+
+describe.each(['light', 'dark'] as const)('%s Appearance columns', (scheme) => {
+  test.each([360, 390])('at %s dp selection keeps equal columns; days, times and 200%% text retain their layouts', async (width) => {
+    const Native: typeof import('react-native') = require('react-native')
+    const dimensions = jest.spyOn(Native, 'useWindowDimensions').mockReturnValue({ width, height: 740, scale: 1, fontScale: 1 })
+    jest.spyOn(Native, 'useColorScheme').mockReturnValue(scheme)
+    await renderRouter('src/app', { initialUrl: '/settings' })
+    await screen.findByText('ana@example.com')
+    const style = (node: ReturnType<typeof screen.getByRole>) => Native.StyleSheet.flatten(node.props.style)
+    const labels = ['System', 'Light', 'Dark']
+
+    for (const selected of [...labels, 'System']) {
+      await fireEvent.press(screen.getByRole('radio', { name: selected }))
+      const radios = labels.map((name) => screen.getByRole('radio', { name }))
+      expect(radios[0].parent).toHaveStyle({ flexDirection: 'row', flexWrap: 'wrap', gap: 8 })
+      for (const radio of radios) {
+        // Equal zero bases and identical minimums divide both phone widths
+        // evenly in Yoga, independent of label length or which check is shown.
+        expect(radio).toHaveStyle({ flexGrow: 1, flexBasis: 0, flexShrink: 0, minWidth: 48, minHeight: 48 })
+        expect(radio).toHaveProp('accessibilityState', { checked: radio.props.accessibilityLabel === selected })
+      }
+      expect(within(screen.getByRole('radio', { name: selected })).getByTestId('selected-check')).toBeOnTheScreen()
+      expect(radios.map((radio) => style(radio).minWidth)).toEqual([48, 48, 48])
+    }
+
+    async function legacyLayouts(fontScale: number) {
+      const monday = screen.getByRole('togglebutton', { name: 'Monday' })
+      const wednesday = screen.getByRole('togglebutton', { name: 'Wednesday' })
+      expect(monday.parent).toHaveStyle({ flexDirection: 'row', flexWrap: 'wrap', gap: 8 })
+      expect(monday).toHaveStyle({ flexGrow: 1, flexBasis: 'auto', flexShrink: 0, flexWrap: 'nowrap', minHeight: 48, minWidth: 3 * 14 * fontScale + 36 })
+      expect(wednesday).toHaveStyle({ flexGrow: 1, flexBasis: 'auto', flexShrink: 0, flexWrap: 'nowrap', minHeight: 48, minWidth: 3 * 14 * fontScale + 16 })
+      await fireEvent.press(wednesday)
+      expect(screen.getByRole('togglebutton', { name: 'Wednesday' })).toHaveProp('accessibilityState', { checked: true })
+      expect(screen.getByRole('togglebutton', { name: 'Wednesday' })).toHaveStyle({ minWidth: 3 * 14 * fontScale + 36 })
+      await fireEvent.press(screen.getByRole('togglebutton', { name: 'Wednesday' }))
+      expect(screen.getByRole('togglebutton', { name: 'Wednesday' })).toHaveProp('accessibilityState', { checked: false })
+
+      await fireEvent.press(screen.getByRole('button', { name: 'To 3:30 PM' }))
+      const selectedTime = screen.getByRole('radio', { name: '3:30 PM' })
+      const otherTime = screen.getByRole('radio', { name: '4:00 PM' })
+      expect(selectedTime.parent).toHaveStyle({ gap: 8, paddingHorizontal: 16 })
+      expect(style(selectedTime.parent!).flexDirection).toBeUndefined()
+      expect(selectedTime).toHaveStyle({ flexGrow: 1, flexBasis: 'auto', flexShrink: 0, flexWrap: 'nowrap', minHeight: 48, minWidth: 7 * 14 * fontScale + 36 })
+      expect(otherTime).toHaveStyle({ flexGrow: 1, flexBasis: 'auto', flexShrink: 0, flexWrap: 'nowrap', minHeight: 48, minWidth: 7 * 14 * fontScale + 16 })
+      expect(within(selectedTime).getByTestId('selected-check')).toBeOnTheScreen()
+      await fireEvent.press(selectedTime)
+      expect(screen.queryByRole('radio', { name: '3:30 PM' })).toBeNull()
+      expect(screen.getByRole('button', { name: 'To 3:30 PM' })).toBeOnTheScreen()
+    }
+
+    await legacyLayouts(1)
+    dimensions.mockReturnValue({ width, height: 740, scale: 1, fontScale: 2 })
+    for (const selected of ['Light', 'Dark', 'System']) {
+      await fireEvent.press(screen.getByRole('radio', { name: selected }))
+      for (const label of labels) {
+        const radio = screen.getByRole('radio', { name: label })
+        // The #669 selected-check allowance and wrapping are unchanged at 200%.
+        expect(radio).toHaveStyle({ flexGrow: 1, flexBasis: 'auto', flexShrink: 0, flexWrap: 'nowrap', minHeight: 48,
+          minWidth: label.length * 14 * 2 + 16 + (label === selected ? 20 : 0) })
+        const text = within(radio).getByText(label)
+        expect(text).toHaveStyle({ flexShrink: 0 })
+        expect(text.props.numberOfLines).toBeUndefined()
+        expect(text.props.allowFontScaling).not.toBe(false)
+        expect(text.props.maxFontSizeMultiplier).toBeUndefined()
+      }
+      expect(within(screen.getByRole('radio', { name: selected })).getByTestId('selected-check')).toBeOnTheScreen()
+    }
+    await legacyLayouts(2)
+  })
+})

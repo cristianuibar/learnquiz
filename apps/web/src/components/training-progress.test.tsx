@@ -220,6 +220,26 @@ describe('Training progress', () => {
   const unitButton = (name: string) => [...section('By unit').querySelectorAll('h3 > button')].find((b) => b.textContent?.startsWith(name)) as HTMLButtonElement
   const panelOf = (button: HTMLButtonElement) => document.getElementById(button.getAttribute('aria-controls')!)!
 
+  it('shows each portal unit state on its disclosure button and opens its concepts', async () => {
+    const portalUnits: Profile['units'] = [
+      ...units,
+      { id: 'u3', name: 'Packing', mastery: 0.95, state: 'mastered', concepts: [] },
+      { id: 'u4', name: 'Dispatch', mastery: 0, state: 'not_started', concepts: [] },
+    ]
+    vi.mocked(getProfile).mockResolvedValue(profile({ units: portalUnits }))
+    await mount('/org/acme/people/learner')
+    for (const [name, state] of [['Receiving', 'Still learning'], ['Safety', 'Placement estimate'], ['Packing', 'Mastered'], ['Dispatch', 'Not started']]) {
+      expect(unitButton(name).textContent).toContain(state)
+    }
+    const safety = unitButton('Safety')
+    expect(safety.getAttribute('aria-expanded')).toBe('false')
+    await act(async () => safety.click())
+    expect(safety.getAttribute('aria-expanded')).toBe('true')
+    expect(panelOf(safety).hidden).toBe(false)
+    expect(panelOf(safety).textContent).toContain('Hazmat sign-off')
+    expect(panelOf(safety).textContent).toContain('Placement estimate')
+  })
+
   it('shows a partner an unpracticed concept in a practiced unit as a placement estimate', async () => {
     const mixed: Profile['units'] = [{ id: 'u1', name: 'Receiving', mastery: 0.48, state: 'learning', concepts: [concept('c1', 'u1', 'Check the seal'), concept('c3', 'u1', 'Count the cartons', { pKnown: 0.26, measured: false, status: 'not_started' })] }]
     vi.mocked(getProfile).mockResolvedValue(profile({ units: mixed }))

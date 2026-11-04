@@ -7,11 +7,11 @@ import { Meter } from '@/components/admin/meter'
 import { Page, PageHeader } from '@/components/admin/page'
 import { Skel } from '@/components/admin/skeleton'
 import { Stat, StatsCard } from '@/components/admin/stat-figure'
-import { Status, type STATUS } from '@/components/admin/status-chip'
+import { Status } from '@/components/admin/status-chip'
 import { usePortal, usePortalLinks } from '@/components/portal/portal-context'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { TRAINING_STATUS } from '@/lib/training-status'
+import { roleTrainingStatus } from '@/lib/training-status'
 import { plural } from '@/lib/utils'
 import type { getOrgOverview } from '@/server/org'
 
@@ -53,7 +53,8 @@ function useBuildAnnouncement(roles: RoleRow[]) {
 }
 
 function TrainingCell({ role }: { role: RoleRow }) {
-  if (role.preparing) {
+  const status = roleTrainingStatus({ ...role, documentCount: role.documents })
+  if (status === 'Preparing training') {
     return (
       <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
         <Status word="Preparing training" />
@@ -61,7 +62,7 @@ function TrainingCell({ role }: { role: RoleRow }) {
       </span>
     )
   }
-  return <Status word={TRAINING_STATUS[role.topicStatus] as keyof typeof STATUS} />
+  return <Status word={status} />
 }
 
 function RolesSection({ roles }: { roles: RoleRow[] }) {

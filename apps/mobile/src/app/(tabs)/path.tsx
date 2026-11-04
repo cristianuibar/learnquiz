@@ -68,7 +68,14 @@ export default function PathScreen() {
           </View>
         )}
         {!path ? (
-          !failed && <Skeleton />
+          !failed && (
+            <>
+              <Skeleton />
+              <View accessible role="status" accessibilityLiveRegion="polite">
+                <Text variant="label" muted>Loading your path</Text>
+              </View>
+            </>
+          )
         ) : isPreparing(path) ? (
           <View
             accessible

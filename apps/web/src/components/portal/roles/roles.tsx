@@ -1,13 +1,14 @@
 import { useRef, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { File, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { Banner } from '@/components/admin/banner'
 import { DataTable, type Column } from '@/components/admin/data-table'
 import { Page, PageHeader } from '@/components/admin/page'
 import { RowMenu } from '@/components/admin/row-menu'
-import { Status, StatusChip } from '@/components/admin/status-chip'
+import { Status } from '@/components/admin/status-chip'
 import { usePortal, usePortalLinks } from '@/components/portal/portal-context'
 import { Button } from '@/components/ui/button'
+import { roleTrainingStatus } from '@/lib/training-status'
 import { plural } from '@/lib/utils'
 import type { listRoles } from '@/server/org'
 import { RoleDialog } from './role-dialog'
@@ -17,9 +18,7 @@ type Role = Org['roles'][number]
 
 const sub = 'text-[13px]/[18px] text-ink-muted'
 
-// Failed topic, or documents that failed with none ready to fall back on, even if the topic was built before.
-const failed = (r: Role) =>
-  r.topicStatus === 'failed' || (r.failedDocuments > 0 && r.documentCount === r.failedDocuments)
+const failed = (r: Role) => roleTrainingStatus(r) === 'Training failed'
 
 export function Roles({ org, readOnly = false }: { org: Org; readOnly?: boolean }) {
   const links = usePortalLinks()
@@ -50,8 +49,8 @@ export function Roles({ org, readOnly = false }: { org: Org; readOnly?: boolean 
     {
       key: 'training', header: 'Training', stack: 'full',
       cell: (r) => {
-        if (failed(r)) return <Status word="Training failed" />
-        if (r.topicStatus === 'generating' || r.preparing) {
+        const status = roleTrainingStatus(r)
+        if (status === 'Preparing training') {
           return (
             <div className="flex flex-col items-start gap-1">
               <Status word="Preparing training" />
@@ -59,9 +58,7 @@ export function Roles({ org, readOnly = false }: { org: Org; readOnly?: boolean 
             </div>
           )
         }
-        if (r.topicStatus === 'ready') return <Status word="Ready" />
-        if (r.documentCount === 0) {
-          if (readOnly) return <Status word="No documents yet" />
+        if (status === 'No documents yet' && !readOnly) {
           return (
             <div className="flex flex-wrap items-center gap-2">
               <Status word="No documents yet" />
@@ -71,7 +68,7 @@ export function Roles({ org, readOnly = false }: { org: Org; readOnly?: boolean 
             </div>
           )
         }
-        return <StatusChip tone="settled" icon={File}>Documents added</StatusChip>
+        return <Status word={status} />
       },
     },
     { key: 'benchmark', header: 'Benchmark', align: 'end', cell: (r) => `${Math.round(r.benchmark * 100)}%` },

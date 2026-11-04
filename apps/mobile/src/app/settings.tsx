@@ -212,7 +212,7 @@ export default function Settings() {
           </View>
           <View style={{ gap: space[3] }}>
             <Text header variant="title3">Appearance</Text>
-            {appearanceReady && <Segmented value={appearance} options={appearanceOptions} onChange={(value) => { setSaveFailed(false); appearanceQueue.current?.change(value) }} />}
+            {appearanceReady && <Segmented equalWidth value={appearance} options={appearanceOptions} onChange={(value) => { setSaveFailed(false); appearanceQueue.current?.change(value) }} />}
           </View>
           <View style={{ gap: space[1] }}>
             <Text header variant="title3">Account</Text>

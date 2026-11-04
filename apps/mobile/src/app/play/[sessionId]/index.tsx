@@ -188,7 +188,7 @@ function ActiveSession({ sessionId, announceReady }: { sessionId: string; announ
   async function check() {
     const item = viewRef.current?.item
     const currentDraft = draftRef.current
-    if (!item || !active() || request.current || revealRef.current || currentDraft.confidence === null || !isAnswerReady(item.format, currentDraft.answer, item.options.length)) return
+    if (!item || !active() || request.current || revealRef.current || voiceCapturing || currentDraft.confidence === null || !isAnswerReady(item.format, currentDraft.answer, item.options.length)) return
     // Keep the complete request, including response time, stable for Try again.
     const body = submission.current ?? answerBody(item, currentDraft, Math.max(0, Date.now() - startedAt.current))
     submission.current = body
@@ -269,7 +269,7 @@ function ActiveSession({ sessionId, announceReady }: { sessionId: string; announ
           onConfidenceChange={(confidence: Confidence) => changeDraft({ ...draftRef.current, confidence })}
           onSubmit={() => { void check() }}
           busy={busy}
-          disabled={reveal !== null}
+          disabled={reveal !== null || voiceCapturing}
           mode={error?.kind === 'check' ? 'retry' : 'check'}
         />
       </View>
