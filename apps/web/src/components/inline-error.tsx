@@ -49,8 +49,9 @@ export function InlineError({ message, onRetry }: { message: string; onRetry: ()
   )
 }
 
-// Signs out and sends the person to sign-in, coming back to the current page afterwards.
-export function useSignOut() {
+// Signs out and sends the person to sign-in. By default sign-in returns them to the current page afterwards;
+// with keepPlace false it is plain /sign-in (for the portal and staff navs, where signing out ends the visit).
+export function useSignOut({ keepPlace = true }: { keepPlace?: boolean } = {}) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -66,7 +67,7 @@ export function useSignOut() {
       return
     }
     await router.invalidate()
-    await router.navigate({ to: '/sign-in', search: { redirect } })
+    await router.navigate({ to: '/sign-in', search: keepPlace ? { redirect } : {} })
   }
   return { busy, error, signOut }
 }

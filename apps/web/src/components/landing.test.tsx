@@ -154,6 +154,18 @@ it('switches the sign-in heading and page title with the form mode', async () =>
   } finally { await cleanup() }
 })
 
+it('shows the Learn Quiz brand row before the sign-in heading', async () => {
+  const { container, cleanup } = await renderApp()
+  try {
+    const brand = [...container.querySelectorAll('span')].find((e) => e.textContent === 'Learn Quiz')
+    expect(brand).toBeTruthy()
+    expect(brand!.previousElementSibling?.tagName.toLowerCase()).toBe('svg')
+    const h1 = container.querySelector('h1')!
+    expect(h1.textContent).toBe('Sign in')
+    expect(brand!.compareDocumentPosition(h1) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  } finally { await cleanup() }
+})
+
 it('prefills an editable email from the sign-in link and returns to the redirect', async () => {
   const { container, router, cleanup } = await renderApp('/sign-in?email=learner%40example.test&redirect=%2Fjoin%2Finvite')
   try {

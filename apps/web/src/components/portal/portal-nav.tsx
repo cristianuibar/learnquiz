@@ -40,7 +40,7 @@ function Header({ shell }: { shell: Shell }) {
 }
 
 function Foot({ shell }: { shell: Shell }) {
-  const { busy, error, signOut } = useSignOut()
+  const { busy, error, signOut } = useSignOut({ keepPlace: false })
   return (
     <>
       {shell.readOnly ? (

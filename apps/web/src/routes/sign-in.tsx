@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { CredentialsForm } from '@/components/credentials-form'
+import { LearnQuizMark } from '@/components/learn-quiz-mark'
 import { Button } from '@/components/ui/button'
 import { authClient } from '@/lib/auth-client'
 import { sitePath } from '@/lib/utils'
@@ -33,6 +34,10 @@ function SignIn() {
 
   return (
     <main className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pt-8 pb-16">
+      <div className="flex items-center gap-2 text-label text-ink">
+        <LearnQuizMark className="size-6" />
+        <span>Learn Quiz</span>
+      </div>
       <h1 className="text-title-1 text-ink">{heading}</h1>
       <CredentialsForm
         initial={initial}
