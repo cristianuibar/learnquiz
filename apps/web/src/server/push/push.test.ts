@@ -245,7 +245,7 @@ it('rejects invalid working hours and timezones without changing saved preferenc
   for (const invalid of [{ startMinute: 800, endMinute: 700 }, { startMinute: -1 }, { endMinute: 1500 }, { timezone: 'not-a-timezone' }]) {
     await expect(savePushPreferences({ data: { ...preferences, ...invalid } })).rejects.toThrow()
   }
-  expect((await getPushSettings()).prefs).toEqual(preferences)
+  expect((await getPushSettings()).prefs).toEqual({ ...preferences, days: [1, 2, 3, 4, 5] })
 })
 
 const token = 'ExponentPushToken[abc-123_X]'
@@ -360,10 +360,66 @@ it('reports the personal default schedule, then the company schedule, seeding an
   expect(rows("SELECT start_minute, end_minute, timezone FROM push_prefs WHERE user_id = 'staff'")).toEqual([{ start_minute: 360, end_minute: 1080, timezone: 'Europe/Bucharest' }])
 
   vi.mocked(getSessionUser).mockResolvedValue(learner as never)
-  await savePushPreferences({ data: { paused: false, startMinute: 0, endMinute: 1440, timezone: 'UTC' } })
-  expect((await getPushSettings()).schedule.window).toEqual(company)
+  await expect(savePushPreferences({ data: { paused: false, startMinute: 0, endMinute: 1440, timezone: 'UTC' } })).rejects.toMatchObject({ status: 400 })
   await savePushPreferences({ data: { paused: false, startMinute: 540, endMinute: 600, timezone: 'UTC' } })
   expect((await getPushSettings()).schedule.window).toEqual({ ...company, startMinute: 540, endMinute: 600, source: 'learner' })
+})
+
+it('lets company members pick hours and days inside the company window and rejects the rest with the window named', async () => {
+  vi.mocked(getSessionUser).mockResolvedValue(learner as never)
+  const now = Date.now()
+  raw.prepare('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, ?)').run('o1', 'Acme', 'acme', now)
+  raw.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, ?)').run('m-learner', 'o1', 'learner', 'member', now)
+  raw.prepare('INSERT INTO org_settings (org_id, company_name, timezone, working_hours_json) VALUES (?, ?, ?, ?)')
+    .run('o1', 'Acme', 'Europe/Bucharest', JSON.stringify({ days: [1, 2, 3, 4, 5], start: '06:00', end: '18:00' }))
+  const company = { name: 'Acme', startMinute: 360, endMinute: 1080, days: [1, 2, 3, 4, 5], timezone: 'Europe/Bucharest' }
+  const companyPrefs = { paused: false, startMinute: 360, endMinute: 1080, timezone: 'Europe/Bucharest', days: [1, 2, 3, 4, 5] }
+  const settings = await getPushSettings()
+  expect(settings.company).toEqual(company)
+  expect(settings.prefs).toEqual(companyPrefs)
+
+  const base = { paused: false, startMinute: 600, endMinute: 900, timezone: 'UTC' }
+  const hours = 'Choose hours inside 6:00 AM–6:00 PM'
+  const days = 'Choose days inside 6:00 AM–6:00 PM, Monday to Friday'
+  for (const [invalid, message] of <[{ startMinute?: number; endMinute?: number; days?: number[] }, string][]>[
+    [{ startMinute: 300 }, hours], [{ endMinute: 1100 }, hours], [{ startMinute: 600, endMinute: 629 }, hours], [{ startMinute: 900, endMinute: 600 }, hours],
+    [{ days: [] }, days], [{ days: [1, 6] }, days], [{ days: [1, 1] }, days],
+  ]) {
+    await expect(savePushPreferences({ data: { ...base, ...invalid } })).rejects.toMatchObject({ status: 400, message })
+  }
+  expect((await getPushSettings()).prefs).toEqual(companyPrefs)
+  expect(rows('SELECT * FROM push_prefs')).toEqual([])
+
+  await savePushPreferences({ data: { ...base, days: [3, 1] } })
+  expect(rows('SELECT start_minute, end_minute, timezone, days_json FROM push_prefs')).toEqual([{ start_minute: 600, end_minute: 900, timezone: 'Europe/Bucharest', days_json: '[1,3]' }])
+  // Omitting days leaves the stored ones alone.
+  await savePushPreferences({ data: { ...base, endMinute: 930 } })
+  expect(rows('SELECT days_json FROM push_prefs')).toEqual([{ days_json: '[1,3]' }])
+  let after = await getPushSettings()
+  expect(after.prefs).toEqual({ paused: false, startMinute: 600, endMinute: 930, timezone: 'Europe/Bucharest', days: [1, 3] })
+  expect(after.schedule.window).toEqual({ startMinute: 600, endMinute: 930, days: [1, 3], timezone: 'Europe/Bucharest', source: 'learner' })
+
+  raw.prepare('UPDATE org_settings SET working_hours_json = ? WHERE org_id = ?').run(JSON.stringify({ days: [1, 2, 4, 5], start: '06:00', end: '18:00' }), 'o1')
+  after = await getPushSettings()
+  expect(after.company).toEqual({ ...company, days: [1, 2, 4, 5] })
+  expect(after.prefs.days).toEqual([1])
+  expect(after.schedule.window.days).toEqual([1])
+  // Every company day on goes back to following the company's days.
+  await savePushPreferences({ data: { ...base, days: [1, 2, 4, 5] } })
+  expect(rows('SELECT days_json FROM push_prefs')).toEqual([{ days_json: null }])
+})
+
+it('keeps personal accounts free of any company window', async () => {
+  vi.mocked(getSessionUser).mockResolvedValue(learner as never)
+  const initial = await getPushSettings()
+  expect(initial.company).toBeNull()
+  expect(initial.prefs).toEqual({ ...preferences, days: [1, 2, 3, 4, 5] })
+  await savePushPreferences({ data: { paused: false, startMinute: 0, endMinute: 1440, timezone: 'Asia/Tokyo', days: [6, 7] } })
+  expect((await getPushSettings()).prefs).toEqual({ paused: false, startMinute: 0, endMinute: 1440, timezone: 'Asia/Tokyo', days: [6, 7] })
+  for (const [invalid, message] of [[{ days: [] }, 'Choose at least one day'], [{ days: [2, 2] }, 'Choose each day once'], [{ startMinute: 600, endMinute: 629 }, 'Choose at least 30 minutes']] as [{ startMinute?: number; endMinute?: number; days?: number[] }, string][]) {
+    await expect(savePushPreferences({ data: { ...preferences, ...invalid } })).rejects.toMatchObject({ status: 400, message })
+  }
+  expect((await getPushSettings()).prefs.days).toEqual([6, 7])
 })
 
 // Scheduled sends: a learner with one web and one Expo device, a personal topic and two due questions.

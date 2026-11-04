@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { and, eq, isNotNull, notExists, exists, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import type { PushSchedule } from '@learnquiz/api/schedule'
+import { describeWindow, formatMinute, type PushSchedule } from '@learnquiz/api/schedule'
 import { getDb, type Db } from '@/db'
 import { attempts, pushPrefs, pushSubscriptions, sessions } from '@/db/schema'
 import { requireStaff } from '@/server/authz'
@@ -65,22 +65,53 @@ export const getPushSettings = createServerFn({ method: 'GET' }).handler(async (
     pushContext(db, user.id),
     previewItem(db, user.id, now),
   ])
-  const schedule: PushSchedule = { window: effectiveWindow(context.company, prefs ?? null), ...capPolicy(context.role, now), preview: preview?.stem ?? null }
+  const window = effectiveWindow(context.company, prefs ?? null)
+  const schedule: PushSchedule = { window, ...capPolicy(context.role, now), preview: preview?.stem ?? null }
+  const base = context.company && effectiveWindow(context.company, null)
   return {
     publicKey: env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_SUBJECT ? env.VAPID_PUBLIC_KEY : null,
     isStaff: user.role === 'admin', endpoints: subscriptions.map((s) => s.endpoint), canPrompt: finished.length === 1,
-    prefs: { paused: prefs?.paused ?? false, startMinute: prefs?.startMinute ?? 540, endMinute: prefs?.endMinute ?? 1020, timezone: prefs?.timezone ?? 'UTC' },
+    prefs: {
+      paused: prefs?.paused ?? false,
+      startMinute: prefs?.startMinute ?? base?.startMinute ?? 540,
+      endMinute: prefs?.endMinute ?? base?.endMinute ?? 1020,
+      timezone: prefs?.timezone ?? base?.timezone ?? 'UTC',
+      days: window.days,
+    },
+    company: base && { name: context.company!.name, startMinute: base.startMinute, endMinute: base.endMinute, days: base.days, timezone: base.timezone },
     schedule,
   }
 })
 
 export const savePushPreferences = createServerFn({ method: 'POST' }).validator(z.object({
   paused: z.boolean(), startMinute: z.number().int().min(0).max(1439), endMinute: z.number().int().min(1).max(1440),
-  timezone: Timezone,
-}).refine((data) => data.startMinute < data.endMinute, 'Working hours must end after they start')).handler(async ({ data }) => {
+  timezone: Timezone, days: z.array(z.number().int().min(1).max(7)).max(7).optional(),
+})).handler(async ({ data }) => {
   const user = checkAccount(await getSessionUser())
-  const values = { ...data, updatedAt: Date.now() }
-  await getDb().insert(pushPrefs).values({ userId: user.id, ...values })
+  const db = getDb()
+  const { company } = await pushContext(db, user.id)
+  const { days, ...rest } = data
+  let timezone = data.timezone
+  let stored: number[] | null | undefined = days && [...days].sort((a, b) => a - b)
+  if (company) {
+    const window = effectiveWindow(company, null)
+    const where = describeWindow(window)
+    if (data.startMinute < window.startMinute || data.endMinute > window.endMinute || data.endMinute - data.startMinute < 30) {
+      throw httpError(`Choose hours inside ${formatMinute(window.startMinute)}–${formatMinute(window.endMinute)}`, 400)
+    }
+    if (days && (!days.length || new Set(days).size !== days.length || days.some((day) => !window.days.includes(day)))) {
+      throw httpError(`Choose days inside ${where}`, 400)
+    }
+    timezone = window.timezone
+    // Every company day on is stored as null, so the learner follows later changes to the company's days.
+    if (stored?.length === window.days.length) stored = null
+  } else {
+    if (data.endMinute - data.startMinute < 30) throw httpError('Choose at least 30 minutes', 400)
+    if (days && !days.length) throw httpError('Choose at least one day', 400)
+    if (days && new Set(days).size !== days.length) throw httpError('Choose each day once', 400)
+  }
+  const values = { ...rest, timezone, ...(stored !== undefined && { days: stored }), updatedAt: Date.now() }
+  await db.insert(pushPrefs).values({ userId: user.id, ...values })
     .onConflictDoUpdate({ target: pushPrefs.userId, set: values })
   return { saved: true }
 })
@@ -102,7 +133,7 @@ export const subscribe = createServerFn({ method: 'POST' }).validator(Subscripti
       .onConflictDoUpdate({ target: pushSubscriptions.endpoint, set: { ...data.keys }, setWhere: eq(pushSubscriptions.userId, user.id) }).returning({ id: pushSubscriptions.id }),
     db.insert(pushPrefs).select(db.select({ userId: pushSubscriptions.userId, enabled: sql<boolean>`1`.as('enabled'),
       paused: sql<boolean>`0`.as('paused'), startMinute: sql<number>`${seed.startMinute}`.as('start_minute'), endMinute: sql<number>`${seed.endMinute}`.as('end_minute'),
-      timezone: sql<string>`${seed.timezone}`.as('timezone'), updatedAt: sql<number>`${now}`.as('updated_at') })
+      timezone: sql<string>`${seed.timezone}`.as('timezone'), days: sql<number[] | null>`null`.as('days_json'), updatedAt: sql<number>`${now}`.as('updated_at') })
       .from(pushSubscriptions).where(and(eq(pushSubscriptions.userId, user.id), eq(pushSubscriptions.endpoint, data.endpoint))))
       .onConflictDoUpdate({ target: pushPrefs.userId, set: { enabled: true, updatedAt: now } }),
   ])
