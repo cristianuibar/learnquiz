@@ -26,7 +26,7 @@ export default function config(): ExpoConfig {
       ...(existsSync(join(__dirname, 'assets/adaptive-icon.png')) && {
         adaptiveIcon: {
           foregroundImage: './assets/adaptive-icon.png',
-          backgroundColor: '#F7F6F2',
+          backgroundColor: '#0E5A73',
         },
       }),
     },
