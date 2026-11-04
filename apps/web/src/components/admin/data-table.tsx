@@ -81,7 +81,7 @@ function Frame({ band, toolbar, footer, scrollRef, region, children }: {
 
 const TABLE = 'w-full border-separate border-spacing-0 text-[14px]/[20px] tabular-nums'
 
-export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSort, selection, actions, band, toolbar, footer, empty, loading, total }: {
+export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSort, selection, actions, actionsClassName, band, toolbar, footer, empty, loading, total }: {
   caption: string
   columns: Column<T>[]
   rows: T[]
@@ -91,6 +91,8 @@ export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSo
   onSort?: (key: string) => void
   selection?: { selected: ReadonlySet<string>; onToggle: (key: string) => void; onToggleAll: () => void; rowLabel: (row: T) => string; selectable?: (row: T) => boolean; allLabel?: string }
   actions?: (row: T) => ReactNode
+  /** Extra classes for the actions cell, including table-specific stacked placement. */
+  actionsClassName?: string
   band?: boolean
   toolbar?: ReactNode
   footer?: ReactNode
@@ -258,7 +260,7 @@ export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSo
                   </td>
                 ))}
                 {actions && (
-                  <td role="cell" className={cn(td, 'text-right', bg, stack && 'max-md:col-start-3 max-md:row-start-1 max-md:block max-md:h-auto max-md:border-0 max-md:p-0')}>
+                  <td role="cell" className={cn(td, 'text-right', bg, stack && 'max-md:col-start-3 max-md:row-start-1 max-md:block max-md:h-auto max-md:border-0 max-md:p-0', actionsClassName)}>
                     {/* Pulls the 44px menu button into the padding so the row keeps the 56px skeleton height. */}
                     <div className={cn('-my-1.5', stack && 'max-md:my-0')}>{actions(row)}</div>
                   </td>
