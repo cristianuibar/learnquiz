@@ -127,6 +127,13 @@
       "when": 1793765378873,
       "tag": "0017_push_prefs_days",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1793768691435,
+      "tag": "0018_magenta_loners",
+      "breakpoints": true
     }
   ]
 }

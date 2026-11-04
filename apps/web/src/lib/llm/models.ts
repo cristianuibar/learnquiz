@@ -4,7 +4,7 @@ export const PROVIDERS = {
   fireworks: { baseUrl: 'https://api.fireworks.ai/inference/v1', keyBinding: 'FIREWORKS_API_KEY', jsonMode: 'json_object' },
 } as const
 
-export type ModelJob = 'curriculum' | 'items' | 'self_check' | 'plan' | 'grade' | 'image' | 'voice' | 'placement_line'
+export type ModelJob = 'curriculum' | 'items' | 'self_check' | 'plan' | 'grade' | 'procedure' | 'image' | 'voice' | 'placement_line'
 export type JobModels = Partial<Record<ModelJob, { provider: keyof typeof PROVIDERS; model: string }>>
 
 // Exact Meta model IDs; Fireworks may prefix these with accounts/fireworks/models/.
