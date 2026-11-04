@@ -25,7 +25,7 @@ export function Managers() {
             </figcaption>
           </figure>
           <figure className="mgr-phone">
-            <PhoneFrame>
+            <PhoneFrame className="fit-w">
               <Screenshot
                 name="phone-morgan-progress"
                 alt="Morgan Chen’s Training progress for Warehouse picker, showing mastery bars and benchmark markers on the page shared with Morgan in the app."

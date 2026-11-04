@@ -145,7 +145,7 @@ export function Hero({
           </div>
 
           <figure className="hero-phone">
-            <PhoneFrame>
+            <PhoneFrame className="fit-w">
               <Screenshot
                 name="phone-question-confidence"
                 alt="Learn Quiz question 1 of 2: Where do you move the tote to start the check? To the assigned checking station and Sure are selected."

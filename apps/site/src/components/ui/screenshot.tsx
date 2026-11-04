@@ -24,7 +24,7 @@ export function Screenshot({
       alt={alt}
       width={width}
       height={height}
-      loading={priority ? 'eager' : 'lazy'}
+      loading={priority && i === 0 ? 'eager' : 'lazy'}
       fetchPriority={priority && i === 0 ? 'high' : undefined}
       className={[className, dark ? (i === 0 ? 'shot-light' : 'shot-dark') : ''].filter(Boolean).join(' ')}
     />

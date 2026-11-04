@@ -485,4 +485,6 @@ label.conf-btn:hover { background: var(--surface-sunken); }
   .demo-phone .phone { --phone-w: calc(100vw - 2 * var(--gutter) - 2 * var(--phone-bezel)); --phone-h: 700px; --phone-radius: 36px; }
   .mgr-phone .phone { --phone-w: calc(100vw - 2 * var(--gutter) - 2 * var(--phone-bezel)); --phone-h: 600px; --phone-radius: 36px; }
 }
+.phone.fit-w { --phone-h: calc(var(--phone-w) * 37 / 18); }
+.push-step .phone.fit-h { --phone-w: calc(var(--phone-h) * 18 / 37); }
 }

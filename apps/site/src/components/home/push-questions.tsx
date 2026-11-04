@@ -32,6 +32,7 @@ export function PushQuestions() {
         >
           <li className="push-step">
             <PhoneFrame
+              className="fit-h"
               os
               label="Lock screen at 9:41 with a Learn Quiz notification: Your pick slot is empty. What do you do first?"
               screenClassName="px-3 pt-[72px] pb-2"
@@ -57,7 +58,7 @@ export function PushQuestions() {
           </li>
 
           <li className="push-step">
-            <PhoneFrame>
+            <PhoneFrame className="fit-h">
               <Screenshot
                 name="phone-question-confidence"
                 alt="Learn Quiz question 1 of 2: Where do you move the tote to start the check? To the assigned checking station and Sure are selected."
@@ -73,7 +74,7 @@ export function PushQuestions() {
           </li>
 
           <li className="push-step">
-            <PhoneFrame>
+            <PhoneFrame className="fit-h">
               <Screenshot
                 name="phone-reveal-why"
                 alt="Correct answer: To the assigned checking station. The expanded Why explanation quotes Warehouse picker SOP v1: Move the tote to the assigned checking station and scan its label."
