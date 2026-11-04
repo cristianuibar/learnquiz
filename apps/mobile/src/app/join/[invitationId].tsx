@@ -242,7 +242,7 @@ function Invite({ invitationId, invite }: { invitationId: string; invite: Invite
         </View>
         <Heading title={view.title} body={view.body} />
       </View>
-      {!viewer && (formOpen || action.kind === 'signIn') && <FacebookSignIn disabled={busy} invitationId={invitationId} />}
+      {!viewer && (formOpen || action.kind === 'signIn') && <FacebookSignIn disabled={busy} invitationId={action.kind === 'signIn' ? undefined : invitationId} />}
       {formOpen ? (
         <AccountForm
           mode={mode}

@@ -1,7 +1,7 @@
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 import { router } from 'expo-router'
 import { Linking } from 'react-native'
-import { getToken, signOut } from './lib/auth'
+import { getToken, signOut, subscribeAuth } from './lib/auth'
 import { holdTarget, peekHeldTarget, releaseReplayHolds, takeHeldTarget } from './lib/held-target'
 
 // #536: who makes the post-auth decision. The real root layout, session store,
@@ -75,6 +75,7 @@ const invite = {
 }
 let needsDisclosure = false
 let facebookEnabled = false
+let acceptResponse: Promise<Response> | null = null
 const facebookState = 'a'.repeat(64)
 const facebookCode = 'b'.repeat(64)
 const facebookVerifier = 'c'.repeat(64)
@@ -90,7 +91,9 @@ const replies: Record<string, () => { data: unknown; token?: string }> = {
 }
 // Anything else (the unit, push) never answers.
 globalThis.fetch = jest.fn((input: RequestInfo | URL) => {
-  const reply = replies[new URL(String(input)).pathname]?.()
+  const path = new URL(String(input)).pathname
+  if (path === '/api/auth/organization/accept-invitation' && acceptResponse) return acceptResponse
+  const reply = replies[path]?.()
   if (!reply) return new Promise<Response>(() => {})
   return Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify(reply.data),
     headers: { get: (name: string) => (name === 'set-auth-token' ? reply.token ?? null : null) } } as unknown as Response)
@@ -105,6 +108,9 @@ beforeEach(async () => {
   takeHeldTarget()
   needsDisclosure = false
   facebookEnabled = false
+  acceptResponse = null
+  invite.status = 'pending'
+  jest.mocked(fetch).mockClear()
   jest.spyOn(Linking, 'openURL').mockResolvedValue(true)
   mockIndexOpen = true
 })
@@ -262,4 +268,65 @@ test('cancelling Facebook shows an actionable error and keeps the learner signed
   expect(navigation.getPathname()).toBe('/sign-in')
   expect(screen.getByText('Facebook sign-in was cancelled. Please try again.')).toBeOnTheScreen()
   expect(screen.getByLabelText('Email')).toBeOnTheScreen()
+})
+
+
+test('Facebook from an already-used invitation goes to Today without accepting again', async () => {
+  facebookEnabled = true
+  invite.status = 'accepted'
+  const navigation = renderRouter('src/app', { initialUrl: '/join/inv-1' })
+  await navigation
+  await openFacebook()
+  await facebookReturn()
+  expect(navigation.getPathname()).toBe('/today')
+  expect(getToken()).toBe('facebook-bearer')
+  expect(jest.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith('/organization/accept-invitation'))).toBe(false)
+})
+
+test('a failed Facebook invitation accept returns the signed-in learner to Join', async () => {
+  facebookEnabled = true
+  acceptResponse = Promise.resolve({ ok: false, status: 400, text: async () => JSON.stringify({ message: 'Invitation could not be accepted' }), headers: { get: () => null } } as unknown as Response)
+  const navigation = renderRouter('src/app', { initialUrl: '/join/inv-1' })
+  await navigation
+  await openFacebook()
+  await facebookReturn()
+  expect(getToken()).toBe('facebook-bearer')
+  expect(navigation.getPathname()).toBe('/join/inv-1')
+  expect(screen.getByRole('header', { name: 'Train as a warehouse picker' })).toBeOnTheScreen()
+})
+
+test('Facebook publishes the session change only after invitation acceptance resolves', async () => {
+  facebookEnabled = true
+  let accept!: (response: Response) => void
+  acceptResponse = new Promise((resolve) => { accept = resolve })
+  const navigation = renderRouter('src/app', { initialUrl: '/join/inv-1' })
+  await navigation
+  await openFacebook()
+  const changed = jest.fn()
+  const unsubscribe = subscribeAuth(changed)
+  try {
+    await facebookReturn()
+    expect(fetch).toHaveBeenCalledWith('https://app.learnquiz.com/api/auth/organization/accept-invitation', expect.anything())
+    expect(changed).not.toHaveBeenCalledWith('changed')
+    expect(navigation.getPathname()).toBe('/sign-in')
+    await act(async () => { accept({ ok: true, status: 200, text: async () => '{}', headers: { get: () => null } } as unknown as Response) })
+    await flush()
+    expect(changed).toHaveBeenCalledWith('changed')
+    expect(navigation.getPathname()).toBe('/today')
+  } finally { unsubscribe() }
+})
+
+test.each([
+  ['not_linked', 'This email already has an account. Sign in with your email and password.'],
+  ['banned', 'Your account has been suspended. Sign in with email for details on contacting your company admin.'],
+  ['failed', 'Facebook sign-in could not finish. Please try again.'],
+  ['expired', 'This Facebook sign-in has expired. Please try again.'],
+])('shows actionable Facebook %s copy', async (error, message) => {
+  facebookEnabled = true
+  await renderRouter('src/app', { initialUrl: '/sign-in' })
+  await openFacebook()
+  await act(async () => { router.push(`/sign-in?facebookState=${facebookState}&facebookError=${error}`) })
+  await flush()
+  expect(screen.getByText(message)).toBeOnTheScreen()
+  expect(getToken()).toBeNull()
 })

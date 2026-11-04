@@ -154,13 +154,21 @@ async function completeFacebook(state: string, code?: string, error?: string) {
   const stored = await SecureStore.getItemAsync(FACEBOOK_KEY)
   if (observed !== revision) return
   const pending: PendingFacebook | null = stored ? JSON.parse(stored) : null
-  if (!pending || pending.state !== state || pending.expiresAt <= Date.now()) {
+  if (!pending || pending.state !== state) {
     throw new Error('This Facebook sign-in has expired. Please try again.')
   }
   const current = ++revision
   await persist(() => SecureStore.deleteItemAsync(FACEBOOK_KEY))
   if (current !== revision) return
-  if (error || !code) throw new Error('Facebook sign-in was cancelled. Please try again.')
+  if (error || !code) {
+    const messages: Record<string, string> = {
+      cancelled: 'Facebook sign-in was cancelled. Please try again.',
+      not_linked: 'This email already has an account. Sign in with your email and password.',
+      banned: 'Your account has been suspended. Sign in with email for details on contacting your company admin.',
+      expired: 'This Facebook sign-in has expired. Please try again.',
+    }
+    throw new Error(messages[error ?? ''] ?? 'Facebook sign-in could not finish. Please try again.')
+  }
   const result = await api<FacebookExchange>('/auth/facebook/exchange', {
     body: { code, verifier: pending.verifier, redirectUri: MOBILE_AUTH_REDIRECT },
   })

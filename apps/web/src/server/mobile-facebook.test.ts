@@ -2,6 +2,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { MOBILE_AUTH_REDIRECT } from '@learnquiz/api/mobile-auth'
+import { bindMobileFacebookSession } from './mobile-facebook-binding'
 import { handleMobileFacebook } from './mobile-facebook'
 
 const boundary = vi.hoisted(() => ({ db: null as unknown, enabled: true, session: vi.fn(), social: vi.fn() }))
@@ -9,7 +10,7 @@ vi.mock('@/db', () => ({ getDb: () => boundary.db }))
 vi.mock('./env', () => ({ getEnv: () => ({ BETTER_AUTH_URL: 'https://app.learnquiz.com' }) }))
 vi.mock('./auth-core', () => ({
   facebookEnabled: () => boundary.enabled,
-  createAuth: () => ({ api: { getSession: boundary.session, signInSocial: boundary.social } }),
+  createAuth: () => ({ options: { baseURL: 'https://app.learnquiz.com', advanced: { crossSubDomainCookies: { enabled: true, domain: 'learnquiz.com' } } }, api: { getSession: boundary.session, signInSocial: boundary.social } }),
 }))
 let raw: DatabaseSync
 beforeEach(() => {
@@ -23,10 +24,10 @@ beforeEach(() => {
     return { rows: (method === 'get' ? statement.get(...values) : statement.all(...values)) as unknown[] }
   })
   boundary.enabled = true
-  boundary.social.mockReset().mockResolvedValue(Response.json({ url: 'https://www.facebook.com/dialog/oauth?state=provider-state' }, { headers: { 'Set-Cookie': 'oauth-state=bound; HttpOnly' } }))
+  boundary.social.mockReset().mockImplementation(async () => Response.json({ url: 'https://www.facebook.com/dialog/oauth?state=provider-state' }, { headers: { 'Set-Cookie': 'oauth-state=bound; HttpOnly' } }))
   boundary.session.mockReset().mockResolvedValue({ session: { token: 'private-bearer' }, user: { id: 'learner-1' } })
 })
-afterEach(() => raw.close())
+afterEach(() => { raw.close(); vi.useRealTimers() })
 const call = (path: string, body?: unknown, cookie?: string) => handleMobileFacebook(new Request(`https://app.learnquiz.com/api/v1/auth${path}`, {
   method: body === undefined ? 'GET' : 'POST',
   headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(cookie ? { Cookie: cookie } : {}) },
@@ -43,6 +44,8 @@ async function browserStart() {
 }
 async function callback() {
   const pending = await browserStart()
+  // Simulate the successful OAuth after-hook; /start alone cannot authorize a handoff.
+  await bindMobileFacebookSession(`https://app.learnquiz.com/api/v1/auth/facebook/callback?state=${pending.state}`, 'private-bearer')
   const response = await call(`/facebook/callback?state=${pending.state}`, undefined, pending.cookie)
   const url = new URL(response.headers.get('Location')!)
   return { ...pending, code: url.searchParams.get('facebookCode'), response, url }
@@ -78,10 +81,10 @@ it('keeps provider cookies and binds the callback to this browser, once', async 
   const flow = await browserStart()
   expect(flow.response.headers.get('Location')).toMatch(/^https:\/\/www.facebook.com\//)
   expect(flow.response.headers.getSetCookie()).toEqual(expect.arrayContaining([expect.stringContaining('oauth-state=bound'), expect.stringContaining('HttpOnly; SameSite=Lax')]))
-  expect((await call(`/facebook/callback?state=${flow.state}`)).status).toBe(400)
-  expect((await call(`/facebook/start?state=${flow.state}`)).status).toBe(400)
+  expect((await call(`/facebook/callback?state=${flow.state}`)).headers.get('Location')).toContain('facebookError=expired')
+  expect((await call(`/facebook/start?state=${flow.state}`)).headers.get('Location')).toContain('facebookError=expired')
   expect((await call(`/facebook/callback?state=${flow.state}`, undefined, flow.cookie)).status).toBe(302)
-  expect((await call(`/facebook/callback?state=${flow.state}`, undefined, flow.cookie)).status).toBe(400)
+  expect((await call(`/facebook/callback?state=${flow.state}`, undefined, flow.cookie)).headers.get('Location')).toContain('facebookError=expired')
 })
 it('allows exactly one concurrent exchange', async () => {
   const flow = await callback()
@@ -89,15 +92,47 @@ it('allows exactly one concurrent exchange', async () => {
   expect(responses.map((response) => response.status).sort()).toEqual([200, 400])
   expect((await exchange(flow)).status).toBe(400)
 })
-it('expires codes after one minute and unfinished browser flows after five minutes', async () => {
+it.each([59_000, 61_000])('enforces the sixty-second code TTL at %i ms', async (elapsed) => {
+  vi.useFakeTimers()
+  vi.setSystemTime(new Date('2026-11-04T10:00:00Z'))
   const flow = await callback()
-  const now = Date.now()
-  // SQL checks use new Date(), so expire the real persisted row as D1 would see it.
-  raw.prepare("UPDATE verification SET expires_at = ? WHERE id LIKE 'mobile-facebook:code:%'").run(now - 1)
-  expect((await exchange(flow)).status).toBe(400)
-  const pending = await prepare()
-  raw.prepare('UPDATE verification SET expires_at = ?').run(now - 1)
-  expect((await call(`/facebook/start?state=${pending.state}`)).status).toBe(400)
+  vi.setSystemTime(Date.now() + elapsed)
+  expect((await exchange(flow)).status).toBe(elapsed < 60_000 ? 200 : 400)
+})
+it.each([299_000, 301_000])('enforces the five-minute flow TTL at %i ms', async (elapsed) => {
+  vi.useFakeTimers()
+  vi.setSystemTime(new Date('2026-11-04T10:00:00Z'))
+  const flow = await browserStart()
+  await bindMobileFacebookSession(`https://app.learnquiz.com/api/v1/auth/facebook/callback?state=${flow.state}`, 'private-bearer')
+  vi.setSystemTime(Date.now() + elapsed)
+  const response = await call(`/facebook/callback?state=${flow.state}`, undefined, flow.cookie)
+  const link = new URL(response.headers.get('Location')!)
+  expect(link.searchParams.has('facebookCode')).toBe(elapsed < 300_000)
+  if (elapsed > 300_000) expect(link.searchParams.get('facebookError')).toBe('expired')
+})
+it.each(['isAnonymous', 'banned'])('rejects %s users at callback and exchange', async (flag) => {
+  const good = await callback()
+  boundary.session.mockResolvedValue({ session: { token: 'private-bearer' }, user: { id: 'learner-1', [flag]: true } })
+  const blocked = await callback()
+  expect(blocked.url.searchParams.get('facebookError')).toBe('failed')
+  expect(blocked.code).toBeNull()
+  expect((await exchange(good)).status).toBe(400)
+})
+it('requires an OAuth-created session even with the browser binding cookie', async () => {
+  const flow = await browserStart()
+  const response = await call(`/facebook/callback?state=${flow.state}`, undefined, flow.cookie)
+  expect(response.headers.get('Location')).toContain('facebookError=failed')
+  expect(boundary.session).not.toHaveBeenCalled()
+})
+it.each([
+  ['access_denied', 'cancelled'], ['user_cancelled', 'cancelled'],
+  ['account_not_linked', 'not_linked'], ['BANNED_USER', 'banned'],
+  ['email_not_found', 'failed'], ['private-provider-text', 'failed'],
+])('maps OAuth error %s to the allowlisted kind %s', async (error, kind) => {
+  const flow = await browserStart()
+  const response = await call(`/facebook/callback?state=${flow.state}&failed=1&error=${error}&error_description=secret`, undefined, flow.cookie)
+  expect(response.headers.get('Location')).toContain(`facebookError=${kind}`)
+  expect(response.headers.get('Location')).not.toContain('secret')
 })
 it.each(['https://evil.example', 'learnquiz://join/x', 'learnquiz://sign-in/evil', 'learnquiz://sign-in?next=evil'])('rejects a wrong redirect %s at prepare and exchange', async (redirectUri) => {
   expect((await call('/facebook/prepare', { redirectUri })).status).toBe(400)
@@ -112,7 +147,7 @@ it('requires the app proof, even if another app intercepts the code', async () =
 })
 it('returns cancellation without issuing a code or reusing an old browser session', async () => {
   const flow = await browserStart()
-  const result = await call(`/facebook/callback?state=${flow.state}&failed=1`, undefined, flow.cookie)
+  const result = await call(`/facebook/callback?state=${flow.state}&failed=1&error=access_denied`, undefined, flow.cookie)
   expect(result.headers.get('Location')).toContain('facebookError=cancelled')
   expect(result.headers.get('Location')).not.toContain('facebookCode')
   expect(boundary.session).not.toHaveBeenCalled()
@@ -121,4 +156,14 @@ it('rejects revoked sessions at exchange', async () => {
   const flow = await callback()
   boundary.session.mockResolvedValue(null)
   expect((await exchange(flow)).status).toBe(400)
+})
+
+it.each(['/facebook/start?state=bad', '/facebook/callback?state=bad', '/facebook/callback'])('returns malformed state from %s to the app with an error', async (path) => {
+  const response = await call(path)
+  expect(response.status).toBe(302)
+  const link = new URL(response.headers.get('Location')!)
+  expect(link.protocol).toBe('learnquiz:')
+  expect(link.searchParams.get('facebookError')).toBe('expired')
+  expect(link.searchParams.get('facebookState')).toBeTruthy()
+  expect(link.searchParams.has('facebookCode')).toBe(false)
 })

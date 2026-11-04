@@ -7,6 +7,7 @@ jest.mock('./api', () => ({ api: jest.fn(), authCall: jest.fn() }))
 jest.mock('./kv', () => ({ clearPrefix: jest.fn() }))
 
 let auth: typeof import('./auth')
+let held: typeof import('./held-target')
 beforeEach(() => {
   jest.clearAllMocks()
   jest.mocked(SecureStore.getItemAsync).mockResolvedValue(null)
@@ -14,7 +15,7 @@ beforeEach(() => {
   jest.mocked(SecureStore.deleteItemAsync).mockResolvedValue()
   jest.mocked(kv.clearPrefix).mockResolvedValue()
   jest.mocked(authCall).mockResolvedValue({ data: {}, token: 'new-token' })
-  jest.isolateModules(() => { auth = require('./auth') })
+  jest.isolateModules(() => { auth = require('./auth'); held = require('./held-target') })
 })
 
 test('loads the secure token once and signs in with the returned bearer', async () => {
@@ -125,4 +126,43 @@ test('Facebook never publishes a bearer if SecureStore persistence fails', async
   await expect(auth.finishFacebookSignIn('state', 'code')).rejects.toThrow('Storage unavailable')
   expect(auth.getToken()).toBeNull()
   expect(listener).not.toHaveBeenCalledWith('changed')
+})
+
+
+function storedFacebookAttempt(extra = {}) {
+  const values = new Map<string, string>([['lq.facebook.pending', JSON.stringify({ state: 'state', verifier: 'proof', expiresAt: 1, target: null, ...extra })]])
+  jest.mocked(SecureStore.getItemAsync).mockImplementation(async (key) => values.get(key) ?? null)
+  jest.mocked(SecureStore.setItemAsync).mockImplementation(async (key, value) => { values.set(key, value) })
+  jest.mocked(SecureStore.deleteItemAsync).mockImplementation(async (key) => { values.delete(key) })
+  jest.mocked(api).mockResolvedValue({ token: 'facebook-token', user: { id: 'u1' } })
+}
+
+test('rejects a different state even when a Facebook attempt is stored', async () => {
+  storedFacebookAttempt()
+  await expect(auth.finishFacebookSignIn('other-state', 'code')).rejects.toThrow('expired')
+  expect(api).not.toHaveBeenCalled()
+  expect(auth.getToken()).toBeNull()
+})
+
+test.each(['logout', 'email sign-in'])('%s invalidates a stored Facebook attempt before the browser returns', async (action) => {
+  storedFacebookAttempt()
+  if (action === 'logout') await auth.signOut()
+  else await auth.signIn('learner@example.com', 'password')
+  await expect(auth.finishFacebookSignIn('state', 'code')).rejects.toThrow('expired')
+  expect(api).not.toHaveBeenCalled()
+  expect(auth.getToken()).toBe(action === 'logout' ? null : 'new-token')
+})
+
+test('lets the server enforce expiry when the phone clock is ahead', async () => {
+  storedFacebookAttempt() // The server timestamp is already behind this phone.
+  await auth.finishFacebookSignIn('state', 'code')
+  expect(auth.getToken()).toBe('facebook-token')
+})
+
+test('restores the saved target when completing a persisted Facebook attempt', async () => {
+  held.holdTarget('/unit/old')
+  storedFacebookAttempt({ target: '/unit/saved' })
+  await auth.finishFacebookSignIn('state', 'code')
+  expect(held.peekHeldTarget()).toBe('/unit/saved')
+  held.takeHeldTarget()
 })

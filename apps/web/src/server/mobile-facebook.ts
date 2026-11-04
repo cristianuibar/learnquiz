@@ -1,4 +1,5 @@
 import { and, eq, gt } from 'drizzle-orm'
+import { getCookies } from 'better-auth/cookies'
 import { MOBILE_AUTH_REDIRECT } from '@learnquiz/api/mobile-auth'
 import { getDb } from '@/db'
 import { verification } from '@/db/auth-schema'
@@ -14,7 +15,7 @@ const validSecret = (value: unknown): value is string => typeof value === 'strin
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' } })
 const invalid = () => json({ error: 'This Facebook sign-in has expired. Please try again.' }, 400)
 const key = (kind: string, value: string) => `mobile-facebook:${kind}:${value}`
-type Flow = { redirectUri: string; proofHash: string; browserHash?: string }
+type Flow = { redirectUri: string; proofHash: string; browserHash?: string; token?: string }
 type Code = Flow & { token: string }
 
 async function save(id: string, value: Flow | Code, expiresAt: number) {
@@ -37,7 +38,19 @@ function returnToApp(state: string, result: { code: string } | { error: string }
   target.searchParams.set('facebookState', state)
   if ('code' in result) target.searchParams.set('facebookCode', result.code)
   else target.searchParams.set('facebookError', result.error)
-  return new Response(null, { status: 302, headers: { Location: target.href, 'Set-Cookie': cookie(state, '', 0), 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' } })
+  const headers = new Headers({ Location: target.href, 'Set-Cookie': cookie(state, '', 0), 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' })
+  const cookies = getCookies(createAuth().options)
+  for (const { name, attributes } of [cookies.sessionToken, cookies.sessionData]) {
+    headers.append('Set-Cookie', `${name}=; Max-Age=0; Path=${attributes.path ?? '/'}${attributes.domain ? `; Domain=${attributes.domain}` : ''}; HttpOnly; SameSite=Lax${attributes.secure ? '; Secure' : ''}`)
+  }
+  return new Response(null, { status: 302, headers })
+}
+
+function oauthError(error: string | null) {
+  if (error === 'access_denied' || error === 'user_cancelled') return 'cancelled'
+  if (error === 'account_not_linked') return 'not_linked'
+  if (error?.toLowerCase() === 'banned_user') return 'banned'
+  return 'failed'
 }
 
 // Raw HTTP handlers: OAuth needs browser cookies and redirects, rather than a server-function JSON envelope.
@@ -60,22 +73,22 @@ export async function handleMobileFacebook(request: Request): Promise<Response> 
     }
     if (path === `${PREFIX}/facebook/start` && request.method === 'GET') {
       const state = url.searchParams.get('state')
-      if (!validSecret(state)) return invalid()
+      if (!validSecret(state)) return returnToApp('invalid', { error: 'expired' })
       const row = await read(key('flow', state))
-      if (!row) return invalid()
+      if (!row) return returnToApp(state, { error: 'expired' })
       const flow: Flow = JSON.parse(row.value)
-      if (flow.browserHash || flow.redirectUri !== MOBILE_AUTH_REDIRECT) return invalid()
+      if (flow.browserHash || flow.redirectUri !== MOBILE_AUTH_REDIRECT) return returnToApp(state, { error: 'expired' })
       const browser = secret()
       const claimed = await getDb().update(verification).set({ value: JSON.stringify({ ...flow, browserHash: await digest(browser) }) })
         .where(and(eq(verification.id, row.id), eq(verification.value, row.value), gt(verification.expiresAt, new Date()))).returning()
-      if (!claimed.length) return invalid()
+      if (!claimed.length) return returnToApp(state, { error: 'expired' })
       const callbackURL = `${new URL(getEnv().BETTER_AUTH_URL).origin}${PREFIX}/facebook/callback?state=${state}`
       const response = await createAuth().api.signInSocial({
         body: { provider: 'facebook', callbackURL, errorCallbackURL: `${callbackURL}&failed=1`, disableRedirect: true },
         headers: request.headers, asResponse: true,
       })
       const data = await response.json() as { url?: string }
-      if (!response.ok || !data.url) return invalid()
+      if (!response.ok || !data.url) return returnToApp(state, { error: 'failed' })
       const headers = new Headers(response.headers)
       headers.delete('content-type')
       headers.set('Location', data.url)
@@ -86,15 +99,16 @@ export async function handleMobileFacebook(request: Request): Promise<Response> 
     }
     if (path === `${PREFIX}/facebook/callback` && request.method === 'GET') {
       const state = url.searchParams.get('state')
-      if (!validSecret(state)) return invalid()
+      if (!validSecret(state)) return returnToApp('invalid', { error: 'expired' })
       const row = await read(key('flow', state))
-      if (!row) return invalid()
+      if (!row) return returnToApp(state, { error: 'expired' })
       const flow: Flow = JSON.parse(row.value)
       const browser = request.headers.get('cookie')?.split(';').map((part) => part.trim()).find((part) => part.startsWith(`${cookieName(state)}=`))?.slice(cookieName(state).length + 1)
-      if (!validSecret(browser) || !flow.browserHash || await digest(browser) !== flow.browserHash || flow.redirectUri !== MOBILE_AUTH_REDIRECT) return invalid()
-      if (!await consume(row)) return invalid()
-      if (url.searchParams.has('failed')) return returnToApp(state, { error: 'cancelled' })
-      const session = await createAuth().api.getSession({ headers: request.headers, query: { disableCookieCache: true } })
+      if (!validSecret(browser) || !flow.browserHash || await digest(browser) !== flow.browserHash || flow.redirectUri !== MOBILE_AUTH_REDIRECT) return returnToApp(state, { error: 'expired' })
+      if (!await consume(row)) return returnToApp(state, { error: 'expired' })
+      if (url.searchParams.has('failed')) return returnToApp(state, { error: oauthError(url.searchParams.get('error')) })
+      if (!flow.token) return returnToApp(state, { error: 'failed' })
+      const session = await createAuth().api.getSession({ headers: new Headers({ Authorization: `Bearer ${flow.token}` }), query: { disableCookieCache: true } })
       if (!session || session.user.isAnonymous || session.user.banned) return returnToApp(state, { error: 'failed' })
       const code = secret()
       await save(key('code', await digest(code)), { ...flow, token: session.session.token }, Date.now() + CODE_MS)
