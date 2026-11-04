@@ -44,6 +44,7 @@ function memoryStore(initial: Record<string, unknown> = {}) {
 function setup(overrides: {
   permission?: string
   isDevice?: boolean
+  platform?: string
   projectId?: string | null
   authed?: boolean
   timezone?: string
@@ -84,6 +85,7 @@ function setup(overrides: {
   const deps = {
     notifications,
     isDevice: overrides.isDevice ?? true,
+    platform: overrides.platform ?? 'ios',
     projectId: overrides.projectId === undefined ? 'proj-1' : overrides.projectId,
     secure,
     store,
@@ -127,7 +129,7 @@ test('denied posts nothing and stores nothing', async () => {
 })
 
 test.each([
-  ['not a device', { isDevice: false }],
+  ['an iOS simulator', { isDevice: false, platform: 'ios' }],
   ['missing project id', { projectId: null }],
 ])('unavailable quietly when %s', async (_name, overrides) => {
   const { push, notifications, putExpoToken, deps } = setup(overrides)
@@ -135,6 +137,14 @@ test.each([
   expect(notifications.setNotificationChannelAsync).not.toHaveBeenCalled()
   expect(notifications.requestPermissionsAsync).not.toHaveBeenCalled()
   expect(putExpoToken).not.toHaveBeenCalled()
+})
+
+test('an Android emulator with Google Play services asks for permission and registers', async () => {
+  const { push, order, putExpoToken, secure, deps } = setup({ isDevice: false, platform: 'android' })
+  await expect(push.enablePush(deps)).resolves.toBe('granted')
+  expect(order).toEqual(['channel', 'permission', 'token', 'post'])
+  expect(putExpoToken).toHaveBeenCalledWith({ token: 'ExponentPushToken[abc]', timezone: 'America/New_York' })
+  expect(secure.data.get(push.PUSH_SECURE_KEY)).toBe('ExponentPushToken[abc]')
 })
 
 test('failed post keeps the secure token, marks pending, resolves granted', async () => {
@@ -377,7 +387,7 @@ function authHarness(marker: unknown = true) {
   }
   jest.doMock('expo-secure-store', () => secure)
   jest.doMock('./kv', () => ({ ...store, clearPrefix }))
-  jest.doMock('react-native', () => ({ AppState: source }))
+  jest.doMock('react-native', () => ({ AppState: source, Platform: { OS: 'android' } }))
   jest.doMock('expo-device', () => ({ isDevice: true }))
   jest.doMock('expo-constants', () => ({ default: { expoConfig: { extra: { eas: { projectId: 'project-349' } } } } }))
   jest.doMock('expo-notifications', () => notifications)
