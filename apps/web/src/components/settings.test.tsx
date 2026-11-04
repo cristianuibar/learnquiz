@@ -155,6 +155,23 @@ it('shows staff links and the test push only to staff', async () => {
   expect(container.textContent).toContain('Test push accepted.')
 })
 
+it('subscribes again after a test push finds the subscription expired', async () => {
+  const endpoint = 'https://push.example/expired'
+  const expired = sub(endpoint)
+  const fresh = sub('https://push.example/fresh')
+  registration.pushManager.subscribe.mockResolvedValue(fresh)
+  vi.mocked(sendTestPush).mockRejectedValueOnce(Object.assign(new Error('This subscription expired. Disable notifications, then enable them again.'), { status: 410 }))
+  await render({ user: { ...learner, role: 'admin' }, push: { isStaff: true, endpoints: [endpoint] }, current: expired })
+  await click(byText('button', 'Send test push'))
+  expect(alertText()).toBe('This subscription expired. Disable notifications, then enable them again.')
+  await click(switchEl())
+  await click(switchEl())
+  expect(expired.unsubscribe).toHaveBeenCalledOnce()
+  expect(subscribe).toHaveBeenCalledExactlyOnceWith({ data: { endpoint: 'https://push.example/fresh', keys: { p256dh: 'pk', auth: 'au' } } })
+  await click(byText('button', 'Send test push'))
+  expect(sendTestPush).toHaveBeenLastCalledWith({ data: { endpoint: 'https://push.example/fresh' } })
+})
+
 it('hides staff links from a regular learner', async () => {
   await render()
   expect(container.textContent).not.toContain('portal')
