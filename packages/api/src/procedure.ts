@@ -124,25 +124,23 @@ export function layoutProcedure(graph: ProcedureGraph, width: number): Procedure
 }
 
 export function describeProcedure(graph: ProcedureGraph): string {
-  const { out, order } = traverse(graph)
+  const { out, order, layer } = traverse(graph)
   const number = new Map(order.map((id, i) => [id, i + 1]))
   const byId = new Map(graph.nodes.map((n) => [n.id, n]))
   const target = (id: string) => `step ${number.get(id)}, ${byId.get(id)!.label}`
+  const destination = (edge: ProcedureEdge) => layer.get(edge.to)! <= layer.get(edge.from)!
+    ? `go back to: ${byId.get(edge.to)!.label}`
+    : `go to ${target(edge.to)}`
   const lines = order.map((id) => {
     const node = byId.get(id)!
     const edges = out.get(id)!
     const mark = node.critical ? ' (critical step)' : ''
+    const rest = edges.map((edge) => `${edge.label ? `If ${edge.label},` : 'Then'} ${destination(edge)}.`).join(' ')
     if (node.kind === 'decision') {
-      const branch = (label: 'yes' | 'no') => {
-        const edge = edges.find((e) => e.label === label)
-        return edge ? `If ${label}, go to ${target(edge.to)}.` : ''
-      }
-      const rest = [branch('yes'), branch('no')].filter(Boolean).join(' ')
       const question = node.label.endsWith('?') ? node.label : `${node.label}?`
       return `${number.get(id)}. ${question}${mark} ${rest}`.trim()
     }
-    const next = edges[0]
-    return `${number.get(id)}. ${node.label}${mark}.${next ? ` Then go to ${target(next.to)}.` : ''}`
+    return `${number.get(id)}. ${node.label}${mark}.${rest ? ` ${rest}` : ''}`
   })
   return lines.join('\n')
 }
