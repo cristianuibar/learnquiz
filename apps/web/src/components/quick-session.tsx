@@ -16,7 +16,7 @@ import { isAnswerReady } from '@learnquiz/api'
 import type { Answer, Confidence, ItemView, Reveal, SessionView } from '@learnquiz/api'
 import { revealCopy, revealModel } from '@learnquiz/api/reveal'
 import { checkFailedMessage } from '@learnquiz/api/system-copy'
-import { answerItem, endSession } from '@/server/play'
+import { answerItem, endSession, getSession } from '@/server/play'
 
 const rootApi = getRouteApi('__root__')
 
@@ -190,6 +190,7 @@ function ResultView({ item, result }: { item: ItemView; result: Result }) {
 function Question({ view, item, onResult, onGone }: { view: SessionView; item: ItemView; onResult(r: Result): void; onGone(s: 'unavailable' | 'answered'): void }) {
   const check = useServerFn(answerItem)
   const end = useServerFn(endSession)
+  const load = useServerFn(getSession)
   const [choice, setChoice] = useState('')
   const [confidence, setConfidence] = useState<Confidence | null>(null)
   const [busy, setBusy] = useState(false)
@@ -214,7 +215,12 @@ function Question({ view, item, onResult, onGone }: { view: SessionView; item: I
       const reviewsLeft = await end({ data: { sessionId: view.id } }).then((s) => s.reviewsLeft, () => null)
       onResult({ reveal, chosen: chosenText(item, answer), reviewsLeft })
     } catch (err) {
-      const gone = goneState(err)
+      let gone = goneState(err)
+      // A claim still held by an earlier request is refused as answered too; only the session says whether an answer was stored.
+      if (gone === 'answered') {
+        const fresh = await load({ data: { sessionId: view.id } }).catch(() => null)
+        if (!fresh || (!fresh.ended && fresh.item)) gone = null
+      }
       // Nothing was stored, so close the mini session instead of leaving it open.
       if (gone === 'unavailable') void end({ data: { sessionId: view.id } }).catch(() => {})
       if (gone) onGone(gone)

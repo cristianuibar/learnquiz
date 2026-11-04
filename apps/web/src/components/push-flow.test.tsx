@@ -254,16 +254,21 @@ it('announces Report sent on the result only after the report sheet stops hiding
 })
 
 it.each([
-  { message: 'This question has been retired', heading: "This question isn't available any more.", ends: true },
-  { message: 'Already answered. Continue to the next question.', heading: 'You already answered this question.', ends: false },
-])('says $heading when Check is refused with 409 "$message"', async ({ message, heading, ends }) => {
+  { message: 'This question has been retired', after: quickView, heading: "This question isn't available any more.", ends: true },
+  { message: 'Already answered. Continue to the next question.', after: { ...quickView, ended: true, item: null }, heading: 'You already answered this question.', ends: false },
+  // An earlier request still holds the answer claim: nothing is stored yet, so the question stays for Try again.
+  { message: 'Already answered. Continue to the next question.', after: quickView, heading: 'x + 1 = 2; what is x?', ends: false },
+])('shows "$heading" when Check is refused with 409 "$message"', async ({ message, after, heading, ends }) => {
   mockQuickAnswer()
+  vi.mocked(getSession).mockResolvedValueOnce(quickView).mockResolvedValueOnce(after)
   vi.mocked(answerItem).mockRejectedValue(Object.assign(new Error(message), { status: 409 }))
   const { container, cleanup } = await renderApp('/play/quick/i1?pushId=push-1')
   try {
     await checkQuick(container)
     expect(container.querySelector('h1')?.textContent).toBe(heading)
-    expect([...container.querySelectorAll('a[href="/today"]')].map((a) => a.textContent?.trim())).toContain('Back to Today')
+    const stays = heading === quickView.item!.stem
+    expect(container.querySelector('[role="alert"]')?.textContent ?? null).toBe(stays ? 'Couldn’t check your answer.' : null)
+    expect([...document.body.querySelectorAll('button')].some((b) => b.textContent?.trim() === 'Try again')).toBe(stays)
     expect(vi.mocked(endSession).mock.calls).toEqual(ends ? [[{ data: { sessionId: 'mini-1' } }]] : [])
   } finally { await cleanup() }
 })
