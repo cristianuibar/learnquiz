@@ -126,6 +126,26 @@ it('Discard restores the saved values without a request', async () => {
   expect(saveCompanySettings).not.toHaveBeenCalled()
 })
 
+it('switching to another company drops the previous company draft before saving', async () => {
+  vi.mocked(saveCompanySettings).mockResolvedValue(undefined as never)
+  const c = document.createElement('div')
+  document.body.appendChild(c)
+  const root = createRoot(c)
+  roots.push({ unmount: () => root.unmount(), container: c })
+  await act(async () => root.render(<SettingsForm settings={settings} />))
+  await setValue(field(c, '#name'), 'Alpha draft')
+  await setValue(field(c, '#timezone'), 'UTC')
+
+  const beta = { ...(settings as object), slug: 'beta', name: 'Beta Corp' } as never
+  await act(async () => root.render(<SettingsForm settings={beta} />))
+  expect(field<HTMLInputElement>(c, '#name').value).toBe('Beta Corp')
+  expect(field<HTMLInputElement>(c, '#timezone').value).toBe('America/Chicago')
+  await click(button(c, 'Save changes'))
+  expect(sent(0).get('slug')).toBe('beta')
+  expect(sent(0).get('name')).toBe('Beta Corp')
+  expect(sent(0).get('timezone')).toBe('America/Chicago')
+})
+
 it('a reload after a save keeps edits made while it was saving', async () => {
   let finish = () => {}
   vi.mocked(saveCompanySettings)

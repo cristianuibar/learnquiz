@@ -84,7 +84,14 @@ function Section({ id, title, children }: { id: string; title: string; children:
 
 const Divider = () => <hr className="m-0 border-0 border-t border-border" />
 
-export function SettingsForm({ settings, onSaved }: { settings: Settings; onSaved?: () => unknown }) {
+type FormProps = { settings: Settings; onSaved?: () => unknown }
+
+// Another company's settings start a fresh form, so no draft or in-flight save carries over.
+export function SettingsForm(props: FormProps) {
+  return <CompanyForm key={props.settings.slug} {...props} />
+}
+
+function CompanyForm({ settings, onSaved }: FormProps) {
   const uid = useId()
   const base = baselineOf(settings)
   const [baseline, setBaseline] = useState<Values>(base)
