@@ -5,7 +5,7 @@ import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet
 import { PortalProvider } from '@/components/portal/portal-context'
 import { afterEach, expect, it, vi } from 'vitest'
 import { Route as roleDetailRoute } from '@/routes/org.$slug.roles_.$roleId'
-import { retireRoleDocument, uploadRoleDocument } from '@/server/role-documents'
+import { retireRoleDocument } from '@/server/role-documents'
 import { getRoleDetail, updateRoleConcept } from '@/server/role-detail'
 
 vi.mock('@/server/role-detail', () => ({ getRoleDetail: vi.fn(), updateRoleConcept: vi.fn() }))
@@ -113,21 +113,101 @@ it('shows the page and pasted-text meta on file rows', async () => {
   expect(container.textContent).toContain('Pasted text · 6,240 characters · Nov 2, 2026 · Dana Whitaker')
 })
 
-it('uploads the chosen PDF with the slug, role id and file', async () => {
-  vi.mocked(uploadRoleDocument).mockResolvedValue({ ok: true } as never)
-  const { container, button } = await mount(makeDetail())
+class FakeXhr {
+  static instances: FakeXhr[] = []
+  upload: { onprogress: ((e: { loaded: number; total: number }) => void) | null } = { onprogress: null }
+  onload: (() => void | Promise<void>) | null = null
+  onerror: (() => void) | null = null
+  status = 0
+  responseText = ''
+  withCredentials = false
+  open = vi.fn()
+  send = vi.fn()
+  abort = vi.fn()
+  constructor() { FakeXhr.instances.push(this) }
+}
+
+async function pickFile(container: HTMLElement, file: File) {
   const input = container.querySelector<HTMLInputElement>('input[type="file"]')!
-  const clickSpy = vi.spyOn(input, 'click')
-  await act(async () => { button('Upload PDF')!.click() })
-  expect(clickSpy).toHaveBeenCalled()
-  const file = new File(['%PDF'], 'sop.pdf', { type: 'application/pdf' })
   Object.defineProperty(input, 'files', { value: [file], configurable: true })
   await act(async () => { input.dispatchEvent(new Event('change', { bubbles: true })) })
-  expect(uploadRoleDocument).toHaveBeenCalledTimes(1)
-  const sent = vi.mocked(uploadRoleDocument).mock.calls[0]![0] as unknown as { data: FormData }
-  expect(sent.data.get('slug')).toBe('x')
-  expect(sent.data.get('roleId')).toBe('r1')
-  expect((sent.data.get('file') as File).name).toBe('sop.pdf')
+}
+const statusText = (container: HTMLElement) => container.querySelector('[role="status"]')!.textContent
+const MB = 1048576
+
+it('rejects a PDF over 10 MB before sending anything and keeps focus where it was', async () => {
+  vi.stubGlobal('XMLHttpRequest', FakeXhr)
+  FakeXhr.instances = []
+  const { container, button } = await mount(makeDetail())
+  button('Upload PDF')!.focus()
+  const focused = document.activeElement
+  const file = new File(['x'], 'Forklift manual.pdf', { type: 'application/pdf' })
+  Object.defineProperty(file, 'size', { value: 11 * MB })
+  await pickFile(container, file)
+  expect(FakeXhr.instances).toHaveLength(0)
+  expect(container.querySelector('[role="alert"]')!.textContent).toBe("Forklift manual.pdf wasn't uploaded. It's 11.0 MB; the limit is 10 MB. Split it or export a smaller PDF.")
+  expect(document.activeElement).toBe(focused)
+  await act(async () => { button('Dismiss')!.click() })
+  expect(container.querySelector('[role="alert"]')).toBeNull()
+})
+
+it('posts the PDF with progress, announcing only at quarter steps', async () => {
+  vi.stubGlobal('XMLHttpRequest', FakeXhr)
+  FakeXhr.instances = []
+  const { container, button } = await mount(makeDetail({ documents: [pdf] }))
+  const file = new File(['%PDF'], 'sop.pdf', { type: 'application/pdf' })
+  Object.defineProperty(file, 'size', { value: 2.4 * MB })
+  await pickFile(container, file)
+  const xhr = FakeXhr.instances[0]!
+  expect(xhr.open).toHaveBeenCalledWith('POST', '/api/org/x/roles/r1/documents')
+  expect(xhr.withCredentials).toBe(true)
+  expect((xhr.send.mock.calls[0]![0] as FormData).get('file')).toBe(file)
+  const progress = async (pct: number) => act(async () => { xhr.upload.onprogress!({ loaded: (pct / 100) * 2.4 * MB, total: 2.4 * MB }) })
+  await progress(10)
+  expect(statusText(container)).toBe('')
+  await progress(30)
+  expect(statusText(container)).toBe('Uploading sop.pdf, 25%')
+  await progress(40)
+  expect(statusText(container)).toBe('Uploading sop.pdf, 25%')
+  await progress(55)
+  expect(statusText(container)).toBe('Uploading sop.pdf, 50%')
+  const bar = container.querySelector('[role="progressbar"]')!
+  expect(bar.getAttribute('aria-valuetext')).toBe('1.3 of 2.4 MB')
+  const build = button('Build curriculum')!
+  expect(build.hasAttribute('disabled')).toBe(true)
+  expect(build.getAttribute('data-variant')).not.toBe('accent')
+})
+
+it('cancels an upload in flight and removes its row', async () => {
+  vi.stubGlobal('XMLHttpRequest', FakeXhr)
+  FakeXhr.instances = []
+  const { container, button } = await mount(makeDetail())
+  await pickFile(container, new File(['%PDF'], 'sop.pdf', { type: 'application/pdf' }))
+  expect(container.querySelector('[role="progressbar"]')).not.toBeNull()
+  await act(async () => { button('Cancel upload')!.click() })
+  expect(FakeXhr.instances[0]!.abort).toHaveBeenCalled()
+  expect(container.querySelector('[role="progressbar"]')).toBeNull()
+  expect(container.querySelector('[role="alert"]')).toBeNull()
+})
+
+it('swaps the uploading row for the new document, announces it and moves focus to Replace', async () => {
+  vi.stubGlobal('XMLHttpRequest', FakeXhr)
+  FakeXhr.instances = []
+  const { container, button } = await mount(makeDetail())
+  await pickFile(container, new File(['%PDF'], 'sop.pdf', { type: 'application/pdf' }))
+  button('Cancel upload')!.focus()
+  const added: Doc = { ...pdf, id: 'new1', title: 'sop' }
+  vi.mocked(getRoleDetail).mockResolvedValue(makeDetail({ documents: [added] }) as never)
+  const before = vi.mocked(getRoleDetail).mock.calls.length
+  const xhr = FakeXhr.instances[0]!
+  xhr.status = 200
+  xhr.responseText = JSON.stringify({ sourceId: 'new1', topicId: 't1', r2Key: 'k', chars: 10, version: 1 })
+  await act(async () => { await xhr.onload!() })
+  await vi.waitFor(() => expect(vi.mocked(getRoleDetail).mock.calls.length).toBeGreaterThan(before))
+  await vi.waitFor(() => expect(container.querySelector('[role="progressbar"]')).toBeNull())
+  expect(container.textContent).toContain('sop')
+  expect(statusText(container)).toBe('sop.pdf uploaded. 1 document ready.')
+  expect(document.activeElement).toBe(button('Replace sop'))
 })
 
 it('flags pasted text over the limit without trimming it', async () => {
