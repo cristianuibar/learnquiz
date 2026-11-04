@@ -43,7 +43,7 @@ function Today() {
   useEffect(() => {
     if (!building) return
     const timer = setInterval(() => {
-      if (document.visibilityState === 'visible') void router.invalidate()
+      if (document.visibilityState === 'visible' && navigator.onLine) void router.invalidate()
     }, 15000)
     return () => clearInterval(timer)
   }, [building, router])

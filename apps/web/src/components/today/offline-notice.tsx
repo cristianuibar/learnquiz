@@ -21,7 +21,8 @@ export function OfflineNotice({ id }: { id: string }) {
   const router = useRouter()
 
   async function retry() {
-    await router.invalidate()
+    // Reloading while offline would fail the loader and replace Today with the route error.
+    if (navigator.onLine) await router.invalidate()
     window.dispatchEvent(new Event(navigator.onLine ? 'online' : 'offline'))
   }
 

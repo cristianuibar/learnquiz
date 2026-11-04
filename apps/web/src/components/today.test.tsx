@@ -164,6 +164,24 @@ describe('Today interactions', () => {
     }
   })
 
+  it('keeps Today while offline when the building poll or Try again would reload', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
+    vi.setSystemTime(todayFixtureNow)
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    const { container, buttons, cleanup } = await renderToday(todayFixtures.building)
+    try {
+      vi.mocked(getToday).mockRejectedValue(new TypeError('Failed to fetch'))
+      await act(async () => { vi.advanceTimersByTime(15_000) })
+      await act(async () => { buttons().find((b) => b.textContent === 'Try again')!.click() })
+      expect(getToday).toHaveBeenCalledTimes(1)
+      expect(container.querySelector('h2')?.textContent).toBe('Building your questions')
+      expect(container.textContent).toContain('You’re offline')
+      expect(playButton(buttons())!.hasAttribute('disabled')).toBe(true)
+    } finally {
+      await cleanup()
+    }
+  })
+
   it('starts a session when Play is pressed', async () => {
     vi.mocked(startSession).mockResolvedValue({ sessionId: 's1' })
     const { router, buttons, cleanup } = await renderToday(todayFixtures.normal)
