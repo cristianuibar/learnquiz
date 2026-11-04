@@ -28,7 +28,8 @@ export function DiagramImage({ image }: { image: NonNullable<ItemView['image']> 
       width={image.width}
       height={image.height}
       onError={() => setFailed(true)}
-      style={{ aspectRatio: `${image.width} / ${image.height}` }}
+      // Cap the width so a tall diagram stays within 280px high without letterboxing inside the rim.
+      style={{ aspectRatio: `${image.width} / ${image.height}`, maxWidth: `min(100%, ${(280 * image.width) / image.height}px)` }}
       className="max-h-[280px] w-full rounded-md border-[1.5px] border-border-strong bg-white object-contain"
     />
   )
