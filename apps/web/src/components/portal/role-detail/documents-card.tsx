@@ -139,7 +139,7 @@ export function DocumentsCard({ detail, readOnly, pasteOpen, pasteFor, onToggleP
       ...(p.orphaned > 0 ? [{
         icon: FileX,
         text: p.orphaned === 1
-          ? `The ${other ? 'other' : '1'} ${doc.title} concept has no other source. It leaves training until you add a document.`
+          ? `The ${other}${doc.title} concept has no other source. It leaves training until you add a document.`
           : `The ${other}${p.orphaned} ${doc.title} concepts have no other source. They leave training until you add a document.`,
       }] : []),
       { icon: Users, text: 'People keep their progress. Nothing is deleted.' },

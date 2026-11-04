@@ -305,6 +305,23 @@ it('retires a document after a confirmation that lists the consequences', async 
   await vi.waitFor(() => expect(vi.mocked(getRoleDetail).mock.calls.length).toBeGreaterThan(before))
 })
 
+it('names a single orphaned concept without a count', async () => {
+  const lines = async (preview: { questions: number; alsoIn: { concept: string; document: string }[]; orphaned: number }) => {
+    vi.mocked(previewRetireRoleDocument).mockResolvedValue(preview)
+    const { button, cleanup } = await renderDetail(makeDetail({ status: 'ready', documents: [pdf] }))
+    await act(async () => { button('More actions for Till handbook')!.click() })
+    const item = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((b) => b.textContent === 'Retire')!
+    await act(async () => { item.click() })
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!
+    const text = [...document.getElementById(dialog.getAttribute('aria-describedby')!)!.querySelectorAll('li')].map((li) => li.textContent)
+    await cleanup()
+    return text
+  }
+  expect(await lines({ questions: 4, alsoIn: [], orphaned: 1 })).toContain('The Till handbook concept has no other source. It leaves training until you add a document.')
+  expect(await lines({ questions: 4, alsoIn: [{ concept: 'Cash float', document: 'Picking SOP v3' }], orphaned: 1 })).toContain('The other Till handbook concept has no other source. It leaves training until you add a document.')
+  expect(await lines({ questions: 4, alsoIn: [], orphaned: 2 })).toContain('The 2 Till handbook concepts have no other source. They leave training until you add a document.')
+})
+
 it('keeps the old row live while a replacement uploads', async () => {
   vi.stubGlobal('XMLHttpRequest', FakeXhr)
   FakeXhr.instances = []
