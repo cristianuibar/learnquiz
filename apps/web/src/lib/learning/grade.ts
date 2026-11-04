@@ -13,6 +13,8 @@ export function normalize(text: string): string {
 }
 
 function numericExpression(text: string): string | null {
+  // Preserve the comma and percent-sign tolerance of prose normalization.
+  text = text.replace(/[,%]/g, '')
   if (!/\d/.test(text) || !/^[\d\s.+/−-]+$/.test(text)) return null
   return text.trim().replace(/−/g, '-').replace(/\s*([+/-])\s*/g, '$1')
 }
