@@ -23,6 +23,9 @@ for (const [theme, index] of [['light', 0], ['dark', 1]] as const) {
     it('on-accent against accent meets AA', () => {
       expect(contrast(colors['on-accent'][index], colors.accent[index])).toBeGreaterThanOrEqual(4.5)
     })
+    it('on-inverse against surface-inverse meets AA', () => {
+      expect(contrast(colors['on-inverse'][index], colors['surface-inverse'][index])).toBeGreaterThanOrEqual(4.5)
+    })
   })
 }
 

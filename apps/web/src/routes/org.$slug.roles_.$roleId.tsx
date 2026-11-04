@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
+import { FieldError, fieldProps } from '@/components/admin/field-error'
 import { RouteError, errorMessage, fieldErrors } from '@/components/inline-error'
 import { RoleDocumentForm } from '@/components/role-document-form'
 import { Button } from '@/components/ui/button'
@@ -203,8 +204,8 @@ function ConceptItem({ concept: c, slug, readOnly }: { concept: Concept; slug: s
         <form className="mt-3 flex max-w-xl flex-col gap-4" onSubmit={save}>
           <div className="flex flex-col gap-2">
             <Label htmlFor={`name-${c.id}`}>Concept name</Label>
-            <Input id={`name-${c.id}`} name="name" defaultValue={c.name} maxLength={80} required aria-invalid={!!fields.name || undefined} aria-describedby={fields.name ? `name-${c.id}-error` : undefined} />
-            {fields.name && <p id={`name-${c.id}-error`} role="alert" className="text-body font-medium text-wrong">{fields.name}</p>}
+            <Input id={`name-${c.id}`} name="name" defaultValue={c.name} maxLength={80} required {...fieldProps(`name-${c.id}`, fields.name)} />
+            {fields.name && <FieldError id={`name-${c.id}`}>{fields.name}</FieldError>}
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor={`summary-${c.id}`}>Summary</Label>
@@ -215,11 +216,10 @@ function ConceptItem({ concept: c, slug, readOnly }: { concept: Concept; slug: s
               defaultValue={c.summary}
               maxLength={400}
               required
-              aria-invalid={!!fields.summary || undefined}
-              aria-describedby={fields.summary ? `summary-${c.id}-error` : undefined}
+              {...fieldProps(`summary-${c.id}`, fields.summary)}
               className={`w-full rounded-md border border-input bg-transparent px-3 py-2 text-body ${ring}`}
             />
-            {fields.summary && <p id={`summary-${c.id}-error`} role="alert" className="text-body font-medium text-wrong">{fields.summary}</p>}
+            {fields.summary && <FieldError id={`summary-${c.id}`}>{fields.summary}</FieldError>}
           </div>
           <div className="flex gap-2">
             <Button type="submit" className="px-6" disabled={busy}>{busy ? 'Saving…' : 'Save'}</Button>

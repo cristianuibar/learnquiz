@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
+import { FieldError, fieldProps } from '@/components/admin/field-error'
 import { RouteError, errorMessage, fieldErrors, useFocusInvalid } from '@/components/inline-error'
 import { RoleDocumentForm } from '@/components/role-document-form'
 import { Button } from '@/components/ui/button'
@@ -78,18 +79,18 @@ function Roles() {
         <form ref={formRef} className="mt-6 flex max-w-xl flex-col gap-6" onSubmit={submit}>
           <div className="flex flex-col gap-2">
             <Label htmlFor="name">Role name</Label>
-            <Input id="name" name="name" maxLength={80} required aria-invalid={!!fields.name || undefined} aria-describedby={fields.name ? 'name-error' : undefined} />
-            {fields.name && <p id="name-error" role="alert" className="text-body font-medium text-wrong">{fields.name}</p>}
+            <Input id="name" name="name" maxLength={80} required {...fieldProps('name', fields.name)} />
+            {fields.name && <FieldError id="name">{fields.name}</FieldError>}
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="benchmark">Benchmark (%)</Label>
-            <Input id="benchmark" name="benchmark" type="number" min={50} max={100} step="any" defaultValue={85} required aria-invalid={!!fields.benchmark || undefined} aria-describedby={fields.benchmark ? 'benchmark-error' : undefined} />
-            {fields.benchmark && <p id="benchmark-error" role="alert" className="text-body font-medium text-wrong">{fields.benchmark}</p>}
+            <Input id="benchmark" name="benchmark" type="number" min={50} max={100} step="any" defaultValue={85} required {...fieldProps('benchmark', fields.benchmark)} />
+            {fields.benchmark && <FieldError id="benchmark">{fields.benchmark}</FieldError>}
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="onboardingDays">Onboarding days</Label>
-            <Input id="onboardingDays" name="onboardingDays" type="number" min={1} max={365} step={1} defaultValue={30} required aria-invalid={!!fields.onboardingDays || undefined} aria-describedby={fields.onboardingDays ? 'onboardingDays-error' : undefined} />
-            {fields.onboardingDays && <p id="onboardingDays-error" role="alert" className="text-body font-medium text-wrong">{fields.onboardingDays}</p>}
+            <Input id="onboardingDays" name="onboardingDays" type="number" min={1} max={365} step={1} defaultValue={30} required {...fieldProps('onboardingDays', fields.onboardingDays)} />
+            {fields.onboardingDays && <FieldError id="onboardingDays">{fields.onboardingDays}</FieldError>}
           </div>
           {error && <p role="alert" className="text-body font-medium text-wrong">{error}</p>}
           <Button type="submit" className="self-end px-6" disabled={busy}>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { renderSVG } from 'uqr'
+import { FieldError, fieldProps } from '@/components/admin/field-error'
 import { RouteError, useFocusInvalid } from '@/components/inline-error'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -148,13 +149,13 @@ function People() {
       {!org.readOnly && <form className="mt-8 flex max-w-xl flex-col gap-6" ref={formRef} onSubmit={invite}>
         <div className="flex flex-col gap-2">
           <Label htmlFor="name">Name</Label>
-          <Input id="name" name="name" maxLength={80} required aria-invalid={!!fields.name || undefined} aria-describedby={fields.name ? 'name-error' : undefined} />
-          {fields.name && <p id="name-error" role="alert" className="text-body font-medium text-wrong">{fields.name}</p>}
+          <Input id="name" name="name" maxLength={80} required {...fieldProps('name', fields.name)} />
+          {fields.name && <FieldError id="name">{fields.name}</FieldError>}
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="email">Email</Label>
-          <Input id="email" name="email" type="email" required aria-invalid={!!fields.email || undefined} aria-describedby={fields.email ? 'email-error' : undefined} />
-          {fields.email && <p id="email-error" role="alert" className="text-body font-medium text-wrong">{fields.email}</p>}
+          <Input id="email" name="email" type="email" required {...fieldProps('email', fields.email)} />
+          {fields.email && <FieldError id="email">{fields.email}</FieldError>}
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="role">Job role</Label>
