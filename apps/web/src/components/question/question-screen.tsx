@@ -77,7 +77,7 @@ export function QuestionScreen({
     <>
       <form
         id="play"
-        className="mt-6 flex flex-1 flex-col gap-6 pb-6"
+        className="mt-2 flex flex-1 flex-col gap-6 pb-6"
         onSubmit={(e) => {
           e.preventDefault()
           onCheck()
