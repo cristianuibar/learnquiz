@@ -1,5 +1,5 @@
 import { Check, ChevronDown } from 'lucide-react'
-import type { ComponentProps } from 'react'
+import { useState, type ComponentProps } from 'react'
 import { Status } from '@/components/admin/status-chip'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -35,6 +35,7 @@ export function QuestionRow({ question, critical, expanded, slug, sources, onTog
   onAct: (id: string, action: Action) => () => void
   onAnnounce: (message: string) => void
 }) {
+  const [editing, setEditing] = useState(false)
   const sid = stemId(question.id)
   const bodyId = `body-${question.id}`
   const toggle = (
@@ -53,7 +54,7 @@ export function QuestionRow({ question, critical, expanded, slug, sources, onTog
   )
   return (
     <li className="flex flex-col">
-      {expanded ? (
+      {!editing && (expanded ? (
         <div className="flex items-start gap-3 pt-3 pr-2 pb-1 pl-4">
           <div className="flex min-w-0 flex-1 flex-col gap-2">
             <h4 id={sid} tabIndex={-1} className="text-body-lg font-semibold text-ink outline-none">{question.payload.stem}</h4>
@@ -77,10 +78,10 @@ export function QuestionRow({ question, critical, expanded, slug, sources, onTog
           <span className="text-caption text-ink-muted tabular-nums max-md:hidden">{`Difficulty ${question.difficulty}`}</span>
           {toggle}
         </div>
-      )}
+      ))}
       {expanded && (
         <div id={bodyId} className="px-4 pb-4">
-          <QuestionDetails question={question} slug={slug} sources={sources} stemId={sid} onAct={onAct} onAnnounce={onAnnounce} />
+          <QuestionDetails question={question} slug={slug} sources={sources} stemId={sid} editing={editing} onEditingChange={setEditing} onAct={onAct} onAnnounce={onAnnounce} />
         </div>
       )}
     </li>

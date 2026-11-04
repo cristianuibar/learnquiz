@@ -213,6 +213,27 @@ const typeIn = (el: HTMLInputElement, v: string) => act(async () => {
 })
 const sentData = () => vi.mocked(reviewQuestion).mock.calls[0]![0].data as { payload: ReturnType<typeof payload>; sourceId?: string }
 
+it.each(['mcq', 'short'])('replaces the display header while editing %s and restores it with focus after Cancel', async (format) => {
+  const p = { ...payload(format, format === 'mcq' ? [true, false] : []), accepted_answers: format === 'short' ? ['Cat'] : [] }
+  const c = await mountAt(review([{ ...concept('c', [{ id: 'q1', status: 'active', reviewedAt: null, payload: p }]), critical: true }], 1))
+  await act(async () => button(c, 'Edit').click())
+  const row = c.querySelector('form')!.closest('li')!
+  expect(button(row, 'Hide details')).toBeUndefined()
+  expect([...row.querySelectorAll('h4')].map((h) => h.textContent)).toEqual(['Edit question'])
+  expect([...row.querySelectorAll('[data-slot="status-chip"]')].map((s) => s.textContent)).toEqual(['Live'])
+  expect(row.textContent).not.toContain('Difficulty 2')
+  expect(document.activeElement).toBe(row.querySelector('h4'))
+  await act(async () => { row.querySelector<HTMLTextAreaElement>('textarea[name="stem"]')!.value = 'Unsaved draft' })
+  await act(async () => button(row, 'Cancel').click())
+  expect(document.activeElement).toBe(button(row, 'Edit'))
+  expect(row.querySelector('h4')!.textContent).toBe('Stem')
+  expect(button(row, 'Hide details')).toBeDefined()
+  expect(row.textContent).toContain('Difficulty 2')
+  expect(reviewQuestion).not.toHaveBeenCalled()
+  await act(async () => button(row, 'Edit').click())
+  expect(row.querySelector<HTMLTextAreaElement>('textarea[name="stem"]')!.value).toBe('Stem')
+})
+
 it('edits a multiple choice question: focuses the heading, saves correct option, difficulty and source, then refocuses Edit', async () => {
   const q = { id: 'q1', status: 'active', reviewedAt: null, payload: payload('mcq', [true, false, false, false]) }
   const c = await mountAt(review([concept('c', [q])], 1), '/org/x/questions', review([concept('c', [q])], 1))
@@ -222,6 +243,8 @@ it('edits a multiple choice question: focuses the heading, saves correct option,
   await act(async () => button(c, '4').click())
   await submit(c)
   await vi.waitFor(() => expect(document.activeElement).toBe(button(c, 'Edit')))
+  expect(c.querySelector('h4')!.textContent).toBe('Stem')
+  expect(button(c, 'Hide details')).toBeDefined()
   expect(sentData().payload.options.map((o) => o.is_correct)).toEqual([false, false, true, false])
   expect(sentData().payload.difficulty).toBe(4)
   expect(sentData().sourceId).toBe('doc1')
