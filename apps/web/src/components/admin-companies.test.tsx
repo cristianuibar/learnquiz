@@ -14,11 +14,11 @@ const seed = [
   { id: 'c3', name: 'Cedar', slug: 'cedar-bar', members: 2, roles: 4, documents: 6, activeLearners: 7, modelSpend: 55 },
 ]
 
-async function mount() {
+async function mount(component = companiesRoute.options.component) {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   vi.mocked(getCompanies).mockResolvedValue(seed as never)
   const rootRoute = createRootRoute({ component: Outlet })
-  const route = createRoute({ getParentRoute: (() => rootRoute) as never, path: '/admin/companies' as never, loader: companiesRoute.options.loader as never, component: companiesRoute.options.component })
+  const route = createRoute({ getParentRoute: (() => rootRoute) as never, path: '/admin/companies' as never, loader: companiesRoute.options.loader as never, component })
   const router = createRouter({ routeTree: rootRoute.addChildren([route as never]), history: createMemoryHistory({ initialEntries: ['/admin/companies'] }) })
   const container = document.createElement('div')
   document.body.appendChild(container)
@@ -89,5 +89,18 @@ it('keeps the 44px link and menu targets off the row height so loaded rows match
     expect([menu.classList.contains('size-11'), menu.closest('td > div')?.classList.contains('-my-1.5')]).toEqual([true, true])
   } finally {
     await cleanup()
+  }
+})
+
+it('fills the admin shell content column on the loaded and loading pages instead of nesting its own padding', async () => {
+  for (const component of [companiesRoute.options.component, companiesRoute.options.pendingComponent]) {
+    const { container, cleanup } = await mount(component)
+    try {
+      // The admin shell already caps at 1120 with px-4; md:p-8 here shrank the table to about 1024 and centered it.
+      const main = container.querySelector('main') as HTMLElement
+      expect([...main.classList].filter((c) => /^(md:)?p[xy]?-/.test(c))).toEqual(['p-0', 'md:p-0'])
+    } finally {
+      await cleanup()
+    }
   }
 })
