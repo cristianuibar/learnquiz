@@ -47,9 +47,12 @@ export function Curriculum({ detail, readOnly, controls, error, announce }: {
       if (total > 0) {
         announceRef.current(`${ready} of ${total} concepts ready. ${failed ? `${plural(failed, 'concept', 'concepts')} failed.` : 'Curriculum ready.'}`)
         setFinished(true)
+      } else {
+        // Replace "Finding concepts…" so the live region does not keep claiming a build is running.
+        announceRef.current(role.topicStatus === 'failed' ? 'Curriculum build failed. No concepts found.' : '')
       }
     }
-  }, [ready, failed, total, running])
+  }, [ready, failed, total, running, role.topicStatus])
 
   const readyText = `${ready} of ${total} concepts ready`
   const stats = `${plural(total, 'concept', 'concepts')} · ${plural(role.liveQuestions, 'live question', 'live questions')} · ${plural(role.criticalQuestions, 'critical question', 'critical questions')}`

@@ -236,6 +236,14 @@ it('announces finding concepts while a build has none yet, then the first count'
   expect(status()).toBe('0 of 2 concepts ready')
 })
 
+it('replaces finding concepts when a build fails before any concepts exist', async () => {
+  const { router, status } = await mount(makeDetail({ status: 'generating', documents: [pdf] }))
+  expect(status()).toBe('Finding concepts…')
+  vi.mocked(getRoleDetail).mockResolvedValue(makeDetail({ status: 'failed', documents: [pdf] }) as never)
+  await act(() => router.invalidate())
+  expect(status()).toBe('Curriculum build failed. No concepts found.')
+})
+
 it('counts only ready concepts when a build ends with a failed concept', async () => {
   const build = (readyN: number, status: string, failedN = 0) => {
     const list = Array.from({ length: 31 }, (_, i) => concept(`c${i}`, `Concept ${i}`, i < readyN ? 'ready' : i < readyN + failedN ? 'failed' : 'pending'))
