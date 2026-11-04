@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import { z } from 'zod'
-import { ItemBatch, ItemPayload } from './schemas'
+import { ItemBatch, ItemPayload, ProcedureGraph } from './schemas'
 
 it('accepts cloze drafts only when the stem contains exactly one blank', () => {
   const draft = {
@@ -53,4 +53,20 @@ it('keeps the model-facing item batch schema strict and free of image', () => {
   const { items } = z.toJSONSchema(ItemBatch).properties as { items: { items: { properties: object; required: string[] } } }
   expect(Object.keys(items.items.properties).sort()).toEqual([...items.items.required].sort())
   expect(items.items.properties).not.toHaveProperty('image')
+})
+
+const node = (id: string) => ({ id, kind: 'step' as const, label: `Step ${id}`, critical: false })
+const chain = (n: number) => Array.from({ length: n }, (_, i) => node(`n${i}`))
+
+it('accepts a 12-node procedure graph and rejects 13 nodes, dangling edges and duplicate ids', () => {
+  const edges = [{ from: 'n0', to: 'n1', label: null }]
+  expect(ProcedureGraph.safeParse({ nodes: chain(12), edges }).success).toBe(true)
+  expect(ProcedureGraph.safeParse({ nodes: chain(13), edges }).success).toBe(false)
+  expect(ProcedureGraph.safeParse({ nodes: chain(2), edges: [{ from: 'n0', to: 'missing', label: null }] }).success).toBe(false)
+  expect(ProcedureGraph.safeParse({ nodes: [node('a'), node('a')], edges: [] }).success).toBe(false)
+})
+
+it('keeps the model-facing procedure graph schema strict', () => {
+  const { nodes, edges } = z.toJSONSchema(ProcedureGraph).properties as { nodes: { items: { properties: object; required: string[] } }; edges: { items: { properties: object; required: string[] } } }
+  for (const s of [nodes.items, edges.items]) expect(Object.keys(s.properties).sort()).toEqual([...s.required].sort())
 })

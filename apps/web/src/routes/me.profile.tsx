@@ -21,11 +21,13 @@ export const Route = createFileRoute('/me/profile')({
 function MyProfile() {
   const { profile, today } = Route.useLoaderData()
   const { status } = Route.useSearch()
+  const { companyMember } = Route.useRouteContext()
   const first = today?.topic && today.plan?.playable && !today.role?.preparing ? { topicId: today.topic.id, placement: today.plan.start === 'placement' } : null
   return (
     <TrainingProgress
       profile={profile}
       self
+      flag={companyMember}
       status={status === 'flag-sent' ? <p role="status" className="text-body text-ink">Flag sent</p> : undefined}
       action={first && <StartButton topicId={first.topicId} placement={first.placement} size="lg">Play first session</StartButton>}
     />

@@ -22,7 +22,7 @@ vi.mock('@/server/diagrams', () => ({ generateConceptDiagram: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: vi.fn(async () => null) }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => 't1' }))
-vi.mock('@/server/session-fn', () => ({ getSessionFn: async () => ({ user: { id: 'u1', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] }) }))
+vi.mock('@/server/session-fn', () => ({ getSessionFn: async () => ({ user: { id: 'u1', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] }) }))
 
 let stopTrack: ReturnType<typeof vi.fn>
 let finishPermission: ((stream: MediaStream) => void) | undefined

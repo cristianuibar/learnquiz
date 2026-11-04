@@ -4,6 +4,7 @@ import { flagResult } from '@/server/flags'
 import { getInvite } from '@/server/org'
 import { getCompanyBranding } from '@/server/org-settings'
 import { answerItem, endSession, getSession, nextItem, prepareNextSession, reportItem, startMiniSession, startPlacement, startSession, transcribeAnswer } from '@/server/play'
+import { getUnitProcedure } from '@/server/procedure'
 import { getProfile } from '@/server/profile'
 import { getPushSettings, savePushPreferences, subscribeExpo, unsubscribe } from '@/server/push'
 import { acceptDisclosure, getSessionFn } from '@/server/session-fn'
@@ -36,6 +37,7 @@ export const v1Routes: V1Route[] = [
   { method: 'POST', pattern: '/items/:itemId/report', fn: reportItem },
   { method: 'POST', pattern: '/concepts/:conceptId/diagram', fn: generateConceptDiagram },
   { method: 'GET', pattern: '/topics/:topicId/path', fn: getTopicPath },
+  { method: 'GET', pattern: '/units/:unitId/procedure', fn: getUnitProcedure },
   { method: 'GET', pattern: '/concepts/:conceptId/items', fn: getConceptItems },
   { method: 'POST', pattern: '/me/result-flags', fn: flagResult },
   // Always the caller's own profile: a learner can never read another learner's profile through this API.

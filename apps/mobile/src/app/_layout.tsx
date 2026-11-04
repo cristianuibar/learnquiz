@@ -12,6 +12,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { applyStoredAppearance } from '@/lib/appearance'
 import { ThemeProvider } from '@/theme/ThemeProvider'
 import { SessionProvider, useSession } from '@/lib/session-store'
 import { holdTarget, replayVersion, subscribeReplay, takeReplayTarget } from '@/lib/held-target'
@@ -19,6 +20,7 @@ import { canOpenTarget, targetFromURL } from '@/lib/route-gates'
 import { useNotificationObserver } from '@/lib/notification-observer'
 
 SplashScreen.preventAutoHideAsync()
+void applyStoredAppearance()
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({

@@ -404,8 +404,13 @@ it('lets company members pick hours and days inside the company window and rejec
   expect(after.company).toEqual({ ...company, days: [1, 2, 4, 5] })
   expect(after.prefs.days).toEqual([1])
   expect(after.schedule.window.days).toEqual([1])
+  // Dropping the learner's last remaining day leaves no push day, not every company day.
+  raw.prepare('UPDATE org_settings SET working_hours_json = ? WHERE org_id = ?').run(JSON.stringify({ days: [2, 4, 5], start: '06:00', end: '18:00' }), 'o1')
+  after = await getPushSettings()
+  expect(after.prefs.days).toEqual([])
+  expect(after.schedule.window).toEqual({ startMinute: 600, endMinute: 930, days: [], timezone: 'Europe/Bucharest', source: 'learner' })
   // Every company day on goes back to following the company's days.
-  await savePushPreferences({ data: { ...base, days: [1, 2, 4, 5] } })
+  await savePushPreferences({ data: { ...base, days: [2, 4, 5] } })
   expect(rows('SELECT days_json FROM push_prefs')).toEqual([{ days_json: null }])
 })
 
