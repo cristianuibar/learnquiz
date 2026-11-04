@@ -127,7 +127,7 @@ it('keeps mistakes collapsed until the disclosure is opened', async () => {
     streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], benchmark: null, reviewsLeft: 0, nextLine: 'Come back soon.', endedEarly: false,
     mistakes: [{ itemId: 'i1', conceptName: 'Pallet checks', stem: 'x', correctAnswer: 'y', wasSure: true, generatedBy: null }] } satisfies SummaryView)
   vi.mocked(getPushSettings).mockResolvedValue({ publicKey: 'public-key', isStaff: false, endpoints: [], canPrompt: false,
-    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' }, schedule })
+    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC', days: [1, 2, 3, 4, 5] }, company: null, schedule })
   const { container, cleanup } = await renderApp('/play/s1/done')
   try {
     const toggle = [...container.querySelectorAll('button')].find((b) => b.textContent?.includes('Mistakes (1)'))
