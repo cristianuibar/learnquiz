@@ -4,17 +4,20 @@ import { ReadAloudButton } from '@/components/question/read-aloud-button'
 export function ProgressHeader({
   position,
   total,
+  totalKnown = true,
   onEnd,
   endDisabled,
   readAloud,
 }: {
   position: number
   total: number
+  totalKnown?: boolean
   onEnd: () => void
   endDisabled?: boolean
   readAloud: string[] | null
 }) {
-  const percent = total > 0 ? Math.min(100, (position / total) * 100) : 0
+  const count = !totalKnown ? `Question ${position}` : `${position} of ${total}`
+  const percent = totalKnown && total > 0 ? Math.min(100, (position / total) * 100) : 0
   return (
     <div className="flex h-14 items-center gap-2">
       <button
@@ -31,9 +34,9 @@ export function ProgressHeader({
           role="progressbar"
           aria-label="Session progress"
           aria-valuemin={0}
-          aria-valuemax={total}
-          aria-valuenow={position}
-          aria-valuetext={`${position} of ${total}`}
+          aria-valuemax={totalKnown ? total : undefined}
+          aria-valuenow={!totalKnown ? undefined : position}
+          aria-valuetext={count}
           className="h-2 min-w-8 flex-1 overflow-hidden rounded-full bg-surface-sunken"
         >
           <div
@@ -42,7 +45,7 @@ export function ProgressHeader({
           />
         </div>
         <span aria-hidden className="shrink-0 text-overline text-ink-muted tabular-nums">
-          {position} of {total}
+          {count}
         </span>
       </div>
       <ReadAloudButton texts={readAloud} />

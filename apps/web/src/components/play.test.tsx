@@ -35,7 +35,7 @@ beforeEach(() => {
 })
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); finishPermission = undefined; sessionStorage.clear() })
 
-async function renderPlay(voiceEnabled: boolean | null = true, permissionPending = false, format: 'cloze' | 'short' | 'mcq' = 'cloze', fromToday = false, overrides: Partial<ItemView> = {}, basics = false) {
+async function renderPlay(voiceEnabled: boolean | null = true, permissionPending = false, format: 'cloze' | 'short' | 'mcq' = 'cloze', fromToday = false, overrides: Partial<ItemView> = {}, basics = false, progress: SessionView['progress'] = { position: 1, total: 1 }) {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   stopTrack = vi.fn()
   const mic = { getTracks: () => [{ stop: stopTrack }] } as unknown as MediaStream
@@ -65,7 +65,7 @@ async function renderPlay(voiceEnabled: boolean | null = true, permissionPending
     startRendering() { return Promise.resolve({ getChannelData: () => new Float32Array(24_000).fill(0.25) }) }
   })
   const initial: SessionView = {
-    id: 's1', kind: 'session', topicId: 't1', topicTitle: 'Algebra', progress: { position: 1, total: 1 }, ended: false,
+    id: 's1', kind: 'session', topicId: 't1', topicTitle: 'Algebra', progress, ended: false,
     ...(voiceEnabled === null ? {} : { voiceEnabled }),
     ...(basics ? { basics } : {}),
     item: {
@@ -76,7 +76,8 @@ async function renderPlay(voiceEnabled: boolean | null = true, permissionPending
   }
   vi.mocked(getSession).mockResolvedValue(initial)
   vi.mocked(transcribeAnswer).mockReset().mockResolvedValue('one')
-  vi.mocked(answerItem).mockReset().mockResolvedValue({ attemptId: 'a0', diagramConceptId: null, score: 1, feedback: null, missingPoints: [], chosenFeedback: null, sourceQuote: null, sourceTitle: null, returnsThisSession: false, pKnownBefore: 0.1, pKnownAfter: 0.5, correct: true, correctAnswer: '1', state: 'A', mixUps: [], explanation: 'Subtract one.', xp: 10, critical: false, correctOptionIds: null, sourceVersion: null, detail: null } as unknown as Reveal)
+  const initialReveal = { attemptId: 'a0', diagramConceptId: null, score: 1, feedback: null, missingPoints: [], chosenFeedback: null, sourceQuote: null, sourceTitle: null, returnsThisSession: false, pKnownBefore: 0.1, pKnownAfter: 0.5, correct: true, correctAnswer: '1', state: 'A', mixUps: [], explanation: 'Subtract one.', xp: 10, critical: false, correctOptionIds: null, sourceVersion: null, detail: null } as unknown as Reveal
+  vi.mocked(answerItem).mockReset().mockResolvedValue(initialReveal)
   vi.mocked(nextItem).mockReset()
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
   const play = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId', loader: playRoute.options.loader, gcTime: playRoute.options.gcTime, component: playRoute.options.component })
@@ -90,7 +91,7 @@ async function renderPlay(voiceEnabled: boolean | null = true, permissionPending
   document.body.appendChild(container)
   const root = createRoot(container)
   await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
-  return { container, mic, initial, router, async cleanup() {
+  return { container, mic, initial, initialReveal, router, async cleanup() {
     await act(async () => root.unmount())
     container.remove()
     delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT
@@ -794,4 +795,34 @@ describe('reveal overlay', () => {
       expect(dialog()).not.toBeNull()
     } finally { await cleanup() }
   })
+})
+
+it('shows an adaptive question without promising twelve, then the exact count on its final reveal', async () => {
+  const { container, cleanup, initialReveal } = await renderPlay(false, false, 'mcq', false, {}, false, { position: 10, total: 10, totalKnown: false })
+  try {
+    const bar = container.querySelector('[role="progressbar"]')!
+    expect(bar.getAttribute('aria-valuetext')).toBe('Question 10')
+    expect(bar.hasAttribute('aria-valuemax')).toBe(false)
+    vi.mocked(answerItem).mockResolvedValue({ ...initialReveal, progress: { position: 10, total: 10 } })
+    await pick(container, 'answer', 'b')
+    await pick(container, 'confidence', 'sure')
+    await click(button(container, 'Check'))
+    expect(bar.getAttribute('aria-valuetext')).toBe('10 of 10')
+    expect(container.textContent).not.toContain('of 12')
+  } finally { await cleanup() }
+})
+
+it('uses the server ended count while summary is loading, ahead of the previous reveal count', async () => {
+  const { container, cleanup, initial, initialReveal } = await renderPlay(false, false, 'mcq', false, {}, false, { position: 1, total: 3 })
+  try {
+    vi.mocked(answerItem).mockResolvedValue({ ...initialReveal, progress: initial.progress })
+    vi.mocked(nextItem).mockResolvedValue({ ...initial, ended: true, item: null, progress: { position: 1, total: 1 } })
+    vi.mocked(endSession).mockImplementation(() => new Promise(() => {}))
+    await pick(container, 'answer', 'b')
+    await pick(container, 'confidence', 'sure')
+    await click(button(container, 'Check'))
+    await click(button(container, 'Next question'))
+    expect(container.querySelector('[role="progressbar"]')!.getAttribute('aria-valuetext')).toBe('1 of 1')
+    expect(container.textContent).not.toContain('1 of 3')
+  } finally { await cleanup() }
 })

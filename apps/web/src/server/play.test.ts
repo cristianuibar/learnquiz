@@ -1032,6 +1032,50 @@ describe('learner practice and unit unlocks', () => {
   })
 })
 
+it.each([
+  { poolSize: 3, answers: [true, false, true] },
+  { poolSize: 12, answers: Array(8).fill(true) as boolean[] },
+  { poolSize: 12, answers: [true, false, true, false, true, false, true, true, true, true] },
+  { poolSize: 12, answers: [true, true, false, false, true, true, false, false, true, true, false, false] },
+])('reports the served count when placement stops after $answers.length answers from $poolSize candidates', async ({ poolSize, answers }) => {
+  seedTopicAndLearner(raw, 0)
+  seedFrontier(raw, poolSize, false)
+  const pool = Array.from({ length: poolSize }, (_, i) => ({ id: `i${i + 1}`, conceptId: 'c1', difficulty: 1 }))
+  raw.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, item_ids_json, plan_json, started_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run('placement-count', 'u1', 't1', 'placement', JSON.stringify(['i1']), JSON.stringify({ position: 0, answered: false, workingLevel: 3, log: [], pool }), 1)
+  let view = await getSession({ data: { sessionId: 'placement-count' } })
+  for (const [index, correct] of answers.entries()) {
+    expect(view.ended).toBe(false)
+    expect(view.progress.position).toBe(index + 1)
+    // An adaptive placement cannot promise the maximum as its total.
+    expect(view.progress.total).toBeLessThanOrEqual(answers.length)
+    if (index < answers.length - 1) expect(view.progress.totalKnown).toBe(false)
+    const request = { data: { sessionId: view.id, itemId: view.item!.id, answer: { text: correct ? '1' : '0' }, confidence: 'sure' as const, responseMs: 100 } }
+    const reveal = await answerItem(request)
+    if (index === answers.length - 1) {
+      expect(reveal.progress).toEqual({ position: answers.length, total: answers.length })
+      expect((await answerItem(request)).progress).toEqual(reveal.progress)
+      expect((await getSession({ data: { sessionId: view.id } })).progress).toEqual(reveal.progress)
+    }
+    view = await nextItem({ data: { sessionId: view.id } })
+  }
+  expect(view).toMatchObject({ ended: true, item: null, progress: { position: answers.length, total: answers.length } })
+  expect((await getSession({ data: { sessionId: view.id } })).progress).toEqual(view.progress)
+  expect((await endSession({ data: { sessionId: view.id } })).total).toBe(view.progress.total)
+})
+
+it('shrinks the ended practice counter to the answers served when the rest are retired', async () => {
+  seedTopicAndLearner(raw, 0)
+  seedFrontier(raw, 3, true)
+  raw.exec('UPDATE learner_item SET due = 1')
+  const { sessionId } = await startSession({ data: { topicId: 't1' } })
+  const view = await getSession({ data: { sessionId } })
+  await answerItem({ data: { sessionId, itemId: view.item!.id, answer: { text: '1' }, confidence: 'sure', responseMs: 100 } })
+  raw.prepare('UPDATE items SET status = ? WHERE id != ?').run('retired', view.item!.id)
+  expect(await nextItem({ data: { sessionId } })).toMatchObject({ ended: true, progress: { position: 1, total: 1 } })
+  expect((await endSession({ data: { sessionId } })).total).toBe(1)
+})
+
 it('credits the streak day for a finished session of eight due reviews and nothing fresh', async () => {
   vi.mocked(chatJson).mockClear()
   vi.spyOn(Date, 'now').mockReturnValue(1793620800000)

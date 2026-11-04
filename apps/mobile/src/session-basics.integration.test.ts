@@ -23,9 +23,11 @@ jest.mock('./lib/session/draft', () => ({
   deleteDraft: jest.fn(async () => {}),
 }))
 jest.mock('./components/ui/Screen', () => ({ useHeadingFocus: jest.fn() }))
-jest.mock('./components/session/SessionFrame', () => ({
-  SessionFrame: ({ children, dock }: { children: ReactNode; dock?: ReactNode }) => require('react').createElement(require('react').Fragment, null, children, dock),
-}))
+jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }))
+jest.mock('react-native-keyboard-controller', () => {
+  const native = jest.requireActual<typeof import('react-native')>('react-native')
+  return { KeyboardAvoidingView: native.View, KeyboardAwareScrollView: native.ScrollView, useKeyboardState: () => false }
+})
 jest.mock('./components/session/QuestionDock', () => ({
   QuestionDock: ({ onSubmit }: { onSubmit(): void }) => {
     const { Pressable, Text } = require('react-native')
@@ -64,4 +66,16 @@ test.each([true, false])('a correct, sure answer opens the explanation only in a
   await fireEvent.press(await screen.findByRole('button', { name: 'Check' }))
   expect(await screen.findByRole('button', { name: 'Why', expanded: basics })).toBeOnTheScreen()
   expect(screen.queryByText('Record before moving.') !== null).toBe(basics)
+})
+
+test('an adaptive placement shows its exact served total on the final reveal', async () => {
+  jest.mocked(api).mockImplementation(async (path: string) => path.endsWith('/answer')
+    ? { ...sureCorrect, progress: { position: 10, total: 10 } }
+    : { id: 'session-574', kind: 'placement', item, ended: false, progress: { position: 10, total: 10, totalKnown: false } })
+  await render(h(ThemeProvider, { children: h(SessionScreen) }))
+  expect(await screen.findByText('Question 10', { includeHiddenElements: true })).toBeOnTheScreen()
+  expect(screen.queryByText('10 of 12')).toBeNull()
+  await fireEvent.press(await screen.findByRole('button', { name: 'Check' }))
+  expect(screen.getByText('10 of 10', { includeHiddenElements: true })).toBeOnTheScreen()
+  expect(screen.queryByText('10 of 12', { includeHiddenElements: true })).toBeNull()
 })
