@@ -133,8 +133,21 @@ export function AnswerMoment() {
     if (key && key !== prev) {
       const heading = resultRef.current
       heading?.focus({ preventScroll: true })
-      // Center the whole band so the sheet's 32px rise cannot tuck its label or XP under the sticky header.
-      heading?.closest('.sheet-band')?.scrollIntoView?.({ block: 'center' })
+      const band = heading?.closest('.sheet-band')
+      if (band) {
+        const rect = band.getBoundingClientRect()
+        // Measure where the band settles, including when an existing sheet is partway through its rise.
+        const transform = window.getComputedStyle(band.closest('.sheet')!).transform
+        const rise = transform && transform !== 'none' ? new DOMMatrixReadOnly(transform).m42 : 0
+        const styles = window.getComputedStyle(document.documentElement)
+        const headerHeight = parseFloat(styles.getPropertyValue('--header-h')) || 64
+        const spacing = parseFloat(styles.getPropertyValue('--space-4')) || 16
+        const top = rect.top - rise
+        const bottom = rect.bottom - rise
+        const minTop = headerHeight + spacing
+        const distance = top < minTop ? top - minTop : Math.max(0, bottom - window.innerHeight)
+        if (distance) window.scrollBy({ top: distance, behavior: 'instant' })
+      }
     }
     if (prev && !key && returnFocus.current) {
       returnFocus.current = false

@@ -26,6 +26,9 @@ afterEach(async () => {
   await act(async () => root.unmount())
   container.remove()
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+  document.documentElement.style.removeProperty('--header-h')
+  document.documentElement.style.removeProperty('--space-4')
   const proto = Element.prototype as unknown as Record<string, unknown>
   if (hadScroll) proto.scrollIntoView = originalScroll
   else delete proto.scrollIntoView
@@ -96,6 +99,37 @@ async function answer(a: number, c: number) {
   await click(answerRadios()[a])
   await click(confRadios()[c])
   await click(checkBtn())
+}
+
+function mockBandPosition(top: number, bottom: number, rise = 0, headerHeight = 64) {
+  let scrolled = 0
+  vi.stubGlobal('innerHeight', 800)
+  document.documentElement.style.setProperty('--header-h', `${headerHeight}px`)
+  document.documentElement.style.setProperty('--space-4', '16px')
+  const getRect = Element.prototype.getBoundingClientRect
+  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+    if (!this.classList.contains('sheet-band')) return getRect.call(this)
+    return DOMRect.fromRect({ x: 0, y: top + rise - scrolled, width: 300, height: bottom - top })
+  })
+  const getStyle = window.getComputedStyle.bind(window)
+  vi.spyOn(window, 'getComputedStyle').mockImplementation((element) => {
+    if (element.classList.contains('sheet')) {
+      return { transform: `matrix(1, 0, 0, 1, 0, ${rise})` } as CSSStyleDeclaration
+    }
+    return getStyle(element)
+  })
+  const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation((options: ScrollToOptions | number, y?: number) => {
+    scrolled += typeof options === 'number' ? y ?? 0 : options.top ?? 0
+  })
+  return {
+    scrollBy,
+    settledTop: () => top - scrolled,
+    settledBottom: () => bottom - scrolled,
+    moveBand: (nextTop: number, nextBottom: number) => {
+      top = nextTop
+      bottom = nextBottom
+    },
+  }
 }
 
 function expectAsking() {
@@ -412,25 +446,77 @@ describe('AnswerMoment', () => {
     expect(answerRadios()[0].textContent!.trim()).toBe('Scan the item next to it')
   })
 
-  it.each(['Check', ...OUTCOME_TITLES])('focuses without browser scrolling, then centers the full result band from %s', async (source) => {
-    const focusSpy = vi.spyOn(HTMLElement.prototype, 'focus')
+  describe.each([0, 32])('result visibility with a %i px rise offset', (rise) => {
+    it.each(['Check', ...OUTCOME_TITLES])('scrolls only enough to clear the header from %s', async (source) => {
+      const position = mockBandPosition(60, 124, rise)
+      const focusSpy = vi.spyOn(HTMLElement.prototype, 'focus')
+      await mount()
+      if (source === 'Check') await answer(1, 0)
+      else await click(outcomeBtns()[OUTCOME_TITLES.indexOf(source)])
+
+      expect(document.activeElement).toBe(heading())
+      expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true })
+      expect(position.scrollBy).toHaveBeenCalledExactlyOnceWith({ top: -20, behavior: 'instant' })
+      expect(focusSpy.mock.invocationCallOrder.at(-1)).toBeLessThan(position.scrollBy.mock.invocationCallOrder[0])
+      expect(position.settledTop()).toBe(80)
+      expect(position.settledBottom()).toBeLessThanOrEqual(window.innerHeight)
+    })
+
+    it.each(['Check', ...OUTCOME_TITLES])('keeps fully visible results still from %s and every outcome switch', async (source) => {
+      const position = mockBandPosition(80, 144, rise)
+      const focusSpy = vi.spyOn(HTMLElement.prototype, 'focus')
+      await mount()
+      if (source === 'Check') await answer(1, 0)
+      else await click(outcomeBtns()[OUTCOME_TITLES.indexOf(source)])
+
+      expect(document.activeElement).toBe(heading())
+      expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true })
+      expect(scrollSpy).not.toHaveBeenCalled()
+      expect(position.scrollBy).not.toHaveBeenCalled()
+
+      const initial = source === 'Check' ? 0 : OUTCOME_TITLES.indexOf(source)
+      for (let step = 1; step <= OUTCOME_TITLES.length; step++) {
+        const next = (initial + step) % OUTCOME_TITLES.length
+        // Tall sheets place the band high; the short confirmation places it low.
+        position.moveBand(next === 0 ? 736 : 100, next === 0 ? 800 : 164)
+        await pointerClick(outcomeBtns()[next])
+        expect(document.activeElement).toBe(heading())
+        expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true })
+        expect(scrollSpy).not.toHaveBeenCalled()
+        expect(position.scrollBy).not.toHaveBeenCalled()
+      }
+    })
+
+    it.each(['Check', ...OUTCOME_TITLES])('scrolls only enough to reveal a band below the viewport from %s', async (source) => {
+      const position = mockBandPosition(780, 844, rise)
+      const focusSpy = vi.spyOn(HTMLElement.prototype, 'focus')
+      await mount()
+      if (source === 'Check') await answer(1, 0)
+      else await click(outcomeBtns()[OUTCOME_TITLES.indexOf(source)])
+
+      expect(document.activeElement).toBe(heading())
+      expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true })
+      expect(position.scrollBy).toHaveBeenCalledExactlyOnceWith({ top: 44, behavior: 'instant' })
+      expect(position.settledTop()).toBeGreaterThanOrEqual(80)
+      expect(position.settledBottom()).toBe(window.innerHeight)
+    })
+  })
+
+  it('does not scroll on mount or when the first result is fully visible', async () => {
+    const position = mockBandPosition(200, 264)
     await mount()
-    if (source === 'Check') await answer(1, 0)
-    else await click(outcomeBtns()[OUTCOME_TITLES.indexOf(source)])
+    expect(scrollSpy).not.toHaveBeenCalled()
+    expect(position.scrollBy).not.toHaveBeenCalled()
+    await answer(1, 0)
+    expect(scrollSpy).not.toHaveBeenCalled()
+    expect(position.scrollBy).not.toHaveBeenCalled()
+  })
 
-    expect(document.activeElement).toBe(heading())
-    expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true })
-    expect(scrollSpy).toHaveBeenCalledExactlyOnceWith({ block: 'center' })
-    expect(scrollSpy.mock.instances[0]).toBe(sheet()!.querySelector('.sheet-band'))
-    expect(focusSpy.mock.invocationCallOrder.at(-1)).toBeLessThan(scrollSpy.mock.invocationCallOrder[0])
-
-    // Switching an already revealed sheet must bring the new result back into view too.
-    const next = source === 'Sure and wrong' ? 0 : 3
-    await pointerClick(outcomeBtns()[next])
-    expect(document.activeElement).toBe(heading())
-    expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true })
-    expect(scrollSpy).toHaveBeenCalledTimes(2)
-    expect(scrollSpy.mock.instances[1]).toBe(sheet()!.querySelector('.sheet-band'))
-    expect(scrollSpy).toHaveBeenLastCalledWith({ block: 'center' })
+  it('uses the configured sticky header height when revealing a result', async () => {
+    const position = mockBandPosition(100, 164, 16, 96)
+    await mount()
+    await answer(1, 0)
+    expect(position.scrollBy).toHaveBeenCalledExactlyOnceWith({ top: -12, behavior: 'instant' })
+    expect(position.settledTop()).toBe(112)
   })
 })
