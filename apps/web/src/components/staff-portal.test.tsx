@@ -6,9 +6,11 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { Route as appRootRoute } from '@/routes/__root'
 import { Route as orgRoute } from '@/routes/org.$slug'
 import { Route as portalRoute } from '@/routes/admin_.companies.$slug.portal'
+import { Route as portalOverviewRoute } from '@/routes/admin_.companies.$slug.portal.index'
 import { Route as portalRolesRoute } from '@/routes/admin_.companies.$slug.portal.roles'
 import { Route as portalRoleRoute } from '@/routes/admin_.companies.$slug.portal.roles_.$roleId'
 import { getStaffSession } from '@/server/admin'
+import { getOrgOverview, listRoles } from '@/server/org'
 import { getPortalShell } from '@/server/org-shell'
 import { getRoleDetail } from '@/server/role-detail'
 import { getSessionFn } from '@/server/session-fn'
@@ -65,7 +67,7 @@ async function renderAt(path: string) {
   const tree = rootRoute.addChildren([
     org.addChildren([stub(org as never, '/'), stub(org as never, '/roles'), stub(org as never, '/people')]),
     portal.addChildren([
-      createRoute({ getParentRoute: () => portal, path: '/', component: () => <p>portal overview</p> }),
+      leaf(portalOverviewRoute, '/'),
       leaf(portalRolesRoute, '/roles'),
       leaf(portalRoleRoute, '/roles/$roleId'),
     ]),
@@ -86,10 +88,23 @@ it('shows a role to staff with no way to change anything', async () => {
   expect(container.textContent).toContain('Pallet check')
   expect(container.textContent).toContain('Critical')
   expect(container.querySelector('[role="switch"]')).toBeNull()
-  const crumb = [...container.querySelectorAll('ol a')].find((a) => a.textContent === 'Overview')
-  expect(crumb?.getAttribute('href')).toBe('/admin/companies/northwind/portal')
   const buttons = [...container.querySelectorAll('button')].map((b) => `${b.textContent} ${b.getAttribute('aria-label') ?? ''}`)
   for (const gone of [/Edit/, /Retry/, /Upload/, /Add document/, /Paste text/]) expect(buttons.filter((b) => gone.test(b))).toEqual([])
+})
+
+it('returns to the staff Overview when the role detail breadcrumb is clicked', async () => {
+  vi.mocked(getOrgOverview).mockResolvedValue({
+    name: 'Northwind', slug: 'northwind', readOnly: true, nextStep: null, roles: [],
+    training: { employees: 3, proficientEmployees: 1, daysToProficiency: 5, criticalErrorsThisWeek: 1, documentsToReview: 0, firstProficientUserId: 'learner1', openErrorUserId: 'learner2' },
+  })
+  vi.mocked(listRoles).mockResolvedValue({ name: 'Northwind', slug: 'northwind', readOnly: true, roles: [] })
+  const { container, router } = await renderAt('/admin/companies/northwind/portal/roles/picker')
+  const crumb = container.querySelector<HTMLAnchorElement>('nav[aria-label="Breadcrumb"] a')!
+  await act(async () => { crumb.click() })
+  await vi.waitFor(() => expect(router.state.status).toBe('idle'))
+  expect(router.state.location.pathname).toBe('/admin/companies/northwind/portal')
+  expect(container.querySelector('h1')?.textContent).toBe('Overview')
+  expect(getOrgOverview).toHaveBeenCalledWith({ data: { slug: 'northwind' } })
 })
 
 it('puts the read-only band first in the tab order, before the nav', async () => {
