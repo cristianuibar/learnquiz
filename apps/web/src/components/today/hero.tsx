@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { TodayHero } from '@learnquiz/api/today'
 import { StartButton } from '@/components/start-button'
 import { cn } from '@/lib/utils'
@@ -47,6 +47,8 @@ export function Hero({
   offline: boolean
   noticeId?: string
 }) {
+  const noteId = useId()
+  const note = hero.kind === 'building' ? hero.note : null
   return (
     <section
       className={cn(
@@ -57,9 +59,22 @@ export function Hero({
       <div className={cn('flex flex-col', hero.kind === 'building' ? 'gap-3' : 'gap-1')}>
         <h2 className="text-title-2">{hero.title}</h2>
         {hero.kind === 'building' ? (
-          hero.total != null && hero.total > 0 && (
-            <BuildingProgress ready={hero.ready} total={hero.total} status={hero.status} />
-          )
+          <>
+            {hero.total != null && hero.total > 0 ? (
+              <BuildingProgress ready={hero.ready} total={hero.total} status={hero.status} />
+            ) : (
+              hero.status && (
+                <p role="status" className="text-body">
+                  {hero.status}
+                </p>
+              )
+            )}
+            {note && (
+              <p id={noteId} className="text-body">
+                {note}
+              </p>
+            )}
+          </>
         ) : (
           <p className="text-body">{hero.meta}</p>
         )}
@@ -72,7 +87,7 @@ export function Hero({
           size="lg"
           label={hero.play.accessibleLabel}
           disabled={hero.play.disabled || offline}
-          describedBy={offline ? noticeId : undefined}
+          describedBy={offline ? noticeId : note ? noteId : undefined}
           className={cn('w-full sm:w-full', !offline && 'focus-visible:outline-on-brand dark:focus-visible:outline-brand')}
         >
           {hero.play.label}
