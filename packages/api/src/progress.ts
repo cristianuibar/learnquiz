@@ -4,6 +4,8 @@ export type ConceptStatus = 'mastered' | 'learning' | 'not_started'
 export type TopicPath = {
   topic: { id: string; title: string; goal: string | null; status: 'draft' | 'generating' | 'ready' | 'failed'; generatedBy: string | null }
   preparing: boolean
+  placeable: boolean
+  company: string | null
   benchmark: number
   onboarding: { day: number; days: number } | null
   mastery: number

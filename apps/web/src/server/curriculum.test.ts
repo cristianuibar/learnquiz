@@ -1,11 +1,12 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
-import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { concepts, learnerTopic } from '@/db/schema'
 import { ACCOUNT_DAILY_MODEL_CALL_CAP, COMPANY_DAILY_MODEL_CALL_CAP } from '@/lib/limits'
 import * as curriculum from './curriculum'
 import { getLatestTopicIdFn } from './latest-topic'
+import { getSession, startSession } from './play'
 import { getToday } from './today'
 
 // Keep the handlers, validation, authorization, model client and database real.
@@ -380,4 +381,114 @@ it.each([
   await curriculum.getTopicPath({ data: { topicId: 'picker-topic' } })
   raw.exec(`UPDATE learner_topic SET streak_count = 5, last_session_at = ${Date.parse(last)} WHERE learner_id = 'employee'`)
   expect((await curriculum.getTopicPath({ data: { topicId: 'picker-topic' } })).learner.streak).toBe(streak)
+})
+
+describe('topic path statuses', () => {
+  const mcq = JSON.stringify({
+    format: 'mcq', stem: 'Which?', accepted_answers: [], model_answer: '', explanation: 'Because.', difficulty: 2,
+    source_quote: null, grounded: false, bloom: 'apply',
+    options: ['a', 'b', 'c'].map((id) => ({ id, text: id, is_correct: id === 'a', feedback: '' })),
+  })
+  // [concept id, unit id, critical, p_known or null (never attempted)]. u1 estimate, u2 locked, u3 learning, u4 mastered.
+  const layout: [string, string, number, number | null][] = [
+    ['c1', 'u1', 0, null],
+    ['c2', 'u2', 0, null],
+    ['c3a', 'u3', 1, 0.5],
+    ['c3b', 'u3', 0, null],
+    ['c4a', 'u4', 0, 0.8],
+    ['c4b', 'u4', 1, 0.95],
+  ]
+  const day = 86_400_000
+  const seedPlaced = (itemConcepts: string[] = layout.map(([id]) => id)) => {
+    seedRoleCurriculum(false)
+    raw.exec("UPDATE job_roles SET benchmark = 0.75, onboarding_days = 14 WHERE id = 'picker'")
+    raw.exec("UPDATE sources SET version = 3 WHERE id = 'receiving'")
+    raw.exec("DELETE FROM concepts; DELETE FROM units")
+    holder.userId = 'employee'
+    raw.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES (?, ?, ?, ?)')
+      .run('employee', 'northwind', 'picker', Date.now() - 4.5 * day)
+    raw.exec("INSERT INTO placements (id, learner_id, topic_id, log_json, created_at) VALUES ('p1', 'employee', 'picker-topic', '[]', 1)")
+    layout.forEach(([id, unit, critical, p], order) => {
+      if (id === 'c1' || id === 'c2' || id === 'c3a' || id === 'c4a') {
+        raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run(unit, 'picker-topic', Number(unit.slice(1)) - 1, `Unit ${unit}`)
+        if (unit !== 'u2') raw.prepare("INSERT INTO learner_unit (learner_id, unit_id, unlocked_at) VALUES ('employee', ?, 1)").run(unit)
+      }
+      raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary, critical, source_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(id, 'picker-topic', unit, order, `Concept ${id}`, '', critical, 'receiving')
+      if (p !== null) raw.prepare("INSERT INTO learner_concept (learner_id, concept_id, p_known, n_attempts, updated_at) VALUES ('employee', ?, ?, 2, 1)").run(id, p)
+      if (itemConcepts.includes(id)) {
+        raw.prepare("INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, status, created_at) VALUES (?, ?, 'picker-topic', 'mcq', ?, 2, 'active', 1)")
+          .run(`i-${id}`, id, mcq)
+      }
+    })
+  }
+  const open = () => curriculum.getTopicPath({ data: { topicId: 'picker-topic' } })
+
+  it('classifies a placed role learner\'s units and reports benchmark, onboarding, source and critical counts', async () => {
+    seedPlaced()
+    const path = await open()
+    expect(path.units.map((u) => u.state)).toEqual(['estimate', 'locked', 'learning', 'mastered'])
+    expect(path.units.map((u) => u.criticalCount)).toEqual([0, 0, 1, 1])
+    expect(path.units.map((u) => u.canPractice)).toEqual([true, false, true, true])
+    expect(path.units.map((u) => u.source)).toEqual(Array(4).fill({ title: 'Receiving and picking', version: 3 }))
+    expect(path.units[2].concepts.map((c) => ({ id: c.id, measured: c.measured, status: c.status }))).toEqual([
+      { id: 'c3a', measured: true, status: 'learning' },
+      { id: 'c3b', measured: false, status: 'not_started' },
+    ])
+    expect(path.units[3].concepts.map((c) => c.status)).toEqual(['mastered', 'mastered'])
+    expect(path.learner.placed).toBe(true)
+    expect(path.benchmark).toBe(0.75)
+    expect(path.onboarding).toEqual({ day: 5, days: 14 })
+  })
+
+  it('keeps a unit learning when a critical concept is below benchmark though the mean is above it', async () => {
+    seedPlaced()
+    raw.exec("INSERT INTO units (id, topic_id, \"order\", name) VALUES ('u5', 'picker-topic', 4, 'Unit u5')")
+    raw.exec("INSERT INTO learner_unit (learner_id, unit_id, unlocked_at) VALUES ('employee', 'u5', 1)")
+    for (const [id, critical, p] of [['c5a', 0, 1], ['c5b', 1, 0.8]]) {
+      raw.exec(`INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary, critical) VALUES ('${id}', 'picker-topic', 'u5', 9, '${id}', '', ${critical})`)
+      raw.exec(`INSERT INTO learner_concept (learner_id, concept_id, p_known, n_attempts, updated_at) VALUES ('employee', '${id}', ${p}, 3, 1)`)
+    }
+    raw.exec("UPDATE job_roles SET benchmark = 0.85 WHERE id = 'picker'")
+    const path = await open()
+    const unit = path.units.find((u) => u.id === 'u5')
+    expect(unit?.mastery).toBeCloseTo(0.9)
+    expect(unit?.state).toBe('learning')
+  })
+
+  it('points nextUnitId at the unit of the first concept a practice session serves', async () => {
+    seedPlaced()
+    raw.exec("INSERT INTO learner_concept (learner_id, concept_id, p_known, n_attempts, updated_at) VALUES ('employee', 'c1', 0.96, 2, 1)")
+    const path = await open()
+    expect(path.nextUnitId).toBe('u3')
+    const { sessionId } = await startSession({ data: { topicId: 'picker-topic' } })
+    const first = (await getSession({ data: { sessionId } })).item
+    const served = raw.prepare('SELECT unit_id FROM concepts WHERE id = ?').get(first!.conceptId) as { unit_id: string }
+    expect(served.unit_id).toBe(path.nextUnitId)
+  })
+
+  it('shows every unit as not started with no next unit before placement', async () => {
+    seedPlaced()
+    raw.exec("DELETE FROM placements; DELETE FROM learner_concept; DELETE FROM learner_unit")
+    const path = await open()
+    expect(path.learner.placed).toBe(false)
+    expect(path.units.map((u) => u.state)).toEqual(['not_started', 'not_started', 'not_started', 'not_started'])
+    expect(path.nextUnitId).toBeNull()
+  })
+
+  it('has no onboarding and the 85% benchmark on a personal topic', async () => {
+    holder.userId = 'owner'
+    raw.exec("INSERT INTO topics (id, learner_id, title, status, created_at) VALUES ('mine', 'owner', 'Mine', 'ready', 1)")
+    const path = await curriculum.getTopicPath({ data: { topicId: 'mine' } })
+    expect(path.onboarding).toBeNull()
+    expect(path.benchmark).toBe(0.85)
+  })
+
+  it('lets an unlocked role unit be practised only when it has a stored non-short item', async () => {
+    seedPlaced(['c1', 'c2'])
+    raw.exec("INSERT INTO items (id, concept_id, topic_id, format, payload_json, status, created_at) VALUES ('s3', 'c3a', 'picker-topic', 'short', '{}', 'active', 1)")
+    const path = await open()
+    // u1 has an item; u2 is locked despite its item; u3 only has a short item; u4 has none.
+    expect(path.units.map((u) => u.canPractice)).toEqual([true, false, false, false])
+  })
 })
