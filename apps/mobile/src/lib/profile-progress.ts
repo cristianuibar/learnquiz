@@ -4,7 +4,7 @@ import type { Today } from '@learnquiz/api/today'
 export { formatShortDate, percentText }
 
 export function firstSessionParams(today: Today | null): { topicId: string; start: 'session' | 'placement' } | null {
-  if (!today?.topic || !today.plan?.playable || today.role?.preparing || today.role?.building) return null
+  if (!today?.topic || !today.plan?.playable || today.role?.preparing) return null
   return { topicId: today.topic.id, start: today.plan.start }
 }
 

@@ -69,3 +69,15 @@ test('first-session navigation uses the confirmed Today start and waits for a pl
   expect(firstSessionParams({ ...today, plan: { ...today.plan!, playable: false } })).toBeNull()
   expect(firstSessionParams({ ...today, role: { ...today.role!, preparing: true } } as Today)).toBeNull()
 })
+
+test('keeps the first session playable while a published role is building', () => {
+  const today = todayFixtures.first
+  const building: Today = {
+    ...today,
+    plan: { ...today.plan!, state: 'first', playable: true },
+    role: { ...today.role!, preparing: false, building: { ready: 2, total: 10 } },
+  }
+  expect(firstSessionParams(building)).toEqual({ topicId: today.topic!.id, start: today.plan!.start })
+  expect(firstSessionParams({ ...building, role: { ...building.role!, preparing: true } })).toBeNull()
+  expect(firstSessionParams({ ...building, plan: { ...building.plan!, playable: false } })).toBeNull()
+})

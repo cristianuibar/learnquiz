@@ -70,7 +70,7 @@ export function WeeklyTrend({ profile }: { profile: Profile }) {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[3] }}>
           {[
             { label: 'Measured', color: colors.brand, dash: undefined },
-            { label: 'Projected', color: colors.brand, dash: '6 6' },
+            ...(chart.projection && last ? [{ label: 'Projected', color: colors.brand, dash: '6 6' }] : []),
             { label: `Benchmark ${percentText(profile.benchmark)}`, color: colors.inkMuted, dash: '4 4' },
           ].map(({ label, color, dash }) => (
             <View key={label} style={{ flexDirection: 'row', alignItems: 'center', gap: space[1] }}>

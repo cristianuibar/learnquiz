@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AccessibilityInfo, findNodeHandle, Pressable, View, type Text as NativeText } from 'react-native'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { ChevronRight } from 'lucide-react-native'
@@ -23,6 +23,7 @@ type ProgressState = {
   profile: ProfileData | null
   play: ReturnType<typeof firstSessionParams>
   status: 'loading' | 'ready' | 'error'
+  error: 'profile' | 'session' | null
 }
 
 export default function Profile() {
@@ -31,14 +32,32 @@ export default function Profile() {
   const { user, status: sessionStatus } = useSession()
   const token = getToken()
   const [attempt, setAttempt] = useState(0)
-  const [state, setState] = useState<ProgressState>({ owner: null, profile: null, play: null, status: 'loading' })
+  const [state, setState] = useState<ProgressState>({ owner: null, profile: null, play: null, status: 'loading', error: null })
   // Hide a previous token's payload even before the focus effect cleans up.
   const current = state.owner === token && sessionStatus === 'ready'
   const profile = current ? state.profile : null
   const status = current ? state.status : 'loading'
+  const error = current ? state.error : null
   const settingsRef = useRef<View | null>(null)
   const returningFromSettings = useRef(false)
   const headingRef = useRef<NativeText | null>(null)
+  const retryHadFocus = useRef(false)
+  const retryStartedWithFocus = useRef(false)
+  const prevStatus = useRef(status)
+
+  // A successful retry removes its control. Preserve focus ownership while
+  // busy disables it, then return TalkBack to the stable screen heading.
+  useEffect(() => {
+    const was = prevStatus.current
+    prevStatus.current = status
+    if (was !== 'ready' && status === 'ready' && (retryHadFocus.current || retryStartedWithFocus.current)) {
+      retryHadFocus.current = false
+      retryStartedWithFocus.current = false
+      const tag = headingRef.current && findNodeHandle(headingRef.current)
+      if (tag != null) AccessibilityInfo.setAccessibilityFocus(tag)
+    }
+    if (status !== 'loading') retryStartedWithFocus.current = false
+  }, [status])
   // A tab screen stays mounted, so focus the heading on every arrival (for
   // example from the Today role card), not only on the first mount.
   useFocusEffect(useCallback(() => {
@@ -48,7 +67,11 @@ export default function Profile() {
       const tag = target && findNodeHandle(target)
       if (tag != null) AccessibilityInfo.setAccessibilityFocus(tag)
     })
-    return () => cancelAnimationFrame(frame)
+    return () => {
+      cancelAnimationFrame(frame)
+      retryHadFocus.current = false
+      retryStartedWithFocus.current = false
+    }
   }, []))
 
   // Tabs stay mounted. Refetch on each arrival and discard responses after
@@ -57,25 +80,53 @@ export default function Profile() {
     if (!token || sessionStatus !== 'ready') return
     const controller = new AbortController()
     const active = () => !controller.signal.aborted && getToken() === token
-    setState({ owner: token, profile: null, play: null, status: 'loading' })
+    setState((previous) => ({
+      owner: token,
+      profile: previous.owner === token ? previous.profile : null,
+      play: null,
+      status: 'loading',
+      error: previous.owner === token ? previous.error : null,
+    }))
     void (async () => {
       let next: ProfileData | null = null
       try {
         next = await api<ProfileData>('/me/profile', { signal: controller.signal })
         if (!active()) return
+        const loaded = next
+        setState((previous) => ({
+          ...previous,
+          profile: loaded,
+          error: previous.error === 'session' && !loaded.started ? 'session' : null,
+        }))
         // The Loading route owns session creation; only Today's confirmed
         // topic and plan.start are passed to it, including placement starts.
         const today = next.started ? null : await api<Today>('/today', { signal: controller.signal })
-        if (active()) setState({ owner: token, profile: next, play: firstSessionParams(today), status: 'ready' })
+        if (active()) setState({ owner: token, profile: next, play: firstSessionParams(today), status: 'ready', error: null })
       } catch (error) {
         if (!active() || (error instanceof ApiError && error.status === 401)) return
-        setState({ owner: token, profile: next, play: null, status: 'error' })
+        setState((previous) => ({
+          owner: token,
+          profile: next ?? (previous.owner === token ? previous.profile : null),
+          play: null,
+          status: 'error',
+          error: next ? 'session' : 'profile',
+        }))
       }
     })()
     return () => controller.abort()
   }, [token, sessionStatus, attempt]))
   const [focused, setFocused] = useState(false)
   const [busy, setBusy] = useState(false)
+  const retry = () => {
+    retryStartedWithFocus.current = true
+    setAttempt((value) => value + 1)
+  }
+  const retryButton = (
+    <Button variant="secondary" busy={status === 'loading'} onPress={retry}
+      onFocus={() => { retryHadFocus.current = true }} onBlur={() => { retryHadFocus.current = false }}>
+      Try again
+    </Button>
+  )
 
   const handleSignOut = async () => {
     if (busy) return
@@ -92,23 +143,30 @@ export default function Profile() {
   return (
     <Screen contentContainerStyle={{ paddingTop: space[2], paddingBottom: space[8] }}
       dock={profile && !profile.started ? (
-        <Button size="lg" disabled={status !== 'ready' || !state.play} onPress={() => {
-          if (state.play && state.owner === getToken()) router.push({ pathname: '/play/loading', params: state.play })
-        }}>Play first session</Button>
+        error === 'session' ? (
+          <>
+            <Text muted accessibilityLiveRegion="polite">Could not load the first session.</Text>
+            {retryButton}
+          </>
+        ) : (
+          <Button size="lg" disabled={status !== 'ready' || !state.play} onPress={() => {
+            if (state.play && state.owner === getToken()) router.push({ pathname: '/play/loading', params: state.play })
+          }}>Play first session</Button>
+        )
       ) : undefined}>
       <ProfileHeader name={profile?.name ?? user?.name ?? null} role={profile?.role ?? null}
         headingRef={headingRef} settingsRef={settingsRef} onSettings={() => {
           returningFromSettings.current = true
           router.push('/settings')
         }} />
-      {status === 'loading' ? <Skeleton /> : (
+      {error === 'profile' && (
+        <View style={{ gap: space[3] }}>
+          <AlertRow>Could not load training progress.</AlertRow>
+          {retryButton}
+        </View>
+      )}
+      {!profile && status === 'loading' ? <Skeleton /> : (
         <>
-          {status === 'error' && (
-            <View style={{ gap: space[3] }}>
-              <AlertRow>Could not load training progress.</AlertRow>
-              <Button variant="secondary" onPress={() => setAttempt((value) => value + 1)}>Try again</Button>
-            </View>
-          )}
           {profile && (profile.started ? (
             <>
               <MasteryCard profile={profile} />

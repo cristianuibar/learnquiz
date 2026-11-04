@@ -12,10 +12,11 @@ export function MasteryCard({ profile }: { profile: Profile }) {
   const mastery = percentText(profile.mastery)
   const benchmark = percentText(profile.benchmark)
   return (
-    <Card style={{ gap: space[4] }}>
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: space[2] }}>
-        <Text variant="display" num>{mastery}</Text>
-        <Text muted>of {benchmark} benchmark</Text>
+    <Card accessible={false} role="group" accessibilityLabel="Role mastery" style={{ gap: space[4] }}>
+      <View accessible accessibilityLabel={`${mastery} of ${benchmark} benchmark`}
+        style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: space[2] }}>
+        <Text accessible={false} importantForAccessibility="no" variant="display" num>{mastery}</Text>
+        <Text accessible={false} importantForAccessibility="no" muted>of {benchmark} benchmark</Text>
       </View>
       <Bar size="lg" value={profile.mastery * 100} benchmark={profile.benchmark * 100}
         accessibilityLabel="Role mastery" accessibilityValue={{ text: `${mastery}, benchmark ${benchmark}` }} />
