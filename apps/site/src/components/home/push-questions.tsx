@@ -1,14 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Icon } from '../ui/icon'
 import { LogoMark } from '../ui/logo'
 import { PhoneFrame } from '../ui/phone-frame'
-
-const options = [
-  'Report a short pick on the scanner',
-  'Take one from the next slot',
-  'Skip it and come back',
-  'Wait for a restock',
-]
 
 export function PushQuestions() {
   const rowRef = useRef<HTMLOListElement>(null)
@@ -34,7 +26,7 @@ export function PushQuestions() {
         <ol
           ref={rowRef}
           className="push-row"
-          aria-label="From push to done, three screens"
+          aria-label="A push, a question and its explanation"
           tabIndex={scrolls ? 0 : undefined}
         >
           <li className="push-step">
@@ -64,60 +56,50 @@ export function PushQuestions() {
           </li>
 
           <li className="push-step">
-            <PhoneFrame label="A one-question session: Your pick slot is empty. What do you do first? Report a short pick on the scanner is selected, and Sure.">
-              <div className="p-topbar">
-                <span className="p-ico"><Icon name="close" size={24} /></span>
-                <span className="t-overline muted flex-1">1 question</span>
-              </div>
-              <div className="p-scroll gap-4">
-                <p className="t-title2">Your pick slot is empty. What do you do first?</p>
-                <div className="opt-list gap-2">
-                  {options.map((option, index) => (
-                    <div key={option} className={`opt min-h-12 cursor-default text-[15px] leading-[22px] ${index === 0 ? 'is-selected' : ''}`}>
-                      <span className="radio" />
-                      <span className="opt-text">{option}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="p-dock">
-                <div className="conf">
-                  <span className="conf-btn is-selected cursor-default"><span className="conf-tick"><Icon name="check" size={16} /></span>Sure</span>
-                  <span className="conf-btn cursor-default">Unsure</span>
-                  <span className="conf-btn cursor-default">Guessing</span>
-                </div>
-                <span className="p-btn p-btn-primary">Check</span>
-              </div>
+            <PhoneFrame>
+              <picture className="absolute inset-0">
+                <source
+                  media="(prefers-color-scheme: dark)"
+                  srcSet="/screenshots/phone-question-confidence-dark.webp 1x, /screenshots/phone-question-confidence-dark@2x.webp 2x"
+                />
+                <img
+                  src="/screenshots/phone-question-confidence.webp"
+                  srcSet="/screenshots/phone-question-confidence.webp 1x, /screenshots/phone-question-confidence@2x.webp 2x"
+                  alt="Learn Quiz question 1 of 2: Where do you move the tote to start the check? To the assigned checking station and Sure are selected."
+                  width={360}
+                  height={740}
+                  loading="lazy"
+                  className="block size-full object-fill"
+                />
+              </picture>
             </PhoneFrame>
             <div className="push-cap flex flex-col gap-0.5">
-              <h3 className="t-label">One question</h3>
-              <p className="t-body muted">Answer it and say how sure you are.</p>
+              <h3 className="t-label">Answer and choose your confidence</h3>
+              <p className="t-body muted">Move the tote to its assigned checking station.</p>
             </div>
           </li>
 
           <li className="push-step">
-            <PhoneFrame label="Done screen: Report a short pick on the scanner, with the quote from Warehouse picker SOPs, section 2.4. One review cleared, three left today.">
-              <div className="p-topbar">
-                <span className="p-ico"><Icon name="close" size={24} /></span>
-              </div>
-              <div className="p-scroll gap-4">
-                <div className="card stack gap-1">
-                  <span className="t-label flex items-center gap-1.5 text-(--brand)"><Icon name="check" size={18} />1 review cleared</span>
-                  <p className="t-body-lg">Report a short pick on the scanner.</p>
-                </div>
-                <div className="quote">
-                  <p className="quote-text">“If the slot is empty, report a short pick on the scanner. Don’t take stock from another slot.”</p>
-                  <p className="quote-src">Warehouse picker SOPs v3 · §2.4</p>
-                </div>
-                <p className="t-label muted">3 left today</p>
-              </div>
-              <div className="p-dock border-t-0">
-                <span className="p-btn p-btn-primary">Back to Today</span>
-              </div>
+            <PhoneFrame>
+              <picture className="absolute inset-0">
+                <source
+                  media="(prefers-color-scheme: dark)"
+                  srcSet="/screenshots/phone-reveal-why-dark.webp 1x, /screenshots/phone-reveal-why-dark@2x.webp 2x"
+                />
+                <img
+                  src="/screenshots/phone-reveal-why.webp"
+                  srcSet="/screenshots/phone-reveal-why.webp 1x, /screenshots/phone-reveal-why@2x.webp 2x"
+                  alt="Correct answer: To the assigned checking station. The expanded Why explanation quotes Warehouse picker SOP v1: Move the tote to the assigned checking station and scan its label."
+                  width={360}
+                  height={740}
+                  loading="lazy"
+                  className="block size-full object-fill"
+                />
+              </picture>
             </PhoneFrame>
             <div className="push-cap flex flex-col gap-0.5">
               <h3 className="t-label">The answer, with its source</h3>
-              <p className="t-body muted">Then back to work.</p>
+              <p className="t-body muted">Why it is correct, with a quote from your SOP.</p>
             </div>
           </li>
         </ol>

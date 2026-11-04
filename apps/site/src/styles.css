@@ -6,9 +6,7 @@
 @import "@learnquiz/tokens/theme.css";
 @import "./site.css";
 
-/* site.css keeps the design's .p-topbar and .p-nav class names. The token theme also makes p-topbar and p-nav
-   valid padding utilities, which would override the design rules from the utilities layer, so never generate them. */
-@source not inline("p-topbar p-nav");
+@source not inline("p-topbar");
 
 @layer base {
   a {
