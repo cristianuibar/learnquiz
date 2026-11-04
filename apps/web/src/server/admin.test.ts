@@ -4,6 +4,7 @@ import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { dbSchema } from '@/db'
+import { DailyCapError } from '@/lib/llm/client'
 import { getAuth } from '@/server/auth'
 import { getSessionUser } from '@/server/session'
 import { createRole, getOrgOverview, listRoles } from '@/server/org'
@@ -296,6 +297,17 @@ it('counts a role build whose model call fails as failed, not queued', async () 
   boundary.chatJson = () => Promise.reject(new Error('timeout'))
   await expect(retryJobs({ data: { ids: ['curriculum:retry-topic'] } })).resolves.toEqual({ queued: 0, skipped: 0, failed: 1 })
   expect(topicStatus()).toBe('failed')
+})
+
+it('counts a role build refused by the owner daily cap as skipped, not failed', async () => {
+  seedAlphaRoleBuild(['Step one: scan the box.'])
+  sqlite.prepare('INSERT INTO job_roles (id, org_id, name, created_at) VALUES (?, ?, ?, ?)').run('capped-role', 'alpha', 'Capped role', NOW)
+  sqlite.prepare('INSERT INTO topics (id, org_id, job_role_id, title, status, created_at) VALUES (?, ?, ?, ?, ?, ?)').run('capped-topic', 'alpha', 'capped-role', 'Capped role', 'failed', NOW)
+  sqlite.prepare('INSERT INTO sources (id, topic_id, kind, title, body_text, created_at) VALUES (?, ?, ?, ?, ?, ?)').run('capped-doc', 'capped-topic', 'text', 'Doc', 'Step one: seal the box.', NOW)
+  // Both builds pass the pre-claim cap check; the model client then refuses the second reservation (one call left).
+  let calls = 0
+  boundary.chatJson = () => Promise.reject(calls++ ? new DailyCapError() : new Error('timeout'))
+  await expect(retryJobs({ data: { ids: ['curriculum:retry-topic', 'curriculum:capped-topic'] } })).resolves.toEqual({ queued: 0, skipped: 1, failed: 1 })
 })
 
 it('lists an abandoned role build as failed and lets it be retried', async () => {

@@ -104,8 +104,13 @@ export const retryJobs = createServerFn({ method: 'POST' })
     }
     if (conceptsQueued) runInBackground(drainConceptQueue())
     // Awaited, not backgrounded: background work lasts about 30 s and a build can take minutes. A failed build marks its own topic failed.
-    // A claimed role build counts as queued only once its build finishes; a rejected build counts as failed.
+    // A claimed role build counts as queued only once its build finishes; a daily-cap refusal of its model call is skipped like
+    // one refused before the claim, and any other rejected build counts as failed.
     const results = await Promise.allSettled(runs.map((run) => run()))
-    for (const r of results) { if (r.status === 'fulfilled') queued++; else failed++ }
+    for (const r of results) {
+      if (r.status === 'fulfilled') queued++
+      else if (status(r.reason) === 429) skipped++
+      else failed++
+    }
     return { queued, skipped, failed }
   })
