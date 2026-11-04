@@ -31,9 +31,10 @@ const click = (el: HTMLElement) => act(async () => { el.click() })
 const keydown = (el: Element, key: string) =>
   act(async () => { el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })) })
 
-function Harness({ onConfirm, reason, consequences = [{ icon: Ban, text: 'Ana is signed out.' }] }: {
+function Harness({ onConfirm, reason, description, consequences = [{ icon: Ban, text: 'Ana is signed out.' }] }: {
   onConfirm: (r?: string) => void | Promise<void>
   reason?: boolean
+  description?: ReactNode
   consequences?: { icon: typeof Ban; text: string }[]
 }) {
   const [open, setOpen] = useState(false)
@@ -48,6 +49,7 @@ function Harness({ onConfirm, reason, consequences = [{ icon: Ban, text: 'Ana is
         verb="Ban"
         object="user"
         reason={reason}
+        description={description}
         onConfirm={onConfirm}
       />
     </>
@@ -55,13 +57,24 @@ function Harness({ onConfirm, reason, consequences = [{ icon: Ban, text: 'Ana is
 }
 
 describe('dialogs and form controls', () => {
-  it('focuses Cancel, hides the page behind, and restores focus on Cancel and Escape', async () => {
-    await render(<Harness onConfirm={vi.fn()} />)
+  it.each([false, true])('describes the consequences and optional target, preserves initial focus, and restores it on Cancel/Escape (description: %s)', async (withDescription) => {
+    const identity = 'ana@acme.test · Acme · Member'
+    const consequences = [
+      { icon: Ban, text: "They're signed out on every device and can't sign in." },
+      { icon: Ban, text: 'Their training records stay. Unban restores access.' },
+    ]
+    await render(<Harness onConfirm={vi.fn()} reason={withDescription} description={withDescription ? identity : undefined} consequences={consequences} />)
     const opener = button('Retire')
     for (const close of [() => click(button('Cancel')), () => keydown(document.activeElement!, 'Escape')]) {
       opener.focus() // el.click() doesn't move focus; a real click does
       await click(opener)
-      expect(document.activeElement).toBe(button('Cancel'))
+      const dialog = document.querySelector('[role="dialog"]')!
+      const list = dialog.querySelector('ul')!
+      const identityParagraph = dialog.querySelector('[data-slot="dialog-header"] p')
+      expect(dialog.getAttribute('aria-describedby')).toBe(withDescription ? `${identityParagraph!.id} ${list.id}` : list.id)
+      const described = dialog.getAttribute('aria-describedby')!.split(' ').map((id) => document.getElementById(id)!.textContent)
+      expect(described).toEqual(withDescription ? [identity, consequences.map((c) => c.text).join('')] : [consequences.map((c) => c.text).join('')])
+      expect(document.activeElement).toBe(withDescription ? dialog.querySelector('textarea') : button('Cancel'))
       expect(opener.closest('[aria-hidden="true"]')).not.toBeNull()
       await close()
       await act(async () => { await new Promise((r) => setTimeout(r, 10)) }) // Radix restores focus on a timeout
