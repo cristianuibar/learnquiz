@@ -5,7 +5,7 @@ import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet
 import { PortalProvider } from '@/components/portal/portal-context'
 import { afterEach, expect, it, vi } from 'vitest'
 import { Route as roleDetailRoute } from '@/routes/org.$slug.roles_.$roleId'
-import { retireRoleDocument } from '@/server/role-documents'
+import { retireRoleDocument, uploadRoleDocument } from '@/server/role-documents'
 import { retryConceptGeneration } from '@/server/curriculum'
 import { getRoleDetail, updateRoleConcept } from '@/server/role-detail'
 
@@ -160,6 +160,19 @@ it('announces finding concepts while a build has none yet, then the first count'
   expect(status()).toBe('0 of 2 concepts ready')
 })
 
+it('counts only ready concepts when a build ends with a failed concept', async () => {
+  const build = (readyN: number, status: string, failedN = 0) => {
+    const list = Array.from({ length: 31 }, (_, i) => concept(`c${i}`, `Concept ${i}`, i < readyN ? 'ready' : i < readyN + failedN ? 'failed' : 'pending'))
+    return makeDetail({ status, documents: [pdf], units: unit(list) })
+  }
+  const { container, router, status } = await mount(build(29, 'generating'))
+  vi.mocked(getRoleDetail).mockResolvedValue(build(29, 'ready', 2) as never)
+  await act(() => router.invalidate())
+  expect(status()).toBe('29 of 31 concepts ready. 2 concepts failed.')
+  expect(container.textContent).toContain('Curriculum built · 29 of 31 concepts ready · 2 failed')
+  expect(container.textContent).not.toContain('Curriculum ready')
+})
+
 it('retries a failed concept', async () => {
   vi.mocked(retryConceptGeneration).mockResolvedValue({ ok: true } as never)
   const { button } = await mount(makeDetail({ status: 'ready', documents: [pdf], units: unit([concept('c9', 'Safe drop', 'failed', { genError: 'No draft passed' })]) }))
@@ -205,7 +218,7 @@ it('shows the page and pasted-text meta on file rows', async () => {
 
 class FakeXhr {
   static instances: FakeXhr[] = []
-  upload: { onprogress: ((e: { loaded: number; total: number }) => void) | null } = { onprogress: null }
+  upload: { onprogress: ((e: { loaded: number; total: number }) => void) | null; onload: (() => void) | null } = { onprogress: null, onload: null }
   onload: (() => void | Promise<void>) | null = null
   onerror: (() => void) | null = null
   status = 0
@@ -280,6 +293,25 @@ it('cancels an upload in flight and removes its row', async () => {
   expect(container.querySelector('[role="alert"]')).toBeNull()
 })
 
+it('keeps an upload whose body was sent when Cancel is pressed, and shows the stored document', async () => {
+  vi.stubGlobal('XMLHttpRequest', FakeXhr)
+  FakeXhr.instances = []
+  const { container, button } = await mount(makeDetail())
+  await pickFile(container, new File(['%PDF'], 'sop.pdf', { type: 'application/pdf' }))
+  const xhr = FakeXhr.instances[0]!
+  await act(async () => { xhr.upload.onload?.() })
+  expect(button('Cancel upload')!.getAttribute('aria-disabled')).toBe('true')
+  await act(async () => { button('Cancel upload')!.click() })
+  expect(xhr.abort).not.toHaveBeenCalled()
+  expect(container.querySelector('[role="progressbar"]')).not.toBeNull()
+  vi.mocked(getRoleDetail).mockResolvedValue(makeDetail({ documents: [{ ...pdf, id: 'new1', title: 'sop' }] }) as never)
+  xhr.status = 200
+  xhr.responseText = JSON.stringify({ sourceId: 'new1', topicId: 't1', r2Key: 'k', chars: 10, version: 1 })
+  await act(async () => { await xhr.onload!() })
+  await vi.waitFor(() => expect(container.querySelector('[role="progressbar"]')).toBeNull())
+  expect(button('Replace sop')).not.toBeNull()
+})
+
 it('swaps the uploading row for the new document, announces it and moves focus to Replace', async () => {
   vi.stubGlobal('XMLHttpRequest', FakeXhr)
   FakeXhr.instances = []
@@ -312,6 +344,30 @@ it('flags pasted text over the limit without trimming it', async () => {
   expect(container.textContent).toContain('60,001 / 60,000 characters. Remove 1 or upload a PDF instead.')
   expect(button('Add text')!.hasAttribute('disabled')).toBe(true)
   expect(area.value.length).toBe(60001)
+})
+
+it('keeps a reopened paste panel and its draft when an earlier cancelled add finishes', async () => {
+  let finish!: (v: unknown) => void
+  vi.mocked(uploadRoleDocument).mockReturnValue(new Promise((r) => { finish = r }) as never)
+  const { container, button } = await mount(makeDetail({ documents: [pdf] }))
+  const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+  const type = async (value: string) => {
+    const area = container.querySelector<HTMLTextAreaElement>('#rd-paste textarea')!
+    await act(async () => {
+      setter.call(area, value)
+      area.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+  }
+  await act(async () => { button('Paste text')!.click() })
+  await type('First notes')
+  await act(async () => { button('Add text')!.click() })
+  await act(async () => { button('Cancel')!.click() })
+  await act(async () => { button('Paste text')!.click() })
+  await type('Second draft')
+  const before = vi.mocked(getRoleDetail).mock.calls.length
+  await act(async () => { finish({}) })
+  await vi.waitFor(() => expect(vi.mocked(getRoleDetail).mock.calls.length).toBeGreaterThan(before))
+  expect(container.querySelector<HTMLTextAreaElement>('#rd-paste textarea')?.value).toBe('Second draft')
 })
 
 it.each([

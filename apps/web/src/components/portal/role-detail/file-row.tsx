@@ -41,7 +41,7 @@ export function FileRow({ doc, actions, readOnly }: { doc: Doc; actions?: ReactN
 export const mb = (bytes: number) => (bytes / 1048576).toFixed(1)
 
 /** The in-flight upload, shown as the first row of the documents list. */
-export function UploadingRow({ name, loaded, total, onCancel }: { name: string; loaded: number; total: number; onCancel: () => void }) {
+export function UploadingRow({ name, loaded, total, sent, onCancel }: { name: string; loaded: number; total: number; sent: boolean; onCancel: () => void }) {
   const text = `${mb(loaded)} of ${mb(total)} MB`
   return (
     <li className="grid grid-cols-[40px_minmax(0,1fr)] items-center gap-x-4 gap-y-2 border-b border-border p-4 last:border-b-0 sm:grid-cols-[40px_minmax(0,1fr)_auto] sm:px-6 sm:py-4">
@@ -57,7 +57,17 @@ export function UploadingRow({ name, loaded, total, onCancel }: { name: string; 
         </div>
       </div>
       <div className="col-start-2 flex items-center gap-1 sm:col-start-3">
-        <Button id="rd-cancel-upload" type="button" variant="ghost" onClick={onCancel}>Cancel upload</Button>
+        {/* aria-disabled, not disabled: focus stays here so it can move to the new row's Replace. */}
+        <Button
+          id="rd-cancel-upload"
+          type="button"
+          variant="ghost"
+          aria-disabled={sent || undefined}
+          className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+          onClick={sent ? undefined : onCancel}
+        >
+          Cancel upload
+        </Button>
       </div>
     </li>
   )

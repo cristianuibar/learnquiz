@@ -23,6 +23,7 @@ export function Curriculum({ detail, readOnly, controls, error, announce }: {
   const concepts = units.flatMap((u) => u.concepts)
   const total = concepts.length
   const ready = concepts.filter((c) => c.genStatus === 'ready').length
+  const failed = concepts.filter((c) => c.genStatus === 'failed').length
   const running = role.topicStatus === 'generating' || concepts.some((c) => c.genStatus === 'pending' || c.genStatus === 'generating')
   const [openById, setOpenById] = useState<Record<string, boolean>>({})
   const [finished, setFinished] = useState(false)
@@ -44,11 +45,11 @@ export function Curriculum({ detail, readOnly, controls, error, announce }: {
       wasRunning.current = false
       bucket.current = null
       if (total > 0) {
-        announceRef.current(`${total} of ${total} concepts ready. Curriculum ready.`)
+        announceRef.current(`${ready} of ${total} concepts ready. ${failed ? `${plural(failed, 'concept', 'concepts')} failed.` : 'Curriculum ready.'}`)
         setFinished(true)
       }
     }
-  }, [ready, total, running])
+  }, [ready, failed, total, running])
 
   const readyText = `${ready} of ${total} concepts ready`
   const stats = `${plural(total, 'concept', 'concepts')} · ${plural(role.liveQuestions, 'live question', 'live questions')} · ${plural(role.criticalQuestions, 'critical question', 'critical questions')}`
@@ -72,7 +73,9 @@ export function Curriculum({ detail, readOnly, controls, error, announce }: {
           kind="info"
           action={<Button asChild variant="primary"><Link {...links.questions({ role: role.id })}>Review questions</Link></Button>}
         >
-          <strong>Curriculum ready</strong> · {plural(total, 'concept', 'concepts')}
+          {failed
+            ? <><strong>Curriculum built</strong> · {readyText} · {failed} failed</>
+            : <><strong>Curriculum ready</strong> · {plural(total, 'concept', 'concepts')}</>}
         </Banner>
       )}
       {units.length > 0 ? (

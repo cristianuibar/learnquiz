@@ -13,7 +13,7 @@ export const Route = createFileRoute('/admin/companies_/$slug')({
 function Company() {
   const company = Route.useLoaderData()
   return (
-    <main>
+    <main className="max-w-[1120px]">
       <h1 className="text-title-1 text-ink">{company.name}</h1>
       <Link to="/org/$slug" params={{ slug: company.slug }} className="mt-4 inline-flex min-h-11 items-center rounded-md underline focus-visible:ring-[3px] focus-visible:ring-ring/50">View company portal (read only)</Link>
       <p className="mt-4">{plural(company.activeLearners, 'active learner', 'active learners')} in the last 30 days · ${company.modelSpend.toFixed(4)} USD lifetime model spend</p>
