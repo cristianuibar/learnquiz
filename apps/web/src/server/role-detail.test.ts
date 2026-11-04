@@ -112,6 +112,17 @@ it('gives an admin the role documents newest first and its units with concept ge
   ] }])
 })
 
+it('counts only current company members in both the Roles list and role detail', async () => {
+  raw.prepare('DELETE FROM member WHERE user_id = ? AND organization_id = ?').run('employee', 'northwind')
+  // Membership in another company must not make a leftover assignment count.
+  raw.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES (?, ?, ?, 1)')
+    .run('other-owner', 'northwind', 'picker')
+
+  expect((await read()).role.people).toBe(1)
+  const result = await listRoles({ data: { slug: 'northwind' } })
+  expect(result.roles.find((role) => role.id === 'picker')?.peopleCount).toBe(1)
+})
+
 it('counts live questions per concept (active and reported only) and totals them for the role and its critical concepts', async () => {
   const item = raw.prepare("INSERT INTO items (id, concept_id, topic_id, format, payload_json, status, created_at) VALUES (?, ?, ?, 'mcq', '{}', ?, 1)")
   for (const [id, conceptId, status] of [
