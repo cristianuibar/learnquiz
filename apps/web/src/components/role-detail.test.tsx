@@ -93,6 +93,19 @@ it('saves the Critical switch, named by its column header and concept', async ()
   await vi.waitFor(() => expect(vi.mocked(getRoleDetail).mock.calls.length).toBeGreaterThan(before))
 })
 
+// happy-dom applies no container queries, so this compares the narrow-list rules the header shares with the rows.
+it('stacks the Questions and Critical headers with the concept rows below a 560px list', async () => {
+  const { container } = await mount(makeDetail({ status: 'ready', documents: [pdf], units: unit([concept('c1', 'Cash float', 'ready')]) }))
+  const narrow = (el: Element) => el.className.split(' ').filter((c) => c.startsWith('@max-[560px]:')).sort()
+  const header = container.querySelector('[id$="-crit"]')!.parentElement!.parentElement!
+  const row = container.querySelector('li li')!
+  expect(narrow(header)).toEqual(narrow(row))
+  expect(narrow(header)).toContain('@max-[560px]:grid-cols-1')
+  expect(narrow(header.firstElementChild!)).toEqual(['@max-[560px]:hidden'])
+  const questionsHeader = [...header.querySelectorAll('span')].find((s) => s.textContent === 'Questions')!
+  expect(narrow(questionsHeader)).toEqual(narrow(row.children[1].firstElementChild!))
+})
+
 it('saves the edit form with a Critical value toggled before the page reloaded', async () => {
   vi.mocked(updateRoleConcept).mockResolvedValue({ ok: true })
   const { container, button } = await mount(makeDetail({ status: 'ready', documents: [pdf], units: unit([concept('c1', 'Cash float', 'ready')]) }))
