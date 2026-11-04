@@ -94,8 +94,9 @@ it.each([
 ])('subscribes this browser before turning questions on when it %s', async (_name, current, leftover) => {
   const endpoint = 'https://push.example/b'
   const keys = { p256dh: 'pk', auth: 'au' }
-  registration.pushManager.subscribe.mockResolvedValue(sub(endpoint, keys))
-  await render({ push: { prefs: { ...prefs, paused: true } }, current })
+  const created = sub(endpoint, keys)
+  registration.pushManager.subscribe.mockResolvedValue(created)
+  await render({ push: { isStaff: true, prefs: { ...prefs, paused: true } }, current })
   await click(switchEl())
   expect(requestPermission).toHaveBeenCalledOnce()
   if (leftover) expect((current as ReturnType<typeof sub>).unsubscribe).toHaveBeenCalledOnce()
@@ -103,6 +104,14 @@ it.each([
   expect(subscribe).toHaveBeenCalledExactlyOnceWith({ data: { endpoint, keys } })
   expect(savePushPreferences).toHaveBeenCalledExactlyOnceWith({ data: { ...prefs, paused: false } })
   expect(switchEl().getAttribute('aria-checked')).toBe('true')
+  // The new subscription counts as this account's: the test push works and toggling again keeps it.
+  expect(byText('button', 'Send test push').hasAttribute('disabled')).toBe(false)
+  await click(switchEl())
+  registration.pushManager.getSubscription.mockResolvedValue(created)
+  await click(switchEl())
+  expect(created.unsubscribe).not.toHaveBeenCalled()
+  expect(registration.pushManager.subscribe).toHaveBeenCalledOnce()
+  expect(savePushPreferences).toHaveBeenLastCalledWith({ data: { ...prefs, paused: false } })
 })
 
 it('never turns off the last day and saves other toggles', async () => {

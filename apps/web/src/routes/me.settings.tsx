@@ -43,7 +43,9 @@ function Settings() {
   const push = Route.useLoaderData()
   const router = useRouter()
   const email = authClient.useSession().data?.user.email ?? null
-  const { company, publicKey, endpoints, isStaff } = push
+  const { company, publicKey, isStaff } = push
+  // Grows when this browser subscribes, so the new subscription counts as this account's.
+  const [endpoints, setEndpoints] = useState(push.endpoints)
   const [prefs, setPrefs] = useState(push.prefs)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(false)
@@ -71,7 +73,7 @@ function Settings() {
       if (active) setSubscription(current)
     }).catch(() => {})
     return () => { active = false }
-  }, [endpoints])
+  }, [])
 
   const saved = Boolean(subscription && endpoints.includes(subscription.endpoint))
 
@@ -95,7 +97,11 @@ function Settings() {
   function toggleSwitch(on: boolean) {
     if (!on) return void save({ ...prefs, paused: true })
     const enable = pushSupported() && publicKey && !saved
-      ? async () => { setSubscription(await enableWebPush(publicKey, endpoints)) }
+      ? async () => {
+        const current = await enableWebPush(publicKey, endpoints)
+        setSubscription(current)
+        setEndpoints((known) => known.includes(current.endpoint) ? known : [...known, current.endpoint])
+      }
       : undefined
     void save({ ...prefs, paused: false }, enable)
   }
