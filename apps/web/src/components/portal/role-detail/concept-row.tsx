@@ -44,18 +44,20 @@ export function ConceptRow({ concept, slug, readOnly, critHeaderId }: { concept:
     wasEditing.current = editing
   }, [editing])
 
-  // Runs a save after the one in flight; a queued save it replaces is skipped.
-  function enqueue(run: (seq: number) => Promise<unknown>) {
-    const seq = ++latest.current
-    const done = saving.current.then(() => (seq === latest.current ? run(seq) : undefined))
+  // Runs a save after every save already queued on this row.
+  function enqueue(run: () => Promise<unknown>) {
+    const done = saving.current.then(run)
     saving.current = done.then(() => {}, () => {})
     return done
   }
 
   function toggle(next: boolean) {
+    const seq = ++latest.current
     setError('')
     setCritical(next)
-    void enqueue(async (seq) => {
+    void enqueue(async () => {
+      // A newer choice is queued behind this one, so skip the stale write.
+      if (seq !== latest.current) return
       try {
         await update({ data: { slug, conceptId: concept.id, critical: next } })
         saved.current = next

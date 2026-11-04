@@ -128,7 +128,7 @@ it('reloads the role when the last Critical save fails after an earlier one land
   await vi.waitFor(() => expect(vi.mocked(getRoleDetail).mock.calls.length).toBeGreaterThan(before))
 })
 
-it('saves the edit form after a Critical toggle in flight and skips the toggle it replaced', async () => {
+it('saves the edit form after the Critical toggles queued before it', async () => {
   const finish: Array<() => void> = []
   vi.mocked(updateRoleConcept).mockImplementation(() => new Promise((resolve) => { finish.push(() => resolve({ ok: true })) }))
   const { container, button } = await mount(makeDetail({ status: 'ready', documents: [pdf], units: unit([concept('c1', 'Cash float', 'ready')]) }))
@@ -142,8 +142,31 @@ it('saves the edit form after a Critical toggle in flight and skips the toggle i
   while (finish.length) await act(async () => { finish.shift()!() })
   expect(vi.mocked(updateRoleConcept).mock.calls.map(([{ data }]) => data)).toEqual([
     { slug: 'x', conceptId: 'c1', critical: true },
+    { slug: 'x', conceptId: 'c1', critical: false },
     { slug: 'x', conceptId: 'c1', name: 'Cash float', summary: 'About Cash float', critical: true },
   ])
+})
+
+it('still sends a queued Critical toggle when the edit form save is rejected', async () => {
+  // The server commits each Critical write when its request finishes and rejects the edit.
+  let persisted = false
+  const finish: Array<() => void> = []
+  vi.mocked(updateRoleConcept).mockImplementation(({ data }) => new Promise((resolve, reject) => {
+    const d = data as { critical: boolean; name?: string }
+    finish.push(() => { if (d.name !== undefined) return reject(new Error('Name is required')); persisted = d.critical; resolve({ ok: true }) })
+  }))
+  const { container, button } = await mount(makeDetail({ status: 'ready', documents: [pdf], units: unit([concept('c1', 'Cash float', 'ready')]) }))
+  const sw = () => container.querySelector<HTMLElement>('[role="switch"]')!
+  await act(async () => { sw().click() })
+  await act(async () => { sw().click() })
+  await act(async () => { button('Edit concept: Cash float')!.click() })
+  const form = container.querySelector<HTMLFormElement>('form[aria-label="Edit concept: Cash float"]')!
+  await act(async () => { form.requestSubmit() })
+  while (finish.length) await act(async () => { finish.shift()!() })
+  expect(container.textContent).toContain('Name is required')
+  await act(async () => { button('Cancel')!.click() })
+  expect(sw().getAttribute('aria-checked')).toBe('false')
+  expect(persisted).toBe(false)
 })
 
 // happy-dom applies no container queries, so this compares the narrow-list rules the header shares with the rows.
