@@ -30,7 +30,8 @@ function describeDays(days: number[]) {
 	const sorted = [...new Set(days)].sort((a, b) => a - b)
 	const names = sorted.map((day) => DAY_NAMES[day - 1])
 	if (sorted.length > 2 && sorted.at(-1)! - sorted[0] === sorted.length - 1) return `${names[0]} to ${names.at(-1)}`
-	return names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names.join('')
+	if (!names.length) return 'no days'
+	return names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]
 }
 
 // "6:00 AM–6:00 PM, Monday to Friday"

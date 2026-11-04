@@ -28,8 +28,8 @@ export function effectiveWindow(company: CompanyHours | null, prefs: LearnerPref
   const base = { startMinute: minutes(workingHours.start), endMinute: minutes(workingHours.end), days: workingHours.days, timezone }
   if (!prefs) return { ...base, source: 'company' }
   // Learner prefs have no zone of their own: their minutes are read in the company timezone, their days within the company's.
-  const own = prefs.days?.filter((day) => base.days.includes(day))
-  const days = own?.length ? base.days.filter((day) => own.includes(day)) : base.days
+  // Days the company drops fall away; if none of the learner's days remain, no day is allowed rather than every company day.
+  const days = prefs.days ? base.days.filter((day) => prefs.days!.includes(day)) : base.days
   const startMinute = Math.max(base.startMinute, prefs.startMinute)
   const endMinute = Math.min(base.endMinute, prefs.endMinute)
   const hoursOk = startMinute < endMinute
