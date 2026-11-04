@@ -22,9 +22,11 @@ const rootApi = getRouteApi('__root__')
 
 type Result = { reveal: Reveal; chosen: string; reviewsLeft: number | null }
 
-function isConflict(err: unknown): boolean {
-  const e = err as { status?: number; message?: string }
-  return e?.status === 409 || ['Already answered', 'This session has ended'].some((m) => e?.message?.includes(m))
+// Only an answer already stored counts as answered; any other 404 or 409 (a retired question, a moved queue) saved nothing.
+export function goneState(err: unknown): 'unavailable' | 'answered' | null {
+  const { status, message } = err as { status?: number; message?: string }
+  if (status === 409 && /already answered|session has ended/i.test(message ?? '')) return 'answered'
+  return status === 404 || status === 409 ? 'unavailable' : null
 }
 
 function chosenText(item: ItemView, answer: Answer): string {
@@ -212,9 +214,10 @@ function Question({ view, item, onResult, onGone }: { view: SessionView; item: I
       const reviewsLeft = await end({ data: { sessionId: view.id } }).then((s) => s.reviewsLeft, () => null)
       onResult({ reveal, chosen: chosenText(item, answer), reviewsLeft })
     } catch (err) {
-      const status = (err as { status?: number }).status
-      if (status === 404) onGone('unavailable')
-      else if (isConflict(err)) onGone('answered')
+      const gone = goneState(err)
+      // Nothing was stored, so close the mini session instead of leaving it open.
+      if (gone === 'unavailable') void end({ data: { sessionId: view.id } }).catch(() => {})
+      if (gone) onGone(gone)
       else {
         setError({ message: checkFailedMessage(false, 'device'), retry: () => void submit() })
         setBusy(false)

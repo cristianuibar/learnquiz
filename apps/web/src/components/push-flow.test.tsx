@@ -228,6 +228,21 @@ it('announces Report sent on the result only after the report sheet stops hiding
   } finally { await cleanup() }
 })
 
+it.each([
+  { message: 'This question has been retired', heading: "This question isn't available any more.", ends: true },
+  { message: 'Already answered. Continue to the next question.', heading: 'You already answered this question.', ends: false },
+])('says $heading when Check is refused with 409 "$message"', async ({ message, heading, ends }) => {
+  mockQuickAnswer()
+  vi.mocked(answerItem).mockRejectedValue(Object.assign(new Error(message), { status: 409 }))
+  const { container, cleanup } = await renderApp('/play/quick/i1?pushId=push-1')
+  try {
+    await checkQuick(container)
+    expect(container.querySelector('h1')?.textContent).toBe(heading)
+    expect([...container.querySelectorAll('a[href="/today"]')].map((a) => a.textContent?.trim())).toContain('Back to Today')
+    expect(vi.mocked(endSession).mock.calls).toEqual(ends ? [[{ data: { sessionId: 'mini-1' } }]] : [])
+  } finally { await cleanup() }
+})
+
 it('says the question is gone when the notification item no longer exists', async () => {
   vi.mocked(startMiniSession).mockRejectedValue(Object.assign(new Error('Question not found'), { status: 404 }))
   const { container, cleanup } = await renderApp('/play/quick/i1?pushId=push-1')

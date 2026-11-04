@@ -1,10 +1,8 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { z } from 'zod'
 import { RouteError } from '@/components/inline-error'
-import { QuickSession } from '@/components/quick-session'
+import { QuickSession, goneState } from '@/components/quick-session'
 import { getSession, startMiniSession } from '@/server/play'
-
-type Err = { status?: number; message?: string }
 
 export const Route = createFileRoute('/play/quick/$itemId')({
   validateSearch: z.object({ pushId: z.string().min(1).optional() }),
@@ -19,10 +17,9 @@ export const Route = createFileRoute('/play/quick/$itemId')({
       if (view.ended || !view.item) return { status: 'answered' as const }
       return { status: 'question' as const, view }
     } catch (err) {
-      const { status, message } = err as Err
-      if (status === 404) return { status: 'unavailable' as const }
-      if (status === 409) return { status: /already answered|session has ended/i.test(message ?? '') ? ('answered' as const) : ('unavailable' as const) }
-      throw err
+      const gone = goneState(err)
+      if (!gone) throw err
+      return { status: gone }
     }
   },
   // The session is created per visit, so cached loader data would replay an old question.
