@@ -120,7 +120,7 @@ export function Roles({ org }: { org: Org }) {
         open={open}
         onOpenChange={setOpen}
         slug={org.slug}
-        onCreated={(id) => { created.current = true; setOpen(false); openRole(id) }}
+        onSaved={(id) => { created.current = true; setOpen(false); openRole(id) }}
         onCloseAutoFocus={restoreFocus}
       />
     </Page>

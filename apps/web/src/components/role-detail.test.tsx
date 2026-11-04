@@ -7,11 +7,13 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { Route as roleDetailRoute } from '@/routes/org.$slug.roles_.$roleId'
 import { previewRetireRoleDocument, removeRoleDocument, retireRoleDocument, uploadRoleDocument } from '@/server/role-documents'
 import { retryConceptGeneration } from '@/server/curriculum'
+import { updateRole } from '@/server/org'
 import { getRoleDetail, updateRoleConcept } from '@/server/role-detail'
 
 vi.mock('@/server/role-detail', () => ({ getRoleDetail: vi.fn(), updateRoleConcept: vi.fn() }))
 vi.mock('@/server/curriculum', () => ({ generateRoleCurriculum: vi.fn(), retryConceptGeneration: vi.fn() }))
 vi.mock('@/server/role-documents', () => ({ uploadRoleDocument: vi.fn(), retireRoleDocument: vi.fn(), previewRetireRoleDocument: vi.fn(), removeRoleDocument: vi.fn() }))
+vi.mock('@/server/org', () => ({ updateRole: vi.fn(), createRole: vi.fn() }))
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
 
 // The portal layout provides the link context; screens are rendered under it here.
@@ -584,4 +586,55 @@ it('shows the header Review questions once every concept is ready or failed', as
   expect(links).toHaveLength(1)
   expect(links[0]!.getAttribute('href')).toBe('/org/x/questions?role=r1')
   expect(container.querySelectorAll('[data-variant="accent"]')).toHaveLength(1)
+})
+
+const dialogField = (text: string) => [...document.querySelectorAll<HTMLLabelElement>('[role="dialog"] label')].find((l) => l.textContent?.startsWith(text))!.control as HTMLInputElement
+const type = async (input: HTMLInputElement, value: string) => {
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+}
+
+it('edits the role in a dialog, then shows the new details and returns focus to Edit role', async () => {
+  vi.mocked(updateRole).mockResolvedValue({ id: 'r1' } as never)
+  const { container, button, status } = await mount(makeDetail())
+  const edit = button('Edit role')!
+  await act(async () => { edit.focus(); edit.click() })
+  expect(document.querySelector('[role="dialog"]')!.textContent).toContain('Edit role')
+  expect(dialogField('Name').value).toBe('Cashier')
+  expect(dialogField('Benchmark').value).toBe('85')
+  expect(dialogField('Onboarding period').value).toBe('30')
+  expect(document.activeElement).toBe(dialogField('Name'))
+  const updated = makeDetail()
+  updated.role = { ...updated.role, name: 'Head cashier', benchmark: 0.9 }
+  vi.mocked(getRoleDetail).mockResolvedValue(updated as never)
+  await type(dialogField('Name'), 'Head cashier')
+  await type(dialogField('Benchmark'), '90')
+  await act(async () => { document.querySelector<HTMLFormElement>('[role="dialog"] form')!.requestSubmit() })
+  expect(updateRole).toHaveBeenCalledWith({ data: { slug: 'x', roleId: 'r1', name: 'Head cashier', benchmark: 90, onboardingDays: 30 } })
+  await vi.waitFor(() => {
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(document.activeElement).toBe(button('Edit role'))
+  })
+  expect(container.querySelector('h1')!.textContent).toBe('Head cashier')
+  expect(container.textContent).toContain('Benchmark 90%')
+  expect(status()).toBe('Role saved.')
+})
+
+it('returns focus to Edit role when the dialog is cancelled', async () => {
+  const { button } = await mount(makeDetail())
+  const edit = button('Edit role')!
+  await act(async () => { edit.focus(); edit.click() })
+  const cancel = [...document.querySelectorAll('[role="dialog"] button')].find((b) => b.textContent === 'Cancel') as HTMLElement
+  await act(async () => { cancel.click() })
+  await vi.waitFor(() => {
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(document.activeElement).toBe(edit)
+  })
+})
+
+it('offers no Edit role when read-only', async () => {
+  const { button } = await mount(makeDetail({ readOnly: true }))
+  expect(button('Edit role')).toBeUndefined()
 })

@@ -7,6 +7,7 @@ import { Page, PageHeader } from '@/components/admin/page'
 import { errorMessage } from '@/components/inline-error'
 import { usePortal, usePortalLinks } from '@/components/portal/portal-context'
 import { Button } from '@/components/ui/button'
+import { RoleDialog } from '@/components/portal/roles/role-dialog'
 import { plural } from '@/lib/utils'
 import { generateRoleCurriculum } from '@/server/curriculum'
 import type { RoleDetail as RoleDetailData } from '@/server/role-detail'
@@ -31,6 +32,8 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
   const [finished, setFinished] = useState<{ name: string; size: number; sourceId: string; refocus: boolean } | null>(null)
   const [announced, setAnnounced] = useState('')
   const [focusId, setFocusId] = useState('')
+  const [editOpen, setEditOpen] = useState(false)
+  const editButton = useRef<HTMLButtonElement>(null)
   const uploader = useUpload({
     orgSlug: slug,
     roleId: role.id,
@@ -115,13 +118,28 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
         }
         title={role.name}
         meta={`Benchmark ${Math.round(role.benchmark * 100)}% · Onboarding ${plural(role.onboardingDays, 'day', 'days')} · ${plural(role.people, 'person', 'people')}`}
-        actions={!readOnly && role.topicStatus === 'ready' && !running ? (
-          <Button asChild variant={pasteOpen ? 'secondary' : 'accent'}>
-            <Link {...links.questions({ role: role.id })}>Review questions</Link>
-          </Button>
+        actions={!readOnly ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <Button ref={editButton} type="button" variant="secondary" aria-haspopup="dialog" onClick={() => setEditOpen(true)}>Edit role</Button>
+            {role.topicStatus === 'ready' && !running && (
+              <Button asChild variant={pasteOpen ? 'secondary' : 'accent'}>
+                <Link {...links.questions({ role: role.id })}>Review questions</Link>
+              </Button>
+            )}
+          </div>
         ) : undefined}
       />
       <p role="status" aria-live="polite" className="sr-only">{uploadStatus}</p>
+      {!readOnly && (
+        <RoleDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          slug={slug}
+          role={role}
+          onSaved={async () => { await router.invalidate(); setAnnounced('Role saved.'); setEditOpen(false) }}
+          onCloseAutoFocus={(e) => { e.preventDefault(); editButton.current?.focus() }}
+        />
+      )}
       <div className="flex flex-col gap-10">
         <DocumentsCard
           uploader={uploader}
