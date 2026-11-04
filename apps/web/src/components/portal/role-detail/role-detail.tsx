@@ -127,7 +127,7 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
           pasteOpen={pasteOpen}
           onTogglePaste={togglePaste}
           panel={pasteOpen && canUpload ? (
-            <PasteTextPanel roleId={role.id} onClose={closePaste} onAdded={async () => { setPasteOpen(false); await router.invalidate() }} />
+            <PasteTextPanel roleId={role.id} onClose={closePaste} onAdded={async (current) => { if (current) setPasteOpen(false); await router.invalidate() }} />
           ) : null}
         />
         <Curriculum

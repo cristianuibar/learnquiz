@@ -5,7 +5,7 @@ import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet
 import { PortalProvider } from '@/components/portal/portal-context'
 import { afterEach, expect, it, vi } from 'vitest'
 import { Route as roleDetailRoute } from '@/routes/org.$slug.roles_.$roleId'
-import { retireRoleDocument } from '@/server/role-documents'
+import { retireRoleDocument, uploadRoleDocument } from '@/server/role-documents'
 import { retryConceptGeneration } from '@/server/curriculum'
 import { getRoleDetail, updateRoleConcept } from '@/server/role-detail'
 
@@ -312,6 +312,30 @@ it('flags pasted text over the limit without trimming it', async () => {
   expect(container.textContent).toContain('60,001 / 60,000 characters. Remove 1 or upload a PDF instead.')
   expect(button('Add text')!.hasAttribute('disabled')).toBe(true)
   expect(area.value.length).toBe(60001)
+})
+
+it('keeps a reopened paste panel and its draft when an earlier cancelled add finishes', async () => {
+  let finish!: (v: unknown) => void
+  vi.mocked(uploadRoleDocument).mockReturnValue(new Promise((r) => { finish = r }) as never)
+  const { container, button } = await mount(makeDetail({ documents: [pdf] }))
+  const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+  const type = async (value: string) => {
+    const area = container.querySelector<HTMLTextAreaElement>('#rd-paste textarea')!
+    await act(async () => {
+      setter.call(area, value)
+      area.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+  }
+  await act(async () => { button('Paste text')!.click() })
+  await type('First notes')
+  await act(async () => { button('Add text')!.click() })
+  await act(async () => { button('Cancel')!.click() })
+  await act(async () => { button('Paste text')!.click() })
+  await type('Second draft')
+  const before = vi.mocked(getRoleDetail).mock.calls.length
+  await act(async () => { finish({}) })
+  await vi.waitFor(() => expect(vi.mocked(getRoleDetail).mock.calls.length).toBeGreaterThan(before))
+  expect(container.querySelector<HTMLTextAreaElement>('#rd-paste textarea')?.value).toBe('Second draft')
 })
 
 it.each([
