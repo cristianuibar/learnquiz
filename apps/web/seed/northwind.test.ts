@@ -207,8 +207,8 @@ it('seeds the three employee stages through the real SOP pipeline and preserves 
     LEFT JOIN learner_concept lc ON lc.concept_id = c.id AND lc.learner_id = (SELECT id FROM user WHERE email = ?) WHERE c.topic_id = ?`).get(NORTHWIND.emails.onboarding, result.topicId) as { known: number }
   expect(people.members.map(({ email, training, lastActiveAt }) => ({ email, training, lastActiveAt }))).toEqual(expect.arrayContaining([
     { email: NORTHWIND.emails.owner, training: null, lastActiveAt: null },
-    { email: NORTHWIND.emails.onboarding, training: { stage: 'onboarding', progress: expect.closeTo(known / 0.85, 10), daysToProficiency: null, criticalConfidentErrors: 1 }, lastActiveAt: now - 86_400_000 - 60_000 },
-    { email: NORTHWIND.emails.proficient, training: { stage: 'proficient', progress: 1, daysToProficiency: 6, criticalConfidentErrors: 0 }, lastActiveAt: now - 4 * 86_400_000 - 60_000 },
+    { email: NORTHWIND.emails.onboarding, training: expect.objectContaining({ stage: 'onboarding', progress: expect.closeTo(known / 0.85, 10), daysToProficiency: null, criticalConfidentErrors: 1 }), lastActiveAt: now - 86_400_000 - 60_000 },
+    { email: NORTHWIND.emails.proficient, training: expect.objectContaining({ stage: 'proficient', progress: 1, daysToProficiency: 6, criticalConfidentErrors: 0 }), lastActiveAt: now - 4 * 86_400_000 - 60_000 },
   ]))
   expect(people.members).toHaveLength(3)
   expect(people.invites).toEqual([expect.objectContaining({ email: NORTHWIND.emails.invited, expired: false, jobRole: 'Warehouse picker' })])

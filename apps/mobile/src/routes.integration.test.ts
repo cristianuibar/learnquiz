@@ -33,6 +33,15 @@ jest.mock('./app/(tabs)/today', () => ({
   __esModule: true,
   default: () => require('react').createElement(require('react-native').Text, null, 'Today screen'),
 }))
+// The tab bar reads Today to enable Path. This file checks routing and counts
+// api calls, so the tab bar sees a fixed Today with no topic and never fetches.
+jest.mock('expo-sqlite/kv-store', () => ({ AsyncStorage: {
+  getItemAsync: async () => null, setItemAsync: async () => {}, removeItemAsync: async () => {}, getAllKeysAsync: async () => [],
+} }))
+jest.mock('./lib/today', () => ({
+  ...jest.requireActual('./lib/today'),
+  useToday: () => ({ today: null, view: null, status: 'loading', refreshing: false, refresh: async () => {} }),
+}))
 jest.mock('react-native-gesture-handler', () => ({ GestureHandlerRootView: 'View' }))
 jest.mock('react-native-keyboard-controller', () => ({
   KeyboardProvider: 'View',
@@ -136,6 +145,9 @@ test('the actual router keeps sign-in closed for a signed-in learner', async () 
   expect(navigation.getPathname()).toBe('/today')
   expect(screen.getByText('Today screen')).toBeOnTheScreen()
   expect(screen.queryByText('Sign in')).toBeNull()
+  // The tab bar is on: Today is selected, and Path waits for a topic.
+  expect(screen.getByRole('tab', { name: 'Today', selected: true })).toBeOnTheScreen()
+  expect(screen.getByRole('tab', { name: 'Path', disabled: true })).toBeOnTheScreen()
 })
 
 test('the actual router replays a held target after startup, sign-in and disclosure', async () => {
@@ -207,7 +219,7 @@ async function signInThroughRoot(held: string | null, needsDisclosure = false) {
 test('real root sign-in opens a held unit once when refresh unlocks the private routes', async () => {
   const { navigation, replace } = await signInThroughRoot('/unit/u1')
   expect(navigation.getPathname()).toBe('/unit/u1')
-  expect(screen.getByText('Unit')).toBeOnTheScreen()
+  expect(screen.getByLabelText('Back to Path')).toBeOnTheScreen()
   expect(replace.mock.calls.map(([target]) => target)).toEqual(['/unit/u1'])
   expect(peekHeldTarget()).toBeNull()
 })
@@ -317,7 +329,7 @@ test('Got it sends one acknowledge while the first tap is pending', async () => 
 test('review mode from Profile shows the branded copy and Got it returns without acknowledging', async () => {
   jest.mocked(getToken).mockReturnValue('token-a')
   jest.mocked(api).mockResolvedValue({ name: 'Learner', role: null, started: true, mastery: 0.66, benchmark: 0.85,
-    onboarding: { day: 16, days: 30 }, proficiency: { achievedAt: null, projectedAt: null }, weeks: [] })
+    onboarding: { day: 16, days: 30 }, proficiency: { achievedAt: null, projectedAt: null }, weeks: [], units: [], confidentErrors: [] })
   jest.mocked(useSession).mockReturnValue({ ...ready, branding: { name: 'Northwind', accent: null, logoUrl: null } })
   const navigation = renderRouter('src/app', { initialUrl: '/profile' })
   await navigation
@@ -333,7 +345,7 @@ test('review mode from Profile shows the branded copy and Got it returns without
 
 test('Profile keeps loaded mastery visible during a return-from-Settings refetch', async () => {
   const profile = { name: 'Learner', role: null, started: true, mastery: 0.66, benchmark: 0.85,
-    onboarding: { day: 16, days: 30 }, proficiency: { achievedAt: null, projectedAt: null }, weeks: [] }
+    onboarding: { day: 16, days: 30 }, proficiency: { achievedAt: null, projectedAt: null }, weeks: [], units: [], confidentErrors: [] }
   let resolve!: (value: unknown) => void
   const pending = new Promise((done) => { resolve = done })
   jest.mocked(getToken).mockReturnValue('token-a')

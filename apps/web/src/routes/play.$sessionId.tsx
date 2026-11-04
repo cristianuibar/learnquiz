@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
-import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
+import { createFileRoute, getRouteApi, redirect, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { InlineError, RouteError, errorMessage } from '@/components/inline-error'
 import { ProgressHeader } from '@/components/progress-header'
@@ -91,8 +91,11 @@ function openedFromHistory() {
   return nav?.type === 'back_forward'
 }
 
+const rootApi = getRouteApi('__root__')
+
 function Play({ initial }: { initial: SessionView }) {
   const router = useRouter()
+  const { branding } = rootApi.useLoaderData()
   const check = useServerFn(answerItem)
   const next = useServerFn(nextItem)
   const end = useServerFn(endSession)
@@ -307,9 +310,9 @@ function Play({ initial }: { initial: SessionView }) {
           reveal={revealed.reveal}
           item={revealed.item}
           answer={answer}
-          hasCompany={false}
+          hasCompany={Boolean(branding)}
           basics={view.basics === true}
-          company={null}
+          company={branding?.name ?? null}
           busy={busy}
           error={error?.message ?? null}
           onContinue={submitNext}
