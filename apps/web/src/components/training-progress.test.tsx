@@ -55,9 +55,9 @@ afterEach(async () => {
   delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT
 })
 
-async function mount(path: '/me/profile' | '/org/acme/people/learner') {
+async function mount(path: '/me/profile' | '/me/profile?status=flag-sent' | '/org/acme/people/learner') {
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
-  const me = createRoute({ getParentRoute: () => rootRoute, path: '/me/profile', beforeLoad: profileRoute.options.beforeLoad, loader: profileRoute.options.loader, component: profileRoute.options.component })
+  const me = createRoute({ getParentRoute: () => rootRoute, path: '/me/profile', validateSearch: profileRoute.options.validateSearch, beforeLoad: profileRoute.options.beforeLoad, loader: profileRoute.options.loader, component: profileRoute.options.component })
   const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, component: Outlet })
   const person = createRoute({ getParentRoute: () => org, path: '/people/$id', loader: personRoute.options.loader as (ctx: { params: { slug: string; id: string } }) => unknown, component: personRoute.options.component })
   const people = createRoute({ getParentRoute: () => org, path: '/people', component: () => <h1>People</h1> })
@@ -80,6 +80,23 @@ describe('Training progress', () => {
     expect(text().includes(SELF_LINE)).toBe(self)
     expect(text()).toContain('Dana Learner')
     expect(getToday).not.toHaveBeenCalled()
+  })
+
+  it('offers the flag link only to the learner, and confirms a sent flag', async () => {
+    const errors = [{ id: 'e1', conceptId: 'c9', concept: 'Emergency exits', at: start, correctedAt: null }]
+    const flagLink = () => [...container.querySelectorAll('a')].find((a) => a.textContent === 'Flag an unfair result')
+    vi.mocked(getProfile).mockResolvedValue(profile({ confidentErrors: errors }))
+    await mount('/me/profile')
+    expect(flagLink()?.getAttribute('href')).toBe('/me/flag?conceptId=c9')
+    expect(container.querySelector('[role="status"]')).toBeNull()
+    await act(async () => root.unmount())
+    root = createRoot(container)
+    await mount('/me/profile?status=flag-sent')
+    expect(container.querySelector('[role="status"]')?.textContent).toBe('Flag sent')
+    await act(async () => root.unmount())
+    root = createRoot(container)
+    await mount('/org/acme/people/learner')
+    expect(flagLink()).toBeUndefined()
   })
 
   it('shows the empty card and starts the first placement from the learner page', async () => {
@@ -111,6 +128,18 @@ describe('Training progress', () => {
     expect(text()).toContain('Day 1 of 30 · Benchmark 85%')
     expect(container.querySelector('button')).toBeNull()
     expect(getToday).not.toHaveBeenCalled()
+  })
+
+  it('draws the weekly trend rules to the chart edge and its markers in the card fill', async () => {
+    vi.mocked(getProfile).mockResolvedValue(profile())
+    await mount('/me/profile')
+    const svg = section('Weekly trend').querySelector('svg[role="img"]')!
+    expect(svg.closest('figure')!.classList).toContain('bg-surface-card')
+    const width = svg.getAttribute('viewBox')!.split(' ')[2]
+    expect([...svg.querySelectorAll('line')].filter((l) => !l.getAttribute('stroke-dasharray')?.startsWith('6')).map((l) => l.getAttribute('x2'))).toEqual([width, width, width, width])
+    const [projected, ...weeks] = [...svg.querySelectorAll('circle')]
+    expect(projected.getAttribute('class')).toBe('fill-surface-card stroke-brand')
+    expect(weeks.map((c) => c.getAttribute('class'))).toEqual(['fill-brand stroke-surface-card', 'fill-brand stroke-surface-card'])
   })
 
   it.each([

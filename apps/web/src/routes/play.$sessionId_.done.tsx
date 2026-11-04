@@ -35,7 +35,7 @@ function Done() {
     if (placed) prepareNextSession({ data: { sessionId: s.sessionId } }).catch(() => {})
   }, [placed, s.sessionId])
   return (
-    <main className="mx-auto flex w-full max-w-xl flex-col gap-8 px-4 pt-8">
+    <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col gap-8 px-4 pt-8">
       <p role="status" className="sr-only">
         {announcement}
       </p>
