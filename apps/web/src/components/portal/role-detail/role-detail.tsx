@@ -33,6 +33,8 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
   const [announced, setAnnounced] = useState('')
   const [focusId, setFocusId] = useState('')
   const [editOpen, setEditOpen] = useState(false)
+  const editGeneration = useRef(0)
+  const editSession = editGeneration.current
   const editButton = useRef<HTMLButtonElement>(null)
   const uploader = useUpload({
     orgSlug: slug,
@@ -120,7 +122,7 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
         meta={`Benchmark ${Math.round(role.benchmark * 100)}% · Onboarding ${plural(role.onboardingDays, 'day', 'days')} · ${plural(role.people, 'person', 'people')}`}
         actions={!readOnly ? (
           <div className="flex flex-wrap items-center gap-3">
-            <Button ref={editButton} type="button" variant="secondary" aria-haspopup="dialog" onClick={() => setEditOpen(true)}>Edit role</Button>
+            <Button ref={editButton} type="button" variant="secondary" aria-haspopup="dialog" onClick={() => { editGeneration.current++; setEditOpen(true) }}>Edit role</Button>
             {role.topicStatus === 'ready' && !running && (
               <Button asChild variant={pasteOpen ? 'secondary' : 'accent'}>
                 <Link {...links.questions({ role: role.id })}>Review questions</Link>
@@ -136,7 +138,12 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
           onOpenChange={setEditOpen}
           slug={slug}
           role={role}
-          onSaved={async () => { await router.invalidate(); setAnnounced('Role saved.'); setEditOpen(false) }}
+          onSaved={async () => {
+            await router.invalidate()
+            setAnnounced('Role saved.')
+            // A cancelled save can finish after another edit session has opened.
+            if (editSession === editGeneration.current) setEditOpen(false)
+          }}
           onCloseAutoFocus={(e) => { e.preventDefault(); editButton.current?.focus() }}
         />
       )}
