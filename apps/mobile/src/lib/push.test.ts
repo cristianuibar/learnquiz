@@ -659,6 +659,36 @@ test('a sign-in without a confirmed learner cannot delete the retained endpoint'
   expect(s.fetch.mock.calls.some(([, init]) => init.method === 'DELETE')).toBe(false)
 })
 
+test('an endpoint retained without a known owner is removed at the next confirmed learner’s sign-out', async () => {
+  // Cold 401 before any session was saved: lq:session is missing, so neither
+  // push.ts nor its token fingerprint can name the endpoint's owner, and the
+  // 401 has already dropped the bearer, so no DELETE can be sent then.
+  const s = authHarness()
+  s.store.data.delete('lq:session')
+  await s.auth.loadToken()
+  s.fetch.mockImplementation(async () => jsonResponse(401, { error: 'Expired' }))
+  await expect(s.client.api('/today')).rejects.toMatchObject({ status: 401 })
+  expect(s.secure.data.size).toBe(0)
+  expect(s.fetch.mock.calls.some(([, init]) => init.method === 'DELETE')).toBe(false)
+  s.fetch.mockImplementation(async () => jsonResponse(200, { token: 'renewed-bearer', user: { id: 'learner-a' } }))
+  await s.auth.signIn('learner@example.com', 'password')
+  await s.auth.signOut()
+  const deletions = s.fetch.mock.calls.filter(([, init]) => init.method === 'DELETE')
+  expect(deletions).toHaveLength(1)
+  expect(deletions[0][0]).toMatch(/\/api\/v1\/push\/expo$/)
+  // The server deletes only rows owned by this bearer's user, so the request
+  // can never remove another learner's subscription.
+  expect(deletions[0][1].headers).toMatchObject({ Authorization: 'Bearer renewed-bearer' })
+  expect(JSON.parse(deletions[0][1].body as string)).toEqual({ endpoint: 'ExponentPushToken[abc]' })
+  expect(s.auth.getToken()).toBeNull()
+  expect(s.secure.data.size).toBe(0)
+  // Once attempted, the endpoint is forgotten: a later learner sends nothing.
+  s.fetch.mockImplementation(async () => jsonResponse(200, { token: 'other-bearer', user: { id: 'learner-b' } }))
+  await s.auth.signIn('other@example.com', 'password')
+  await s.auth.signOut()
+  expect(s.fetch.mock.calls.filter(([, init]) => init.method === 'DELETE')).toHaveLength(1)
+})
+
 test('network PUT failures back off and remain retryable beyond the token budget', async () => {
   jest.useFakeTimers({ now: Date.UTC(2035, 1, 4, 12) })
   const s = setup({ putFails: true })

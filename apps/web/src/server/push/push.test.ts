@@ -499,6 +499,21 @@ it.each([
   expect(JSON.parse(expoCall[1]!.body as string).ttl).toBe(ttl)
 })
 
+it('shortens the ttl for a later device by the time spent sending to an earlier one', async () => {
+  await seedLearner()
+  vi.setSystemTime(new Date('2026-11-02T16:30:00Z'))
+  // The first device takes 20 minutes to answer, so the second may only be held until the 17:00 window end.
+  http.mockImplementationOnce(async () => {
+    vi.setSystemTime(new Date('2026-11-02T16:50:00Z'))
+    return new Response(null, { status: 201 })
+  })
+  expect(await sendDuePushes(Date.now(), holder.db as Db)).toBe(2)
+  const webCall = http.mock.calls.find(([destination]) => String(destination) === endpoint)!
+  const expoCall = http.mock.calls.find(([destination]) => String(destination) === expoUrl)!
+  expect(new Headers(webCall[1]!.headers).get('TTL')).toBe('1800')
+  expect(JSON.parse(expoCall[1]!.body as string).ttl).toBe(600)
+})
+
 it('measures the local day and window end in the learner timezone', async () => {
   await seedLearner()
   // 14:30Z is 09:30 in New York (UTC-5) and the local day began at 05:00Z; two of the three pushes were yesterday local time.
@@ -510,14 +525,38 @@ it('measures the local day and window end in the learner timezone', async () => 
   expect(JSON.parse(http.mock.calls.find(([d]) => String(d) === expoUrl)![1]!.body as string).ttl).toBe(3600)
 })
 
-it('delivers in the company window when the learner kept personal UTC hours from before joining', async () => {
+it.each([
+  // Fall back: local midnight was 04:00Z (EDT), so the 00:30 push counts and three are already sent.
+  { name: 'after the fall-back change', at: '2026-11-01T15:00:00Z', times: ['2026-11-01T04:30:00Z', '2026-11-01T10:00:00Z', '2026-11-01T12:00:00Z'], sends: 0 },
+  // Spring forward: local midnight was 05:00Z (EST), so the 23:30 Saturday push is yesterday's.
+  { name: 'after the spring-forward change', at: '2026-03-08T14:00:00Z', times: ['2026-03-08T04:30:00Z', '2026-03-08T10:00:00Z', '2026-03-08T12:00:00Z'], sends: 2 },
+])('starts the New York Sunday at local midnight $name', async ({ at, times, sends }) => {
   await seedLearner()
   raw.prepare('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, ?)').run('o1', 'Acme', 'acme', noon)
   raw.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, ?)').run('m1', 'o1', 'learner', 'member', noon)
   raw.prepare('INSERT INTO org_settings (org_id, company_name, timezone, working_hours_json) VALUES (?, ?, ?, ?)')
-    .run('o1', 'Acme', 'America/Los_Angeles', JSON.stringify({ days: [1, 2, 3, 4, 5], start: '09:00', end: '17:00' }))
+    .run('o1', 'Acme', 'America/New_York', JSON.stringify({ days: [1, 2, 3, 4, 5, 6, 7], start: '00:00', end: '23:00' }))
+  raw.exec("UPDATE push_prefs SET start_minute = 0, end_minute = 1440")
+  raw.exec('UPDATE learner_item SET due = 0')
+  vi.setSystemTime(new Date(at))
+  times.forEach((time, i) => raw.prepare('INSERT INTO push_log (id, user_id, subscription_id, outcome, item_id, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(`old-${i}`, 'learner', 'gone-sub', 'accepted', `earlier-${i}`, Date.parse(time)))
+  expect(await sendDuePushes(Date.now(), holder.db as Db)).toBe(sends)
+  expect(pushLogRows()).toHaveLength(sends)
+})
+
+it.each([
   // 17:00Z is after the saved 09:00-17:00 UTC hours but 09:00 in Los Angeles, inside the company window.
-  vi.setSystemTime(new Date('2026-11-02T17:00:00Z'))
+  { zone: 'America/Los_Angeles', at: '2026-11-02T17:00:00Z' },
+  // 03:00Z is before the saved UTC hours but 12:00 in Tokyo, inside the company window.
+  { zone: 'Asia/Tokyo', at: '2026-11-02T03:00:00Z' },
+])('delivers in the $zone company window when the learner kept personal UTC hours from before joining', async ({ zone, at }) => {
+  await seedLearner()
+  raw.prepare('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, ?)').run('o1', 'Acme', 'acme', noon)
+  raw.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, ?)').run('m1', 'o1', 'learner', 'member', noon)
+  raw.prepare('INSERT INTO org_settings (org_id, company_name, timezone, working_hours_json) VALUES (?, ?, ?, ?)')
+    .run('o1', 'Acme', zone, JSON.stringify({ days: [1, 2, 3, 4, 5], start: '09:00', end: '17:00' }))
+  vi.setSystemTime(new Date(at))
   expect(await sendDuePushes(Date.now(), holder.db as Db)).toBe(2)
   expect(pushLogRows()).toEqual([{ item_id: 'i-old', outcome: 'accepted' }, { item_id: 'i-old', outcome: 'accepted' }])
   expect(http).toHaveBeenCalledTimes(2)

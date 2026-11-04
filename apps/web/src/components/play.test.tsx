@@ -382,7 +382,7 @@ it.each([false, true])('submits a short answer and shows its reveal (ungraded=%s
     vi.mocked(answerItem).mockResolvedValueOnce({
       attemptId: ungraded ? null : 'a1', diagramConceptId: 'c1', state: ungraded ? 'ungraded' : 'D', correct: false,
       xp: 0, critical: false, correctOptionIds: null, sourceVersion: null, detail: null,
-      score: ungraded ? null : 0.5, feedback: ungraded ? 'Compare your answer with the model answer.' : 'Explain why both sides stay equal.',
+      score: ungraded ? null : 0.5, feedback: ungraded ? 'Daily grading limit reached; back tomorrow. Compare your answer with the model answer. Your learning progress has not changed.' : 'Explain why both sides stay equal.',
       missingPoints: ungraded ? [] : ['Subtract the same amount from both sides.'],
       correctAnswer: 'Equal changes preserve equality.', explanation: 'Both sides change by the same amount.',
       chosenFeedback: null, sourceQuote: 'Subtract equal quantities.', sourceTitle: 'Algebra notes', mixUps: [], returnsThisSession: false, pKnownBefore: 0.6, pKnownAfter: 0.6,
@@ -399,6 +399,7 @@ it.each([false, true])('submits a short answer and shows its reveal (ungraded=%s
       expect(dialog.querySelector('h2')?.textContent).toBe('Couldn’t grade this answer')
       expect(dialog.textContent).toMatch(/Your answerBoth sides get smaller\.The answerEqual changes preserve equality\./)
       expect(dialog.textContent).toContain('Subtract equal quantities.')
+      expect(dialog.textContent).toContain('Daily grading limit reached; back tomorrow. Compare your answer with the model answer. Your learning progress has not changed.')
       expect(dialog.querySelector('input')).toBeNull()
     } else {
       expect(dialog.querySelector('h2')?.textContent).toBe('Not quite')
@@ -508,6 +509,38 @@ it('ends the session from the top bar and returns to Today', async () => {
     vi.mocked(endSession).mockReset().mockResolvedValue({} as never)
     await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="End session"]')!.click() })
     expect(endSession).toHaveBeenCalledWith({ data: { sessionId: 's1' } })
+    expect(container.textContent).toContain('Today page')
+  } finally { await cleanup() }
+})
+
+it('keeps Check for the answer on screen when ending the session fails, and retries the end on its own', async () => {
+  const { container, cleanup } = await renderPlay(false, false, 'mcq')
+  try {
+    vi.mocked(endSession).mockReset().mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValue({} as never)
+    await pick(container, 'answer', 'b')
+    await pick(container, 'confidence', 'sure')
+    await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="End session"]')!.click() })
+    expect(button(container, 'Check').disabled).toBe(false)
+    // The alert and its Try again share the sticky dock with Check, so a long question cannot push them below the fold.
+    expect(button(container, 'Check').parentElement!.contains(container.querySelector('[role="alert"]'))).toBe(true)
+    expect(button(container, 'Check').parentElement!.contains(button(container, 'Try again'))).toBe(true)
+    await act(async () => { button(container, 'Check').click() })
+    expect(answerItem).toHaveBeenCalledWith({ data: expect.objectContaining({ answer: { optionId: 'b' }, confidence: 'sure' }) })
+    expect(endSession).toHaveBeenCalledTimes(1)
+    expect(document.querySelector('[role="dialog"] h2')!.textContent).toBe('Correct')
+  } finally { await cleanup() }
+})
+
+it('retries ending the session from the error after End session fails', async () => {
+  const { container, cleanup } = await renderPlay(false, false, 'mcq')
+  try {
+    vi.mocked(endSession).mockReset().mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValue({} as never)
+    await pick(container, 'answer', 'b')
+    await pick(container, 'confidence', 'sure')
+    await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="End session"]')!.click() })
+    await act(async () => { button(container, 'Try again').click() })
+    expect(endSession).toHaveBeenCalledTimes(2)
+    expect(answerItem).not.toHaveBeenCalled()
     expect(container.textContent).toContain('Today page')
   } finally { await cleanup() }
 })

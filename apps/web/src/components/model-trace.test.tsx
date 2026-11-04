@@ -28,6 +28,10 @@ it.each(['topic', 'session'] as const)('opens the %s trace from its page and ret
     preparing: false,
     placeable: true,
     company: null,
+    benchmark: 0.85,
+    onboarding: null,
+    mastery: 0,
+    nextUnitId: null,
     learner: { level: 3, levelLine: null, levelLineModel: null, placed: false, xp: 0, streak: 0 }, units: [], edges: [],
   })
   vi.mocked(endSession).mockResolvedValue({

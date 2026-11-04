@@ -182,6 +182,39 @@ describe('Today interactions', () => {
     }
   })
 
+  it('keeps Today when the building poll fails after connectivity drops mid-flight', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
+    vi.setSystemTime(todayFixtureNow)
+    const { container, buttons, cleanup } = await renderToday(todayFixtures.building)
+    try {
+      vi.mocked(getToday).mockRejectedValue(new TypeError('Failed to fetch'))
+      await act(async () => {
+        vi.advanceTimersByTime(15_000)
+        vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+        window.dispatchEvent(new Event('offline'))
+      })
+      expect(getToday).toHaveBeenCalledTimes(2)
+      expect(container.querySelector('h2')?.textContent).toBe('Building your questions')
+      expect(container.textContent).toContain('You’re offline')
+      expect(playButton(buttons())!.hasAttribute('disabled')).toBe(true)
+    } finally {
+      await cleanup()
+    }
+  })
+
+  it('shows the polled Today once building finishes', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
+    vi.setSystemTime(todayFixtureNow)
+    const { container, cleanup } = await renderToday(todayFixtures.building)
+    try {
+      vi.mocked(getToday).mockResolvedValue(todayFixtures.normal)
+      await act(async () => { vi.advanceTimersByTime(15_000) })
+      expect(container.querySelector('h2')?.textContent).toBe('4 reviews, then Picking')
+    } finally {
+      await cleanup()
+    }
+  })
+
   it('opens the Loading screen to start a session when Play is pressed', async () => {
     const { router, buttons, cleanup } = await renderToday(todayFixtures.normal)
     try {

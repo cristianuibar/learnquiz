@@ -281,6 +281,6 @@ it('allows short items in practice generation and serves the checked items witho
   expect(view.item).not.toHaveProperty('model_answer')
   expect(row('SELECT COUNT(*) AS n FROM items WHERE format = \'short\'').n).toBe(6)
   const body = JSON.parse((fetchModel.mock.calls[0] as [string, RequestInit])[1].body as string)
-  expect(body.messages[0].content).toContain('Allowed formats: mcq, cloze, short.')
+  expect(body.messages[0].content).toContain('Allowed formats: mcq, multi, cloze, short, order.')
   expect(raw.prepare('SELECT purpose, ok FROM model_calls').all()).toEqual([{ purpose: 'items', ok: 1 }, { purpose: 'self_check', ok: 1 }, { purpose: 'plan', ok: 1 }])
 })

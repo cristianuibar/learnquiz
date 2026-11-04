@@ -34,6 +34,10 @@ beforeEach(() => {
     preparing: false,
     placeable: true,
     company: null,
+    benchmark: 0.85,
+    onboarding: null,
+    mastery: 0,
+    nextUnitId: null,
     learner: { level: 1, levelLine: null, levelLineModel: null, placed: false, xp: 0, streak: 0 }, units: [], edges: [],
   })
   vi.mocked(getSession).mockResolvedValue({
@@ -101,8 +105,12 @@ it('shows the offline message for answered questions on Path and loads them with
     preparing: false,
     placeable: true,
     company: null,
+    benchmark: 0.85,
+    onboarding: null,
+    mastery: 0,
+    nextUnitId: 'unit',
     learner: { level: 1, levelLine: null, levelLineModel: null, placed: false, xp: 0, streak: 0 },
-    units: [{ id: 'unit', order: 0, name: 'Basics', summary: '', mastery: 0, measured: false, unlocked: true, concepts: [{ id: 'concept', order: 0, name: 'Addition', summary: '', visual: false, grounded: false, critical: false, answeredCount: 1, pKnown: 0 }] }],
+    units: [{ id: 'unit', order: 0, name: 'Basics', summary: '', mastery: 0, measured: false, unlocked: true, state: 'not_started', criticalCount: 0, canPractice: true, source: null, concepts: [{ id: 'concept', order: 0, name: 'Addition', summary: '', visual: false, grounded: false, critical: false, answeredCount: 1, pKnown: 0, measured: false, status: 'not_started' }] }],
     edges: [],
   })
   const { container, cleanup } = await renderApp('/t/topic/path')
@@ -131,8 +139,12 @@ it('opens and closes the answered questions on Path from the same button', async
     preparing: false,
     placeable: true,
     company: null,
+    benchmark: 0.85,
+    onboarding: null,
+    mastery: 0,
+    nextUnitId: 'unit',
     learner: { level: 1, levelLine: null, levelLineModel: null, placed: false, xp: 0, streak: 0 },
-    units: [{ id: 'unit', order: 0, name: 'Basics', summary: '', mastery: 0, measured: false, unlocked: true, concepts: [{ id: 'concept', order: 0, name: 'Addition', summary: '', visual: false, grounded: false, critical: false, answeredCount: 1, pKnown: 0 }] }],
+    units: [{ id: 'unit', order: 0, name: 'Basics', summary: '', mastery: 0, measured: false, unlocked: true, state: 'not_started', criticalCount: 0, canPractice: true, source: null, concepts: [{ id: 'concept', order: 0, name: 'Addition', summary: '', visual: false, grounded: false, critical: false, answeredCount: 1, pKnown: 0, measured: false, status: 'not_started' }] }],
     edges: [],
   })
   vi.mocked(getConceptItems).mockResolvedValue({

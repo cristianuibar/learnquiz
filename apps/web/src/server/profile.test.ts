@@ -271,6 +271,19 @@ it('leaves concepts of a retired document out of the profile curriculum and prof
   expect(profile.units.flatMap((u) => u.concepts.map((c) => c.name))).toEqual(['Emergency exits', 'Reporting hazards'])
 })
 
+it('leaves attempts on retired concepts out of the week chart and the day estimate', async () => {
+  seedWeek()
+  raw.exec(`INSERT INTO sources (id, topic_id, kind, title, body_text, created_at, retired_at) VALUES ('old-doc', 'training', 'text', 'Retired', '', 1, 2);
+    INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary, critical, source_id) VALUES ('dead', 'training', 'practice', 1, 'Old rule', '', 1, 'old-doc')`)
+  raw.prepare('INSERT INTO attempts (id, learner_id, item_id, concept_id, at, answer_json, correct, score, confidence, response_ms, rating, p_known_before, p_known_after) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run('dead-attempt', 'learner-a', 'i9', 'dead', start + 6 * DAY + 7200_000, '"answer"', 0, 0, 'guess', 1000, 3, 0, 0.2)
+  const profile = await getProfile({ data: {} })
+  expect(profile.weeks).toEqual([{ start, mastery: 0.75, sessions: 7, partial: true }])
+  expect(profile.proficiency).toEqual({ achievedAt: null, days: null, estimatedDays: 2, projectedAt: now + 2 * DAY })
+  raw.exec("UPDATE learner_concept SET p_known = 0.9; UPDATE attempts SET p_known_after = 0.9 WHERE id IN ('a5', 'a6')")
+  expect((await getProfile({ data: {} })).weeks[0].mastery).toBe(0.9)
+})
+
 it('has no projection before training and refuses a target without a company', async () => {
   holder.user = { id: 'new-learner', name: 'New learner', isAnonymous: false }
   const profile = await getProfile({ data: {} })

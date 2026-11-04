@@ -36,7 +36,7 @@ function result(overrides: Partial<Reveal> = {}): Reveal {
   }
 }
 
-const item: ItemView = {
+const baseItem: ItemView = {
   id: 'i1',
   conceptId: 'c1',
   conceptName: 'Damage',
@@ -47,12 +47,12 @@ const item: ItemView = {
   image: null,
   difficulty: 1,
 }
-const answer: Answer = { optionId: 'move' }
+const baseAnswer: Answer = { optionId: 'move' }
 
 let cleanup: (() => void) | null = null
 afterEach(() => { cleanup?.(); cleanup = null })
 
-async function mount(reveal: Reveal, props: { onContinue?: (r: string) => void; onReport?: (r: string) => void } = {}) {
+async function mount(reveal: Reveal, props: { onContinue?: (r: string) => void; onReport?: (r: string) => void; item?: ItemView; answer?: Answer } = {}) {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   const container = document.createElement('div')
   document.body.appendChild(container)
@@ -60,8 +60,8 @@ async function mount(reveal: Reveal, props: { onContinue?: (r: string) => void; 
   await act(async () => root.render(
     <RevealSheet
       reveal={reveal}
-      item={item}
-      answer={answer}
+      item={props.item ?? baseItem}
+      answer={props.answer ?? baseAnswer}
       hasCompany
       onContinue={props.onContinue ?? vi.fn()}
       onReport={props.onReport ?? vi.fn()}
@@ -115,6 +115,12 @@ describe('RevealSheet', () => {
     expect(c.textContent!.includes('Critical step · Comes back first next session')).toBe(critical)
   })
 
+  it('shows the chosen option feedback in D when the concept has no mix-ups', async () => {
+    const c = await mount(result({ state: 'D', correct: false, xp: 0, chosenFeedback: 'Moving first loses evidence.' }))
+    expect(c.textContent).toContain('Moving first loses evidence.')
+    expect(c.textContent).not.toContain('Why it felt right')
+  })
+
   it('passes the reflection to Got it and reports from the footer', async () => {
     const onContinue = vi.fn()
     const onReport = vi.fn()
@@ -128,5 +134,53 @@ describe('RevealSheet', () => {
     expect(onContinue).toHaveBeenCalledWith('Evidence matters')
     await act(async () => button(c, 'Report this question').click())
     expect(onReport).toHaveBeenCalledWith('Evidence matters')
+  })
+
+  it('shows the partly-right lines, counts and quote for a partial multi-select', async () => {
+    const multi: ItemView = {
+      ...baseItem,
+      format: 'multi',
+      options: [
+        { id: 'hazmat', text: 'Hazmat' },
+        { id: 'seal', text: 'Broken seal' },
+        { id: 'mixed', text: 'Mixed-SKU' },
+        { id: 'damaged', text: 'Damaged' },
+      ],
+    }
+    const c = await mount(
+      result({
+        state: 'P',
+        correct: false,
+        xp: 0,
+        returnsThisSession: true,
+        correctOptionIds: ['hazmat', 'seal'],
+        detail: {
+          kind: 'multi',
+          found: 1,
+          total: 2,
+          extra: 1,
+          options: [
+            { id: 'hazmat', text: 'Hazmat', correct: true, chosen: true, note: '' },
+            { id: 'seal', text: 'Broken seal', correct: true, chosen: false, note: 'needs sign-off.' },
+            { id: 'mixed', text: 'Mixed-SKU', correct: false, chosen: true, note: 'no sign-off needed.' },
+            { id: 'damaged', text: 'Damaged', correct: false, chosen: false, note: '' },
+          ],
+        },
+      }),
+      { item: multi, answer: { optionIds: ['hazmat', 'mixed'] } },
+    )
+    const text = c.textContent!
+    expect(c.querySelector('h2')!.textContent).toBe('Partly right')
+    const band = c.querySelector('[role=status]')!.textContent!
+    expect(band).toContain('1 of 2 found · 1 extra')
+    expect(band).not.toContain('+10 XP')
+    const lines = [...c.querySelectorAll('li')]
+    expect(lines.map((li) => li.textContent)).toEqual(['Broken seal: needs sign-off. You missed it.', 'Mixed-SKU: no sign-off needed.'])
+    expect(lines[0]!.querySelector('strong')!.textContent).toBe('Broken seal:')
+    expect(text).not.toContain('You chose')
+    expect(text).not.toContain('The answer')
+    expect(text).toContain('Photograph the damage before moving anything.')
+    expect(text).toContain('This comes back later this session.')
+    expect(button(c, 'Continue')).toBeTruthy()
   })
 })

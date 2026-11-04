@@ -10,10 +10,19 @@ import { cn } from '@/lib/utils'
 import { revealCopy, revealModel } from '@learnquiz/api/reveal'
 import type { Answer, ItemView, Reveal } from '@learnquiz/api'
 
+function HalfDisc({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
+      <path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="9" />
+    </svg>
+  )
+}
+
 const TONE = {
   correct: { ground: 'bg-feedback-correct-tint', disc: 'bg-feedback-correct text-on-feedback', text: 'text-feedback-correct', Icon: Check },
   wrong: { ground: 'bg-feedback-wrong-tint', disc: 'bg-feedback-wrong text-on-feedback', text: 'text-feedback-wrong', Icon: X },
-  learning: { ground: 'bg-feedback-learning-tint', disc: 'bg-feedback-learning text-on-feedback', text: 'text-feedback-learning', Icon: Info },
+  learning: { ground: 'bg-feedback-learning-tint', disc: 'bg-feedback-learning text-on-feedback', text: 'text-feedback-learning', Icon: HalfDisc },
   neutral: { ground: 'bg-surface-sunken', disc: 'bg-ink-muted text-surface-card', text: 'text-ink', Icon: Info },
 }
 
@@ -120,6 +129,14 @@ export function RevealSheet({
     </>
   )
 
+  const partialOptions = reveal.detail?.kind === 'multi' ? reveal.detail.options : []
+  const partialLine = (id: string, text: string) => {
+    const name = partialOptions.find((o) => o.id === id)?.text
+    if (!name || !text.startsWith(name)) return text
+    const lead = text.charAt(name.length) === ':' ? `${name}:` : name
+    return <><strong className="font-semibold">{lead}</strong>{text.slice(lead.length)}</>
+  }
+
   let body: ReactNode
   if (variant === 'correctSure' || variant === 'correctUnsure' || variant === 'noSource') {
     body = (
@@ -145,8 +162,29 @@ export function RevealSheet({
       <>
         {mine && <Row label={label}>{mine}</Row>}
         <Row label={revealCopy.theAnswer}>{correct}</Row>
+        {reveal.feedback && <p className="text-body">{reveal.feedback}</p>}
         {explanation}
         {quote}
+      </>
+    )
+  } else if (variant === 'partial') {
+    body = (
+      <>
+        {model.partialLines.length > 0 && (
+          <ul className="flex flex-col gap-3">
+            {model.partialLines.map((line) => {
+              const Icon = line.icon === 'check' ? Check : X
+              return (
+                <li key={line.id} className="flex items-start gap-3">
+                  <Icon aria-hidden className={cn('mt-0.5 size-5 shrink-0', line.icon === 'check' ? 'text-feedback-correct' : 'text-feedback-wrong')} />
+                  <p className="text-body-lg">{partialLine(line.id, line.text)}</p>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+        {quote}
+        {returns}
       </>
     )
   } else if (variant === 'sureWrong') {
@@ -169,6 +207,7 @@ export function RevealSheet({
               : <ul className="list-disc pl-6 text-body">{mixUps.map((m) => <li key={m}>{m}</li>)}</ul>}
           </div>
         )}
+        {mixUps.length === 0 && reveal.chosenFeedback && <p className="text-body">{reveal.chosenFeedback}</p>}
         <div className="flex flex-col gap-1">
           <h3 className="text-label">{revealCopy.whatActuallyMatters}</h3>
           {explanation}
@@ -218,7 +257,9 @@ export function RevealSheet({
         >
           {model.heading}
         </h2>
-        {model.xpText && <span className="ml-auto text-label text-ink-muted tabular-nums">{model.xpText}</span>}
+        {model.counts
+          ? <span className="ml-auto text-label text-ink tabular-nums">{model.counts}</span>
+          : model.xpText && <span className="ml-auto text-label text-ink-muted tabular-nums">{model.xpText}</span>}
       </div>
       <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
         {body}
