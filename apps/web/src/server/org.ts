@@ -49,7 +49,11 @@ async function roleSummaries(orgId: string) {
   const db = getDb()
   const [roles, people, documents, conceptRows] = await Promise.all([
     rolesOf(orgId),
-    db.select({ id: memberRoleAssignments.jobRoleId, n: count() }).from(memberRoleAssignments).where(eq(memberRoleAssignments.orgId, orgId)).groupBy(memberRoleAssignments.jobRoleId),
+    db.select({ id: memberRoleAssignments.jobRoleId, n: count() })
+      .from(memberRoleAssignments)
+      .innerJoin(member, and(eq(member.userId, memberRoleAssignments.userId), eq(member.organizationId, memberRoleAssignments.orgId)))
+      .where(eq(memberRoleAssignments.orgId, orgId))
+      .groupBy(memberRoleAssignments.jobRoleId),
     db.select({ id: sources.topicId, n: count() }).from(sources).innerJoin(topics, eq(topics.id, sources.topicId)).where(and(eq(topics.orgId, orgId), isNull(sources.retiredAt), isNull(sources.deletedAt))).groupBy(sources.topicId),
     db.select({ id: concepts.topicId, total: count(), ready: sql<number>`coalesce(sum(${concepts.genStatus} = 'ready'), 0)`, busy: sql<number>`coalesce(sum(${concepts.genStatus} in ('pending', 'generating')), 0)` })
       .from(concepts).innerJoin(topics, eq(topics.id, concepts.topicId)).where(and(eq(topics.orgId, orgId), liveConcept())).groupBy(concepts.topicId),
