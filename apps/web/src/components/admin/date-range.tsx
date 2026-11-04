@@ -81,8 +81,10 @@ export function DateRange({
   const openPicker = () => {
     setStart(from)
     setEnd(to)
-    setFocused(from)
-    setRightMonth(monthStart(to))
+    // Focus the start day, or the end day when the start falls before the two shown months.
+    const right = monthStart(to)
+    setFocused(monthStart(from) < addMonths(right, -1) ? to : from)
+    setRightMonth(right)
     moveFocus.current = true
     setOpen(true)
   }
