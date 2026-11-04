@@ -25,7 +25,7 @@ afterEach(async () => {
   delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT
 })
 
-async function renderLoading(search = 'topicId=t1&start=session', strict = false) {
+async function renderLoading(search = 'topicId=t1&start=session', strict = false, todayLoader?: () => Promise<unknown>) {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
   const loading = createRoute({
@@ -36,7 +36,7 @@ async function renderLoading(search = 'topicId=t1&start=session', strict = false
     component: loadingRoute.options.component,
   })
   const play = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId', component: () => <h1>Question 1</h1> })
-  const today = createRoute({ getParentRoute: () => rootRoute, path: '/today', component: () => <p>Today page</p> })
+  const today = createRoute({ getParentRoute: () => rootRoute, path: '/today', loader: todayLoader, component: () => <p>Today page</p> })
   const router = createRouter({
     routeTree: rootRoute.addChildren([loading, play, today]),
     history: createMemoryHistory({ initialEntries: ['/today', `/play/loading?${search}`], initialIndex: 1 }),
@@ -128,5 +128,24 @@ describe('session Loading screen', () => {
     await act(async () => {})
     expect(startSession).toHaveBeenCalledTimes(1)
     expect(pathname(router)).toBe('/play/s1')
+  })
+
+  it.each([
+    ['Cancel', (c: HTMLElement) => (c.querySelector('a[aria-label="Cancel"]') as HTMLAnchorElement).click()],
+    ['Back', (_c: HTMLElement, router: { history: { back: () => void } }) => router.history.back()],
+  ] as const)('stays on Today when the start finishes after %s while Today is still loading', async (_label, leave) => {
+    let finishStart!: (v: { sessionId: string }) => void
+    vi.mocked(startSession).mockReturnValue(new Promise((r) => { finishStart = r }) as never)
+    let finishToday!: () => void
+    const todayLoader = vi.fn(() => new Promise<void>((r) => { finishToday = r }))
+    const { container, router } = await renderLoading('topicId=t1&start=session', false, todayLoader)
+    await act(async () => leave(container, router))
+    expect(todayLoader).toHaveBeenCalled()
+    expect(container.querySelector('h1')!.textContent).toBe(loadingTitle)
+    await act(async () => finishStart({ sessionId: 's1' }))
+    await act(async () => finishToday())
+    await act(async () => {})
+    expect(pathname(router)).toBe('/today')
+    expect(container.textContent).toContain('Today page')
   })
 })

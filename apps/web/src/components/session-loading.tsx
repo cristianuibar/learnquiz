@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { Link, useNavigate, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { X } from 'lucide-react'
 import { loadingTitle, slowAfterMs, startFailed, startSlow } from '@learnquiz/api/system-copy'
@@ -24,16 +24,23 @@ function describeFailure(err: unknown): Failure {
 
 export function SessionLoading({ topicId, start, unitId }: { topicId: string; start: 'session' | 'placement'; unitId?: string }) {
   const navigate = useNavigate()
+  const router = useRouter()
   const runSession = useServerFn(startSession)
   const runPlacement = useServerFn(startPlacement)
   const heading = useRef<HTMLHeadingElement>(null)
   const mounted = useRef(false)
   const started = useRef<number | null>(null)
+  // Cancel or Back may still be loading its target while this screen stays mounted; a late start must not override it.
+  const left = useRef(false)
   const [attempt, setAttempt] = useState(0)
   const [slow, setSlow] = useState(false)
   const [failure, setFailure] = useState<Failure | null>(null)
 
   useEffect(() => heading.current?.focus(), [])
+
+  useEffect(() => router.subscribe('onBeforeNavigate', ({ pathChanged }) => {
+    if (pathChanged) left.current = true
+  }), [router])
 
   useEffect(() => {
     // StrictMode replays mount, cleanup, mount; only a real unmount leaves this false.
@@ -47,7 +54,7 @@ export function SessionLoading({ topicId, start, unitId }: { topicId: string; st
       request.then(
         ({ sessionId }) => {
           clearTimeout(timer)
-          if (mounted.current) void navigate({ to: '/play/$sessionId', params: { sessionId }, replace: true })
+          if (mounted.current && !left.current) void navigate({ to: '/play/$sessionId', params: { sessionId }, replace: true })
         },
         (err: unknown) => {
           clearTimeout(timer)
