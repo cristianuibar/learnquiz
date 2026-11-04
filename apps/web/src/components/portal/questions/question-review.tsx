@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { ReviewLayout } from './review-outline'
 import { ReviewToolbar, type FilterPatch, type ReviewSearch } from './review-toolbar'
-import { isFlagged, isUnreviewed, QuestionRow, stemId, toggleId, type Review } from './question-row'
+import { isFlagged, isUnreviewed, QuestionRow, stemId, toggleId, type Action, type Review } from './question-row'
 
 const VISIBLE = 4
 const CLEAR_ID = 'review-clear-filters'
@@ -66,8 +66,8 @@ function Body({ data, slug, search, onClear }: { data: Review; slug: string; sea
   const [showAll, setShowAll] = useState(init.showAll)
   const [focusId, setFocusId] = useState<string | null>(init.focus)
   const [message, setMessage] = useState('')
-  // The approved id and the outline order when Approve was pressed; the refreshed list re-sorts the approved question.
-  const [approved, setApproved] = useState<{ id: string; order: string[] } | null>(null)
+  // The acted-on id, the action and the outline order when it was pressed; the refreshed list re-sorts that question by rank.
+  const [acted, setActed] = useState<{ id: string; action: Action; order: string[] } | null>(null)
 
   useEffect(() => {
     if (!focusId) return
@@ -82,33 +82,37 @@ function Body({ data, slug, search, onClear }: { data: Review; slug: string; sea
   const units = useMemo(() => filterUnits(data.units, search), [data.units, search.q, search.unreviewed, search.flagged, search.critical, search.status])
   const flat = useMemo(() => units.flatMap((u) => u.concepts.flatMap((c) => c.questions.map((q, i) => ({ q, conceptId: c.id, index: i })))), [units])
 
-  // Once the refreshed data shows the approved question settled, move on to the next open one in the pre-approval order.
+  // Once the refreshed data shows the question settled, Approve moves on to the next open one in the pre-action order; Retire stays on it.
   useEffect(() => {
-    if (!approved) return
-    const { id: approvedId } = approved
+    if (!acted) return
+    const { id: actedId, action } = acted
     const byId = new Map(flat.map((e) => [e.q.id, e]))
-    const settled = byId.get(approvedId)
-    if (settled && (isUnreviewed(settled.q) || isFlagged(settled.q))) return
-    setApproved(null)
-    setMessage(`Approved. ${data.unreviewed} unreviewed.`)
-    const at = approved.order.indexOf(approvedId)
-    const order = approved.order.slice(at + 1).concat(approved.order.slice(0, Math.max(at, 0)))
-    const next = order.map((id) => byId.get(id)).find((e) => e !== undefined && (isUnreviewed(e.q) || isFlagged(e.q)))
-    // With no open question left, stay on the approved row; if a filter removed it, the nearest remaining row, else Clear filters.
+    const settled = byId.get(actedId)
+    if (settled && (action === 'retire' ? settled.q.status !== 'retired' : isUnreviewed(settled.q) || isFlagged(settled.q))) return
+    setActed(null)
+    if (action === 'approve') setMessage(`Approved. ${data.unreviewed} unreviewed.`)
+    const at = acted.order.indexOf(actedId)
+    const order = acted.order.slice(at + 1).concat(acted.order.slice(0, Math.max(at, 0)))
+    const next = action === 'approve' ? order.map((id) => byId.get(id)).find((e) => e !== undefined && (isUnreviewed(e.q) || isFlagged(e.q))) : undefined
+    // With no open question left, stay on the acted-on row; if a filter removed it, the nearest remaining row, else Clear filters.
     const target = next ?? settled ?? order.map((id) => byId.get(id)).find((e) => e !== undefined)
-    setExpanded((s) => {
-      const n = new Set(s)
-      n.delete(approvedId)
-      if (next) n.add(next.q.id)
-      return n
-    })
+    if (action === 'approve') {
+      setExpanded((s) => {
+        const n = new Set(s)
+        n.delete(actedId)
+        if (next) n.add(next.q.id)
+        return n
+      })
+    }
+    // The re-sort can move the row past the first four, so reveal the rest of its concept.
     if (target && target.index >= VISIBLE) setShowAll((s) => new Set(s).add(target.conceptId))
-    setFocusId(!target ? CLEAR_ID : target === next ? stemId(target.q.id) : toggleId(target.q.id))
-  }, [approved, flat, data.unreviewed])
+    const stem = target === next || (action === 'retire' && target === settled)
+    setFocusId(!target ? CLEAR_ID : stem ? stemId(target.q.id) : toggleId(target.q.id))
+  }, [acted, flat, data.unreviewed])
 
-  const approve = (id: string) => {
+  const onAct = (id: string, action: Action) => {
     const order = flat.map((e) => e.q.id)
-    return () => setApproved({ id, order })
+    return () => setActed({ id, action, order })
   }
 
   const toggle = (id: string) => setExpanded((s) => {
@@ -137,7 +141,7 @@ function Body({ data, slug, search, onClear }: { data: Review; slug: string; sea
                 <h2 id={hid} className="text-title-2 text-ink">{u.name}</h2>
                 <p className="text-caption text-ink-muted">{`${plural(u.concepts.length, 'concept')} · ${plural(total, 'question')}`}</p>
               </div>
-              {u.concepts.map((c) => <ConceptBlock key={c.id} concept={c} slug={slug} sources={data.sources} expanded={expanded} showAll={showAll.has(c.id)} onShowAll={() => setShowAll((s) => new Set(s).add(c.id))} onToggle={toggle} onApprove={approve} onAnnounce={setMessage} />)}
+              {u.concepts.map((c) => <ConceptBlock key={c.id} concept={c} slug={slug} sources={data.sources} expanded={expanded} showAll={showAll.has(c.id)} onShowAll={() => setShowAll((s) => new Set(s).add(c.id))} onToggle={toggle} onAct={onAct} onAnnounce={setMessage} />)}
             </section>
           )
         })}
@@ -146,7 +150,7 @@ function Body({ data, slug, search, onClear }: { data: Review; slug: string; sea
   )
 }
 
-function ConceptBlock({ concept: c, slug, sources, expanded, showAll, onShowAll, onToggle, onApprove, onAnnounce }: {
+function ConceptBlock({ concept: c, slug, sources, expanded, showAll, onShowAll, onToggle, onAct, onAnnounce }: {
   concept: Concept
   slug: string
   sources: Review['sources']
@@ -154,7 +158,7 @@ function ConceptBlock({ concept: c, slug, sources, expanded, showAll, onShowAll,
   showAll: boolean
   onShowAll: () => void
   onToggle: (id: string) => void
-  onApprove: (id: string) => () => void
+  onAct: (id: string, action: Action) => () => void
   onAnnounce: (m: string) => void
 }) {
   const hid = `concept-${c.id}`
@@ -173,7 +177,7 @@ function ConceptBlock({ concept: c, slug, sources, expanded, showAll, onShowAll,
       <div className="rounded-md border border-border bg-surface-card">
         <ul aria-labelledby={hid} className="divide-y divide-border">
           {shown.map((q) => (
-            <QuestionRow key={q.id} question={q} critical={c.critical} slug={slug} sources={sources} expanded={expanded.has(q.id)} onToggle={() => onToggle(q.id)} onApprove={onApprove} onAnnounce={onAnnounce} />
+            <QuestionRow key={q.id} question={q} critical={c.critical} slug={slug} sources={sources} expanded={expanded.has(q.id)} onToggle={() => onToggle(q.id)} onAct={onAct} onAnnounce={onAnnounce} />
           ))}
         </ul>
         {hidden > 0 && (
