@@ -1,3 +1,4 @@
+import { GUEST_DAILY_MODEL_CALL_CAP } from '@/lib/limits'
 import { readFileSync, readdirSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
@@ -188,11 +189,11 @@ it('does not generate for nonvisual concepts, local models, or capped learners',
   expect(await generateConceptDiagram({ data: { conceptId: 'procedure' } })).toEqual({ status: 'disabled' })
   boundary.env.LLM_PROFILE = 'meta'
   const log = raw.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-  for (let i = 0; i < 20; i++) log.run(`call-${i}`, 'learner', 'items', 'muse-spark-1.3', 1, 1, Date.now())
+  for (let i = 0; i < GUEST_DAILY_MODEL_CALL_CAP; i++) log.run(`call-${i}`, 'learner', 'items', 'muse-spark-1.3', 1, 1, Date.now())
   await expect(generateConceptDiagram({ data: { conceptId: 'procedure' } })).rejects.toMatchObject({ status: 429 })
   expect(fetchModel).not.toHaveBeenCalled()
   expect(boundary.env.MEDIA.put).not.toHaveBeenCalled()
-  expect(row('SELECT COUNT(*) AS n FROM model_calls').n).toBe(20)
+  expect(row('SELECT COUNT(*) AS n FROM model_calls').n).toBe(GUEST_DAILY_MODEL_CALL_CAP)
 })
 
 it.each(['http', 'invalid-image', 'storage'])('allows retry after a %s failure without leaving a stuck claim', async (failure) => {

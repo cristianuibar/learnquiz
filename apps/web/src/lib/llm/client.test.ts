@@ -234,8 +234,8 @@ it('logs the selected model and redacts its key when a provider fails without re
   })
 })
 
-it('refuses a malformed-output retry after the twentieth daily model call', async () => {
-  await db.insert(modelCalls).values(Array.from({ length: 19 }, (_, i) => ({
+it('refuses a malformed-output retry after the final allowed daily model call', async () => {
+  await db.insert(modelCalls).values(Array.from({ length: GUEST_DAILY_MODEL_CALL_CAP - 1 }, (_, i) => ({
     id: `call-${i}`,
     learnerId: 'u1',
     purpose: 'test',
@@ -262,7 +262,7 @@ it('refuses a malformed-output retry after the twentieth daily model call', asyn
   expect(error).toBeInstanceOf(LlmError)
   expect(error).toMatchObject({ status: 429 })
   const calls = await db.select().from(modelCalls)
-  expect(calls).toHaveLength(20)
+  expect(calls).toHaveLength(GUEST_DAILY_MODEL_CALL_CAP)
   expect(calls.filter((call) => !call.ok)).toEqual([
     expect.objectContaining({ learnerId: 'u1', error: expect.stringContaining('invalid JSON:') }),
   ])
@@ -303,7 +303,8 @@ it('lets only one of five concurrent grading and voice calls take the last daily
 })
 
 it.each([
-  { calls: 20, capped: false },
+  { calls: GUEST_DAILY_MODEL_CALL_CAP, capped: false },
+  { calls: ACCOUNT_DAILY_MODEL_CALL_CAP - 1, capped: false },
   { calls: ACCOUNT_DAILY_MODEL_CALL_CAP, capped: true },
 ])('lets a signed-in account with $calls calls today be capped: $capped', async ({ calls, capped }) => {
   raw.exec(`INSERT INTO user (id, name, email, is_anonymous) VALUES ('u1', 'Ada', 'ada@example.test', 0)`)
