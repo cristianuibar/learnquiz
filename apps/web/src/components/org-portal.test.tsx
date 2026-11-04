@@ -251,10 +251,23 @@ const overviewLeaf = {
 }
 const training = { employees: 4, proficientEmployees: 1, daysToProficiency: null, criticalErrorsThisWeek: 2, documentsToReview: 6, firstProficientUserId: 'u1', openErrorUserId: null }
 const noTraining = { ...training, employees: 0, proficientEmployees: 0, criticalErrorsThisWeek: 0, documentsToReview: 0, firstProficientUserId: null }
-const role = { id: 'r1', name: 'Cashier', benchmark: 0.85, onboardingDays: 30, topicId: 't1', topicStatus: 'ready', people: 3, documents: 2, conceptsReady: 24, conceptsTotal: 24, preparing: false }
+const role = { id: 'r1', name: 'Cashier', benchmark: 0.85, onboardingDays: 30, topicId: 't1', topicStatus: 'ready', people: 3, documents: 2, failedDocuments: 0, conceptsReady: 24, conceptsTotal: 24, preparing: false }
 const building = (ready: number) => ({ ...role, id: 'r2', name: 'Barista', topicId: 't2', topicStatus: 'generating', onboardingDays: 1, documents: 1, conceptsReady: ready, conceptsTotal: 31, preparing: ready < 31 })
 const overview = (o: Record<string, unknown>) => ({ name: 'Acme', slug: 'x', readOnly: false, nextStep: null, roles: [role], training, ...o }) as never
 const hrefs = (c: Element) => Object.fromEntries([...c.querySelectorAll('main a')].map((a) => [a.textContent, a.getAttribute('href')]))
+
+it.each([
+  ['a draft role with a readable SOP', { topicStatus: 'draft', documents: 1 }, 'Documents added'],
+  ['a ready role after its last readable SOP is retired', { documents: 1, failedDocuments: 1 }, 'Training failed'],
+])('shows the document-aware training status on Overview for %s', async (_scenario, changes, expected) => {
+  vi.mocked(getOrgOverview).mockResolvedValue(overview({ roles: [{ ...role, ...changes }] }))
+  const { container, cleanup } = await renderAt('/org/x', overviewLeaf)
+  try {
+    expect(container.querySelector('tbody tr td:nth-child(2)')!.textContent).toBe(expected)
+  } finally {
+    await cleanup()
+  }
+})
 
 it('shows the figures, role table and next step on the overview', async () => {
   vi.mocked(getOrgOverview).mockResolvedValue(overview({
