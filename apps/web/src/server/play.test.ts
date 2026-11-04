@@ -738,6 +738,28 @@ describe('learner practice and unit unlocks', () => {
     await expect(getSessionReadiness({ data: { topicId: 'nope' } })).rejects.toMatchObject({ status: 404 })
   })
 
+  it('counts only unlocked-unit questions as ready, matching the session it starts', async () => {
+    const payload = JSON.stringify({
+      format: 'cloze', stem: 'Solve x + 1 = 2: x = ____.', options: [], accepted_answers: ['1'], model_answer: '1',
+      explanation: 'Subtract 1 from both sides.', difficulty: 1, source_quote: null, grounded: false, bloom: 'apply',
+    })
+    for (const order of [0, 1]) {
+      raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run(`un${order + 1}`, 't1', order, `Unit ${order + 1}`)
+      raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(`c${order + 1}`, 't1', `un${order + 1}`, 0, `Concept ${order + 1}`, '')
+      for (let i = 0; i < 6; i++) {
+        raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+          .run(`c${order + 1}-i${i}`, `c${order + 1}`, 't1', 'cloze', payload, 1, Date.now())
+      }
+    }
+    // Only unit 1 is unlocked; unit 2 stays locked.
+    raw.prepare('INSERT INTO learner_unit (learner_id, unit_id, unlocked_at) VALUES (?, ?, ?)').run('u1', 'un1', 1)
+
+    expect(await getSessionReadiness({ data: { topicId: 't1' } })).toEqual({ ready: 6, total: 12 })
+    const { sessionId } = await startSession({ data: { topicId: 't1' } })
+    expect((JSON.parse(scalar(raw, 'SELECT item_ids_json FROM sessions WHERE id = ?', sessionId).item_ids_json as string) as string[]).length).toBe(6)
+  })
+
   it('scopes a unit session to that unit and refuses locked or foreign units', async () => {
     const payload = JSON.stringify({
       format: 'cloze', stem: 'Solve x + 1 = 2: x = ____.', options: [], accepted_answers: ['1'], model_answer: '1',

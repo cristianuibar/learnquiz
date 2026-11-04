@@ -222,12 +222,20 @@ export const getSessionReadiness = createServerFn({ method: 'POST' })
     if (!topic) throw httpError('Topic not found', 404)
     if (topic.status !== 'ready') return null
     const inUnit = data.unitId ? inArray(items.conceptId, db.select({ id: concepts.id }).from(concepts).where(eq(concepts.unitId, data.unitId))) : undefined
-    // Playable now: unseen, or seen and due.
+    // Unseen items come from the frontier, so only live concepts of unlocked units count; an employee who never placed
+    // gets units 0 and 1, as startSession unlocks them.
+    const openUnit = db.select({ id: units.id }).from(units).where(and(eq(units.topicId, topic.id), or(
+      exists(db.select({ id: learnerUnit.unitId }).from(learnerUnit).where(and(eq(learnerUnit.unitId, units.id), eq(learnerUnit.learnerId, learnerId)))),
+      topic.jobRoleId !== null
+        ? and(lte(units.order, 1), sql`NOT EXISTS (SELECT 1 FROM ${learnerUnit} lu JOIN ${units} u ON u.id = lu.unit_id WHERE lu.learner_id = ${learnerId} AND u.topic_id = ${topic.id})`)
+        : undefined)))
+    const inFrontier = inArray(items.conceptId, db.select({ id: concepts.id }).from(concepts).where(and(inArray(concepts.unitId, openUnit), liveConcept())))
+    // Playable now: unseen in the frontier, or seen and due.
     const [row] = await db.select({ n: count() }).from(items)
       .leftJoin(learnerItem, and(eq(learnerItem.itemId, items.id), eq(learnerItem.learnerId, learnerId)))
       .where(and(eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId), inUnit,
         topic.jobRoleId !== null ? ne(items.format, 'short') : undefined,
-        or(isNull(learnerItem.itemId), lte(learnerItem.due, Date.now()))))
+        or(and(isNull(learnerItem.itemId), inFrontier), lte(learnerItem.due, Date.now()))))
     return { ready: Math.min(row.n, SESSION_SIZE), total: SESSION_SIZE }
   })
 
