@@ -109,8 +109,9 @@ require a preloaded demo account or a seed script.
 2. Open the role under **Roles**. Upload a PDF with a text layer or paste a fictional
    support handbook, then choose **Build curriculum**. Questions generate in the
    background for the role.
-3. Open **People**, enter a teammate's name and email, select the role, and choose
-   **Create invite link**. Share the link or its QR code with that teammate.
+3. Open **People**, choose **Invite people**, enter a teammate's name and email,
+   select their job role, and choose **Create invite links**. Share the link or its
+   QR code with that teammate.
 4. The teammate opens the invite, creates an account or signs in with the invited
    email, joins the company and acknowledges **Before you start**.
 5. Once the role's training is ready, the teammate opens **Today** to begin placement
