@@ -6,7 +6,8 @@ export function normalize(text: string): string {
     .normalize('NFD')
     .replace(/\p{M}/gu, '')
     .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    // Keep a decimal point between digits so 0.07 never reads as 007.
+    .replace(/(?<!\d)\.|\.(?!\d)|[^\p{L}\p{N}\s.]/gu, '')
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -60,7 +61,8 @@ export function gradeAnswer(payload: ItemPayload, answer: Answer) {
     const given = normalize(answer.text ?? '')
     const correct = payload.accepted_answers.some((a) => {
       const want = normalize(a)
-      if (/^\d+$/.test(given) && /^\d+$/.test(want)) return Number(given) === Number(want)
+      if (/^\d+$/.test(given) && /^\d+$/.test(want)) return BigInt(given) === BigInt(want)
+      if (/^[\d.]+$/.test(want)) return given === want
       return given === want || (want.length >= 6 && withinOneEdit(given, want))
     })
     return { correct, correctAnswer: payload.accepted_answers[0] ?? payload.model_answer, chosenFeedback: null }

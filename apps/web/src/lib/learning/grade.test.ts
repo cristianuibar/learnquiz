@@ -120,6 +120,11 @@ it.each<[string, string, boolean]>([
   ['7', '007', true],
   ['7 kg', '7', false],
   ['123457', '123456', false],
+  ['0.07', '7', false],
+  ['7', '0.07', false],
+  ['0.07', '0.07', true],
+  ['100.08', '100.07', false],
+  ['9007199254740992', '9007199254740993', false],
 ])('cloze compares digit-only answers as numbers: %j vs accepted %j', (text, accepted, correct) => {
   expect(gradeAnswer({ ...base, format: 'cloze', accepted_answers: [accepted] }, { text }).correct).toBe(correct)
 })
