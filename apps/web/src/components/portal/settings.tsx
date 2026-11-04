@@ -109,7 +109,6 @@ export function SettingsForm({ settings, onSaved }: { settings: Settings; onSave
   const colorRef = useRef<HTMLInputElement>(null)
   const daysRef = useRef<HTMLDivElement>(null)
   const savingRef = useRef(false)
-  const lastAttempt = useRef<{ fd: FormData; snapshot: Values } | null>(null)
   const owned = useRef(new Set<string>())
   const baselineRef = useRef(baseline)
   baselineRef.current = baseline
@@ -254,12 +253,11 @@ export function SettingsForm({ settings, onSaved }: { settings: Settings; onSave
     if (file) fd.set('logo', file)
     if (removeLogo) fd.set('removeLogo', 'on')
     const snapshot = { name, accent, timezone, days, start, end, logo }
-    lastAttempt.current = { fd, snapshot }
     void send(fd, snapshot)
   }
 
   function retry() {
-    if (lastAttempt.current) void send(lastAttempt.current.fd, lastAttempt.current.snapshot)
+    formRef.current?.requestSubmit()
   }
 
   function discard() {

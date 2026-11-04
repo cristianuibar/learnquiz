@@ -74,7 +74,7 @@ it('blocks saving a low-contrast accent and focuses the field', async () => {
   expect(document.activeElement).toBe(field(c, '#accent'))
 })
 
-it('keeps edits after a failed save and Try again resends the same data', async () => {
+it('keeps edits after a failed save and Try again resends the form', async () => {
   vi.mocked(saveCompanySettings).mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValue(undefined as never)
   const c = await mount()
   await setValue(field(c, '#name'), 'Northwind Logistics Ltd')
@@ -92,8 +92,21 @@ it('keeps edits after a failed save and Try again resends the same data', async 
 
   await click(button(c, 'Try again'))
   expect(saveCompanySettings).toHaveBeenCalledTimes(2)
-  expect(sent(1)).toBe(sent(0))
+  expect(sent(1).get('name')).toBe('Northwind Logistics Ltd')
+  expect(sent(1).getAll('days')).toEqual(['1', '2', '3', '4', '5', '6'])
   expect(c.querySelector('[role="alert"]')).toBeNull()
+  expect(c.querySelector('[role="status"]')?.textContent).toBe('Settings saved.')
+})
+
+it('Try again after a failed save sends the working days edited since', async () => {
+  vi.mocked(saveCompanySettings).mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValue(undefined as never)
+  const c = await mount()
+  await click(button(c, 'Save changes'))
+  expect(sent(0).getAll('days')).toEqual(['1', '2', '3', '4', '5'])
+  await click(button(c, 'Saturday'))
+  await click(button(c, 'Try again'))
+  expect(saveCompanySettings).toHaveBeenCalledTimes(2)
+  expect(sent(1).getAll('days')).toEqual(['1', '2', '3', '4', '5', '6'])
   expect(c.querySelector('[role="status"]')?.textContent).toBe('Settings saved.')
 })
 
