@@ -12,7 +12,7 @@ export function PageHeader({ crumbs, title, meta, actions }: { crumbs?: ReactNod
     <div className="flex flex-col items-stretch gap-4 md:flex-row md:flex-wrap md:items-end md:justify-between">
       <div className="flex min-w-0 flex-col gap-1">
         {crumbs && <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-1 text-label text-ink-muted">{crumbs}</nav>}
-        <h1 tabIndex={-1} className="text-title-1 text-ink outline-none">{title}</h1>
+        <h1 tabIndex={-1} className="text-title-1 text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">{title}</h1>
         {meta && <div className="text-body text-ink-muted">{meta}</div>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-3 max-md:[&>*]:flex-1">{actions}</div>}
