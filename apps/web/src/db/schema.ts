@@ -42,6 +42,8 @@ export const units = sqliteTable('units', {
   name: text('name').notNull(),
   summary: text('summary').notNull().default(''),
   unlockedAt: integer('unlocked_at'),
+  procedureJson: text('procedure_json'), // { sourceId, version, graph }: the unit's procedure flowchart, generated once per source version.
+  procedureStartedAt: integer('procedure_started_at'), // Claim time of the flowchart generation; a stale claim may be taken again.
 })
 
 export const concepts = sqliteTable('concepts', {

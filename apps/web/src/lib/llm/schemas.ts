@@ -88,3 +88,24 @@ export const Grade = z.object({
   missing_points: z.array(z.string().min(1).max(200)).max(6),
 })
 export type Grade = z.infer<typeof Grade>
+
+// A unit's procedure flowchart. Strict json_schema: label is nullable, not optional.
+export const ProcedureGraph = z
+  .object({
+    nodes: z.array(z.object({
+      id: z.string().min(1),
+      kind: z.enum(['step', 'decision']),
+      label: z.string().trim().min(1).max(120),
+      critical: z.boolean(),
+    })).min(1).max(12),
+    edges: z.array(z.object({
+      from: z.string(),
+      to: z.string(),
+      label: z.enum(['yes', 'no']).nullable(),
+    })),
+  })
+  .refine((g) => {
+    const ids = new Set(g.nodes.map((n) => n.id))
+    return ids.size === g.nodes.length && g.edges.every((e) => ids.has(e.from) && ids.has(e.to))
+  }, { message: 'node ids must be unique and every edge must join existing nodes' })
+export type ProcedureGraph = z.infer<typeof ProcedureGraph>

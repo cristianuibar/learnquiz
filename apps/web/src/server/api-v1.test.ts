@@ -8,6 +8,7 @@ const fns = vi.hoisted(() => ({
   answerItem: vi.fn(),
   prepareNextSession: vi.fn(),
   getTopicPath: vi.fn(),
+  getUnitProcedure: vi.fn(),
   getProfile: vi.fn(),
   reportItem: vi.fn(),
   flagResult: vi.fn(),
@@ -33,6 +34,7 @@ vi.mock('@/server/play', () => ({
   startSession: vi.fn(),
   transcribeAnswer: fns.transcribeAnswer,
 }))
+vi.mock('@/server/procedure', () => ({ getUnitProcedure: fns.getUnitProcedure }))
 vi.mock('@/server/profile', () => ({ getProfile: fns.getProfile }))
 vi.mock('@/server/push', () => ({
   getPushSettings: vi.fn(),
@@ -193,4 +195,12 @@ it('transcribes a multipart recording with the path session ID, with a bearer on
   expect(data.get('sessionId')).toBe('s-1')
   expect(data.get('itemId')).toBe('i-1')
   expect(await (data.get('audio') as File).text()).toBe('RIFF')
+})
+
+it('routes GET /units/:unitId/procedure with the path unit ID, bearer only', async () => {
+  expect((await call('/units/u-1/procedure')).status).toBe(401)
+  fns.getUnitProcedure.mockResolvedValue(null)
+  const res = await call('/units/u-1/procedure', { headers: auth })
+  expect(res.status).toBe(200)
+  expect(fns.getUnitProcedure).toHaveBeenCalledWith({ data: { unitId: 'u-1' } })
 })
