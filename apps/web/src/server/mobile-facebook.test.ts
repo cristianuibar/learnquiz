@@ -79,7 +79,7 @@ it('starts Facebook in the browser, preserves OAuth cookies, and returns only an
 })
 it('keeps provider cookies and binds the callback to this browser, once', async () => {
   const flow = await browserStart()
-  expect(flow.response.headers.get('Location')).toMatch(/^https:\/\/www.facebook.com\//)
+  expect(flow.response.headers.get('Location')).toMatch(/^https:\/\/www\.facebook\.com\//)
   expect(flow.response.headers.getSetCookie()).toEqual(expect.arrayContaining([expect.stringContaining('oauth-state=bound'), expect.stringContaining('HttpOnly; SameSite=Lax')]))
   expect((await call(`/facebook/callback?state=${flow.state}`)).headers.get('Location')).toContain('facebookError=expired')
   expect((await call(`/facebook/start?state=${flow.state}`)).headers.get('Location')).toContain('facebookError=expired')
