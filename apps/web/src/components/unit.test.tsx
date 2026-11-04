@@ -7,13 +7,16 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { Route as pathRoute } from '@/routes/t.$topicId.path'
 import { Route as unitRoute } from '@/routes/t.$topicId.u.$unitId'
 import { Route as appRootRoute } from '@/routes/__root'
+import { describeProcedure } from '@learnquiz/api/procedure'
 import { getConceptItems, getTopicPath } from '@/server/curriculum'
+import { getUnitProcedure } from '@/server/procedure'
 
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
 vi.mock('@/server/curriculum', () => ({ getTopicPath: vi.fn(), getConceptItems: vi.fn() }))
 vi.mock('@/server/model-trace', () => ({ getModelTrace: vi.fn() }))
 vi.mock('@/server/play', () => ({ prepareNextSession: vi.fn(async () => ({ ok: true })), endSession: vi.fn(), startSession: vi.fn(), startPlacement: vi.fn() }))
 vi.mock('@/server/push', () => ({ getPushSettings: async () => ({ canPrompt: false, endpoints: [] }), subscribe: vi.fn(), unsubscribe: vi.fn(), sendTestPush: vi.fn(), savePushPreferences: vi.fn() }))
+vi.mock('@/server/procedure', () => ({ getUnitProcedure: vi.fn(async () => null) }))
 vi.mock('@/server/diagrams', () => ({ generateConceptDiagram: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
@@ -126,6 +129,49 @@ it('loads a concept\'s answered questions on demand', async () => {
     expect(getConceptItems).toHaveBeenCalledWith({ data: { conceptId: 'c1' } })
     expect(container.textContent).toContain('What is 2 + 2?')
     expect(button(container, 'Hide answered questions')?.getAttribute('aria-expanded')).toBe('true')
+  } finally {
+    await cleanup()
+  }
+})
+
+it('renders the stored procedure flowchart under the concepts', async () => {
+  const graph = {
+    nodes: [
+      { id: 'n1', kind: 'step' as const, label: 'Inspect', critical: false },
+      { id: 'n2', kind: 'decision' as const, label: 'Damaged?', critical: false },
+      { id: 'n3', kind: 'step' as const, label: 'Photo damage', critical: true },
+      { id: 'n4', kind: 'step' as const, label: 'Staging', critical: false },
+    ],
+    edges: [
+      { from: 'n1', to: 'n2', label: null },
+      { from: 'n2', to: 'n3', label: 'yes' as const },
+      { from: 'n2', to: 'n4', label: 'no' as const },
+    ],
+  }
+  vi.mocked(getUnitProcedure).mockResolvedValueOnce({ status: 'ready', graph, source: { title: 'Receiving SOP', version: 3 } })
+  const { container, cleanup } = await render(topic(), '/t/t1/u/u2')
+  try {
+    expect(getUnitProcedure).toHaveBeenCalledWith({ data: { unitId: 'u2' } })
+    const svg = container.querySelector('svg[role="img"]')
+    expect(svg?.getAttribute('aria-label')).toBe(describeProcedure(graph))
+    expect(svg?.getAttribute('aria-label')).toContain('(critical step)')
+    const drawn = svg?.textContent?.replace(/\s+/g, '')
+    for (const node of graph.nodes) expect(drawn).toContain(node.label.replace(/\s+/g, ''))
+    expect([...container.querySelectorAll('h2')].some((h) => h.textContent === 'Procedure')).toBe(true)
+    expect(container.querySelector('figcaption')?.textContent).toBe('Receiving SOP · v3')
+  } finally {
+    await cleanup()
+  }
+})
+
+it('renders no procedure section when the unit has no stored graph', async () => {
+  vi.mocked(getUnitProcedure).mockResolvedValueOnce(null)
+  const { container, cleanup } = await render(topic(), '/t/t1/u/u2')
+  try {
+    expect(getUnitProcedure).toHaveBeenCalledWith({ data: { unitId: 'u2' } })
+    expect(container.querySelector('svg[role="img"]')).toBeNull()
+    expect([...container.querySelectorAll('h2')].some((h) => h.textContent === 'Procedure')).toBe(false)
+    expect(container.querySelector('figcaption')).toBeNull()
   } finally {
     await cleanup()
   }

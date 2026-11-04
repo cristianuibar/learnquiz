@@ -3,6 +3,7 @@ import { ChevronLeft } from 'lucide-react'
 import { RouteError } from '@/components/inline-error'
 import { StartButton } from '@/components/start-button'
 import { ConceptRow } from '@/components/unit/concept-row'
+import { ProcedureDiagram } from '@/components/unit/procedure-diagram'
 import { UnitBar } from '@/components/unit/unit-bar'
 import { getTopicPath } from '@/server/curriculum'
 
@@ -60,6 +61,7 @@ function UnitDetail() {
           ))}
         </ul>
       </section>
+      <ProcedureDiagram unitId={unit.id} />
       {unit.source && (
         <p className="text-caption text-ink-muted">
           {unit.source.title} · v{unit.source.version}
