@@ -13,7 +13,7 @@ vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => ({ nam
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => null }))
 
 const user = { id: 'u1', name: 'Learner', isAnonymous: false }
-const session = (needsDisclosure: boolean) => ({ user, facebookEnabled: false, needsDisclosure, adminCompanies: [] })
+const session = (needsDisclosure: boolean) => ({ user, facebookEnabled: false, needsDisclosure, companyMember: false, adminCompanies: [] })
 
 beforeEach(() => vi.clearAllMocks())
 

@@ -14,6 +14,7 @@ export const Route = createFileRoute('/me/flag')({
   }),
   beforeLoad: ({ context }) => {
     if (!context.user) throw redirect({ to: '/' })
+    if (!context.companyMember) throw redirect({ to: '/me/profile' })
   },
   component: FlagResult,
 })

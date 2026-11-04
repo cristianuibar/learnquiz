@@ -49,7 +49,7 @@ async function mount() {
 }
 
 it('keeps the signed-in join controls and error when accepting fails after sign-up', async () => {
-  const session = { user: null, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] }
+  const session = { user: null, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] }
   vi.mocked(getSessionFn).mockResolvedValue(session)
   signUp.mockImplementation(async () => {
     vi.mocked(getSessionFn).mockResolvedValue({ ...session, user: { id: 'learner', name: 'Learner', isAnonymous: false } })
@@ -84,10 +84,10 @@ it('keeps the signed-in join controls and error when accepting fails after sign-
 })
 
 it('offers to sign in as the invited address instead of joining from another account', async () => {
-  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'owner', name: 'Owner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })
+  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'owner', name: 'Owner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] })
   getInvite.mockResolvedValue({ ...invite, otherAccount: true })
   signOut.mockImplementation(async () => {
-    vi.mocked(getSessionFn).mockResolvedValue({ user: null, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })
+    vi.mocked(getSessionFn).mockResolvedValue({ user: null, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] })
     return { error: null }
   })
   const { router, container, cleanup } = await mount()
@@ -108,7 +108,7 @@ it('offers to sign in as the invited address instead of joining from another acc
 })
 
 it('re-enables the sign-in button and shows an error when sign-out is rejected offline', async () => {
-  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'owner', name: 'Owner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })
+  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'owner', name: 'Owner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] })
   getInvite.mockResolvedValue({ ...invite, otherAccount: true })
   signOut.mockRejectedValueOnce(new TypeError('Failed to fetch'))
   signOut.mockResolvedValueOnce({ error: null })
@@ -137,7 +137,7 @@ it.each([
   { viewer: { id: 'learner', name: 'Learner', isAnonymous: false }, label: 'Continue to Today', path: '/today', search: {} },
   { viewer: null, label: 'Sign in as learner@example.test', path: '/sign-in', search: { redirect: '/today', email: 'learner@example.test' } },
 ])('leads $label from an invite that was already used', async ({ viewer, label, path, search }) => {
-  vi.mocked(getSessionFn).mockResolvedValue({ user: viewer, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })
+  vi.mocked(getSessionFn).mockResolvedValue({ user: viewer, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] })
   getInvite.mockResolvedValue({ ...invite, status: 'accepted' })
   const { router, container, cleanup } = await mount()
   try {
@@ -154,7 +154,7 @@ it.each([
 })
 
 it('enables the create button only from eight password characters', async () => {
-  vi.mocked(getSessionFn).mockResolvedValue({ user: null, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })
+  vi.mocked(getSessionFn).mockResolvedValue({ user: null, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] })
   getInvite.mockResolvedValue(invite)
   const { container, cleanup } = await mount()
   try {
@@ -177,7 +177,7 @@ it('enables the create button only from eight password characters', async () => 
 })
 
 it.each([true, false])('shows Facebook sign-up only when enabled (%s)', async (facebookEnabled) => {
-  vi.mocked(getSessionFn).mockResolvedValue({ user: null, facebookEnabled, needsDisclosure: false, adminCompanies: [] })
+  vi.mocked(getSessionFn).mockResolvedValue({ user: null, facebookEnabled, needsDisclosure: false, companyMember: false, adminCompanies: [] })
   getInvite.mockResolvedValue(invite)
   const { container, cleanup } = await mount()
   try {

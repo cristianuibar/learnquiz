@@ -29,7 +29,7 @@ beforeEach(() => {
   Object.defineProperty(reducedMotion, 'matches', { value: true })
   vi.spyOn(window, 'matchMedia').mockReturnValue(reducedMotion)
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
-  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'learner', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })
+  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'learner', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] })
   vi.mocked(getTopicPath).mockResolvedValue({
     topic: { id: 'topic', title: 'Arithmetic', goal: null, status: 'ready', generatedBy: null },
     preparing: false,

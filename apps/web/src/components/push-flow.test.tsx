@@ -15,7 +15,7 @@ import { getSessionFn } from '@/server/session-fn'
 import type { SummaryView } from '@learnquiz/api'
 
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
-vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn(async () => ({ user: { id: 'u1', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })) }))
+vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn(async () => ({ user: { id: 'u1', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] })) }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => 't1' }))
 vi.mock('@/server/today', () => ({ getToday: vi.fn() }))
@@ -154,7 +154,7 @@ it('opens a notification deep link through the quick route and redirects into fo
 })
 
 it('preserves the notification link through sign-in without opening a session while signed out', async () => {
-  vi.mocked(getSessionFn).mockResolvedValue({ user: null, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })
+  vi.mocked(getSessionFn).mockResolvedValue({ user: null, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] })
   const link = '/play/quick/i1?pushId=push-1'
   const { container, router, cleanup } = await renderApp(link)
   try {
@@ -166,7 +166,7 @@ it('preserves the notification link through sign-in without opening a session wh
 })
 
 it('keeps staff navigation and working push controls together on Profile', async () => {
-  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'u1', name: 'Learner', isAnonymous: false, role: 'admin' }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })
+  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'u1', name: 'Learner', isAnonymous: false, role: 'admin' }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] })
   const prefs = { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC', days: [1, 2, 3, 4, 5] }
   vi.mocked(getPushSettings).mockResolvedValue({ publicKey: null, isStaff: true, endpoints: [], canPrompt: false, prefs, company: null, schedule })
   const { container, cleanup } = await renderApp('/me')
