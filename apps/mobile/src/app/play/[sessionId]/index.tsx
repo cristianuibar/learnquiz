@@ -269,7 +269,8 @@ function ActiveSession({ sessionId, announceReady }: { sessionId: string; announ
           onConfidenceChange={(confidence: Confidence) => changeDraft({ ...draftRef.current, confidence })}
           onSubmit={() => { void check() }}
           busy={busy}
-          disabled={reveal !== null || voiceCapturing}
+          disabled={reveal !== null}
+          voiceCapturing={voiceCapturing}
           mode={error?.kind === 'check' ? 'retry' : 'check'}
         />
       </View>

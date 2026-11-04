@@ -10,9 +10,9 @@ export function Segment({ label, accessibilityLabel = label, selected, radio, eq
   const { colors, space, radius, sizes, typography } = useTheme()
   // The check and its gap are part of a selected option's width, so it shows at every font scale (#669).
   const { fontScale } = useWindowDimensions()
-  // Appearance uses equal columns at standard text size. Enlarged text keeps
-  // the existing content widths and wrapping, including the #669 check allowance.
-  const column = equalWidth && fontScale <= 1
+  // Appearance's three columns fit through Android Larger text at 390 dp.
+  // Above that, keep content widths and wrapping, including the #669 check allowance.
+  const column = equalWidth && fontScale <= 1.3
   const [focused, setFocused] = useState(false)
   return (
     <Pressable accessible focusable accessibilityRole={radio ? 'radio' : 'togglebutton'} accessibilityLabel={accessibilityLabel}
