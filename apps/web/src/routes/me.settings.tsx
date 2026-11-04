@@ -145,7 +145,7 @@ function Settings() {
   return (
     <main className="mx-auto flex w-full max-w-xl flex-col gap-8 px-4 pt-6 pb-8">
       <header className="flex items-center gap-2">
-        <Link to="/me/profile" aria-label="Back" className="-ml-3 inline-flex size-12 items-center justify-center rounded-full text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
+        <Link to="/me/profile" state={{ focus: 'settings' }} aria-label="Back" className="-ml-3 inline-flex size-12 items-center justify-center rounded-full text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
           <ChevronLeft aria-hidden className="size-6" />
         </Link>
         <h1 tabIndex={-1} className="text-title-1 text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">Settings</h1>
