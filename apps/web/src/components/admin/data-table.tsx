@@ -109,7 +109,7 @@ export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSo
   }, [rows.length, columns.length])
 
   const sortCol = columns.find((c) => c.key === sort?.key)
-  const sortedNote = sort && sortCol
+  const sortedNote = sort && sortCol?.sortable
     ? `, sorted by ${labelOf(sortCol).toLowerCase()}, ${(sortCol.sortOrder ?? DEFAULT_ORDER)[sort.direction]}`
     : ''
   const grouped = columns.some((c) => c.group)
@@ -128,7 +128,7 @@ export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSo
         className={cn(c.hideBelowLg && 'dt-hide-lg max-xl:hidden', c.className)}
       />
     ) : (
-      <th key={c.key} scope="col" role="columnheader" rowSpan={span} className={cn(TH, pos(c.align), c.hideBelowLg && 'dt-hide-lg max-xl:hidden', c.className)}>
+      <th key={c.key} scope="col" role="columnheader" aria-sort={sort?.key === c.key ? sort.direction : undefined} rowSpan={span} className={cn(TH, pos(c.align), c.hideBelowLg && 'dt-hide-lg max-xl:hidden', c.className)}>
         {c.header}
       </th>
     )

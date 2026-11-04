@@ -7,7 +7,8 @@ import { dbSchema } from '@/db'
 import { getAuth } from '@/server/auth'
 import { getSessionUser } from '@/server/session'
 import { createRole, getPeople, getOrgOverview, listRoles } from '@/server/org'
-import { getCompanies, getCompany, getContentFlags, getGenerationJobs, getStaffSession, listUsers, resolveFlag, retryJobConcept, setUserBan } from './admin'
+import { getCompanies, getCompany, getContentFlags, getGenerationJobs, getStaffSession, resolveFlag, retryJobConcept } from './admin'
+import { listUsers, setUserBan } from './admin-users'
 
 const boundary = vi.hoisted(() => ({ db: null as unknown, headers: new Headers(), status: 200, background: [] as unknown[] }))
 
@@ -103,8 +104,8 @@ it('refuses every admin function for non-staff, including a company owner', asyn
     () => getStaffSession(),
     () => getCompanies(),
     () => getCompany({ data: { slug: 'alpha' } }),
-    () => listUsers({ data: { search: '', field: 'email', offset: 0 } }),
-    () => setUserBan({ data: { userId: accounts.get('outsider')!.id, banned: true } }),
+    () => listUsers({ data: { search: '', offset: 0 } }),
+    () => setUserBan({ data: { userId: accounts.get('outsider')!.id, banned: true, reason: 'x' } }),
     () => setUserBan({ data: { userId: accounts.get('outsider')!.id, banned: false } }),
     () => getGenerationJobs(),
     () => retryJobConcept({ data: { conceptId: 'x' } }),
@@ -161,11 +162,11 @@ it('gives staff who own a company the full portal for that company', async () =>
   await expect(getPeople({ data: { slug: 'beta' } })).resolves.toMatchObject({ readOnly: true, invites: [] })
 })
 
-it('searches users through the admin plugin and bans, revokes sessions, blocks sign-in and unbans', async () => {
+it('searches users and bans, revokes sessions, blocks sign-in and unbans', async () => {
   const learner = accounts.get('learner')!
-  await expect(listUsers({ data: { search: 'learner@', field: 'email', offset: 0 } })).resolves.toMatchObject({ users: [{ id: learner.id }], total: 1 })
-  await expect(listUsers({ data: { search: 'outsider', field: 'name', offset: 0 } })).resolves.toMatchObject({ users: [{ id: accounts.get('outsider')!.id }], total: 1 })
-  await expect(listUsers({ data: { search: 'learner@', field: 'email', offset: 25 } })).resolves.toEqual({ users: [], total: 1 })
+  await expect(listUsers({ data: { search: 'learner@', offset: 0 } })).resolves.toMatchObject({ users: [{ id: learner.id }], total: 1 })
+  await expect(listUsers({ data: { search: 'outsider', offset: 0 } })).resolves.toMatchObject({ users: [{ id: accounts.get('outsider')!.id }], total: 1 })
+  await expect(listUsers({ data: { search: 'learner@', offset: 25 } })).resolves.toEqual({ users: [], total: 1 })
   sqlite.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, ?)').run('learner-beta', 'beta', learner.id, 'member', NOW)
   await setUserBan({ data: { userId: learner.id, banned: true, reason: 'Test suspension' } })
   const blocked = await authRequest('sign-in/email', { email: 'learner@staff.test', password: learner.password })
@@ -173,7 +174,7 @@ it('searches users through the admin plugin and bans, revokes sessions, blocks s
   expect(await blocked.json()).toEqual({ code: 'BANNED_USER', message: 'Your account has been suspended. To get access back, contact your company admin at alpha or beta.' })
   const outsider = accounts.get('outsider')!
   sqlite.prepare('DELETE FROM member WHERE user_id = ?').run(outsider.id)
-  await setUserBan({ data: { userId: outsider.id, banned: true } })
+  await setUserBan({ data: { userId: outsider.id, banned: true, reason: 'Left the company' } })
   const personal = await authRequest('sign-in/email', { email: 'outsider@staff.test', password: outsider.password })
   expect(await personal.json()).toEqual({ code: 'BANNED_USER', message: 'You have been banned from this application. Please contact support if you believe this is an error.' })
   expect(sqlite.prepare('SELECT banned, ban_reason FROM user WHERE id = ?').get(learner.id)).toEqual({ banned: 1, ban_reason: 'Test suspension' })
@@ -184,6 +185,40 @@ it('searches users through the admin plugin and bans, revokes sessions, blocks s
   const allowed = await authRequest('sign-in/email', { email: 'learner@staff.test', password: learner.password })
   expect(allowed.status).toBe(200)
   expect(sqlite.prepare('SELECT banned, ban_reason FROM user WHERE id = ?').get(learner.id)).toEqual({ banned: 0, ban_reason: null })
+})
+
+it('refuses to ban yourself and keeps the staff account and session intact', async () => {
+  const staff = accounts.get('staff')!
+  boundary.status = 200
+  await expect(setUserBan({ data: { userId: staff.id, banned: true, reason: 'x' } })).rejects.toMatchObject({ status: 403 })
+  expect(boundary.status).toBe(403)
+  expect(sqlite.prepare('SELECT banned FROM user WHERE id = ?').get(staff.id)).toEqual({ banned: 0 })
+  await expect(getStaffSession()).resolves.toMatchObject({ id: staff.id })
+})
+
+it('requires a reason to ban', async () => {
+  const learner = accounts.get('learner')!
+  for (const reason of [undefined, '   ']) {
+    boundary.status = 200
+    await expect(setUserBan({ data: { userId: learner.id, banned: true, reason } })).rejects.toMatchObject({ status: 400 })
+    expect(boundary.status).toBe(400)
+  }
+  expect(sqlite.prepare('SELECT banned FROM user WHERE id = ?').get(learner.id)).toEqual({ banned: 0 })
+})
+
+it('filters users by role and status together and reports each user\'s company', async () => {
+  const [staff, learner, outsider] = ['staff', 'learner', 'outsider'].map((name) => accounts.get(name)!.id)
+  await setUserBan({ data: { userId: learner, banned: true, reason: 'Test suspension' } })
+  const ids = async (filter: object) => (await listUsers({ data: { search: '', offset: 0, ...filter } })).users.map((u) => u.id).sort()
+  expect(await ids({ role: 'admin' })).toEqual([staff])
+  expect(await ids({ role: 'user' })).toEqual([learner, outsider].sort())
+  expect(await ids({ status: 'banned' })).toEqual([learner])
+  expect(await ids({ status: 'active' })).toEqual([staff, outsider].sort())
+  expect(await ids({ role: 'user', status: 'active' })).toEqual([outsider])
+  const { users, total } = await listUsers({ data: { search: '', offset: 0 } })
+  expect(total).toBe(3)
+  expect(users.find((u) => u.id === learner)).toMatchObject({ admin: false, banned: true, banReason: 'Test suspension', company: { name: 'alpha', role: 'owner' } })
+  expect(users.find((u) => u.id === staff)).toMatchObject({ admin: true, banned: false, company: null })
 })
 
 // Company topics in beta: a role curriculum that is building, a failed and a ready concept, flagged and retired questions.

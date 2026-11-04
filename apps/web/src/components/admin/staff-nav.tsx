@@ -63,7 +63,7 @@ function Foot({ name }: { name: string }) {
 export function StaffNav({ failed, name, children }: { failed: number; name: string; children: ReactNode }) {
   const items: SideNavItem[] = [
     { to: { to: '/admin/companies' }, label: 'Companies', icon: icons.companies },
-    { to: { to: '/admin/users', search: { search: '', field: 'email', offset: 0 }, activeOptions: { includeSearch: false } }, label: 'Users', icon: icons.users },
+    { to: { to: '/admin/users', search: { search: '', role: 'all', status: 'all', offset: 0 }, activeOptions: { includeSearch: false } }, label: 'Users', icon: icons.users },
     {
       to: { to: '/admin/jobs' },
       label: 'Generation jobs',
