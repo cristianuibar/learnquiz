@@ -46,7 +46,8 @@ export function RowMenu({ label, items, menuLabel }: { label: string; items: Row
   const onMenuKey = (e: KeyboardEvent) => {
     const list = entries()
     const i = list.indexOf(document.activeElement as HTMLElement)
-    const go = { ArrowDown: (i + 1) % list.length, ArrowUp: (i - 1 + list.length) % list.length, Home: 0, End: list.length - 1 }[e.key]
+    const moves: Partial<Record<string, number>> = { ArrowDown: (i + 1) % list.length, ArrowUp: (i - 1 + list.length) % list.length, Home: 0, End: list.length - 1 }
+    const go = moves[e.key]
     if (go !== undefined) { e.preventDefault(); list[go]?.focus() }
     else if (e.key === 'Escape') { e.preventDefault(); close(true) }
     else if (e.key === 'Tab') close(false)
