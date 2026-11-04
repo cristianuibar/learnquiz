@@ -33,7 +33,7 @@ export function ModelTrace({ scope, variant = 'secondary' }: { scope: Scope; var
       <DialogTrigger asChild>
         <Button variant={variant} className={variant === 'link' ? 'self-start' : 'mt-4 px-6'}>Show model trace</Button>
       </DialogTrigger>
-      <DialogContent className="top-0 right-0 left-auto flex h-dvh max-w-full translate-x-0 translate-y-0 flex-col gap-6 overflow-y-auto rounded-none sm:max-w-xl">
+      <DialogContent className="top-0 right-0 left-auto flex h-dvh max-w-full translate-x-0 translate-y-0 flex-col gap-6 overflow-y-auto rounded-none max-md:top-0 max-md:h-dvh max-md:max-h-none max-md:rounded-none md:max-w-xl">
         <DialogHeader className="pr-10 text-left">
           <DialogTitle>Model trace</DialogTitle>
           <DialogDescription>

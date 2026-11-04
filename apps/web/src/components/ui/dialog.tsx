@@ -49,9 +49,14 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  size = "default",
+  initialFocus,
+  onOpenAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  size?: "default" | "wide"
+  initialFocus?: React.RefObject<HTMLElement | null>
 }) {
   return (
     <DialogPortal data-slot="dialog-portal">
@@ -59,9 +64,17 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border border-border bg-surface-card p-6 text-ink shadow-raised motion-safe:data-[state=open]:animate-dialog-enter motion-safe:data-[state=closed]:animate-dialog-exit sm:max-w-lg",
+          "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border border-border bg-surface-card p-6 text-ink shadow-raised motion-safe:data-[state=open]:animate-dialog-enter motion-safe:data-[state=closed]:animate-dialog-exit max-md:top-auto max-md:bottom-0 max-md:left-0 max-md:max-h-[calc(100dvh-24px)] max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:overflow-y-auto max-md:rounded-t-lg max-md:rounded-b-none",
+          size === "wide" ? "md:max-w-[720px]" : "md:max-w-[520px]",
           className
         )}
+        onOpenAutoFocus={(event) => {
+          onOpenAutoFocus?.(event)
+          if (initialFocus?.current) {
+            event.preventDefault()
+            initialFocus.current.focus()
+          }
+        }}
         {...props}
       >
         {children}
@@ -101,7 +114,7 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
+        "flex flex-row gap-3 max-md:[&>*]:flex-1 md:justify-end",
         className
       )}
       {...props}

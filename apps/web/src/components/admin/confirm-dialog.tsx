@@ -1,0 +1,114 @@
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import type { LucideIcon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Banner } from './banner'
+import { FieldError, fieldProps } from './field-error'
+
+const REASON_ERROR = 'Enter a reason. Other staff see it in the user list.'
+
+export function ConfirmDialog({ open, onOpenChange, title, consequences, verb, object, onConfirm, reason: askReason }: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  title: string
+  consequences: { icon: LucideIcon; text: React.ReactNode }[]
+  verb: string
+  object: string
+  onConfirm: (reason?: string) => void | Promise<void>
+  reason?: boolean
+}) {
+  const id = useId()
+  const reasonId = `${id}-reason`
+  const cancelRef = useRef<HTMLButtonElement>(null)
+  const reasonRef = useRef<HTMLTextAreaElement>(null)
+  const pendingRef = useRef(false)
+  const openerRef = useRef<HTMLElement | null>(null)
+  const [reason, setReason] = useState('')
+  const [error, setError] = useState('')
+  const [failure, setFailure] = useState('')
+  const [pending, setPending] = useState(false)
+
+  // Callers open this from plain buttons, not DialogTrigger, so Radix has no trigger to give focus back to.
+  useLayoutEffect(() => {
+    if (open && document.activeElement instanceof HTMLElement) openerRef.current = document.activeElement
+  }, [open])
+
+  useEffect(() => {
+    setReason('')
+    setError('')
+    setFailure('')
+  }, [open])
+
+  async function confirm() {
+    if (pendingRef.current) return
+    const trimmed = reason.trim()
+    if (askReason && !trimmed) {
+      setError(REASON_ERROR)
+      reasonRef.current?.focus()
+      return
+    }
+    setError('')
+    setFailure('')
+    pendingRef.current = true
+    setPending(true)
+    try {
+      await onConfirm(askReason ? trimmed : undefined)
+      onOpenChange(false)
+    } catch (err) {
+      setFailure(err instanceof Error && err.message ? err.message : 'Something went wrong. Try again.')
+    } finally {
+      pendingRef.current = false
+      setPending(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent initialFocus={cancelRef} aria-describedby={undefined}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault()
+          if (openerRef.current?.isConnected) openerRef.current.focus()
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        <ul className="flex flex-col gap-3">
+          {consequences.map(({ icon: Icon, text }, i) => (
+            <li key={i} className="flex items-start gap-3 text-body text-ink">
+              <Icon aria-hidden className="mt-px size-5 shrink-0 text-ink-muted" />
+              <span>{text}</span>
+            </li>
+          ))}
+        </ul>
+        {askReason && (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor={reasonId}>Reason · required</Label>
+            <Textarea
+              id={reasonId}
+              ref={reasonRef}
+              rows={2}
+              required
+              aria-required="true"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              {...fieldProps(reasonId, error)}
+            />
+            {error && <FieldError id={reasonId}>{error}</FieldError>}
+          </div>
+        )}
+        {failure && <Banner kind="alert">{failure}</Banner>}
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button ref={cancelRef} variant="secondary">Cancel</Button>
+          </DialogClose>
+          <Button variant="danger" aria-disabled={pending || undefined} aria-busy={pending || undefined} onClick={() => void confirm()}>
+            {verb} {object}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
