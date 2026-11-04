@@ -338,14 +338,16 @@ it.each([
   ['a figures state', { roles: [role], nextStep: { unreviewed: 1, documentTitle: 'Doc', roleId: 'r1', topicId: 't1' } }],
   ['an empty state', { roles: [{ ...role, topicStatus: 'draft', documents: 0 }], training: noTraining }],
   ['a preparing state', { roles: [building(3)], training: noTraining }],
-])('hides every action staff cannot use on the read-only overview (%s)', async (_name, data) => {
+])('hides every action staff cannot use on the read-only overview but keeps the role links (%s)', async (name, data) => {
   vi.mocked(getOrgOverview).mockResolvedValue(overview({ ...data, readOnly: true }))
   const { container, cleanup } = await renderAt('/org/x', overviewLeaf)
   try {
     const labels = Object.keys(hrefs(container))
-    for (const gone of ['Review questions', 'Upload SOP', 'Invite people', 'Watch the build', 'All roles', 'Cashier', 'Barista']) expect(labels).not.toContain(gone)
+    for (const gone of ['Review questions', 'Upload SOP', 'Invite people']) expect(labels).not.toContain(gone)
     expect(container.textContent).not.toContain('Next step')
-    expect(container.textContent).toMatch(/Cashier|Barista/)
+    expect(labels).toContain('All roles')
+    expect(labels.some((l) => l === 'Cashier' || l === 'Barista')).toBe(true)
+    if (name === 'a preparing state') expect(labels).toContain('Watch the build')
   } finally {
     await cleanup()
   }

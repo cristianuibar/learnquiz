@@ -64,13 +64,13 @@ function TrainingCell({ role }: { role: RoleRow }) {
   return <Status word={TRAINING_STATUS[role.topicStatus] as keyof typeof STATUS} />
 }
 
-function RolesSection({ roles, readOnly }: { roles: RoleRow[]; readOnly: boolean }) {
+function RolesSection({ roles }: { roles: RoleRow[] }) {
   const links = usePortalLinks()
   const { base } = usePortal()
   const columns: Column<RoleRow>[] = [
     {
       key: 'role', header: 'Role', stack: 'full',
-      cell: (r) => (readOnly ? <span className="font-medium">{r.name}</span> : <Link {...links.role(r.id)} className={ROLE_LINK}>{r.name}</Link>),
+      cell: (r) => <Link {...links.role(r.id)} className={ROLE_LINK}>{r.name}</Link>,
     },
     { key: 'training', header: 'Training', stack: 'full', cell: (r) => <TrainingCell role={r} /> },
     { key: 'benchmark', header: 'Benchmark', align: 'end', cell: (r) => `${Math.round(r.benchmark * 100)}%` },
@@ -81,9 +81,7 @@ function RolesSection({ roles, readOnly }: { roles: RoleRow[]; readOnly: boolean
     <section aria-labelledby="overview-roles" className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="overview-roles" className="text-title-2 text-ink">Roles</h2>
-        {!readOnly && (
-          <Button variant="ghost" asChild><Link {...links.roles}>All roles</Link></Button>
-        )}
+        <Button variant="ghost" asChild><Link {...links.roles}>All roles</Link></Button>
       </div>
       <DataTable
         stack
@@ -121,12 +119,10 @@ function PreparingCard({ role, readOnly }: { role: RoleRow; readOnly: boolean })
       <div><Status word="Generating questions" /></div>
       <Meter value={role.conceptsReady} max={role.conceptsTotal} label="Concepts ready" valueText={text} />
       <p className="text-body text-ink-muted">{text}</p>
-      {!readOnly && (
-        <div className="flex flex-wrap gap-3">
-          <Button variant="accent" asChild><Link {...links.people} search={{ invite: 1 }}><Plus aria-hidden />Invite people</Link></Button>
-          <Button variant="ghost" asChild><Link {...links.role(role.id)}>Watch the build</Link></Button>
-        </div>
-      )}
+      <div className="flex flex-wrap gap-3">
+        {!readOnly && <Button variant="accent" asChild><Link {...links.people} search={{ invite: 1 }}><Plus aria-hidden />Invite people</Link></Button>}
+        <Button variant="ghost" asChild><Link {...links.role(role.id)}>Watch the build</Link></Button>
+      </div>
     </CardBox>
   )
 }
@@ -193,7 +189,7 @@ export function Overview({ data, readOnly }: { data: OverviewData; readOnly: boo
           )}
         </>
       )}
-      <RolesSection roles={roles} readOnly={readOnly} />
+      <RolesSection roles={roles} />
     </Page>
   )
 }
