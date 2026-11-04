@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import type { z } from 'zod'
+import { todayView } from '@learnquiz/api/today'
 import { chatJson, LlmError } from '@/lib/llm/client'
 import { requireLearnerId } from '@/server/session'
 
@@ -22,7 +23,7 @@ vi.mock('@tanstack/react-start', () => ({
 
 vi.mock('@/db', () => ({ getDb: () => holder.db }))
 
-vi.mock('@/server/session', () => ({ requireLearnerId: vi.fn(async () => 'u1'), getSessionUser: async () => ({ id: 'u1', isAnonymous: false }) }))
+vi.mock('@/server/session', () => ({ getLearnerId: vi.fn(async () => 'u1'), requireLearnerId: vi.fn(async () => 'u1'), getSessionUser: async () => ({ id: 'u1', isAnonymous: false }) }))
 
 vi.mock('@/lib/llm/client', async (importOriginal) => {
   const client = await importOriginal<typeof import('@/lib/llm/client')>()
@@ -42,6 +43,7 @@ import { getEnv } from '@/server/env'
 import { getConceptItems, getTopicPath } from './curriculum'
 import { getModelTrace } from './model-trace'
 import { getPushSettings } from './push'
+import { getToday } from './today'
 
 type Method = 'run' | 'all' | 'values' | 'get'
 
@@ -1035,6 +1037,7 @@ describe('learner practice and unit unlocks', () => {
 it.each([
   { poolSize: 3, answers: [true, false, true] },
   { poolSize: 12, answers: Array(8).fill(true) as boolean[] },
+  { poolSize: 12, answers: [true, true, false, false, true, true, true, true] },
   { poolSize: 12, answers: [true, false, true, false, true, false, true, true, true, true] },
   { poolSize: 12, answers: [true, true, false, false, true, true, false, false, true, true, false, false] },
 ])('reports the served count when placement stops after $answers.length answers from $poolSize candidates', async ({ poolSize, answers }) => {
@@ -1062,6 +1065,24 @@ it.each([
   expect(view).toMatchObject({ ended: true, item: null, progress: { position: answers.length, total: answers.length } })
   expect((await getSession({ data: { sessionId: view.id } })).progress).toEqual(view.progress)
   expect((await endSession({ data: { sessionId: view.id } })).total).toBe(view.progress.total)
+  const today = todayView(await getToday(), new Date())
+  expect(today.hero).toMatchObject({ kind: 'done', title: 'Done for today' })
+  expect(today.quests).toContainEqual({ key: 'session', label: 'One session', count: null, done: true })
+})
+
+it.each(['session', 'placement'])('does not earn One session by leaving a %s after one answer', async (kind) => {
+  seedTopicAndLearner(raw, 0)
+  seedFrontier(raw, 12, true)
+  raw.exec('UPDATE learner_item SET due = 1')
+  const { sessionId } = kind === 'placement'
+    ? await startPlacement({ data: { topicId: 't1' } })
+    : await startSession({ data: { topicId: 't1' } })
+  const view = await getSession({ data: { sessionId } })
+  await answerItem({ data: { sessionId, itemId: view.item!.id, answer: { text: '1' }, confidence: 'sure', responseMs: 100 } })
+  expect((await endSession({ data: { sessionId } })).total).toBe(1)
+  const today = todayView(await getToday(), new Date())
+  expect(today.hero.kind).not.toBe('done')
+  expect(today.quests).toContainEqual({ key: 'session', label: 'One session', count: null, done: false })
 })
 
 it('shrinks the ended practice counter to the answers served when the rest are retired', async () => {
@@ -1074,6 +1095,7 @@ it('shrinks the ended practice counter to the answers served when the rest are r
   raw.prepare('UPDATE items SET status = ? WHERE id != ?').run('retired', view.item!.id)
   expect(await nextItem({ data: { sessionId } })).toMatchObject({ ended: true, progress: { position: 1, total: 1 } })
   expect((await endSession({ data: { sessionId } })).total).toBe(1)
+  expect((await getToday()).plan).toMatchObject({ state: 'done', sessionDone: true })
 })
 
 it('credits the streak day for a finished session of eight due reviews and nothing fresh', async () => {
@@ -1092,6 +1114,7 @@ it('credits the streak day for a finished session of eight due reviews and nothi
   }
   expect(scalar(raw, 'SELECT COUNT(*) AS n, SUM(correct) AS ok FROM attempts WHERE session_id = ?', sessionId)).toEqual({ n: 8, ok: 8 })
   expect(scalar(raw, 'SELECT streak_count, last_session_at FROM learner_topic WHERE topic_id = ?', 't1')).toEqual({ streak_count: 1, last_session_at: 1793620800000 })
+  expect((await getToday()).plan).toMatchObject({ state: 'done', sessionDone: true })
 })
 
 it('credits the session bonus once when two finishing nextItem calls race (practice)', async () => {

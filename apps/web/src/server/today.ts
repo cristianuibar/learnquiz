@@ -1,8 +1,9 @@
 import type { Today } from '@learnquiz/api'
 import { createServerFn } from '@tanstack/react-start'
-import { and, count, countDistinct, desc, eq, gt, gte, inArray, min, ne, sql } from 'drizzle-orm'
+import { and, countDistinct, desc, eq, gt, gte, inArray, min, ne, sql } from 'drizzle-orm'
 import { getDb } from '@/db'
 import { onboardingDay } from '@/lib/learning/profile'
+import { shouldStop } from '@/lib/learning/placement'
 import { streakShown } from '@/lib/learning/session'
 import { attempts, concepts, items, learnerItem, learnerTopic, placements, sessions, topics, units } from '@/db/schema'
 import { dueCount } from '@/server/due'
@@ -70,12 +71,14 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
     loadFrontier(db, learnerId, topicId),
     basicsUnits(db, learnerId, topicId),
     hasAttemptOn(topicId),
-    // A finished session or placement today with at least 10 answers.
-    db.select({ n: count() }).from(sessions)
+    // Completion earns the quest even for a short queue or adaptive placement.
+    // Keep the old 10-answer eligibility for sessions recorded before completion was stored.
+    db.select({ kind: sessions.kind, planJson: sessions.planJson,
+      answered: sql<number>`(select count(*) from attempts a where a.session_id = sessions.id)`,
+    }).from(sessions)
       .where(and(
         eq(sessions.learnerId, learnerId), eq(sessions.topicId, topicId), inArray(sessions.kind, ['session', 'placement']), gte(sessions.endedAt, dayStart),
-        sql`(select count(*) from ${attempts} where ${attempts.sessionId} = ${sessions.id}) >= 10`,
-      )).get(),
+      )),
     // Items answered today that were already known before today and are now scheduled ahead.
     db.select({ n: countDistinct(attempts.itemId) }).from(attempts)
       .innerJoin(items, eq(items.id, attempts.itemId))
@@ -93,7 +96,14 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
   ])
   const placed = Boolean(placement)
   const start = !placed && placeable ? 'placement' : 'session'
-  const sessionDone = (done?.n ?? 0) > 0
+  const sessionDone = done.some((s) => {
+    if (s.answered >= 10) return true
+    if (s.answered === 0) return false
+    const plan = JSON.parse(s.planJson ?? '{}') as { completed?: boolean; log?: { level: number }[] }
+    if (plan.completed !== undefined) return plan.completed
+    // Existing adaptive placements have no completion flag; their stopping log is the evidence.
+    return s.kind === 'placement' && plan.log !== undefined && shouldStop(plan.log)
+  })
   const unitId = basics?.[0] ?? frontier[0]?.concept.unitId
   const [unit, playable] = await Promise.all([
     start === 'placement' || !unitId

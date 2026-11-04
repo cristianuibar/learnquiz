@@ -977,9 +977,11 @@ async function finalise(db: Db, learnerId: string, session: SessionRow, topic: T
   const plan = readPlan(session)
   const stmts: Stmt[] = []
   let bonus = 0
+  let completed = false
 
   // A placement abandoned before its first answer changes nothing but its end time.
   if ('log' in plan && plan.log.length) {
+    completed = finished || shouldStop(plan.log)
     const level = levelResult(plan.log)
     const [unitRows, conceptRows, line] = await Promise.all([
       db.select({ id: units.id, order: units.order }).from(units).where(eq(units.topicId, topic.id)),
@@ -1022,7 +1024,7 @@ async function finalise(db: Db, learnerId: string, session: SessionRow, topic: T
     ])
     const ids = JSON.parse(session.itemIdsJson) as string[]
     // The bonus is for finishing the queue with at least one scored answer, not for leaving early or for ungraded items; a quick question shows no bonus.
-    const completed = session.kind !== 'mini' && answered > 0 && (finished || (plan.answered && plan.position >= ids.length - 1))
+    completed = session.kind !== 'mini' && answered > 0 && (finished || (plan.answered && plan.position >= ids.length - 1))
     bonus = completed ? SESSION_BONUS : 0
     // A finished queue of only stored reviews holds 8 items at most, so finishing it earns the day too.
     const { streakCount, lastSessionAt } = streakAfter(lt, new Date(now), answered, completed)
@@ -1040,7 +1042,7 @@ async function finalise(db: Db, learnerId: string, session: SessionRow, topic: T
       .set({
         endedAt: now,
         xp: session.xp + bonus,
-        planJson: sql`json_set(coalesce(plan_json, '{}'), '$.finaliseClaim', ${claimToken})`,
+        planJson: sql`json_set(coalesce(plan_json, '{}'), '$.finaliseClaim', ${claimToken}, '$.completed', json(${JSON.stringify(completed)}))`,
       })
       .where(and(eq(sessions.id, session.id), isNull(sessions.endedAt))),
   )
