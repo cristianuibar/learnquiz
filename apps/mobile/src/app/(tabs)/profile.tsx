@@ -31,7 +31,7 @@ type ProgressState = {
 export default function Profile() {
   const { space } = useTheme()
   const router = useRouter()
-  const { user, status: sessionStatus } = useSession()
+  const { user, companyMember, status: sessionStatus } = useSession()
   const token = getToken()
   const [attempt, setAttempt] = useState(0)
   const [state, setState] = useState<ProgressState>({ owner: null, profile: null, play: null, status: 'loading', error: null })
@@ -157,7 +157,7 @@ export default function Profile() {
           }}>Play first session</Button>
         )
       ) : undefined}>
-      <ProfileHeader name={profile?.name ?? user?.name ?? null} role={profile?.role ?? null}
+      <ProfileHeader companyMember={companyMember === true} name={profile?.name ?? user?.name ?? null} role={profile?.role ?? null}
         headingRef={headingRef} settingsRef={settingsRef} onSettings={() => {
           returningFromSettings.current = true
           router.push('/settings')
