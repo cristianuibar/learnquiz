@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { getDb } from '@/db'
 import { invitation, member, organization, user } from '@/db/auth-schema'
 import { attempts, concepts, jobRoles, learnerConcept, memberRoleAssignments, orgSettings, sessions, topics } from '@/db/schema'
+import { roleMastery } from '@/lib/learning/path'
 import { WEEK, benchmarkMet } from '@/lib/learning/profile'
 import { getAuth } from '@/server/auth'
 import { requireOrgAdmin, requireOrgReader } from '@/server/authz'
@@ -41,7 +42,7 @@ const rolesOf = (orgId: string) =>
     .where(and(eq(jobRoles.orgId, orgId), eq(jobRoles.status, 'active')))
     .orderBy(asc(jobRoles.createdAt))
 
-type Training = { stage: 'onboarding' | 'proficient'; progress: number; daysToProficiency: number | null; criticalConfidentErrors: number }
+type Training = { stage: 'onboarding' | 'proficient'; progress: number; daysToProficiency: number | null; criticalConfidentErrors: number; mastery: number; benchmark: number }
 
 async function trainingOf(orgId: string) {
   const db = getDb()
@@ -86,6 +87,8 @@ async function trainingOf(orgId: string) {
       progress: progressRow.list.length ? (progressRow.benchmark > 0 ? Math.min(1, ...[mean(progressRow.list.map((c) => c.pKnown)), ...progressRow.list.filter((c) => c.critical).map((c) => c.pKnown)].map((p) => p / progressRow.benchmark)) : 1) : 0,
       daysToProficiency: proficient && reachedAt !== null && reachedAt >= progressRow.assignedAt && reachedAt <= now ? Math.ceil((reachedAt - progressRow.assignedAt) / 86_400_000) : null,
       criticalConfidentErrors: 0,
+      mastery: Math.round(roleMastery(progressRow.list.map((c) => ({ conceptId: c.id, pKnown: c.pKnown })), progressRow.list.map((c) => c.id)) * 100),
+      benchmark: Math.round(progressRow.benchmark * 100),
     })
   }
   for (const error of errors) {

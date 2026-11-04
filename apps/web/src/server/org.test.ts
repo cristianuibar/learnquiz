@@ -173,8 +173,8 @@ it('reports assigned training stages, unresolved critical errors and company pro
   const people = await getPeople({ data: { slug: 'alpha' } })
   expect(people.members).toEqual([
     expect.objectContaining({ name: 'owner', training: null, lastActiveAt: null }),
-    expect.objectContaining({ name: 'admin', training: { stage: 'proficient', progress: 1, daysToProficiency: 4, criticalConfidentErrors: 0 }, lastActiveAt: null }),
-    expect.objectContaining({ name: 'member', training: { stage: 'onboarding', progress: expect.closeTo(0.4 / 3 / 0.85, 10), daysToProficiency: null, criticalConfidentErrors: 2 }, lastActiveAt: now - day }),
+    expect.objectContaining({ name: 'admin', training: { stage: 'proficient', progress: 1, daysToProficiency: 4, criticalConfidentErrors: 0, mastery: 90, benchmark: 85 }, lastActiveAt: null }),
+    expect.objectContaining({ name: 'member', training: { stage: 'onboarding', progress: expect.closeTo(0.4 / 3 / 0.85, 10), daysToProficiency: null, criticalConfidentErrors: 2, mastery: 13, benchmark: 85 }, lastActiveAt: now - day }),
   ])
   expect(people.invites).toEqual([expect.objectContaining({ name: 'Waiting', expired: false })])
   expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { employees: 3, proficientEmployees: 1, daysToProficiency: 4, criticalErrorsThisWeek: 1, documentsToReview: null } })
@@ -189,8 +189,8 @@ it('reports assigned training stages, unresolved critical errors and company pro
   sqlite.prepare("UPDATE learner_concept SET p_known = CASE concept_id WHEN 'scan' THEN 0.6 ELSE 0.99 END WHERE learner_id = ?").run('admin')
   expect((await getPeople({ data: { slug: 'alpha' } })).members).toEqual([
     expect.objectContaining({ name: 'owner', training: null }),
-    expect.objectContaining({ name: 'admin', training: { stage: 'onboarding', progress: expect.closeTo(0.6 / 0.85, 10), daysToProficiency: null, criticalConfidentErrors: 0 } }),
-    expect.objectContaining({ name: 'member', training: { stage: 'onboarding', progress: expect.closeTo(0.4 / 3 / 0.85, 10), daysToProficiency: null, criticalConfidentErrors: 1 } }),
+    expect.objectContaining({ name: 'admin', training: { stage: 'onboarding', progress: expect.closeTo(0.6 / 0.85, 10), daysToProficiency: null, criticalConfidentErrors: 0, mastery: 86, benchmark: 85 } }),
+    expect.objectContaining({ name: 'member', training: { stage: 'onboarding', progress: expect.closeTo(0.4 / 3 / 0.85, 10), daysToProficiency: null, criticalConfidentErrors: 1, mastery: 13, benchmark: 85 } }),
   ])
   expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { employees: 3, proficientEmployees: 0, daysToProficiency: null, criticalErrorsThisWeek: 1, documentsToReview: null } })
 })
@@ -213,8 +213,27 @@ it('ignores concepts of a retired document when deciding an employee is proficie
   const attempt = sqlite.prepare('INSERT INTO attempts (id, learner_id, item_id, concept_id, at, answer_json, correct, score, confidence, response_ms, rating, p_known_before, p_known_after) VALUES (?, ?, ?, ?, 1, ?, 0, 0, ?, 1000, 1, 0.5, 0.4)')
   attempt.run('dead-error', 'member', 'dead-item', 'dead-critical', '"skip forklift check"', 'sure')
   const people = await getPeople({ data: { slug: 'alpha' } })
-  expect(people.members.find((m) => m.name === 'member')!.training).toEqual({ stage: 'proficient', progress: 1, daysToProficiency: null, criticalConfidentErrors: 0 })
+  expect(people.members.find((m) => m.name === 'member')!.training).toEqual({ stage: 'proficient', progress: 1, daysToProficiency: null, criticalConfidentErrors: 0, mastery: 93, benchmark: 85 })
   expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { employees: 1, proficientEmployees: 1 } })
+})
+
+it("returns each member's mastery against their job role benchmark", async () => {
+  sqlite.prepare("UPDATE topics SET status = 'ready' WHERE job_role_id = 'legacy-role'").run()
+  const topic = sqlite.prepare('SELECT id FROM topics WHERE job_role_id = ?').get('legacy-role')!.id as string
+  const assignment = sqlite.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES (?, ?, ?, 1)')
+  for (const id of ['owner', 'admin', 'member']) assignment.run(id, 'org-a', 'legacy-role')
+  const source = sqlite.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, created_at, retired_at) VALUES (?, ?, 'text', ?, '', 1, ?)")
+  source.run('live-doc', topic, 'Live handbook', null)
+  source.run('old-doc', topic, 'Retired handbook', 2)
+  const concept = sqlite.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary, critical, source_id) VALUES (?, ?, ?, 0, ?, ?, 0, ?)')
+  for (const id of ['c1', 'c2', 'c3', 'c4', 'c5']) concept.run(id, topic, 'warehouse', id, '', 'live-doc')
+  concept.run('dead', topic, 'warehouse', 'Old rule', '', 'old-doc')
+  const known = sqlite.prepare('INSERT INTO learner_concept (learner_id, concept_id, p_known, updated_at) VALUES (?, ?, ?, 1)')
+  for (const id of ['c1', 'c2', 'c3', 'c4', 'c5']) known.run('admin', id, 1)
+  known.run('admin', 'dead', 0) // would pull the mean to 83 if retired concepts counted
+  ;[1, 1, 0.5, 0.4, 0.2].forEach((p, i) => known.run('member', `c${i + 1}`, p)) // mean 0.62
+  const { members } = await getPeople({ data: { slug: 'alpha' } })
+  expect(members.map((m) => [m.name, m.training?.mastery, m.training?.benchmark])).toEqual([['owner', 0, 85], ['admin', 100, 85], ['member', 62, 85]])
 })
 
 it('rolls back the role when its draft topic cannot be stored', async () => {
