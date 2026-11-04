@@ -297,6 +297,23 @@ it('announces build progress politely in steps of five, and the end', async () =
   }
 })
 
+it('announces the end of one role while another is still preparing', async () => {
+  let ready = 14
+  const other = { ...building(4), id: 'r3', name: 'Baker', topicId: 't3', conceptsTotal: 30, preparing: true }
+  vi.mocked(getOrgOverview).mockImplementation(async () => overview({ roles: [{ ...building(ready), conceptsTotal: 20, preparing: ready < 20 }, other], training: noTraining }))
+  const { container, cleanup } = await renderAt('/org/x', overviewLeaf)
+  try {
+    const status = () => container.querySelector('p[role="status"]')!.textContent
+    for (const [next, said] of [[15, '15 of 20 concepts ready'], [20, '20 of 20 concepts ready.'], [20, '20 of 20 concepts ready.']] as const) {
+      ready = next
+      await act(async () => { await refresh() })
+      expect(status()).toBe(said)
+    }
+  } finally {
+    await cleanup()
+  }
+})
+
 it.each([
   ['a figures state', { roles: [role], nextStep: { unreviewed: 1, documentTitle: 'Doc', roleId: 'r1', topicId: 't1' } }],
   ['an empty state', { roles: [{ ...role, topicStatus: 'draft', documents: 0 }], training: noTraining }],
