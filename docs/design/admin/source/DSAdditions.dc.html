@@ -1,0 +1,992 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Admin design-system additions</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" style="position: relative; padding: 48px; display: flex; flex-direction: column; gap: 48px;">
+
+  <!-- ============ HEADER ============ -->
+  <header style="display: flex; align-items: center; gap: 16px;">
+    <svg viewBox="0 0 64 64" width="40" height="40" aria-hidden="true"><mask id="lqm-dsa" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="#fff"></rect><circle cx="48" cy="48" r="13"></circle></mask><circle cx="32" cy="32" r="19" fill="none" stroke="var(--brand)" stroke-width="14" mask="url(#lqm-dsa)"></circle><circle cx="48" cy="48" r="9" fill="#F2A900"></circle></svg>
+    <h1 class="t-title1" tabindex="-1">Admin design-system additions</h1>
+  </header>
+
+  <!-- ============ 1. STATUS COLORS ============ -->
+  <section class="section" aria-labelledby="dsa-s1">
+    <h2 id="dsa-s1" class="t-title2">Status colors</h2>
+    <div style="display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 48px; align-items: start;">
+      <article style="display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); min-width: 0;">
+        <h3 class="t-body-lg" style="font-weight: 600;">Decision</h3>
+        <p class="t-body-lg" style="font-weight: 600; max-width: 720px;">No new semantic error or warning color. Red, green and amber stay reserved for answer feedback and mastery.</p>
+        <div style="display: grid; grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.4fr) minmax(0, 1fr); gap: 24px; align-items: start;">
+          <figure style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="min-height: 56px; display: flex; align-items: center;">
+              <span class="chip chip-strong"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l5 5v8l-5 5H8l-5-5V8z"></path><path d="M12 8v5M12 16h.01"></path></svg>Training failed</span>
+            </div>
+            <figcaption class="t-caption muted">chip-strong · needs a person</figcaption>
+          </figure>
+          <figure style="display: flex; flex-direction: column; gap: 8px;">
+            <div class="banner banner-alert" role="alert">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5h.01"></path></svg>
+              <p class="banner-text"><strong>Couldn't build training.</strong> Retry, or replace Picking SOP v3.</p>
+            </div>
+            <figcaption class="t-caption muted">banner-alert · sunken ground, strong border, words first</figcaption>
+          </figure>
+          <figure style="display: flex; flex-direction: column; gap: 8px;">
+            <div class="field is-invalid">
+              <label class="field-label" for="dsa-bench1">Benchmark</label>
+              <span class="input-suffix"><input id="dsa-bench1" class="input num" type="text" value="120" aria-invalid="true" aria-describedby="dsa-bench1-err"><span>%</span></span>
+              <p id="dsa-bench1-err" class="field-error"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5h.01"></path></svg>Enter a number from 50 to 100.</p>
+            </div>
+            <figcaption class="t-caption muted">Field error · 2px ink border, icon, words</figcaption>
+          </figure>
+        </div>
+        <p class="t-caption muted">Tokens: surface-inverse, on-inverse, surface-sunken, border-strong, ink · A11y: words carry the state, icon repeats it; role="alert" for blocking errors; 2px ink border clears 3:1 in both themes.</p>
+      </article>
+      <article style="display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); min-width: 0;">
+        <h3 class="t-body-lg" style="font-weight: 600;">Proposed, not adopted: attention token</h3>
+        <p class="t-body">If usability testing shows failures are missed, propose a single "attention" token reviewed against answer feedback. Not used in these screens.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ============ 2. STATUS CHIP SET ============ -->
+  <section class="section" aria-labelledby="dsa-s2">
+    <h2 id="dsa-s2" class="t-title2">Status chip set</h2>
+    <div class="dt-wrap">
+      <table class="dt">
+        <caption class="sr-only">Status chips by emphasis level</caption>
+        <thead><tr><th scope="col" style="width: 160px;">Group</th><th scope="col" style="width: 280px;">Class · treatment</th><th scope="col">Statuses</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="cell-main">Not yet</td>
+            <td><span class="cell-code">.chip-dashed</span><div class="cell-sub">Dashed border-strong</div></td>
+            <td><div style="display: flex; flex-wrap: wrap; gap: 8px;">
+              <span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"></path></svg>Invited</span>
+              <span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Queued</span>
+              <span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span>
+              <span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-dasharray="2 3.2"></circle><path d="M12 8v4"></path><path d="M12 16h.01"></path></svg>Unreviewed</span>
+              <span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" stroke-dasharray="3 3"></path></svg>No documents yet</span>
+            </div></td>
+          </tr>
+          <tr>
+            <td class="cell-main">In motion</td>
+            <td><span class="cell-code">.chip-tint</span><div class="cell-sub">brand-tint ground, brand icon</div></td>
+            <td><div style="display: flex; flex-wrap: wrap; gap: 8px;">
+              <span class="chip chip-tint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12M6 21h12M7 3v3a5 5 0 0 0 10 0V3M7 21v-3a5 5 0 0 1 10 0v3"></path></svg>Uploading</span>
+              <span class="chip chip-tint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12M6 21h12M7 3v3a5 5 0 0 0 10 0V3M7 21v-3a5 5 0 0 1 10 0v3"></path></svg>Preparing training</span>
+              <span class="chip chip-tint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12M6 21h12M7 3v3a5 5 0 0 0 10 0V3M7 21v-3a5 5 0 0 1 10 0v3"></path></svg>Generating questions</span>
+              <span class="chip chip-tint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12M6 21h12M7 3v3a5 5 0 0 0 10 0V3M7 21v-3a5 5 0 0 1 10 0v3"></path></svg>Building curriculum</span>
+            </div></td>
+          </tr>
+          <tr>
+            <td class="cell-main">Settled</td>
+            <td><span class="cell-code">.chip</span><div class="cell-sub">1px border-strong, card ground</div></td>
+            <td><div style="display: flex; flex-wrap: wrap; gap: 8px;">
+              <span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active</span>
+              <span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>Ready</span>
+              <span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>Done</span>
+              <span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor"></circle><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"></path></svg>Live</span>
+              <span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>Approved</span>
+            </div></td>
+          </tr>
+          <tr>
+            <td class="cell-main">Needs a person</td>
+            <td><span class="cell-code">.chip-strong</span><div class="cell-sub">surface-inverse ground, on-inverse text</div></td>
+            <td><div style="display: flex; flex-wrap: wrap; gap: 8px;">
+              <span class="chip chip-strong"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l5 5v8l-5 5H8l-5-5V8z"></path><path d="M12 8v5M12 16h.01"></path></svg>Failed</span>
+              <span class="chip chip-strong"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l5 5v8l-5 5H8l-5-5V8z"></path><path d="M12 8v5M12 16h.01"></path></svg>Training failed</span>
+              <span class="chip chip-strong"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l5 5v8l-5 5H8l-5-5V8z"></path><path d="M12 8v5M12 16h.01"></path></svg>Extraction failed</span>
+              <span class="chip chip-strong"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>Flagged by learner</span>
+              <span class="chip chip-strong"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m5.6 5.6 12.8 12.8"></path></svg>Banned</span>
+            </div></td>
+          </tr>
+          <tr>
+            <td class="cell-main">Out of play</td>
+            <td><span class="cell-code">.chip-muted</span><div class="cell-sub">Sunken ground, ink-muted text</div></td>
+            <td><div style="display: flex; flex-wrap: wrap; gap: 8px;">
+              <span class="chip chip-muted"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"></rect><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"></path></svg>Retired</span>
+              <span class="chip chip-muted"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Expired</span>
+              <span class="chip chip-muted"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m5.6 5.6 12.8 12.8"></path></svg>Revoked</span>
+              <span class="chip chip-muted"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m5.6 5.6 12.8 12.8"></path></svg>Rejected</span>
+            </div></td>
+          </tr>
+          <tr>
+            <td class="cell-main">Mastery</td>
+            <td><span class="cell-code">.chip-mastered · .chip-learning · .chip-critical</span><div class="cell-sub">The only chips allowed feedback colors</div></td>
+            <td><div style="display: flex; flex-wrap: wrap; gap: 8px;">
+              <span class="chip chip-mastered"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Proficient</span>
+              <span class="chip chip-learning"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"></path></svg>Still learning</span>
+              <span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-dasharray="2 3.2"></circle></svg>Estimate</span>
+              <span class="chip chip-critical"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>Critical</span>
+            </div></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="t-label">Icon + word always. Never the feedback icons on operational chips.</p>
+    <p class="t-caption muted">Tokens: border-strong, brand-tint + brand, surface-inverse + on-inverse, surface-sunken + ink-muted, feedback-* (mastery only) · 28px, radius-full, 13/18 600 · A11y: the word is the state, icons aria-hidden; emphasis by shape and ground, never hue alone.</p>
+  </section>
+
+  <!-- ============ 3. SIDE NAVIGATION ============ -->
+  <section class="section" aria-labelledby="dsa-s3">
+    <h2 id="dsa-s3" class="t-title2">Side navigation</h2>
+    <div style="display: flex; gap: 48px; align-items: flex-start;">
+      <figure style="display: flex; flex-direction: column; gap: 8px;">
+        <nav class="sidenav" aria-label="Northwind Logistics portal (specimen)" style="position: static; height: 460px; width: 248px; border: 1px solid var(--border); border-radius: var(--radius-md);">
+          <div class="nav-org">
+            <svg class="org-logo" viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#5B2A6E"></rect><path d="M9 23V9l14 14V9" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            <span class="nav-org-name">Northwind Logistics</span>
+          </div>
+          <ul class="nav-list">
+            <li><a class="nav-item" href="Overview.dc.html"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"></path></svg>Overview</a></li>
+            <li><a class="nav-item" href="Roles.dc.html" style="background: var(--surface-page);"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"></path></svg>Roles</a></li>
+            <li><a class="nav-item" href="Questions.dc.html"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.7M12 17h.01"></path></svg>Questions</a></li>
+            <li><a class="nav-item" href="People.dc.html" aria-current="page"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"></path></svg>People</a></li>
+            <li><a class="nav-item" href="Settings.dc.html" style="outline: 2px solid var(--brand); outline-offset: 2px;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"></path><circle cx="16" cy="6" r="2"></circle><circle cx="10" cy="12" r="2"></circle><circle cx="18" cy="18" r="2"></circle></svg>Settings</a></li>
+          </ul>
+          <div class="nav-foot">
+            <div class="nav-user">
+              <span class="avatar" aria-hidden="true">DW</span>
+              <div style="display: flex; flex-direction: column; min-width: 0; flex: 1;">
+                <span class="t-label">Dana Whitaker</span>
+                <span class="t-caption muted">Owner</span>
+              </div>
+              <button class="icon-btn" type="button" aria-label="Sign out"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H4"></path></svg></button>
+            </div>
+            <div class="nav-poweredby">
+              <svg viewBox="0 0 64 64" width="20" height="20" aria-hidden="true"><mask id="lqm-dsa2" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="#fff"></rect><circle cx="48" cy="48" r="13"></circle></mask><circle cx="32" cy="32" r="19" fill="none" stroke="var(--brand)" stroke-width="14" mask="url(#lqm-dsa2)"></circle><circle cx="48" cy="48" r="9" fill="#F2A900"></circle></svg>
+              <span>Learn Quiz</span>
+            </div>
+          </div>
+        </nav>
+        <figcaption class="t-caption muted">≥1024 · 248px · Roles hover · People current · Settings focus</figcaption>
+      </figure>
+
+      <figure style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="width: 390px; border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; background: var(--surface-page);">
+          <header class="topbar" style="display: flex; align-items: center; gap: 12px; height: var(--topbar-h); padding: 0 8px 0 16px; background: var(--surface-card); border-bottom: 1px solid var(--border);">
+            <div class="nav-org" style="padding: 0; flex: 1; min-width: 0;">
+              <svg class="org-logo" viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#5B2A6E"></rect><path d="M9 23V9l14 14V9" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+              <span class="nav-org-name">Northwind Logistics</span>
+            </div>
+            <button class="icon-btn" type="button" aria-label="Close menu" aria-expanded="true" aria-controls="dsa-sheet"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+          </header>
+          <div id="dsa-sheet" class="menu" style="border-radius: 0 0 var(--radius-md) var(--radius-md); border: 0; border-bottom: 1px solid var(--border); padding: 8px 12px 12px; gap: 8px;">
+            <ul class="nav-list">
+              <li><a class="nav-item" href="Overview.dc.html"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"></path></svg>Overview</a></li>
+              <li><a class="nav-item" href="Roles.dc.html"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"></path></svg>Roles</a></li>
+              <li><a class="nav-item" href="Questions.dc.html"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.7M12 17h.01"></path></svg>Questions</a></li>
+              <li><a class="nav-item" href="People.dc.html" aria-current="page"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"></path></svg>People</a></li>
+              <li><a class="nav-item" href="Settings.dc.html"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"></path><circle cx="16" cy="6" r="2"></circle><circle cx="10" cy="12" r="2"></circle><circle cx="18" cy="18" r="2"></circle></svg>Settings</a></li>
+            </ul>
+            <div class="menu-sep"></div>
+            <div class="nav-user" style="padding: 0 4px 0 12px;">
+              <span class="avatar" aria-hidden="true">DW</span>
+              <div style="display: flex; flex-direction: column; min-width: 0; flex: 1;">
+                <span class="t-label">Dana Whitaker</span>
+                <span class="t-caption muted">Owner</span>
+              </div>
+              <button class="icon-btn" type="button" aria-label="Sign out"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H4"></path></svg></button>
+            </div>
+          </div>
+        </div>
+        <figcaption class="t-caption muted">Below 1024 · top bar 56px · menu open, same five items as a sheet</figcaption>
+      </figure>
+
+      <div style="display: flex; flex-direction: column; gap: 16px; min-width: 0; flex: 1;">
+        <figure style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="width: 248px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-card);">
+            <div class="nav-org">
+              <svg viewBox="0 0 64 64" width="32" height="32" aria-hidden="true"><mask id="lqm-dsa3" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="#fff"></rect><circle cx="48" cy="48" r="13"></circle></mask><circle cx="32" cy="32" r="19" fill="none" stroke="var(--brand)" stroke-width="14" mask="url(#lqm-dsa3)"></circle><circle cx="48" cy="48" r="9" fill="#F2A900"></circle></svg>
+              <div style="display: flex; flex-direction: column;">
+                <span class="nav-org-name">Learn Quiz</span>
+                <span class="t-caption muted">Staff admin</span>
+              </div>
+            </div>
+          </div>
+          <figcaption class="t-caption muted">Staff variant header · desktop only</figcaption>
+        </figure>
+        <p class="t-caption muted">Tokens: nav-w 248, topbar-h 56, target 44, surface-page (hover), brand-tint (current), brand (current icon, focus) · company logo only, portal stays petrol · A11y: nav aria-label with the company name; aria-current="page"; menu button aria-expanded + aria-controls; Esc closes the sheet and returns focus to the button.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 4. DATA TABLE ============ -->
+  <section class="section" aria-labelledby="dsa-s4">
+    <h2 id="dsa-s4" class="t-title2">Data table</h2>
+    <div style="display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 48px; align-items: start;">
+
+      <article style="display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); min-width: 0;">
+        <h3 class="t-body-lg" style="font-weight: 600;">Desktop</h3>
+        <div class="dt-toolbar">
+          <label class="input-icon grow">
+            <span class="sr-only">Search questions</span>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+            <input class="input" type="search" placeholder="Search questions">
+          </label>
+          <button class="filter-chip" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-dasharray="2 3.2"></circle><path d="M12 8v4"></path><path d="M12 16h.01"></path></svg>Unreviewed <span class="count">38</span></button>
+          <button class="filter-chip" type="button" aria-pressed="false" style="outline: 2px solid var(--brand); outline-offset: 2px;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>Flagged by learner <span class="count">2</span></button>
+          <button class="filter-chip" type="button" aria-pressed="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>Critical <span class="count">96</span></button>
+        </div>
+        <div class="dt-wrap">
+          <div class="bulkbar" role="region" aria-label="Bulk actions">
+            <p class="t-label num" role="status">1 selected</p>
+            <button class="btn btn-secondary" type="button">Approve questions</button>
+            <button class="btn btn-secondary" type="button">Retire questions</button>
+            <button class="btn btn-ghost" type="button" style="margin-left: auto;">Clear selection</button>
+          </div>
+          <table class="dt">
+            <caption class="sr-only">Critical questions, Warehouse picker, sorted by attempts, most first</caption>
+            <thead>
+              <tr>
+                <th scope="col" class="col-check"><label class="check"><input type="checkbox" aria-label="Select all 25 on this page"></label></th>
+                <th scope="col"><button class="th-sort" type="button">Question<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"></path></svg></button></th>
+                <th scope="col"><button class="th-sort" type="button">Unit<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"></path></svg></button></th>
+                <th scope="col">Status</th>
+                <th scope="col" class="r" aria-sort="descending"><button class="th-sort" type="button">Attempts<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 10 5 5 5-5"></path></svg></button></th>
+                <th scope="col" class="r"><button class="th-sort" type="button">First-try correct<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"></path></svg></button></th>
+                <th scope="col" class="col-actions"><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="col-check"><label class="check"><input type="checkbox" aria-label="Select: The scanner beeps twice. What do you do?"></label></td>
+                <td><a class="cell-main" href="Questions.dc.html">The scanner beeps twice. What do you do?</a></td>
+                <td>Scanning</td>
+                <td><span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor"></circle><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"></path></svg>Live</span></td>
+                <td class="r num">52</td>
+                <td class="r num">64%</td>
+                <td class="col-actions">
+                  <div class="menu-anchor" style="display: inline-block;">
+                    <button class="icon-btn" type="button" aria-haspopup="menu" aria-expanded="true" aria-controls="dsa-rowmenu" aria-label="More actions for: The scanner beeps twice. What do you do?" style="background: var(--surface-sunken);"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg></button>
+                    <div id="dsa-rowmenu" class="menu" role="menu" aria-label="Question actions" style="width: 232px;">
+                      <button class="menu-item" type="button" role="menuitem"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>Approve</button>
+                      <button class="menu-item" type="button" role="menuitem"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"></path><path d="m13.5 6.5 4 4"></path></svg>Edit question</button>
+                      <button class="menu-item" type="button" role="menuitem"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5M9 13h6M9 17h6"></path></svg>Open source document</button>
+                      <div class="menu-sep" role="separator"></div>
+                      <button class="menu-item" type="button" role="menuitem"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"></rect><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"></path></svg>Retire</button>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="col-check" style="background: var(--row-hover);"><label class="check"><input type="checkbox" aria-label="Select: Who lifts a 30 kg carton?"></label></td>
+                <td style="background: var(--row-hover);"><a class="cell-main" href="Questions.dc.html">Who lifts a 30 kg carton?</a></td>
+                <td style="background: var(--row-hover);">Safety</td>
+                <td style="background: var(--row-hover);"><span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor"></circle><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"></path></svg>Live</span></td>
+                <td class="r num" style="background: var(--row-hover);">44</td>
+                <td class="r num" style="background: var(--row-hover);">82%</td>
+                <td class="col-actions" style="background: var(--row-hover);"><button class="icon-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="More actions for: Who lifts a 30 kg carton?"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg></button></td>
+              </tr>
+              <tr>
+                <td class="col-check"><label class="check"><input type="checkbox" aria-label="Select: What do you check before taking an item from a slot?"></label></td>
+                <td><a class="cell-main" href="Questions.dc.html">What do you check before taking an item from a slot?</a></td>
+                <td>Picking</td>
+                <td><span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor"></circle><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"></path></svg>Live</span></td>
+                <td class="r num">38</td>
+                <td class="r num">71%</td>
+                <td class="col-actions"><button class="icon-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="More actions for: What do you check before taking an item from a slot?"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg></button></td>
+              </tr>
+              <tr aria-selected="true">
+                <td class="col-check"><label class="check"><input type="checkbox" checked aria-label="Select: A pallet arrives with a crushed corner. When do you report it?"></label></td>
+                <td><a class="cell-main" href="Questions-Flagged.dc.html">A pallet arrives with a crushed corner. When do you report it?</a></td>
+                <td>Receiving</td>
+                <td><span class="chip chip-strong"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>Flagged by learner</span></td>
+                <td class="r num">29</td>
+                <td class="r num">48%</td>
+                <td class="col-actions"><button class="icon-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="More actions for: A pallet arrives with a crushed corner. When do you report it?"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg></button></td>
+              </tr>
+              <tr>
+                <td class="col-check"><label class="check"><input type="checkbox" aria-label="Select: When can a return be refunded?"></label></td>
+                <td><a class="cell-main" href="Questions.dc.html">When can a return be refunded?</a></td>
+                <td>Returns</td>
+                <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-dasharray="2 3.2"></circle><path d="M12 8v4"></path><path d="M12 16h.01"></path></svg>Unreviewed</span></td>
+                <td class="r num">0</td>
+                <td class="r num"><span class="null" aria-hidden="true">—</span><span class="sr-only">No attempts yet</span></td>
+                <td class="col-actions"><button class="icon-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="More actions for: When can a return be refunded?"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg></button></td>
+              </tr>
+            </tbody>
+          </table>
+          <nav class="pager" aria-label="Pages">
+            <p class="t-caption muted num">1–25 of 96</p>
+            <div class="pager-btns">
+              <button class="btn btn-secondary" type="button" disabled><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg>Previous</button>
+              <button class="btn btn-secondary" type="button">Next<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button>
+            </div>
+          </nav>
+        </div>
+        <p class="t-caption muted">Filter chips off / focus / on (aria-pressed, count in the name) · Attempts sorted descending · row 2 hover · row 4 selected · More actions open on row 1 (.menu-anchor) · Tokens: row-hover, brand-tint, border-strong header rule, row 56 · A11y: caption + th scope; sort button in th, aria-sort on that column only; checkboxes name their row; "1 selected" role="status"; menu arrows move, Esc closes and returns focus.</p>
+      </article>
+
+      <article style="display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); min-width: 0;">
+        <h3 class="t-body-lg" style="font-weight: 600;">Below 640: stacked</h3>
+        <div class="dt-wrap" style="width: 360px;">
+          <table class="dt dt-stack" style="display: block;">
+            <caption class="sr-only">Critical questions, stacked</caption>
+            <thead style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">
+              <tr><th scope="col">Question</th><th scope="col">Actions</th><th scope="col">Unit</th><th scope="col">Status</th><th scope="col">Attempts</th><th scope="col">First-try correct</th></tr>
+            </thead>
+            <tbody style="display: block;">
+              <tr aria-selected="true" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 12px; align-items: start; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--brand-tint);">
+                <td class="stack-wide" style="display: block; padding: 0; border: 0; height: auto; grid-column: span 2;"><label class="check" style="align-items: flex-start; min-height: 0;"><input type="checkbox" checked aria-label="Select: A pallet arrives with a crushed corner. When do you report it?"><span class="t-label">A pallet arrives with a crushed corner. When do you report it?</span></label></td>
+                <td class="col-actions" style="display: block; padding: 0; border: 0; height: auto; width: auto; text-align: right;"><button class="icon-btn" type="button" aria-haspopup="menu" aria-label="More actions for: A pallet arrives with a crushed corner. When do you report it?" style="margin: -10px -8px 0 0;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg></button></td>
+                <td data-label="Unit" style="display: block; padding: 0; border: 0; height: auto;"><span class="t-caption muted" style="display: block;" aria-hidden="true">Unit</span>Receiving</td>
+                <td data-label="Status" class="stack-wide" style="display: block; padding: 0; border: 0; height: auto; grid-column: span 2;"><span class="t-caption muted" style="display: block;" aria-hidden="true">Status</span><span class="chip chip-strong"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>Flagged by learner</span></td>
+                <td data-label="Attempts" class="r num" style="display: block; padding: 0; border: 0; height: auto; text-align: left;"><span class="t-caption muted" style="display: block;" aria-hidden="true">Attempts</span>29</td>
+                <td data-label="First-try correct" class="r num stack-wide" style="display: block; padding: 0; border: 0; height: auto; text-align: left; grid-column: span 2;"><span class="t-caption muted" style="display: block;" aria-hidden="true">First-try correct</span>48%</td>
+              </tr>
+              <tr style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 12px; align-items: start; padding: 12px 16px;">
+                <td class="stack-wide" style="display: block; padding: 0; border: 0; height: auto; grid-column: span 2;"><label class="check" style="align-items: flex-start; min-height: 0;"><input type="checkbox" aria-label="Select: When can a return be refunded?"><span class="t-label">When can a return be refunded?</span></label></td>
+                <td class="col-actions" style="display: block; padding: 0; border: 0; height: auto; width: auto; text-align: right;"><button class="icon-btn" type="button" aria-haspopup="menu" aria-label="More actions for: When can a return be refunded?" style="margin: -10px -8px 0 0;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg></button></td>
+                <td data-label="Unit" style="display: block; padding: 0; border: 0; height: auto;"><span class="t-caption muted" style="display: block;" aria-hidden="true">Unit</span>Returns</td>
+                <td data-label="Status" class="stack-wide" style="display: block; padding: 0; border: 0; height: auto; grid-column: span 2;"><span class="t-caption muted" style="display: block;" aria-hidden="true">Status</span><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-dasharray="2 3.2"></circle><path d="M12 8v4"></path><path d="M12 16h.01"></path></svg>Unreviewed</span></td>
+                <td data-label="Attempts" class="r num" style="display: block; padding: 0; border: 0; height: auto; text-align: left;"><span class="t-caption muted" style="display: block;" aria-hidden="true">Attempts</span>0</td>
+                <td data-label="First-try correct" class="r num stack-wide" style="display: block; padding: 0; border: 0; height: auto; text-align: left; grid-column: span 2;"><span class="t-caption muted" style="display: block;" aria-hidden="true">First-try correct</span><span class="null">—</span></td>
+              </tr>
+            </tbody>
+          </table>
+          <nav class="pager" aria-label="Pages">
+            <p class="t-caption muted num">1–25 of 96</p>
+            <div class="pager-btns">
+              <button class="icon-btn" type="button" disabled aria-label="Previous page"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button>
+              <button class="icon-btn" type="button" aria-label="Next page"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button>
+            </div>
+          </nav>
+        </div>
+        <p class="t-caption muted">Real table.dt.dt-stack; the &lt;640 rules are copied inline because the media query can't fire at 1440 (labels drawn as spans where data-label::before would be) · A11y: thead visually hidden, not removed; row actions stay visible.</p>
+      </article>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 48px; align-items: start;">
+      <article style="display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); min-width: 0;">
+        <h3 class="t-body-lg" style="font-weight: 600;">Sticky header</h3>
+        <div class="dt-wrap" style="height: 220px; overflow-y: auto;" tabindex="0" role="region" aria-label="Critical concepts, scrollable">
+          <table class="dt">
+            <caption class="sr-only">Critical concepts, Warehouse picker</caption>
+            <thead><tr><th scope="col">Critical concept</th><th scope="col">Unit</th></tr></thead>
+            <tbody>
+              <tr><td>Report damaged pallets before put-away</td><td>Receiving</td></tr>
+              <tr><td>Confirm the location label before picking</td><td>Picking</td></tr>
+              <tr><td>Double beep: put the item back and re-scan</td><td>Scanning</td></tr>
+              <tr><td>Keep pedestrian lanes clear</td><td>Safety</td></tr>
+              <tr><td>Two-person lift above 23 kg</td><td>Safety</td></tr>
+              <tr><td>Refund only after inspection</td><td>Returns</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="t-caption muted">Scroll the box: th stays put (position: sticky). In the app it sticks under the read-only band (48px) and the top bar (56px) · A11y: scroll region is focusable and labelled.</p>
+      </article>
+
+      <article style="display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); min-width: 0;">
+        <h3 class="t-body-lg" style="font-weight: 600;">Loading</h3>
+        <div class="dt-wrap">
+          <p role="status" class="sr-only">Loading questions</p>
+          <table class="dt" aria-hidden="true" style="table-layout: fixed;">
+            <thead><tr><th scope="col">Question</th><th scope="col" style="width: 112px;">Status</th><th scope="col" class="r" style="width: 96px;">Attempts</th></tr></thead>
+            <tbody>
+              <tr><td><span class="skel-line" style="width: 85%;"></span></td><td><span class="skel" style="width: 64px; height: 28px; border-radius: 14px;"></span></td><td class="r"><span class="skel-line" style="width: 28px; margin-left: auto;"></span></td></tr>
+              <tr><td><span class="skel-line" style="width: 65%;"></span></td><td><span class="skel" style="width: 80px; height: 28px; border-radius: 14px;"></span></td><td class="r"><span class="skel-line" style="width: 20px; margin-left: auto;"></span></td></tr>
+              <tr><td><span class="skel-line" style="width: 75%;"></span></td><td><span class="skel" style="width: 56px; height: 28px; border-radius: 14px;"></span></td><td class="r"><span class="skel-line" style="width: 28px; margin-left: auto;"></span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="t-caption muted">Skeleton rows in table shape under the real header · .skel-line · no spinner · A11y: skeleton aria-hidden, "Loading questions" in role="status".</p>
+      </article>
+
+      <article style="display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); min-width: 0;">
+        <h3 class="t-body-lg" style="font-weight: 600;">No results for these filters</h3>
+        <div class="dt-wrap">
+          <table class="dt" style="table-layout: fixed;">
+            <caption class="sr-only">Questions, filtered</caption>
+            <thead><tr><th scope="col">Question</th><th scope="col" style="width: 112px;">Status</th><th scope="col" class="r" style="width: 96px;">Attempts</th></tr></thead>
+          </table>
+          <div role="status" style="padding: 24px; display: flex; flex-direction: column; gap: 16px; align-items: flex-start;">
+            <p class="t-body">No questions are both Unreviewed and Flagged by learner.</p>
+            <button class="btn btn-secondary" type="button">Clear filters</button>
+          </div>
+        </div>
+        <p class="t-caption muted">Names the filters, one way out · not the first-run empty state · A11y: Clear filters returns focus to the search field.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ============ 5. FILE UPLOAD ============ -->
+  <section class="section" aria-labelledby="dsa-s5">
+    <h2 id="dsa-s5" class="t-title2">File upload</h2>
+    <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: start;">
+      <div style="display: flex; flex-direction: column; gap: 48px; min-width: 0;">
+        <article style="display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); min-width: 0;">
+          <h3 class="t-body-lg" style="font-weight: 600;">Dropzone</h3>
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start;">
+          <figure style="display: flex; flex-direction: column; gap: 8px;">
+            <div class="dropzone">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--ink-muted);"><path d="M12 15V4M7 9l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"></path></svg>
+              <div class="dz-text">
+                <p class="t-label">Drop a PDF here</p>
+                <p class="t-caption muted">Selectable text · up to 10 MB</p>
+              </div>
+              <button class="btn btn-secondary" type="button">Choose file</button>
+            </div>
+            <figcaption class="t-caption muted">Idle</figcaption>
+          </figure>
+          <figure style="display: flex; flex-direction: column; gap: 8px;">
+            <div class="dropzone is-over">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--brand);"><path d="M12 15V4M7 9l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"></path></svg>
+              <div class="dz-text">
+                <p class="t-label">Release to upload</p>
+                <p class="t-caption muted">Selectable text · up to 10 MB</p>
+              </div>
+              <button class="btn btn-secondary" type="button">Choose file</button>
+            </div>
+            <figcaption class="t-caption muted">Drag-over · .is-over</figcaption>
+          </figure>
+          </div>
+          <p class="t-caption muted">Tokens: 2px dashed border-strong on surface-page; brand + brand-tint when over or focus-within · A11y: drag is optional, "Choose file" is a real button; the zone is not a focus stop.</p>
+        </article>
+
+        <article style="display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); min-width: 0;">
+          <h3 class="t-body-lg" style="font-weight: 600;">Pasted text</h3>
+          <div class="card card-body">
+            <div class="field">
+              <label class="field-label" for="dsa-ptitle">Title</label>
+              <input id="dsa-ptitle" class="input" type="text" value="Returns procedure">
+            </div>
+            <div class="field">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px;">
+                <label class="field-label" for="dsa-ptext">Text</label>
+                <span id="dsa-pcount" class="field-meta num">6,240 / 60,000</span>
+              </div>
+              <textarea id="dsa-ptext" class="textarea" rows="3" aria-describedby="dsa-pcount">Returns arrive at dock 4. Scan the return label before you open the carton. Inspect every item against the order. Refund only after inspection is complete and logged.</textarea>
+            </div>
+            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+              <button class="btn btn-primary" type="button">Add text</button>
+              <button class="btn btn-ghost" type="button">Cancel</button>
+            </div>
+          </div>
+          <p class="t-caption muted">Counter tabular, limit 60,000 · A11y: counter in aria-describedby, announced politely at 90% and at the limit; over the limit becomes a field error.</p>
+        </article>
+      </div>
+
+      <article style="display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); min-width: 0;">
+        <h3 class="t-body-lg" style="font-weight: 600;">File rows</h3>
+        <figure style="display: flex; flex-direction: column; gap: 8px;">
+          <div class="card">
+            <div class="file-row">
+              <span class="file-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5M9 13h6M9 17h6"></path></svg></span>
+              <div class="file-main">
+                <p class="file-title">Picking SOP v3.pdf <span class="chip chip-tint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12M6 21h12M7 3v3a5 5 0 0 0 10 0V3M7 21v-3a5 5 0 0 1 10 0v3"></path></svg>Uploading</span></p>
+                <div class="meter" role="progressbar" aria-label="Uploading Picking SOP v3.pdf" aria-valuemin="0" aria-valuemax="100" aria-valuenow="46" aria-valuetext="1.1 of 2.4 MB"><i style="width: 46%;"></i></div>
+                <p class="file-meta num">1.1 of 2.4 MB</p>
+              </div>
+              <div class="file-actions"><button class="btn btn-ghost" type="button">Cancel upload</button></div>
+            </div>
+          </div>
+          <figcaption class="t-caption muted">Uploading · meter + bytes</figcaption>
+        </figure>
+        <figure style="display: flex; flex-direction: column; gap: 8px;">
+          <div class="banner banner-alert" role="alert">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5h.01"></path></svg>
+            <p class="banner-text"><strong>Couldn't add Forklift manual.pdf (14.2 MB).</strong> Larger than 10 MB. Split it or export a smaller PDF.</p>
+            <button class="icon-btn" type="button" aria-label="Dismiss"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+          </div>
+          <figcaption class="t-caption muted">Rejected before upload · banner-alert</figcaption>
+        </figure>
+        <figure style="display: flex; flex-direction: column; gap: 8px;">
+          <div class="card" style="overflow: hidden;">
+            <div class="file-row is-problem">
+              <span class="file-ico" style="background: var(--surface-card);"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5M9 13h6M9 17h6"></path></svg></span>
+              <div class="file-main">
+                <p class="file-title">Receiving checklist.pdf <span class="chip chip-strong"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l5 5v8l-5 5H8l-5-5V8z"></path><path d="M12 8v5M12 16h.01"></path></svg>Extraction failed</span></p>
+                <p class="t-body">No selectable text found. This looks like a scan. Upload a PDF with text, or paste the text.</p>
+              </div>
+              <div class="file-actions">
+                <button class="btn btn-secondary" type="button">Paste text</button>
+                <button class="btn btn-ghost" type="button">Remove</button>
+              </div>
+            </div>
+          </div>
+          <figcaption class="t-caption muted">Extraction failed · is-problem + chip-strong + what to do</figcaption>
+        </figure>
+        <figure style="display: flex; flex-direction: column; gap: 8px;">
+          <div class="card">
+            <div class="file-row">
+              <span class="file-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5M9 13h6M9 17h6"></path></svg></span>
+              <div class="file-main">
+                <p class="file-title">Picking SOP v3 <span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>Ready</span></p>
+                <p class="file-meta num">PDF · 2.4 MB · 18 pages · Version 3 · Oct 28, 2026 · Dana Whitaker</p>
+              </div>
+              <div class="file-actions">
+                <button class="btn btn-ghost" type="button">Replace</button>
+                <button class="icon-btn" type="button" aria-haspopup="menu" aria-label="More actions for Picking SOP v3"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg></button>
+              </div>
+            </div>
+            <div class="file-row">
+              <span class="file-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 10h16M4 14h10M4 18h7"></path></svg></span>
+              <div class="file-main">
+                <p class="file-title">Returns procedure <span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>Ready</span></p>
+                <p class="file-meta num">Pasted text · 6,240 characters · Version 1 · Nov 2, 2026 · Dana Whitaker</p>
+              </div>
+              <div class="file-actions">
+                <button class="btn btn-ghost" type="button">Replace</button>
+                <button class="icon-btn" type="button" aria-haspopup="menu" aria-label="More actions for Returns procedure"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg></button>
+              </div>
+            </div>
+          </div>
+          <figcaption class="t-caption muted">Done · title, type, size, version, date, uploader</figcaption>
+        </figure>
+        <p class="t-caption muted">Tokens: meter 4px brand on surface-sunken; is-problem = surface-sunken row · A11y: role="progressbar" with aria-valuetext in MB, progress in role="status" every 25%; rejected and failed messages are role="alert" and say what to do.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ============ 6. STAT FIGURE ============ -->
+  <section class="section" aria-labelledby="dsa-s6">
+    <h2 id="dsa-s6" class="t-title2">Stat figure</h2>
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <div class="stats card" style="grid-template-columns: repeat(5, minmax(0, 1fr));">
+        <div class="stat"><span class="stat-label">Employees</span><span class="stat-value">3</span></div>
+        <div class="stat"><span class="stat-label">Avg. days to proficiency</span><span class="stat-value">21<span class="stat-unit">days</span></span></div>
+        <div class="stat"><span class="stat-label">Avg. days to proficiency</span><span><span class="stat-empty" aria-hidden="true">—</span><span class="sr-only">No data yet.</span><span class="t-caption muted" style="display: block;">No one has reached the benchmark yet</span></span></div>
+        <div class="stat" aria-hidden="true"><span class="skel-line" style="width: 120px; margin: 4px 0;"></span><span class="skel" style="width: 48px; height: 28px; margin: 6px 0;"></span></div>
+        <a class="stat" href="Person.dc.html" style="background: var(--surface-page);"><span class="stat-label" style="color: var(--ink); text-decoration: underline;">Critical-step errors this week</span><span class="stat-value">1</span></a>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));">
+        <p class="t-caption muted" style="padding: 0 24px;">Normal</p>
+        <p class="t-caption muted" style="padding: 0 24px;">With unit</p>
+        <p class="t-caption muted" style="padding: 0 24px;">No data yet · never a fake 0</p>
+        <p class="t-caption muted" style="padding: 0 24px;">Loading</p>
+        <p class="t-caption muted" style="padding: 0 24px;">As a link · hover</p>
+      </div>
+    </div>
+    <p class="t-caption muted">Tokens: stat-value 32/40 700 tabular, label 14/20 ink-muted, unit 15/22, 1px dividers, surface-page hover; the label names the thing and its window · A11y: label before value; "—" carries sr text "No data yet"; skeleton aria-hidden.</p>
+  </section>
+
+  <!-- ============ 7. CHARTS ============ -->
+  <section class="section" aria-labelledby="dsa-s7">
+    <h2 id="dsa-s7" class="t-title2">Charts</h2>
+    <p class="t-label">2px strokes · dash 6/4 second series · 4/4 benchmark · brand, ink, ink-muted only · never saffron or feedback colors</p>
+    <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: start;">
+
+      <article style="display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); min-width: 0;">
+        <h3 class="t-body-lg" style="font-weight: 600;">Line chart</h3>
+        <div class="card card-pad" style="display: flex; flex-direction: column; gap: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap;">
+            <p class="t-label">Weekly mastery · Jordan Reyes</p>
+            <div class="legend">
+              <span><i class="key-line"></i>Mastery</span>
+              <span><i class="key-proj"></i>Projected</span>
+              <span><i class="key-bench"></i>Benchmark 85%</span>
+            </div>
+          </div>
+          <svg class="chart" viewBox="0 0 600 260" role="img" aria-label="Jordan Reyes's mastery rose from 18% in the week of Oct 26 to 42% in the week of Nov 2, and is projected to reach the 85% benchmark on Nov 20.">
+            <line class="grid" x1="56" y1="216" x2="592" y2="216"></line>
+            <line class="grid" x1="56" y1="126" x2="592" y2="126"></line>
+            <line class="grid" x1="56" y1="36" x2="592" y2="36"></line>
+            <text class="axis-label" x="48" y="220" text-anchor="end">0%</text>
+            <text class="axis-label" x="48" y="130" text-anchor="end">50%</text>
+            <text class="axis-label" x="48" y="40" text-anchor="end">100%</text>
+            <line class="bench" x1="56" y1="63" x2="592" y2="63"></line>
+            <text class="value-label" x="48" y="67" text-anchor="end">85%</text>
+            <path class="s1" d="M88 183.6 L222.4 140.4"></path>
+            <path class="proj" d="M222.4 140.4 L568 63"></path>
+            <circle class="dot" cx="88" cy="183.6" r="4"></circle>
+            <circle class="dot" cx="222.4" cy="140.4" r="4"></circle>
+            <circle class="dot-open" cx="568" cy="63" r="5"></circle>
+            <text class="value-label" x="88" y="171" text-anchor="middle">18%</text>
+            <text class="value-label" x="222.4" y="128" text-anchor="middle">42%</text>
+            <text class="value-label" x="568" y="50" text-anchor="middle">Nov 20</text>
+            <text class="axis-label" x="88" y="240" text-anchor="middle">Oct 26</text>
+            <text class="axis-label" x="222.4" y="240" text-anchor="middle">Nov 2</text>
+            <text class="axis-label" x="356.8" y="240" text-anchor="middle">Nov 9</text>
+            <text class="axis-label" x="491.2" y="240" text-anchor="middle">Nov 16</text>
+            <text class="axis-label" x="568" y="240" text-anchor="middle">Nov 20</text>
+          </svg>
+          <table class="sr-only">
+            <caption>Weekly mastery, Jordan Reyes, benchmark 85%</caption>
+            <thead><tr><th scope="col">Week of</th><th scope="col">Mastery</th></tr></thead>
+            <tbody>
+              <tr><td>Oct 26</td><td>18%</td></tr>
+              <tr><td>Nov 2 (so far)</td><td>42%</td></tr>
+              <tr><td>Nov 20 (projected)</td><td>85%</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="t-caption muted">Tokens: s1 brand 2px, proj brand 6/6, bench ink 2px 4/4, grid border, dot brand, dot-open card + brand · A11y: role="img" one-sentence summary + sr-only table; series by dash, legend and direct labels.</p>
+      </article>
+
+      <article style="display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); min-width: 0;">
+        <h3 class="t-body-lg" style="font-weight: 600;">Bar chart</h3>
+        <div class="card card-pad" style="display: flex; flex-direction: column; gap: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap;">
+            <p class="t-label">Model calls by day · Oct 21 – Nov 3</p>
+            <div class="legend"><span><i class="key-box"></i>Calls</span><span><i class="key-box" style="background: transparent; border: 2px solid var(--brand);"></i>Today, so far</span></div>
+          </div>
+          <svg class="chart" viewBox="0 0 600 260" role="img" aria-label="Model calls by day, Oct 21 to Nov 3: 8,717 in total. Weekdays 675 to 898, weekends 368 to 436. Peak 898 on Oct 29. Nov 3 so far: 342.">
+            <line class="grid" x1="56" y1="216" x2="592" y2="216"></line>
+            <line class="grid" x1="56" y1="171" x2="592" y2="171"></line>
+            <line class="grid" x1="56" y1="126" x2="592" y2="126"></line>
+            <line class="grid" x1="56" y1="81" x2="592" y2="81"></line>
+            <line class="grid" x1="56" y1="36" x2="592" y2="36"></line>
+            <text class="axis-label" x="48" y="220" text-anchor="end">0</text>
+            <text class="axis-label" x="48" y="175" text-anchor="end">250</text>
+            <text class="axis-label" x="48" y="130" text-anchor="end">500</text>
+            <text class="axis-label" x="48" y="85" text-anchor="end">750</text>
+            <text class="axis-label" x="48" y="40" text-anchor="end">1,000</text>
+            <rect class="s1-fill" x="64.1" y="83.2" width="22" height="132.8" rx="2"></rect><text class="axis-label" x="75.1" y="236" text-anchor="middle">21</text>
+            <rect class="s1-fill" x="102.4" y="86.2" width="22" height="129.8" rx="2"></rect><text class="axis-label" x="113.4" y="236" text-anchor="middle">22</text>
+            <rect class="s1-fill" x="140.7" y="94.5" width="22" height="121.5" rx="2"></rect><text class="axis-label" x="151.7" y="236" text-anchor="middle">23</text>
+            <rect class="s1-fill" x="179.0" y="141.3" width="22" height="74.7" rx="2"></rect><text class="axis-label" x="190.0" y="236" text-anchor="middle">24</text>
+            <rect class="s1-fill" x="217.3" y="149.2" width="22" height="66.8" rx="2"></rect><text class="axis-label" x="228.3" y="236" text-anchor="middle">25</text>
+            <rect class="s1-fill" x="255.6" y="87.5" width="22" height="128.5" rx="2"></rect><text class="axis-label" x="266.6" y="236" text-anchor="middle">26</text>
+            <rect class="s1-fill" x="293.9" y="84.2" width="22" height="131.8" rx="2"></rect><text class="axis-label" x="304.9" y="236" text-anchor="middle">27</text>
+            <rect class="s1-fill" x="332.1" y="81.2" width="22" height="134.8" rx="2"></rect><text class="axis-label" x="343.1" y="236" text-anchor="middle">28</text>
+            <rect class="s1-fill" x="370.4" y="54.4" width="22" height="161.6" rx="2"></rect><text class="axis-label" x="381.4" y="236" text-anchor="middle">29</text>
+            <rect class="s1-fill" x="408.7" y="72.4" width="22" height="143.6" rx="2"></rect><text class="axis-label" x="419.7" y="236" text-anchor="middle">30</text>
+            <rect class="s1-fill" x="447.0" y="137.5" width="22" height="78.5" rx="2"></rect><text class="axis-label" x="458.0" y="236" text-anchor="middle">31</text>
+            <rect class="s1-fill" x="485.3" y="149.8" width="22" height="66.2" rx="2"></rect><text class="axis-label" x="496.3" y="236" text-anchor="middle">1</text>
+            <rect class="s1-fill" x="523.6" y="79.2" width="22" height="136.8" rx="2"></rect><text class="axis-label" x="534.6" y="236" text-anchor="middle">2</text>
+            <rect class="dot-open" x="562.9" y="155.4" width="20" height="59.6" rx="2"></rect><text class="axis-label" x="572.9" y="236" text-anchor="middle">3</text>
+            <text class="value-label" x="381.4" y="46" text-anchor="middle">898</text>
+            <text class="value-label" x="572.9" y="146" text-anchor="middle">342</text>
+            <text class="axis-label" x="75.1" y="254" text-anchor="middle">Oct</text>
+            <text class="axis-label" x="496.3" y="254" text-anchor="middle">Nov</text>
+            <text class="axis-label" x="572.9" y="254" text-anchor="middle">Today</text>
+          </svg>
+          <table class="sr-only">
+            <caption>Model calls by day, Oct 21 to Nov 3, 2026</caption>
+            <thead><tr><th scope="col">Day</th><th scope="col">Calls</th></tr></thead>
+            <tbody>
+              <tr><td>Oct 21</td><td>738</td></tr><tr><td>Oct 22</td><td>721</td></tr><tr><td>Oct 23</td><td>675</td></tr><tr><td>Oct 24</td><td>415</td></tr><tr><td>Oct 25</td><td>371</td></tr><tr><td>Oct 26</td><td>714</td></tr><tr><td>Oct 27</td><td>732</td></tr><tr><td>Oct 28</td><td>749</td></tr><tr><td>Oct 29</td><td>898</td></tr><tr><td>Oct 30</td><td>798</td></tr><tr><td>Oct 31</td><td>436</td></tr><tr><td>Nov 1</td><td>368</td></tr><tr><td>Nov 2</td><td>760</td></tr><tr><td>Nov 3 (today, so far)</td><td>342</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="t-caption muted">Tokens: s1-fill brand, radius 2; today's partial day outlined (card fill, 2px brand); direct labels on the peak and today only · A11y: summary states total, range and peak; sr-only table lists all 14 days, today marked "so far".</p>
+      </article>
+
+      <article style="display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); min-width: 0;">
+        <h3 class="t-body-lg" style="font-weight: 600;">Horizontal bar list</h3>
+        <div class="card card-pad" style="display: flex; flex-direction: column; gap: 12px;">
+          <p class="t-label">Model calls by job · Oct 21 – Nov 3</p>
+          <div role="img" aria-label="Model calls by job: grading 4,412, questions 2,508, explanations 1,561, curriculum 236." style="display: flex; flex-direction: column; gap: 4px;">
+            <div class="hbar" aria-hidden="true"><span>Grading</span><span class="hbar-track"><i style="width: 100%;"></i></span><span class="hbar-val">4,412</span></div>
+            <div class="hbar" aria-hidden="true"><span>Questions</span><span class="hbar-track"><i style="width: 56.8%;"></i></span><span class="hbar-val">2,508</span></div>
+            <div class="hbar" aria-hidden="true"><span>Explanations</span><span class="hbar-track"><i style="width: 35.4%;"></i></span><span class="hbar-val">1,561</span></div>
+            <div class="hbar" aria-hidden="true"><span>Curriculum</span><span class="hbar-track"><i style="width: 5.3%;"></i></span><span class="hbar-val">236</span></div>
+          </div>
+          <table class="sr-only">
+            <caption>Model calls by job, Oct 21 to Nov 3, 2026</caption>
+            <thead><tr><th scope="col">Job</th><th scope="col">Calls</th></tr></thead>
+            <tbody><tr><td>Grading</td><td>4,412</td></tr><tr><td>Questions</td><td>2,508</td></tr><tr><td>Explanations</td><td>1,561</td></tr><tr><td>Curriculum</td><td>236</td></tr></tbody>
+          </table>
+        </div>
+        <p class="t-caption muted">Tokens: hbar-track 12px surface-sunken, fill brand, .hbar-val 600 tabular right-aligned; sorted by value · A11y: role="img" with the full list in its label, plus the sr-only table.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ============ 8. DATE RANGE FILTER ============ -->
+  <section class="section" aria-labelledby="dsa-s8">
+    <h2 id="dsa-s8" class="t-title2">Date range filter</h2>
+    <div style="display: grid; grid-template-columns: minmax(0, 1fr) 720px; gap: 48px; align-items: start;">
+      <div style="display: flex; flex-direction: column; gap: 24px; min-width: 0;">
+        <figure style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+            <div class="seg" role="group" aria-label="Date range">
+              <button class="seg-btn" type="button" aria-pressed="false">7 days</button>
+              <button class="seg-btn" type="button" aria-pressed="true">30 days</button>
+              <button class="seg-btn" type="button" aria-pressed="false">90 days</button>
+            </div>
+            <button class="btn btn-secondary num" type="button" aria-haspopup="dialog" aria-expanded="false"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>Oct 5 – Nov 3, 2026</button>
+          </div>
+          <figcaption class="t-caption muted">Closed · presets + custom range · one range drives every chart on the page</figcaption>
+        </figure>
+        <p class="t-caption muted">Tokens: popover = .menu ground + shadow-raised; range brand-tint; ends brand + on-brand; days after today ink-muted, no box · A11y: trigger aria-haspopup="dialog" + aria-expanded; each month is a role="grid" with one tab stop (roving tabindex), arrows move by day, Page Up/Down by month; each day names its full date; Apply commits, Esc cancels, focus returns to the trigger.</p>
+      </div>
+
+      <figure style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start;">
+          <button class="btn btn-secondary num" type="button" aria-haspopup="dialog" aria-expanded="true" aria-controls="dsa-cal"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>Oct 5 – Nov 3, 2026</button>
+          <div id="dsa-cal" class="menu" role="dialog" aria-label="Choose dates" style="padding: 16px; gap: 12px; width: 100%;">
+            <!-- Each month is a role="grid". Roving tabindex: only the focused day has tabindex="0" (the range start on open); every other day is tabindex="-1". Arrow keys move by day, Home/End by week, Page Up/Down by month. -->
+            <div style="display: flex; gap: 32px;">
+              <div style="display: flex; flex-direction: column; gap: 4px;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                  <button class="icon-btn" type="button" aria-label="Previous month"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button>
+                  <p class="t-label" id="dsa-cal-oct">October 2026</p>
+                  <span style="width: 44px;"></span>
+                </div>
+<table role="grid" aria-labelledby="dsa-cal-oct" class="num" style="border-collapse: separate; border-spacing: 0 2px;">
+<thead><tr><th scope="col" abbr="Sunday" class="t-caption muted" style="width: 44px; height: 24px; font-weight: 500;">Su</th><th scope="col" abbr="Monday" class="t-caption muted" style="width: 44px; height: 24px; font-weight: 500;">Mo</th><th scope="col" abbr="Tuesday" class="t-caption muted" style="width: 44px; height: 24px; font-weight: 500;">Tu</th><th scope="col" abbr="Wednesday" class="t-caption muted" style="width: 44px; height: 24px; font-weight: 500;">We</th><th scope="col" abbr="Thursday" class="t-caption muted" style="width: 44px; height: 24px; font-weight: 500;">Th</th><th scope="col" abbr="Friday" class="t-caption muted" style="width: 44px; height: 24px; font-weight: 500;">Fr</th><th scope="col" abbr="Saturday" class="t-caption muted" style="width: 44px; height: 24px; font-weight: 500;">Sa</th></tr></thead>
+<tbody>
+<tr><td></td><td></td><td></td><td></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 1, 2026">1</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 2, 2026">2</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 3, 2026">3</button></td></tr>
+<tr><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 4, 2026">4</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="0" aria-pressed="true" aria-label="October 5, 2026, start" style="background: var(--brand); color: var(--on-brand); font-weight: 600;">5</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 6, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">6</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 7, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">7</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 8, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">8</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 9, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">9</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 10, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">10</button></td></tr>
+<tr><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 11, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">11</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 12, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">12</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 13, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">13</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 14, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">14</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 15, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">15</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 16, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">16</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 17, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">17</button></td></tr>
+<tr><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 18, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">18</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 19, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">19</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 20, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">20</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 21, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">21</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 22, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">22</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 23, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">23</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 24, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">24</button></td></tr>
+<tr><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 25, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">25</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 26, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">26</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 27, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">27</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 28, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">28</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 29, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">29</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 30, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">30</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="October 31, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">31</button></td></tr>
+</tbody></table>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 4px;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                  <span style="width: 44px;"></span>
+                  <p class="t-label" id="dsa-cal-nov">November 2026</p>
+                  <button class="icon-btn" type="button" disabled aria-label="Next month"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button>
+                </div>
+<table role="grid" aria-labelledby="dsa-cal-nov" class="num" style="border-collapse: separate; border-spacing: 0 2px;">
+<thead><tr><th scope="col" abbr="Sunday" class="t-caption muted" style="width: 44px; height: 24px; font-weight: 500;">Su</th><th scope="col" abbr="Monday" class="t-caption muted" style="width: 44px; height: 24px; font-weight: 500;">Mo</th><th scope="col" abbr="Tuesday" class="t-caption muted" style="width: 44px; height: 24px; font-weight: 500;">Tu</th><th scope="col" abbr="Wednesday" class="t-caption muted" style="width: 44px; height: 24px; font-weight: 500;">We</th><th scope="col" abbr="Thursday" class="t-caption muted" style="width: 44px; height: 24px; font-weight: 500;">Th</th><th scope="col" abbr="Friday" class="t-caption muted" style="width: 44px; height: 24px; font-weight: 500;">Fr</th><th scope="col" abbr="Saturday" class="t-caption muted" style="width: 44px; height: 24px; font-weight: 500;">Sa</th></tr></thead>
+<tbody>
+<tr><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="November 1, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">1</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-label="November 2, 2026, in range" style="background: var(--brand-tint); border-radius: 0;">2</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" aria-pressed="true" aria-label="November 3, 2026, end, today" style="background: var(--brand); color: var(--on-brand); font-weight: 600;">3</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 4, 2026, unavailable" style="color: var(--ink-muted);">4</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 5, 2026, unavailable" style="color: var(--ink-muted);">5</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 6, 2026, unavailable" style="color: var(--ink-muted);">6</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 7, 2026, unavailable" style="color: var(--ink-muted);">7</button></td></tr>
+<tr><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 8, 2026, unavailable" style="color: var(--ink-muted);">8</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 9, 2026, unavailable" style="color: var(--ink-muted);">9</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 10, 2026, unavailable" style="color: var(--ink-muted);">10</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 11, 2026, unavailable" style="color: var(--ink-muted);">11</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 12, 2026, unavailable" style="color: var(--ink-muted);">12</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 13, 2026, unavailable" style="color: var(--ink-muted);">13</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 14, 2026, unavailable" style="color: var(--ink-muted);">14</button></td></tr>
+<tr><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 15, 2026, unavailable" style="color: var(--ink-muted);">15</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 16, 2026, unavailable" style="color: var(--ink-muted);">16</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 17, 2026, unavailable" style="color: var(--ink-muted);">17</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 18, 2026, unavailable" style="color: var(--ink-muted);">18</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 19, 2026, unavailable" style="color: var(--ink-muted);">19</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 20, 2026, unavailable" style="color: var(--ink-muted);">20</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 21, 2026, unavailable" style="color: var(--ink-muted);">21</button></td></tr>
+<tr><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 22, 2026, unavailable" style="color: var(--ink-muted);">22</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 23, 2026, unavailable" style="color: var(--ink-muted);">23</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 24, 2026, unavailable" style="color: var(--ink-muted);">24</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 25, 2026, unavailable" style="color: var(--ink-muted);">25</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 26, 2026, unavailable" style="color: var(--ink-muted);">26</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 27, 2026, unavailable" style="color: var(--ink-muted);">27</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 28, 2026, unavailable" style="color: var(--ink-muted);">28</button></td></tr>
+<tr><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 29, 2026, unavailable" style="color: var(--ink-muted);">29</button></td><td role="gridcell" style="padding: 0;"><button class="icon-btn" type="button" tabindex="-1" disabled aria-label="November 30, 2026, unavailable" style="color: var(--ink-muted);">30</button></td><td></td><td></td><td></td><td></td><td></td></tr>
+</tbody></table>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
+              <p class="t-label num" role="status">Oct 5 – Nov 3 · 30 days</p>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-ghost" type="button">Cancel</button>
+                <button class="btn btn-primary" type="button">Apply</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption class="t-caption muted">Open · two months · range in brand-tint, start and end in brand · days after today ink-muted text, no box</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ============ 9. CONFIRMATION DIALOG ============ -->
+  <section class="section" aria-labelledby="dsa-s9">
+    <h2 id="dsa-s9" class="t-title2">Confirmation dialog</h2>
+    <p class="t-label">Destructive = solid ink, never red. Focus starts on Cancel. Esc closes. Focus returns to the opener.</p>
+    <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: start;">
+      <article style="display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); min-width: 0;">
+        <h3 class="t-body-lg" style="font-weight: 600;">Consequences</h3>
+        <div style="background: var(--scrim); border-radius: var(--radius-md); padding: 24px; display: flex; justify-content: center;">
+          <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dsa-dlg-t">
+            <div class="dialog-head">
+              <p id="dsa-dlg-t" class="t-title2" style="padding-top: 8px;">Retire Picking SOP v3?</p>
+              <button class="icon-btn" type="button" aria-label="Close"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+            </div>
+            <div class="dialog-body">
+              <ul class="consequences">
+                <li><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"></rect><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"></path></svg><span>Its questions leave play. Learners stop seeing them today.</span></li>
+                <li><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12M6 21h12M7 3v3a5 5 0 0 0 10 0V3M7 21v-3a5 5 0 0 1 10 0v3"></path></svg><span>New questions are generated from the documents that remain.</span></li>
+              </ul>
+            </div>
+            <div class="dialog-foot">
+              <button class="btn btn-secondary" type="button" style="outline: 2px solid var(--brand); outline-offset: 2px;">Cancel</button>
+              <button class="btn btn-danger" type="button">Retire document</button>
+            </div>
+          </div>
+        </div>
+        <p class="t-caption muted">Title names the object; one line per consequence; button repeats verb + object · Tokens: scrim, radius-lg, shadow-raised, btn-danger = surface-inverse + on-inverse · A11y: role="dialog" aria-modal aria-labelledby; focus trapped; Cancel focused on open.</p>
+      </article>
+
+      <article style="display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); min-width: 0;">
+        <h3 class="t-body-lg" style="font-weight: 600;">Required reason</h3>
+        <div style="background: var(--scrim); border-radius: var(--radius-md); padding: 24px; display: flex; justify-content: center;">
+          <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dsa-dlg2-t">
+            <div class="dialog-head">
+              <p id="dsa-dlg2-t" class="t-title2" style="padding-top: 8px;">Ban Theo Marsh?</p>
+              <button class="icon-btn" type="button" aria-label="Close"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+            </div>
+            <div class="dialog-body">
+              <ul class="consequences">
+                <li><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m5.6 5.6 12.8 12.8"></path></svg><span>Theo is signed out and can't sign in until unbanned.</span></li>
+              </ul>
+              <div class="field is-invalid">
+                <label class="field-label" for="dsa-reason">Reason · required</label>
+                <textarea id="dsa-reason" class="textarea" rows="2" required aria-required="true" aria-invalid="true" aria-describedby="dsa-reason-err"></textarea>
+                <p id="dsa-reason-err" class="field-error"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5h.01"></path></svg>Enter a reason. Other staff see it in the user list.</p>
+              </div>
+            </div>
+            <div class="dialog-foot">
+              <button class="btn btn-secondary" type="button">Cancel</button>
+              <button class="btn btn-danger" type="button">Ban user</button>
+            </div>
+          </div>
+        </div>
+        <p class="t-caption muted">Shown after "Ban user" with an empty reason · A11y: the button stays enabled; on press, focus moves to the field and the error is announced; aria-required + aria-invalid + aria-describedby.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ============ 10–11. BANNERS AND FORMS (incl. read-only band) ============ -->
+  <section class="section" aria-labelledby="dsa-s11">
+    <h2 id="dsa-s11" class="t-title2">Banners and forms</h2>
+    <article style="display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); min-width: 0;">
+    <h3 class="t-body-lg" style="font-weight: 600;">Read-only band</h3>
+    <p class="t-label">Sticky on every staff-viewed portal screen. Every edit control removed, not disabled.</p>
+    <div class="ro-band" role="region" aria-label="Read-only view" style="position: relative; border-radius: var(--radius-md);">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+      <span class="ro-text">Read only · You are viewing Northwind Logistics as Learn Quiz staff.</span>
+      <a href="CompanyDetail.dc.html">Exit to staff admin</a>
+    </div>
+    <div style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap;">
+      <div style="width: 248px; padding: 4px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-card);">
+        <div class="nav-user">
+          <span class="ro-pill"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>Read only</span>
+          <span class="t-caption muted">Learn Quiz staff</span>
+        </div>
+      </div>
+      <p class="t-caption muted" style="flex: 1; min-width: 280px;">Nav foot pill replaces the user row · Tokens: surface-inverse + on-inverse, 48px, z-index 10, ro-pill border-strong · A11y: role="region" aria-label="Read-only view", first in reading order; exit link 44px with an on-inverse focus ring.</p>
+    </div>
+    </article>
+    <div style="display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 0.8fr); gap: 48px; align-items: start;">
+      <article style="display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); min-width: 0;">
+        <h3 class="t-body-lg" style="font-weight: 600;">Banners</h3>
+        <div class="banner">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5.5M12 7.5h.01"></path></svg>
+          <p class="banner-text"><strong>Next step:</strong> review 38 new questions from Returns procedure.</p>
+          <a class="btn btn-accent" href="Questions.dc.html">Review questions</a>
+        </div>
+        <div class="banner banner-alert" role="alert">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5h.01"></path></svg>
+          <p class="banner-text"><strong>Couldn't save settings.</strong> Your changes are still here. Check your connection and save again.</p>
+          <button class="btn btn-secondary" type="button">Save again</button>
+        </div>
+        <p class="t-caption muted">Info: brand-tint, may hold the screen's one saffron action · Alert: surface-sunken + 1px border-strong + ink icon, role="alert", what happened then what to do · no stripes.</p>
+      </article>
+
+      <article style="display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); min-width: 0;">
+        <h3 class="t-body-lg" style="font-weight: 600;">Field error</h3>
+        <div class="field is-invalid">
+          <label class="field-label" for="dsa-acc2">Accent color</label>
+          <input id="dsa-acc2" class="input code" type="text" value="#F7C948" aria-invalid="true" aria-describedby="dsa-acc2-err">
+          <p id="dsa-acc2-err" class="field-error"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5h.01"></path></svg>Too light on white (1.6:1). Pick a darker color that reaches 4.5:1.</p>
+        </div>
+        <p class="t-caption muted">2px ink border (padding drops 1px so text holds still), 14/20 600 message · A11y: aria-invalid + aria-describedby; focus moves to the first invalid field.</p>
+      </article>
+
+      <article style="display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); min-width: 0;">
+        <h3 class="t-body-lg" style="font-weight: 600;">Buttons</h3>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+          <button class="btn btn-primary" type="button" disabled>Build curriculum</button>
+          <button class="btn btn-danger" type="button">Retire document</button>
+        </div>
+        <p class="t-caption muted">Disabled: sunken + 2px dashed border-strong, never faded · Danger: surface-inverse + on-inverse, dialogs only · both clear 4.5:1 in both themes.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ============ 12. CURRICULUM AND REVIEW HELPERS ============ -->
+  <section class="section" aria-labelledby="dsa-s12">
+    <h2 id="dsa-s12" class="t-title2">Curriculum and review helpers</h2>
+    <div style="display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 48px; align-items: start;">
+      <article style="display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); min-width: 0;">
+        <h3 class="t-body-lg" style="font-weight: 600;">Concept row</h3>
+        <div class="card concept-list">
+          <div style="display: flex; align-items: center; gap: 12px; padding: 16px 24px;">
+            <p class="t-body-lg" style="font-weight: 600;">Receiving</p>
+            <p class="t-caption muted num">7 concepts</p>
+          </div>
+          <!-- Column headers; each switch is labelled by "Critical" + the concept name -->
+          <div class="concept-row" style="padding-top: 8px; padding-bottom: 8px;">
+            <span></span>
+            <div class="concept-controls">
+              <span class="t-caption muted">Questions</span>
+              <span class="t-caption muted" id="dsa-crit-h" style="width: 52px; text-align: center;">Critical</span>
+              <span style="width: 44px;"></span>
+            </div>
+          </div>
+          <ol aria-label="Receiving concepts">
+            <li class="concept-row">
+              <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+                <span class="t-label" id="dsa-c1">Check the delivery against the ASN</span>
+                <span class="t-body muted">Match carrier, PO number and pallet count before signing.</span>
+              </div>
+              <div class="concept-controls">
+                <span class="t-body muted num">16</span>
+                <span style="width: 52px; display: inline-flex; justify-content: center;"><button type="button" class="switch" role="switch" aria-checked="false" aria-labelledby="dsa-crit-h dsa-c1"></button></span>
+                <button type="button" class="icon-btn" aria-label="Edit concept: Check the delivery against the ASN"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"></path><path d="m13.5 6.5 4 4"></path></svg></button>
+              </div>
+            </li>
+            <li class="concept-row">
+              <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+                <span class="t-label" id="dsa-c2">Report damaged pallets before put-away</span>
+                <span class="t-body muted">Photograph the damage, tag the pallet and log it in the WMS.</span>
+              </div>
+              <div class="concept-controls">
+                <span class="t-body muted num">15</span>
+                <span style="width: 52px; display: inline-flex; justify-content: center;"><button type="button" class="switch" role="switch" aria-checked="true" aria-labelledby="dsa-crit-h dsa-c2"></button></span>
+                <button type="button" class="icon-btn" aria-label="Edit concept: Report damaged pallets before put-away"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"></path><path d="m13.5 6.5 4 4"></path></svg></button>
+              </div>
+            </li>
+          </ol>
+        </div>
+        <p class="t-caption muted">As shipped in Role detail: header row "Questions" / "Critical", plain question count, unlabelled switch, pencil Edit · .concept-list / .concept-row / .concept-controls; controls drop under the text below 560px (container query) · A11y: each switch is labelled by "Critical" + the concept name; Edit names the concept.</p>
+      </article>
+      <article style="display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); min-width: 0;">
+        <h3 class="t-body-lg" style="font-weight: 600;">Review outline</h3>
+        <nav class="review-outline" aria-label="Units" style="position: static;">
+          <a class="outline-link" href="Questions.dc.html">Receiving</a>
+          <a class="outline-link" href="Questions.dc.html">Picking</a>
+          <a class="outline-link" href="Questions.dc.html">Scanning</a>
+          <a class="outline-link" href="Questions.dc.html">Safety</a>
+          <a class="outline-link" href="Questions.dc.html" aria-current="true">Returns<span class="nav-count" aria-label="38 unreviewed">38</span></a>
+        </nav>
+        <p class="t-caption muted">.review-layout 240px outline + content; outline hides under 1280 · count = unreviewed.</p>
+      </article>
+    </div>
+    <p class="t-caption muted">Also added: .menu-anchor / .opens-up (row menus), .dt-hide-lg (low-priority columns under 1280), .null (muted "—"), .skel-line, .cell-code (ids, model names), .dt tfoot td (totals), .rows-compact (48px list rows), .hbar-val.</p>
+  </section>
+
+  <!-- ============ 13 + 14. TOKENS AND LAYOUT ============ -->
+  <div style="display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 48px; align-items: start;">
+    <section class="section" aria-labelledby="dsa-s13">
+      <h2 id="dsa-s13" class="t-title2">Added tokens</h2>
+      <div class="dt-wrap">
+        <table class="dt">
+          <caption class="sr-only">Tokens added for admin, light and dark values</caption>
+          <thead><tr><th scope="col">Token</th><th scope="col">Light</th><th scope="col">Dark</th><th scope="col">Use</th></tr></thead>
+          <tbody>
+            <tr><td><div style="display: flex; align-items: center; gap: 12px;"><span style="width: 24px; height: 24px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-inverse);" aria-hidden="true"></span><span class="cell-code">surface-inverse</span></div></td><td class="cell-code">#14181F</td><td class="cell-code">#ECEEF1</td><td>Read-only band, chip-strong, btn-danger</td></tr>
+            <tr><td><div style="display: flex; align-items: center; gap: 12px;"><span style="width: 24px; height: 24px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--on-inverse);" aria-hidden="true"></span><span class="cell-code">on-inverse</span></div></td><td class="cell-code">#F7F6F2</td><td class="cell-code">#121417</td><td>Text and icons on surface-inverse</td></tr>
+            <tr><td><div style="display: flex; align-items: center; gap: 12px;"><span style="width: 24px; height: 24px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--scrim);" aria-hidden="true"></span><span class="cell-code">scrim</span></div></td><td class="cell-code">rgba(20,24,31,0.48)</td><td class="cell-code">rgba(0,0,0,0.6)</td><td>Behind dialogs (as the learner app)</td></tr>
+            <tr><td><div style="display: flex; align-items: center; gap: 12px;"><span style="width: 24px; height: 24px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--row-hover);" aria-hidden="true"></span><span class="cell-code">row-hover</span></div></td><td class="cell-code">#F7F6F2</td><td class="cell-code">#20252B</td><td>Table row hover</td></tr>
+            <tr><td><span class="cell-code" style="padding-left: 36px;">target</span></td><td class="cell-code">44px</td><td class="cell-code">44px</td><td>Minimum control size</td></tr>
+            <tr><td><span class="cell-code" style="padding-left: 36px;">nav-w</span></td><td class="cell-code">248px</td><td class="cell-code">248px</td><td>Side nav at 1024 and up</td></tr>
+            <tr><td><span class="cell-code" style="padding-left: 36px;">content-max</span></td><td class="cell-code">1120px</td><td class="cell-code">1120px</td><td>Forms, profiles, detail. Tables and charts fill the column.</td></tr>
+            <tr><td><span class="cell-code" style="padding-left: 36px;">topbar-h</span></td><td class="cell-code">56px</td><td class="cell-code">56px</td><td>Top bar below 1024</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="dsa-s14">
+      <h2 id="dsa-s14" class="t-title2">Layout rules</h2>
+      <dl class="kv" style="gap: 12px 24px;">
+        <dt class="num">≥ 1024</dt><dd>Side nav 248px + content column · 32px page padding.</dd>
+        <dt class="num">640–1023</dt><dd>Top bar 56px + menu sheet · content full width.</dd>
+        <dt class="num">&lt; 640</dt><dd>Single column · 16px gutters · tables stack · stats 2-up · dialogs become bottom sheets.</dd>
+        <dt>Width</dt><dd>Forms, profiles and detail cap at 1120px. Tables and charts fill the content column.</dd>
+        <dt>Emphasis</dt><dd>One accent per screen, at most. One primary per region. Staff admin is desktop only.</dd>
+      </dl>
+    </section>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light"},"$preview":{"width":1440,"height":7980}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      theme: this.props.theme ?? 'light',
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Learn Quiz admin · start</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" style="min-height: 0; padding: 64px 72px; display: flex; flex-direction: column; gap: 48px;">
+  <header style="display: flex; align-items: center; gap: 16px;">
+    <svg viewBox="0 0 64 64" width="48" height="48" aria-hidden="true"><mask id="lqm-main" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="#fff"></rect><circle cx="48" cy="48" r="13"></circle></mask><circle cx="32" cy="32" r="19" fill="none" stroke="var(--brand)" stroke-width="14" mask="url(#lqm-main)"></circle><circle cx="48" cy="48" r="9" fill="#F2A900"></circle></svg>
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h1 class="t-title1">Learn Quiz admin</h1>
+      <p class="t-body muted">Partner portal and staff admin · Northwind Logistics demo · Nov 3, 2026</p>
+    </div>
+  </header>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; align-items: start;">
+    <section class="card" aria-labelledby="m-partner">
+      <div class="card-head"><h2 id="m-partner" class="t-title2">Partner flow</h2><a class="btn btn-accent" href="CreateCompany.dc.html">Start</a></div>
+      <ol class="rows rows-compact">
+        <li><span class="t-label num muted" style="width: 20px;">1</span><a class="link-btn" href="CreateCompany.dc.html">Create company</a></li>
+        <li><span class="t-label num muted" style="width: 20px;">2</span><a class="link-btn" href="Overview-Empty.dc.html">Overview, new company</a></li>
+        <li><span class="t-label num muted" style="width: 20px;">3</span><a class="link-btn" href="Roles-New.dc.html">Roles</a></li>
+        <li><span class="t-label num muted" style="width: 20px;">4</span><a class="link-btn" href="RoleDetail.dc.html">Role detail, no documents</a></li>
+        <li><span class="t-label num muted" style="width: 20px;">5</span><a class="link-btn" href="RoleDetail-Uploading.dc.html">Upload SOP</a></li>
+        <li><span class="t-label num muted" style="width: 20px;">6</span><a class="link-btn" href="RoleDetail-BuildingLive.dc.html">Curriculum building</a></li>
+        <li><span class="t-label num muted" style="width: 20px;">7</span><a class="link-btn" href="RoleDetail-Ready.dc.html">Curriculum ready</a></li>
+        <li><span class="t-label num muted" style="width: 20px;">8</span><a class="link-btn" href="Questions.dc.html">Question review</a></li>
+        <li><span class="t-label num muted" style="width: 20px;">9</span><a class="link-btn" href="People.dc.html">People</a></li>
+        <li><span class="t-label num muted" style="width: 20px;">10</span><a class="link-btn" href="People-InviteLink.dc.html">Invite with QR code</a></li>
+        <li><span class="t-label num muted" style="width: 20px;">11</span><a class="link-btn" href="Person.dc.html">Training progress</a></li>
+      </ol>
+    </section>
+    <section class="card" aria-labelledby="m-staff">
+      <div class="card-head"><h2 id="m-staff" class="t-title2">Staff flow</h2><a class="btn btn-primary" href="Companies.dc.html">Start</a></div>
+      <ol class="rows rows-compact">
+        <li><span class="t-label num muted" style="width: 20px;">1</span><a class="link-btn" href="Companies.dc.html">Companies</a></li>
+        <li><span class="t-label num muted" style="width: 20px;">2</span><a class="link-btn" href="CompanyDetail.dc.html">Company detail</a></li>
+        <li><span class="t-label num muted" style="width: 20px;">3</span><a class="link-btn" href="RO-Overview.dc.html">Portal, read only</a></li>
+        <li><span class="t-label num muted" style="width: 20px;">4</span><a class="link-btn" href="ModelUsage.dc.html">Model usage</a></li>
+        <li><span class="t-label num muted" style="width: 20px;">5</span><a class="link-btn" href="Jobs.dc.html">Generation jobs, retry</a></li>
+        <li><span class="t-label num muted" style="width: 20px;">6</span><a class="link-btn" href="Users-Ban.dc.html">Users, ban</a></li>
+        <li><span class="t-label num muted" style="width: 20px;">7</span><a class="link-btn" href="Flags.dc.html">Content flags</a></li>
+      </ol>
+    </section>
+    <section class="card" aria-labelledby="m-ref">
+      <div class="card-head"><h2 id="m-ref" class="t-title2">Reference</h2></div>
+      <ul class="rows rows-compact">
+        <li><a class="link-btn" href="DSAdditions.dc.html">Design-system additions</a></li>
+        <li><a class="link-btn" href="Handoff.dc.html">Handoff notes</a></li>
+        <li><a class="link-btn" href="Overview-Loading.dc.html">Loading</a></li>
+        <li><a class="link-btn" href="Denied.dc.html">Permission denied</a></li>
+        <li><a class="link-btn" href="NotFound.dc.html">Not found</a></li>
+        <li><a class="link-btn" href="Settings-SaveFail.dc.html">Failed save</a></li>
+      </ul>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return { theme: this.props.theme ?? 'light' }; }
+}
+</script>
+</body>
+</html>

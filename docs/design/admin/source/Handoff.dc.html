@@ -1,0 +1,837 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Handoff notes · Learn Quiz admin</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" style="min-height: 0; padding: 48px 72px; display: flex; flex-direction: column; gap: 40px;">
+  <header style="display: flex; align-items: center; gap: 16px;">
+    <svg viewBox="0 0 64 64" width="48" height="48" aria-hidden="true"><mask id="lqm-ho" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="#fff"></rect><circle cx="48" cy="48" r="13"></circle></mask><circle cx="32" cy="32" r="19" fill="none" stroke="var(--brand)" stroke-width="14" mask="url(#lqm-ho)"></circle><circle cx="48" cy="48" r="9" fill="#F2A900"></circle></svg>
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h1 class="t-title1">Handoff notes</h1>
+      <p class="t-body muted">Partner portal and staff admin. One section per screen, in flow order. Artboard names link to the artboards.</p>
+    </div>
+  </header>
+
+  <!-- ============ Basics ============ -->
+  <section aria-labelledby="ho-basics" style="display: flex; flex-direction: column; gap: 20px; border-top: 1px solid var(--border); padding-top: 32px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="ho-basics" class="t-title2">Basics</h2>
+      <p class="t-body muted">Applies to every screen · Start board: <a href="Main.dc.html">Main</a> · Design-system additions: <a href="DSAdditions.dc.html">DSAdditions</a>, <a href="DSAdditions-Dark.dc.html">DSAdditions-Dark</a></p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; align-items: start;">
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Desktop-first web app. Frames at 1440 and 1024; partner Overview and People also at 390. Staff admin is desktop only.</li>
+          <li>≥1024: side nav 248px (<code class="code">.sidenav</code>, sticky, full height) next to the content column (<code class="code">.main</code>).</li>
+          <li>640–1023: nav becomes <code class="code">.topbar</code> (56px, sticky) with a Menu button that opens the same list as a sheet.</li>
+          <li>&lt;640: single column, 16px gutters, page actions stretch full width, figures go 2-up.</li>
+          <li>Tables at &lt;640 stack via <code class="code">.dt-stack</code>: each row becomes a 3-column grid, each cell labelled from its <code class="code">data-label</code>; <code class="code">.stack-full</code>, <code class="code">.stack-wide</code>, <code class="code">.stack-hide</code> place cells.</li>
+          <li>Forms, profiles and detail pages: <code class="code">.page.page-capped</code>, content capped at 1120.</li>
+          <li>Tables and charts: <code class="code">.page</code>, filling the content column. Dense data gains from width (fewer wraps, no sideways scroll); reading text does not, so its line length stays capped.</li>
+          <li>Below 1280, <code class="code">.dt-hide-lg</code> drops secondary table columns and the Questions outline hides.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Components</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li><code class="code">admin.css</code> = Petrol &amp; Saffron tokens plus admin rules marked ADDITION. Tokens only; no raw hex except the Northwind logo and the mark's saffron dot.</li>
+          <li>Dark theme: <code class="code">data-theme="dark"</code> on <code class="code">.lq</code> swaps every token. Every key screen has a -Dark artboard.</li>
+          <li>White-label: company logo in the nav (<code class="code">.nav-org</code>); the portal stays petrol. The customer accent shows only in the learner app.</li>
+          <li>Saffron <code class="code">.btn-accent</code>: at most one per screen, the key action. Many screens have none. One <code class="code">.btn-primary</code> per region.</li>
+          <li>Green, red and amber only for answer feedback and mastery status: <code class="code">.chip-mastered</code> (Proficient, Mastered), <code class="code">.chip-learning</code> (Still learning).</li>
+          <li>Operational state = chip + icon + word, by emphasis: <code class="code">.chip-dashed</code> not started, <code class="code">.chip-tint</code> in motion, <code class="code">.chip</code> settled, <code class="code">.chip-strong</code> needs a person, <code class="code">.chip-muted</code> out of play.</li>
+          <li>Critical concepts: <code class="code">.chip-critical</code>, shield icon and the word Critical.</li>
+          <li>Errors without red: <code class="code">.banner.banner-alert</code> (alert icon, words first) and <code class="code">.field.is-invalid</code> + <code class="code">.field-error</code>.</li>
+          <li>Destructive: <code class="code">.btn-danger</code> (solid ink), only inside a confirmation dialog with a <code class="code">.consequences</code> list.</li>
+          <li>No spinners: determinate <code class="code">.meter</code> progressbars for uploads and builds; static <code class="code">.skel</code> / <code class="code">.skel-line</code> skeletons for loading.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Interaction</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Focus ring 2px brand, offset 2px. Targets 44px; icon-only buttons carry an aria-label naming the row ("More actions for Jordan Reyes").</li>
+          <li>Route change moves focus to the h1 (<code class="code">tabindex="-1"</code>). Current nav item: <code class="code">aria-current="page"</code>.</li>
+          <li>Dialogs: <code class="code">role="dialog"</code> + <code class="code">aria-modal</code>, focus trapped, starts on the safest control, Esc closes, focus returns to the opener; page behind is aria-hidden.</li>
+          <li>Menus (<code class="code">.menu</code>, <code class="code">role="menu"</code>) open from a visible More actions button with aria-haspopup and aria-expanded; Esc closes and returns focus.</li>
+          <li>Tables: <code class="code">&lt;caption&gt;</code> (sr-only), <code class="code">th scope="col"</code>, <code class="code">.th-sort</code> buttons inside th, aria-sort only on the sorted column. Sticky header offsets for the band and top bar.</li>
+          <li>Charts: <code class="code">svg.chart</code> <code class="code">role="img"</code> with a one-sentence summary plus an sr-only table of the same numbers. Series by dash, legend and direct labels.</li>
+          <li>Live updates: one persistent <code class="code">role="status"</code> per screen, outside any conditional block, throttled. Blocking errors use <code class="code">role="alert"</code>, announced once.</li>
+          <li>prefers-reduced-motion: transitions drop to 0 ms. Nothing loops or pulses.</li>
+          <li>Staff read-only view: sticky inverse <code class="code">.ro-band</code> on every portal screen; nav foot shows the <code class="code">.ro-pill</code> "Read only" instead of the user.</li>
+          <li>Read-only removes every edit control from the DOM; nothing is shown disabled. The server enforces it: writes call <code class="code">requireOrgAdmin</code>, staff reads call <code class="code">requireStaff</code>.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Navigation ============ -->
+  <section aria-labelledby="ho-nav" style="display: flex; flex-direction: column; gap: 20px; border-top: 1px solid var(--border); padding-top: 32px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="ho-nav" class="t-title2">Navigation</h2>
+      <p class="t-body muted">Every portal and staff screen · Artboards: <a href="PortalNav.dc.html">PortalNav</a>, <a href="StaffNav.dc.html">StaffNav</a></p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; align-items: start;">
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>PortalNav: company logo and name, then Overview, Roles, Questions, People, Settings; foot with the signed-in user and the Learn Quiz mark.</li>
+          <li>StaffNav: Learn Quiz mark and "Staff admin", then Companies, Users, Model usage, Generation jobs, Content flags; foot with the staff user.</li>
+          <li>Below 1024 both collapse to <code class="code">.topbar</code>: logo, name (ellipsis), Menu button.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Components</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li><code class="code">.sidenav</code>, <code class="code">.nav-org</code>, <code class="code">.org-logo</code>, <code class="code">.nav-list</code>, <code class="code">.nav-item</code>, <code class="code">.nav-foot</code>, <code class="code">.nav-user</code>, <code class="code">.avatar</code>, <code class="code">.nav-poweredby</code>, <code class="code">.topbar</code>.</li>
+          <li>Generation jobs carries <code class="code">.nav-count</code> with the failed-job count (sr-only " failed").</li>
+          <li>Props: PortalNav <code class="code">active</code>, <code class="code">readonly</code>; StaffNav <code class="code">active</code>, <code class="code">failed</code>.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Interaction</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Items are links; the current one has aria-current="page" (brand-tint ground, brand icon).</li>
+          <li>Menu button: aria-expanded + aria-controls; the sheet holds the same list; Esc closes, focus returns to Menu.</li>
+          <li>Sign out: icon button, aria-label "Sign out". Read-only hides it and shows "Read only · Staff view".</li>
+          <li>The failed count follows the Generation jobs poll; it is not a live region.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 1 Create company ============ -->
+  <section aria-labelledby="ho-s1" style="display: flex; flex-direction: column; gap: 20px; border-top: 1px solid var(--border); padding-top: 32px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="ho-s1" class="t-title2">1 · Create company</h2>
+      <p class="t-body muted">Route: <code class="code">/org/new</code> · Artboards: <a href="CreateCompany.dc.html">CreateCompany</a>, <a href="CreateCompany-Error.dc.html">CreateCompany-Error</a>, <a href="CreateCompany-Dark.dc.html">CreateCompany-Dark</a></p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; align-items: start;">
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>No nav. Learn Quiz mark top left, one centered card, signed-in line with Sign out under it.</li>
+          <li>Card: h1 "Create your company", Company name, First job role, full-width action.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Components</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li><code class="code">.card</code>, <code class="code">.field</code>, <code class="code">.input</code>, <code class="code">.btn-accent.btn-block</code> "Create company", <code class="code">.link-btn</code> Sign out.</li>
+          <li>Error: <code class="code">.banner.banner-alert</code> above the button.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Interaction</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Focus on load: h1, Tab to Company name. Enter submits. Build as a form with <code class="code">button type="submit"</code>; the artboard uses a link only to continue the flow.</li>
+          <li>Create company: creates the org (creator becomes owner) and the first job role, then routes to Overview, empty state.</li>
+          <li>Error: banner role="alert" "Couldn't create the company…"; both inputs keep their values; focus stays on the button.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 2 Overview ============ -->
+  <section aria-labelledby="ho-s2" style="display: flex; flex-direction: column; gap: 20px; border-top: 1px solid var(--border); padding-top: 32px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="ho-s2" class="t-title2">2 · Overview</h2>
+      <p class="t-body muted">Route: <code class="code">/org/northwind</code> · Artboards: <a href="Overview.dc.html">Overview</a>, <a href="Overview-Empty.dc.html">Overview-Empty</a>, <a href="Overview-Preparing.dc.html">Overview-Preparing</a>, <a href="Overview-Loading.dc.html">Overview-Loading</a>, <a href="Overview-Dark.dc.html">Overview-Dark</a>, <a href="Overview-1024.dc.html">Overview-1024</a>, <a href="Overview-390.dc.html">Overview-390</a>, <a href="Overview-390-Dark.dc.html">Overview-390-Dark</a></p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; align-items: start;">
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Full-width <code class="code">.page</code>: h1, five figures in one row, next-step banner, Roles table.</li>
+          <li>Empty: next-step card (max 720) "Add your first SOP", then Roles. No figures until there is something to count.</li>
+          <li>Preparing: card "Preparing Warehouse picker training" with progress, then Roles.</li>
+          <li>390: figures 2-up, the odd last one spans both; table stacks.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Components</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li><code class="code">.stats.card</code> of <code class="code">a.stat</code>: Employees, Proficient, Avg. days to proficiency, Critical-step errors this week, Documents awaiting review.</li>
+          <li><code class="code">.banner</code> "Next step: review 38 new questions…" with the saffron "Review questions".</li>
+          <li>Empty: saffron "Upload SOP". Preparing: <code class="code">.chip-tint</code> Generating questions, <code class="code">.meter</code>, saffron "Invite people", ghost "Watch the build".</li>
+          <li><code class="code">.dt.dt-stack</code>: Role, Training chip, People, Benchmark, Onboarding.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Interaction</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Figures are links: Employees and Proficient → People; days → a proficient person; errors → the person with the open error; documents → Questions.</li>
+          <li>Role name → Role detail. "All roles" → Roles.</li>
+          <li>Preparing: progress sits in <code class="code">role="status"</code>, fed by the Role detail build poll, announced in steps of 5 concepts.</li>
+          <li>Loading: static skeleton of figures and table (aria-hidden), sr-only status "Loading overview".</li>
+          <li>Read-only (<a href="RO-Overview.dc.html">RO-Overview</a>): next-step banner removed; role links open the read-only Role detail.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 3 Roles ============ -->
+  <section aria-labelledby="ho-s3" style="display: flex; flex-direction: column; gap: 20px; border-top: 1px solid var(--border); padding-top: 32px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="ho-s3" class="t-title2">3 · Roles</h2>
+      <p class="t-body muted">Route: <code class="code">/org/northwind/roles</code> · Artboards: <a href="Roles.dc.html">Roles</a>, <a href="Roles-New.dc.html">Roles-New</a>, <a href="Roles-Create.dc.html">Roles-Create</a>, <a href="Roles-Failed.dc.html">Roles-Failed</a>, <a href="Roles-Dark.dc.html">Roles-Dark</a></p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; align-items: start;">
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Page head: h1 + "Create role". One full-width table.</li>
+          <li>Failed: attention banner above the table.</li>
+          <li>Create: dialog over the list.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Components</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>"Create role" is primary; secondary in the new-company state, where the row's Upload SOP link leads.</li>
+          <li><code class="code">.dt.dt-stack</code>: Role, Training, Benchmark, Onboarding, People, More actions <code class="code">.icon-btn</code>.</li>
+          <li>Training: dashed No documents yet + <code class="code">.link-btn</code> Upload SOP; tint Preparing training + "9 of 24 concepts"; plain Ready; strong Training failed.</li>
+          <li>Dialog: Name; Benchmark <code class="code">.input-suffix</code> % (default 85, 1–100); Onboarding period days (default 30, 1–365); Cancel, primary Create role.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Interaction</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Create role opens the dialog, focus on Name. Esc or Cancel returns focus to Create role.</li>
+          <li>Submit routes to the new role's detail (empty), focus on its h1.</li>
+          <li>Failed: banner role="alert" "Forklift operator training failed. 2 documents have no selectable text…" + secondary "Fix documents" → Role detail, problems state.</li>
+          <li>No sort controls; roles in created order.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 4 Role detail ============ -->
+  <section aria-labelledby="ho-s4" style="display: flex; flex-direction: column; gap: 20px; border-top: 1px solid var(--border); padding-top: 32px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="ho-s4" class="t-title2">4 · Role detail</h2>
+      <p class="t-body muted">Route: <code class="code">/org/northwind/roles/:roleId</code> · Artboards: <a href="RoleDetail.dc.html">RoleDetail</a>, <a href="RoleDetail-Uploading.dc.html">RoleDetail-Uploading</a>, <a href="RoleDetail-UploadingLive.dc.html">RoleDetail-UploadingLive</a>, <a href="RoleDetail-Building.dc.html">RoleDetail-Building</a>, <a href="RoleDetail-BuildingLive.dc.html">RoleDetail-BuildingLive</a>, <a href="RoleDetail-Ready.dc.html">RoleDetail-Ready</a>, <a href="RoleDetail-Replace.dc.html">RoleDetail-Replace</a>, <a href="RoleDetail-Paste.dc.html">RoleDetail-Paste</a>, <a href="RoleDetail-Problems.dc.html">RoleDetail-Problems</a>, <a href="RoleDetail-Retire.dc.html">RoleDetail-Retire</a>, <a href="RoleDetail-Edit.dc.html">RoleDetail-Edit</a>, <a href="RoleDetail-Dark.dc.html">RoleDetail-Dark</a>, <a href="RoleDetail-1024.dc.html">RoleDetail-1024</a></p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; align-items: start;">
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li><code class="code">.page-capped</code>. Crumbs Roles › role, h1, meta "Benchmark 85% · Onboarding 30 days · 3 people", actions Edit role + Review questions.</li>
+          <li>Documents: list card of file rows. An empty role shows the drop zone instead.</li>
+          <li>Curriculum: units in procedure order, one card each, concepts as rows. Receiving and Picking open on load.</li>
+          <li>Narrow (1024 and below): concept controls wrap under the text via a container query on <code class="code">.concept-list</code> (&lt;560).</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Components</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li><code class="code">.crumbs</code>; <code class="code">.file-row</code> (<code class="code">.file-ico</code>, <code class="code">.file-title</code> + <code class="code">.tag</code> v3, <code class="code">.file-meta</code>, <code class="code">.file-actions</code>); <code class="code">.dropzone</code>; <code class="code">.meter</code>.</li>
+          <li>Unit header: h3 › button with number, name, meta "7 concepts · 2 critical", chevron.</li>
+          <li><code class="code">.concept-row</code>: name, summary, question state (count, dashed Queued, tint Generating questions, strong Failed + Retry), Critical <code class="code">.switch</code>, Edit <code class="code">.icon-btn</code>.</li>
+          <li>Saffron moves with the state: Upload PDF (empty), Build curriculum (after upload), Review questions (ready). Never two at once.</li>
+          <li>Retire dialog: <code class="code">.consequences</code> list, Cancel, <code class="code">.btn-danger</code> "Retire document".</li>
+          <li>Paste panel: Title, Text <code class="code">.textarea</code> with counter, Cancel, Add text.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Interaction</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Upload accepts a PDF up to 10 MB, size checked before sending. Too large: banner role="alert" naming the file and the fix; focus stays.</li>
+          <li>Uploading: tint Uploading + progressbar "1.5 of 2.4 MB" + Cancel upload. Done: row turns ready in place, status "Picking SOP v3.pdf uploaded. 2 documents ready."</li>
+          <li>Focus after upload moves to the row's Replace only if it was on Cancel upload.</li>
+          <li>Dragging a file over the window makes the Documents card the drop target (<code class="code">.dropzone.is-over</code>).</li>
+          <li>Build curriculum → building (see Model working). Edit is disabled on concepts not done yet.</li>
+          <li>Failed concept: field-error "Couldn't generate questions…" + Retry (aria-label names the concept) → Generating.</li>
+          <li>Critical switch saves at once; labelled by the column header + concept name.</li>
+          <li>Edit: row becomes an inline form (Name, Summary, Critical, Cancel, Save concept); focus to Name; back to the Edit button after.</li>
+          <li>Paste text: panel toggles (aria-expanded), focus to Title, counter "n / 60,000". Over the limit nothing is cut: field-error role="alert", Add text disabled.</li>
+          <li>Replace: v4 uploads in the same row; "v3 stays live until v4 is ready."</li>
+          <li>Extraction failed: <code class="code">.file-row.is-problem</code>, strong chip, field-error, Replace file, Paste text instead, More › Remove.</li>
+          <li>Retire (More actions): dialog, focus on Cancel, Esc = Cancel, focus returns to "More actions for Returns procedure".</li>
+          <li>Read-only (<a href="RO-RoleDetail.dc.html">RO-RoleDetail</a>): no page or document actions, menus, switches, Edit or Retry; critical concepts show <code class="code">.chip-critical</code>; crumb → Overview.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 5 Question review ============ -->
+  <section aria-labelledby="ho-s5" style="display: flex; flex-direction: column; gap: 20px; border-top: 1px solid var(--border); padding-top: 32px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="ho-s5" class="t-title2">5 · Question review</h2>
+      <p class="t-body muted">Route: <code class="code">/org/northwind/questions?role=warehouse-picker</code> · Artboards: <a href="Questions.dc.html">Questions</a>, <a href="Questions-Flagged.dc.html">Questions-Flagged</a>, <a href="Questions-Edit.dc.html">Questions-Edit</a>, <a href="Questions-EditShort.dc.html">Questions-EditShort</a>, <a href="Questions-Dark.dc.html">Questions-Dark</a>, <a href="RO-Questions.dc.html">RO-Questions</a></p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; align-items: start;">
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Full-width <code class="code">.page</code>. Head: h1 + Role select. Toolbar: search, filter chips, status select; results line + Clear filters under it.</li>
+          <li>Body <code class="code">.review-layout</code>: sticky outline (240px, units › concepts with counts) beside the grouped questions. Outline hides below 1280.</li>
+          <li>Unit h2 (meta "7 concepts · 105 questions") › concept h3 + Critical chip + counts › one card of compact 56px rows.</li>
+          <li>Per concept: one row expanded in place into the full card, the rest collapsed, then "Show N more".</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Components</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Row: status chip (plain Live, strong Flagged by learner, muted Retired or Rejected), review state (dashed Unreviewed or "Approved Oct 30"), stem h4, difficulty, Show details <code class="code">.icon-btn</code>.</li>
+          <li>Expanded: type line, options A–D with "Correct answer" and per-option feedback, Explanation, source <code class="code">.quote</code> or <code class="code">.quote-none</code>.</li>
+          <li>Learner flag: <code class="code">.sunken</code> group "Reported by Jordan Reyes · Nov 2, 10:14" + <code class="code">.kv</code> Reason, Note, Attempt.</li>
+          <li>Actions: ghost Retire, secondary Edit, primary "Approve and next" or "Approve, resolve flag and next". Rejected rows: Edit only.</li>
+          <li>Edit in place: Type, Difficulty 1–5 (<code class="code">.seg</code> radiogroup), Stem, options with Correct radio + Feedback, or Accepted answers chips for short answer, Explanation, Source document, Section, Source quote.</li>
+          <li><code class="code">.filter-chip</code>: Unreviewed 38, Flagged by learners 2, Critical 96.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Interaction</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Role select rewrites <code class="code">?role=</code> and reloads the groups; focus stays on the select.</li>
+          <li>Filters combine (AND). Results line <code class="code">role="status"</code> ("38 questions"). No match: "No questions match these filters…" + Clear filters.</li>
+          <li>Show/Hide details: aria-expanded + aria-controls; every row button is described by its stem.</li>
+          <li>Approve and next: records reviewer and date, collapses the row, expands the next unreviewed one and focuses its stem; status "Approved. 37 unreviewed."</li>
+          <li>Approve on a flagged question also resolves the flag. Flags never change a learner's progress.</li>
+          <li>Retire: the question leaves play at once and the row turns muted Retired; it never shows to learners again.</li>
+          <li>Edit: focus to "Edit question". Save checks the quote against the source text; a miss shows field-error role="alert" "This quote isn't in Picking SOP v3…". Cancel returns focus to Edit.</li>
+          <li>Outline links jump to the concept; <code class="code">aria-current="location"</code> follows the concept in view.</li>
+          <li>Read-only (RO-Questions, Flagged filter on): band; Retire, Edit and Approve removed; flags and content stay. Content flags link here.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 6 People ============ -->
+  <section aria-labelledby="ho-s6" style="display: flex; flex-direction: column; gap: 20px; border-top: 1px solid var(--border); padding-top: 32px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="ho-s6" class="t-title2">6 · People</h2>
+      <p class="t-body muted">Route: <code class="code">/org/northwind/people</code> · Artboards: <a href="People.dc.html">People</a>, <a href="People-Empty.dc.html">People-Empty</a>, <a href="People-Invite.dc.html">People-Invite</a>, <a href="People-InviteLink.dc.html">People-InviteLink</a>, <a href="People-Dark.dc.html">People-Dark</a>, <a href="People-1024.dc.html">People-1024</a>, <a href="People-390.dc.html">People-390</a>, <a href="People-390-Dark.dc.html">People-390-Dark</a></p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; align-items: start;">
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Full-width <code class="code">.page</code>: h1 + saffron "Invite people", toolbar, table, footer count.</li>
+          <li>Role, onboarding day and last active ride as sub lines so the table fits 1024 without sideways scroll.</li>
+          <li>Empty: one card "No one invited yet." + Invite people; no table, no toolbar.</li>
+          <li>390: rows stack; name full width, status and progress below.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Components</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Toolbar: search (name or email), Job role select, <code class="code">.filter-chip</code> Invited, Active, Proficient, Expired with counts.</li>
+          <li><code class="code">.dt.dt-stack</code>: Name, Status, Progress to benchmark (<code class="code">.progress-cell</code>: <code class="code">.bar</code> + <code class="code">.bar-bench</code> + %), Open critical errors, actions.</li>
+          <li>Status: plain Active, <code class="code">.chip-mastered</code> Proficient, dashed Invited, muted Expired; "Not joined" in <code class="code">.null</code>.</li>
+          <li>Invite dialog (<code class="code">.dialog-wide</code>): fieldset per person (Name, Email, Job role), Add another person, Cancel, Create invite links.</li>
+          <li>Link dialog: <code class="code">.qr</code> at 288px, readonly link input, primary Copy link, "Joins as Warehouse picker · Expires Nov 9 · Works once", ghost Revoke link, Done.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Interaction</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Alphabetical. No sort controls and no column that ranks people; the caption says the order.</li>
+          <li>Chips filter one status (aria-pressed); footer <code class="code">role="status"</code> "1 of 4 people".</li>
+          <li>Joined people's names link to Training progress; invited and expired rows have no link.</li>
+          <li>Row menus: Invited › Show invite link, Revoke. Expired › Create new link, Remove.</li>
+          <li>Invite: focus to the first Name; Add another person appends a fieldset and focuses its Name. Create invite links → link dialog, one link per person.</li>
+          <li>Copy link writes the clipboard; status "Link copied".</li>
+          <li>Revoke link acts at once: QR fades, Copy link aria-disabled, status "Link revoked · Undo". No confirm step.</li>
+          <li>Done or Esc closes; focus returns to the opener (Invite people or the row's More actions).</li>
+          <li>Bars are aria-hidden; the % reads "42% of 85% benchmark".</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 7 Training progress ============ -->
+  <section aria-labelledby="ho-s7" style="display: flex; flex-direction: column; gap: 20px; border-top: 1px solid var(--border); padding-top: 32px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="ho-s7" class="t-title2">7 · Training progress</h2>
+      <p class="t-body muted">Route: <code class="code">/org/northwind/people/:userId</code> · Artboards: <a href="Person.dc.html">Person</a>, <a href="Person-Proficient.dc.html">Person-Proficient</a>, <a href="Person-NotStarted.dc.html">Person-NotStarted</a>, <a href="Person-Dark.dc.html">Person-Dark</a></p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; align-items: start;">
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li><code class="code">.page-capped</code>. Crumbs People › name, h1 "Training progress", person line, "Jordan sees this same page in the app."</li>
+          <li>Benchmark card and Weekly trend side by side (auto-fit, min 320), then By unit, then Confident errors and Flags side by side.</li>
+          <li>Not started: benchmark card only, "Day 1 of 30 · Benchmark 85%". No figures, no zeros.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Components</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li><code class="code">.t-display</code> %, <code class="code">.bar.bar-lg</code> progressbar with <code class="code">.bar-bench</code>, facts "Day 9 of 30 · Projected: Nov 20 · Sessions: 2 this week · 9 total".</li>
+          <li><code class="code">svg.chart</code>: mastery <code class="code">.s1</code>, projection <code class="code">.proj</code>, benchmark <code class="code">.bench</code>, <code class="code">.legend</code>, sr-only weekly table.</li>
+          <li>By unit: concept bar measured (<code class="code">.bar-fill</code>) or placement estimate (<code class="code">.bar-est</code>, "~30%"); Mastered, Still learning, Placement estimate or "Not started"; <code class="code">.chip-critical</code>.</li>
+          <li>Confident errors (<code class="code">.rows</code>, at most five): dashed Awaiting correction or plain "Corrected Oct 31".</li>
+          <li>Flags: dashed Open, reason, concept, <code class="code">.link-btn</code> "Open in Questions".</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Interaction</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Read-only for partners; same evidence the employee sees. No edit, sort or comparison controls.</li>
+          <li>Unit rows are disclosure buttons (aria-expanded); Receiving open on load.</li>
+          <li>"Open in Questions" → the flagged question. "Flags never change progress." sits under the list.</li>
+          <li>Proficient: chip and date reached. A unit added later (Returns, "Added Nov 2") does not recompute proficiency.</li>
+          <li>No polling; data is read on load.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 8 Settings ============ -->
+  <section aria-labelledby="ho-s8" style="display: flex; flex-direction: column; gap: 20px; border-top: 1px solid var(--border); padding-top: 32px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="ho-s8" class="t-title2">8 · Settings</h2>
+      <p class="t-body muted">Route: <code class="code">/org/northwind/settings</code> · Artboards: <a href="Settings.dc.html">Settings</a>, <a href="Settings-AccentFail.dc.html">Settings-AccentFail</a>, <a href="Settings-SaveFail.dc.html">Settings-SaveFail</a>, <a href="Settings-Dark.dc.html">Settings-Dark</a></p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; align-items: start;">
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li><code class="code">.page-capped</code>; one form card in three sections split by <code class="code">.divider</code>: Company, Learner app, Learning pushes.</li>
+          <li><code class="code">.card-foot</code>: Discard, Save changes.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Components</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Company name <code class="code">.input</code>; logo preview + secondary Replace logo + ghost Remove, "PNG, JPEG or WebP · up to 2 MB".</li>
+          <li>Accent color: hex input, swatch button, "Start quiz" button preview with its contrast ratio.</li>
+          <li>Timezone <code class="code">.select</code>; Working days <code class="code">.seg</code> toggles (aria-pressed, check icon); Working hours From and To selects.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Interaction</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Accent contrast is checked as you type. Below 4.5:1 on white: <code class="code">.is-invalid</code> + field-error role="alert" "1.6:1 on white. Pick a darker color that reaches 4.5:1."</li>
+          <li>Save changes stays enabled. With an invalid field nothing is sent and focus moves to that field.</li>
+          <li>Logo type and size are checked before upload; the preview swaps on success.</li>
+          <li>Discard resets to the last saved values. Pushes go out only inside the working days and hours.</li>
+          <li>Save fail: see Failed save.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 9 Companies ============ -->
+  <section aria-labelledby="ho-s9" style="display: flex; flex-direction: column; gap: 20px; border-top: 1px solid var(--border); padding-top: 32px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="ho-s9" class="t-title2">9 · Companies</h2>
+      <p class="t-body muted">Route: <code class="code">/admin/companies</code> · Artboards: <a href="Companies.dc.html">Companies</a>, <a href="Companies-Loading.dc.html">Companies-Loading</a>, <a href="Companies-Dark.dc.html">Companies-Dark</a>, <a href="Companies-1024.dc.html">Companies-1024</a></p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; align-items: start;">
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Full-width <code class="code">.page</code>: h1 + "8 companies", search toolbar, one table. One page, no pager.</li>
+          <li>Below 1280: Job roles, Documents and the slug line hide.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Components</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li><code class="code">.dt</code> with a two-row header: Company, Members, Job roles, Documents, and a "Last 30 days" colgroup (Active learners, Model spend).</li>
+          <li><code class="code">.th-sort</code> on every column; default Model spend, descending.</li>
+          <li>Row: company link + <code class="code">/org/slug</code> sub line, numbers right-aligned, More actions <code class="code">.icon-btn</code>.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Interaction</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Search by name or slug as you type (debounced); the count under the h1 updates.</li>
+          <li>Sort button toggles direction; aria-sort moves to that th only; the caption names the order.</li>
+          <li>Company name → Company detail.</li>
+          <li>Loading: see Loading skeletons.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 10 Company detail ============ -->
+  <section aria-labelledby="ho-s10" style="display: flex; flex-direction: column; gap: 20px; border-top: 1px solid var(--border); padding-top: 32px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="ho-s10" class="t-title2">10 · Company detail</h2>
+      <p class="t-body muted">Route: <code class="code">/admin/companies/:slug</code> · Artboards: <a href="CompanyDetail.dc.html">CompanyDetail</a>, <a href="CompanyDetail-Dark.dc.html">CompanyDetail-Dark</a></p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; align-items: start;">
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li><code class="code">.page-capped</code>: crumbs, logo + h1, meta (slug · created · owner), two key figures and the portal action.</li>
+          <li>Then Members, Roles, Documents, Model spend by job, stacked.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Components</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Saffron "View portal (read only)", the one key action.</li>
+          <li>Tables: Members (email, membership role, joined, last active), Roles (training chip, concepts, live questions, people), Documents (type, version, uploaded, by, status chip).</li>
+          <li><code class="code">.hbar</code> per job with the model id in <code class="code">.code</code>; sr-only table with the total.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Interaction</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>View portal → <code class="code">/admin/companies/northwind/portal</code> (read-only Overview), focus on its h1.</li>
+          <li>Tables are plain lists, no row actions.</li>
+          <li>"—" cells carry sr-only words ("Not joined", "Still generating").</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 11 Read-only portal ============ -->
+  <section aria-labelledby="ho-s11" style="display: flex; flex-direction: column; gap: 20px; border-top: 1px solid var(--border); padding-top: 32px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="ho-s11" class="t-title2">11 · Read-only portal</h2>
+      <p class="t-body muted">Route: <code class="code">/admin/companies/:slug/portal</code> + the partner routes under it · Artboards: <a href="RO-Overview.dc.html">RO-Overview</a>, <a href="RO-Overview-Dark.dc.html">RO-Overview-Dark</a>, <a href="RO-RoleDetail.dc.html">RO-RoleDetail</a>, <a href="RO-Questions.dc.html">RO-Questions</a></p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; align-items: start;">
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>The partner screens, unchanged in layout, under the staff prefix (<code class="code">/portal</code>, <code class="code">/portal/roles/:roleId</code>, <code class="code">/portal/questions</code>…).</li>
+          <li><code class="code">.ro-band</code> 48px, sticky, full width above nav and content; <code class="code">.app.has-band</code> shifts the sticky nav and table heads down 48px.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Components</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Band: eye icon, "Read only · You are viewing Northwind Logistics as Learn Quiz staff. Nothing here can be changed.", link "Exit to staff admin".</li>
+          <li>PortalNav <code class="code">readonly</code>: <code class="code">.ro-pill</code> "Read only" + "Staff view" replace the user and Sign out.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Interaction</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Band is <code class="code">role="region"</code> "Read-only view", first in tab order. Exit → Company detail.</li>
+          <li>Not rendered: page actions, upload, document menus, switches, Edit, Retry, Approve, Retire, next-step banners. Critical shows as a chip.</li>
+          <li>Reads accept <code class="code">requireStaff</code>; every write requires <code class="code">requireOrgAdmin</code>, so a leaked control still fails.</li>
+          <li>People, Person and Settings have no read-only artboards; the same rule applies.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 12 Users ============ -->
+  <section aria-labelledby="ho-s12" style="display: flex; flex-direction: column; gap: 20px; border-top: 1px solid var(--border); padding-top: 32px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="ho-s12" class="t-title2">12 · Users</h2>
+      <p class="t-body muted">Route: <code class="code">/admin/users</code> · Artboards: <a href="Users.dc.html">Users</a>, <a href="Users-Ban.dc.html">Users-Ban</a>, <a href="Users-Banned.dc.html">Users-Banned</a>, <a href="Users-Dark.dc.html">Users-Dark</a></p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; align-items: start;">
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Full-width <code class="code">.page</code>: h1, toolbar (search, Global role, Status), table, pager. 25 per page.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Components</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li><code class="code">.dt</code>: Name + email, Global role (<code class="code">.tag</code> Admin), Company + membership, Status (plain Active, strong Banned + reason), Joined (sorted, newest first), action.</li>
+          <li>Action: ghost Ban or secondary Unban. Own row: <code class="code">.tag</code> You; Ban aria-disabled with "You can't ban yourself".</li>
+          <li>Ban dialog: who line, Reason <code class="code">.textarea</code> (required, "Only Learn Quiz staff see this."), consequences, Cancel, <code class="code">.btn-danger</code> "Ban user".</li>
+          <li><code class="code">.pager</code>: "1–25 of 214 users", Previous, Next.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Interaction</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Search by email or name; any filter change resets to page 1.</li>
+          <li>Ban opens the dialog with focus on Reason; Esc or Cancel returns focus to that row's Ban.</li>
+          <li>Ban user signs them out on every device. Banner <code class="code">role="status"</code> "Theo Marsh is banned." + Undo; the row shows Banned + Unban; focus to that Unban.</li>
+          <li>Unban acts at once, no dialog; the status line confirms.</li>
+          <li>The server refuses a self-ban whatever the UI shows.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 13 Model usage ============ -->
+  <section aria-labelledby="ho-s13" style="display: flex; flex-direction: column; gap: 20px; border-top: 1px solid var(--border); padding-top: 32px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="ho-s13" class="t-title2">13 · Model usage</h2>
+      <p class="t-body muted">Route: <code class="code">/admin/usage</code> · Artboards: <a href="ModelUsage.dc.html">ModelUsage</a>, <a href="ModelUsage-Dark.dc.html">ModelUsage-Dark</a></p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; align-items: start;">
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Full-width <code class="code">.page</code>: h1 + range line (times in UTC), date range in page actions.</li>
+          <li>Four figures; Calls and Cost charts in <code class="code">.grid-2</code>; Latency full width; By job; By company; Latest 50 failures.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Components</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Date range: <code class="code">.seg</code> 7, 30, 90 days + secondary button with the custom range (aria-haspopup="dialog").</li>
+          <li><code class="code">.stats.card</code>: Calls, Failures (+ % of calls), Latency p95, Cost.</li>
+          <li>Bar charts (calls with failure-rate strip, cost); line chart p50 solid, p95 dashed, with a Job select. Each: legend, role="img" summary, sr-only table with a total row.</li>
+          <li>By job: model name + id (<code class="code">.cell-code</code>), totals in tfoot. By company: sortable, Cost descending. Failures: time, job, model, company, error in <code class="code">.code</code>; pager 25 per page.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Interaction</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>The range drives every figure, chart and table. Preset buttons are aria-pressed; focus stays on the control; the range line under the h1 updates.</li>
+          <li>Custom range opens a dialog with From and To; Esc returns focus to the button.</li>
+          <li>Today is partial; captions say so ("Nov 3 counts up to 10:42").</li>
+          <li>No auto-refresh; the page shows data as of load.</li>
+          <li>Company names → Company detail.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 14 Generation jobs ============ -->
+  <section aria-labelledby="ho-s14" style="display: flex; flex-direction: column; gap: 20px; border-top: 1px solid var(--border); padding-top: 32px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="ho-s14" class="t-title2">14 · Generation jobs</h2>
+      <p class="t-body muted">Route: <code class="code">/admin/jobs</code> · Artboards: <a href="Jobs.dc.html">Jobs</a>, <a href="Jobs-Retried.dc.html">Jobs-Retried</a>, <a href="Jobs-Dark.dc.html">Jobs-Dark</a></p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; align-items: start;">
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Full-width <code class="code">.page</code>: h1 + "Updated 10:42:15 · refreshes every 5 s" + Pause updates; filter chips; table with bulk bar; pager.</li>
+          <li>Order: failed first, then generating, then pending in queue order.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Components</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li><code class="code">.filter-chip</code>: Not ready 19 (default: Failed + Generating + Pending), Failed, Generating, Pending, Ready.</li>
+          <li><code class="code">.dt</code> + <code class="code">.col-check</code>: Company · role, Target (concept or document + job type), State, Started, Duration, Error (<code class="code">.code</code>), Retry.</li>
+          <li>States: strong Failed, tint Generating, dashed Pending, plain Ready.</li>
+          <li><code class="code">.bulkbar</code> after selection: "3 selected", saffron "Retry 3 jobs", Clear selection. Selected rows aria-selected (brand-tint).</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Interaction</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Polls every 5 s. Rows are keyed by job id so focus and selection survive a refresh. The table is not a live region.</li>
+          <li>Polling pauses while focus is in the table, while any row is selected, and on Pause updates (aria-pressed).</li>
+          <li>One sr-only <code class="code">role="status"</code> announces only count changes: "3 failed, 4 generating, 12 pending, 389 ready."</li>
+          <li>Retry (row or bulk) re-queues; banner <code class="code">role="status"</code> "3 jobs queued again." with Dismiss; selection clears; focus to the banner.</li>
+          <li>StaffNav's failed count follows the same poll.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 15 Content flags ============ -->
+  <section aria-labelledby="ho-s15" style="display: flex; flex-direction: column; gap: 20px; border-top: 1px solid var(--border); padding-top: 32px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="ho-s15" class="t-title2">15 · Content flags</h2>
+      <p class="t-body muted">Route: <code class="code">/admin/flags</code> · Artboards: <a href="Flags.dc.html">Flags</a>, <a href="Flags-Dark.dc.html">Flags-Dark</a></p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; align-items: start;">
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Full-width <code class="code">.page</code>: h1, toolbar (type chips, Company, Status), one table, newest first.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Components</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li><code class="code">.filter-chip</code>, single choice: All 9, Reported by learners 5, Retired by partners 4.</li>
+          <li><code class="code">.dt</code>: Question (stem link + source · unit), Company, Reason and note, When (sorted, + who), Status (strong Flagged by learner, muted Retired, plain "Resolved Nov 1").</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Interaction</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Chips and selects filter rows; sr-only status "Showing 5 flags".</li>
+          <li>Question link → that question in the company's read-only Questions (<code class="code">/admin/companies/:slug/portal/questions</code>).</li>
+          <li>No actions here; the partner resolves flags in Question review.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 16 Loading ============ -->
+  <section aria-labelledby="ho-s16" style="display: flex; flex-direction: column; gap: 20px; border-top: 1px solid var(--border); padding-top: 32px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="ho-s16" class="t-title2">16 · Loading skeletons</h2>
+      <p class="t-body muted">Any route on first load · Artboards: <a href="Overview-Loading.dc.html">Overview-Loading</a>, <a href="Companies-Loading.dc.html">Companies-Loading</a></p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; align-items: start;">
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Skeleton keeps the final layout: h1 and nav are real; figures, section heading, table header and rows at their real heights.</li>
+          <li>Companies keeps the real <code class="code">&lt;thead&gt;</code>, so columns don't jump when rows arrive.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Components</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li><code class="code">.skel</code> blocks (chip-shaped where a chip will be), <code class="code">.skel-line</code>, <code class="code">.stats.card</code> and <code class="code">.dt-wrap</code> shells.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Interaction</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Skeleton is aria-hidden; the table gets <code class="code">aria-busy="true"</code>; one sr-only status ("Loading companies").</li>
+          <li>Static: no shimmer, no spinner. Content replaces it in place; focus stays on the h1.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 17 Model working ============ -->
+  <section aria-labelledby="ho-s17" style="display: flex; flex-direction: column; gap: 20px; border-top: 1px solid var(--border); padding-top: 32px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="ho-s17" class="t-title2">17 · Model working</h2>
+      <p class="t-body muted">Route: <code class="code">/org/northwind/roles/:roleId</code> · Artboards: <a href="RoleDetail-Building.dc.html">RoleDetail-Building</a>, <a href="RoleDetail-BuildingLive.dc.html">RoleDetail-BuildingLive</a>, <a href="Overview-Preparing.dc.html">Overview-Preparing</a></p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; align-items: start;">
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Progress sits in the Curriculum section head. Units fill in as they are found.</li>
+          <li>Next unit: name + "Finding concepts…" + skeleton lines. Units further out: one skeleton card.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Components</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li><code class="code">.meter</code> <code class="code">role="progressbar"</code> with aria-valuenow and valuetext "12 of 31 concepts ready".</li>
+          <li>Concepts: question count when done, <code class="code">.chip-tint</code> Generating questions, <code class="code">.chip-dashed</code> Queued.</li>
+          <li>Finish: <code class="code">.banner</code> "Curriculum ready · 31 concepts" + primary Review questions.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Interaction</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Work runs on the queue (one message per concept), so the partner can leave; status also shows on Overview and Roles.</li>
+          <li>The page polls job status (BuildingLive simulates one concept per 700 ms). Critical switches stay usable on found concepts.</li>
+          <li>Announced in steps of 5 ("15 of 31 concepts ready"), then "31 of 31 concepts ready. Curriculum ready." Focus never moves.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 18 Permission denied ============ -->
+  <section aria-labelledby="ho-s18" style="display: flex; flex-direction: column; gap: 20px; border-top: 1px solid var(--border); padding-top: 32px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="ho-s18" class="t-title2">18 · Permission denied</h2>
+      <p class="t-body muted">Route: any <code class="code">/org/:slug/…</code> without owner or admin, any <code class="code">/admin/…</code> without staff · Artboards: <a href="Denied.dc.html">Denied</a>, <a href="Denied-Staff.dc.html">Denied-Staff</a>, <a href="Denied-Dark.dc.html">Denied-Dark</a></p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; align-items: start;">
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>No nav. Learn Quiz mark + one card: h1, one paragraph, one action.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Components</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li><code class="code">.card</code>, <code class="code">.btn-primary.btn-block</code>.</li>
+          <li>Portal: "No access to this portal", signed-in email, who to ask (the owner), "Sign in with another account".</li>
+          <li>Staff: "No access to the staff admin", "Go to your portal".</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Interaction</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Rendered for a 403 from <code class="code">requireOrgAdmin</code> or <code class="code">requireStaff</code>; the URL stays. Focus on h1.</li>
+          <li>Always a way out; never "Try again".</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 19 Not found ============ -->
+  <section aria-labelledby="ho-s19" style="display: flex; flex-direction: column; gap: 20px; border-top: 1px solid var(--border); padding-top: 32px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="ho-s19" class="t-title2">19 · Not found</h2>
+      <p class="t-body muted">Route: e.g. <code class="code">/org/northwind/roles/:roleId</code> with an unknown id · Artboards: <a href="NotFound.dc.html">NotFound</a>, <a href="NotFound-Dark.dc.html">NotFound-Dark</a></p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; align-items: start;">
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Inside the portal shell, nav with no current item; <code class="code">.page-capped</code>; h1 + one line + two actions.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Components</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>h1 names the missing thing ("Role not found"); primary Go to Overview, secondary View roles.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Interaction</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>404 status; focus on h1. Same pattern for a missing person or question, with the matching list as the second action.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 20 Failed save ============ -->
+  <section aria-labelledby="ho-s20" style="display: flex; flex-direction: column; gap: 20px; border-top: 1px solid var(--border); padding-top: 32px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 id="ho-s20" class="t-title2">20 · Failed save keeps input</h2>
+      <p class="t-body muted">Route: <code class="code">/org/northwind/settings</code>, <code class="code">/org/new</code> · Artboards: <a href="Settings-SaveFail.dc.html">Settings-SaveFail</a>, <a href="CreateCompany-Error.dc.html">CreateCompany-Error</a></p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; align-items: start;">
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Layout</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li>Banner at the top of the form region: under the h1 on Settings, above the button on Create company.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Components</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li><code class="code">.banner.banner-alert</code>, alert icon, words first: "Couldn't save your changes. The server didn't respond. Your edits are still in the form." + secondary Try again.</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+        <h3 class="t-label">Interaction</h3>
+        <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere;">
+          <li><code class="code">role="alert"</code>, announced once. Every input keeps its value (the artboard shows the edited name and Saturday on).</li>
+          <li>Focus stays on the submit button. Try again resends the same values; the banner clears on success.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Open questions ============ -->
+  <section aria-labelledby="ho-open" style="display: flex; flex-direction: column; gap: 20px; border-top: 1px solid var(--border); padding-top: 32px;">
+    <h2 id="ho-open" class="t-title2">Open questions</h2>
+    <ul class="t-body" style="list-style: disc; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; max-width: 960px;">
+      <li>Build progress and Generation jobs: poll (3 to 5 s, as designed) or server-sent events from the Worker? Polling is simpler on Workers; SSE removes the delay.</li>
+      <li>Retiring the last source of a concept: today the dialog warns and the concept leaves training. Should it block instead, or ask for a replacement document first?</li>
+      <li>Invite links: 7 days and single use as designed? Does "Create new link" invalidate the old link?</li>
+      <li>Should opening a company's portal read-only write an audit entry (staff user, company, time), and should the partner see it?</li>
+      <li>What counts as a "document awaiting review": any document with Unreviewed questions, or only a new version since the last review? Overview shows 1 (Returns procedure).</li>
+      <li>"Approve and next" order: outline order, or critical concepts first?</li>
+      <li>Critical switch saves at once. Should changing it trigger anything (question priority, critical-error tracking from that day), and does it need an undo?</li>
+      <li>Model usage custom range: maximum span, and is UTC right for staff, or should each company's figures follow its timezone?</li>
+    </ul>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light"},"$preview":{"width":1440,"height":11000}}'>
+class Component extends DCLogic {
+  renderVals() { return { theme: this.props.theme ?? 'light' }; }
+}
+</script>
+</body>
+</html>

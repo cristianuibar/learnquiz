@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Roles · Northwind Logistics</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" style="position: relative;">
+  <div class="app" aria-hidden="{{bgHidden}}">
+    <dc-import name="PortalNav" active="roles" readonly="false" hint-size="248px,900px"></dc-import>
+    <main class="main">
+      <div class="page">
+        <div class="page-head">
+          <div class="page-head-text">
+            <h1 class="t-title1" tabindex="-1">Roles</h1>
+          </div>
+          <div class="page-actions">
+            <a class="{{createBtnClass}}" href="Roles-Create.dc.html" aria-haspopup="dialog"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Create role</a>
+          </div>
+        </div>
+
+        <!-- ============ FAILED: attention banner above the table ============ -->
+        <sc-if value="{{isFailed}}" hint-placeholder-val="{{ false }}">
+          <div class="banner banner-alert" role="alert">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5h.01"></path></svg>
+            <p class="banner-text"><strong>Forklift operator training failed.</strong> 2 documents have no selectable text. Replace them or paste the text.</p>
+            <a class="btn btn-secondary" href="RoleDetail-Problems.dc.html">Fix documents</a>
+          </div>
+        </sc-if>
+
+        <div class="dt-wrap">
+          <table class="dt dt-stack">
+            <caption class="sr-only">Job roles with training status, benchmark, onboarding period and people assigned</caption>
+            <thead>
+              <tr>
+                <th scope="col" style="width: 28%;">Role</th>
+                <th scope="col" style="width: 32%;">Training</th>
+                <th scope="col" class="r">Benchmark</th>
+                <th scope="col" class="r">Onboarding</th>
+                <th scope="col" class="r">People</th>
+                <th scope="col" class="col-actions"><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- ============ NEW company: one role, no documents ============ -->
+              <sc-if value="{{isNew}}" hint-placeholder-val="{{ false }}">
+                <tr>
+                  <td class="stack-full"><a class="cell-main" href="RoleDetail.dc.html">Warehouse picker</a></td>
+                  <td data-label="Training">
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                      <span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" stroke-dasharray="3 3"></path></svg>No documents yet</span>
+                      <a class="link-btn" href="RoleDetail.dc.html" aria-label="Upload SOP for Warehouse picker">Upload SOP</a>
+                    </div>
+                  </td>
+                  <td class="r num" data-label="Benchmark">85%</td>
+                  <td class="r num" data-label="Onboarding">30 days</td>
+                  <td class="r num" data-label="People">0</td>
+                  <td class="col-actions"><button class="icon-btn" type="button" aria-haspopup="menu" aria-label="More actions for Warehouse picker"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg></button></td>
+                </tr>
+              </sc-if>
+
+              <!-- ============ NORMAL / CREATE / FAILED: two roles ============ -->
+              <sc-if value="{{hasTwoRoles}}" hint-placeholder-val="{{ true }}">
+                <tr>
+                  <td class="stack-full"><a class="cell-main" href="RoleDetail-Ready.dc.html">Warehouse picker</a></td>
+                  <td data-label="Training"><span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>Ready</span></td>
+                  <td class="r num" data-label="Benchmark">85%</td>
+                  <td class="r num" data-label="Onboarding">30 days</td>
+                  <td class="r num" data-label="People">3</td>
+                  <td class="col-actions"><button class="icon-btn" type="button" aria-haspopup="menu" aria-label="More actions for Warehouse picker"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg></button></td>
+                </tr>
+                <tr>
+                  <td class="stack-full"><a class="cell-main" href="{{forkliftHref}}">Forklift operator</a></td>
+                  <td data-label="Training">
+                    <sc-if value="{{forkliftPreparing}}" hint-placeholder-val="{{ true }}">
+                      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                        <span class="chip chip-tint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12M6 21h12M7 3v3a5 5 0 0 0 10 0V3M7 21v-3a5 5 0 0 1 10 0v3"></path></svg>Preparing training</span>
+                        <span class="t-caption muted num">9 of 24 concepts</span>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{isFailed}}" hint-placeholder-val="{{ false }}">
+                      <span class="chip chip-strong"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l5 5v8l-5 5H8l-5-5V8z"></path><path d="M12 8v5M12 16h.01"></path></svg>Training failed</span>
+                    </sc-if>
+                  </td>
+                  <td class="r num" data-label="Benchmark">90%</td>
+                  <td class="r num" data-label="Onboarding">21 days</td>
+                  <td class="r num" data-label="People">0</td>
+                  <td class="col-actions"><button class="icon-btn" type="button" aria-haspopup="menu" aria-label="More actions for Forklift operator"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg></button></td>
+                </tr>
+              </sc-if>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ============ CREATE: dialog over the list ============ -->
+  <sc-if value="{{isCreate}}" hint-placeholder-val="{{ false }}">
+    <div class="overlay">
+      <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="rl-dlg-title">
+        <form style="display: contents;">
+          <div class="dialog-head">
+            <h2 id="rl-dlg-title" class="t-title2">Create role</h2>
+            <a class="icon-btn" href="Roles.dc.html" aria-label="Close"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></a>
+          </div>
+          <div class="dialog-body">
+            <div class="field">
+              <label class="field-label" for="rl-name">Name</label>
+              <input class="input" id="rl-name" name="name" type="text" value="" autocomplete="off">
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label class="field-label" for="rl-bench">Benchmark<span class="sr-only"> (percent)</span></label>
+                <span class="input-suffix">
+                  <input class="input num" id="rl-bench" name="benchmark" type="number" inputmode="numeric" min="1" max="100" step="1" value="85">
+                  <span aria-hidden="true">%</span>
+                </span>
+              </div>
+              <div class="field">
+                <label class="field-label" for="rl-days">Onboarding period<span class="sr-only"> (days)</span></label>
+                <span class="input-suffix">
+                  <input class="input num" id="rl-days" name="onboarding_days" type="number" inputmode="numeric" min="1" max="365" step="1" value="30" style="padding-right: 56px;">
+                  <span aria-hidden="true">days</span>
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="dialog-foot">
+            <a class="btn btn-secondary" href="Roles.dc.html">Cancel</a>
+            <!-- Build: <button type="submit">; an <a> here so the canvas flow continues to the new role. -->
+            <a class="btn btn-primary" href="RoleDetail.dc.html">Create role</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light"},"state":{"editor":"enum","options":["normal","new","create","failed"],"default":"normal"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.props.state ?? 'normal';
+    const failed = s === 'failed';
+    return {
+      theme: this.props.theme ?? 'light',
+      isNew: s === 'new',
+      createBtnClass: s === 'new' ? 'btn btn-secondary' : 'btn btn-primary',
+      hasTwoRoles: s !== 'new',
+      isCreate: s === 'create',
+      isFailed: failed,
+      forkliftPreparing: !failed,
+      forkliftHref: failed ? 'RoleDetail-Problems.dc.html' : 'RoleDetail-Building.dc.html',
+      bgHidden: s === 'create' ? 'true' : undefined,
+    };
+  }
+}
+</script>
+</body>
+</html>

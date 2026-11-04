@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Generation jobs · Learn Quiz staff</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" style="position: relative;">
+  <div class="app">
+    <dc-import name="StaffNav" active="jobs" failed="{{failedCount}}" hint-size="248px,900px"></dc-import>
+    <main class="main">
+      <div class="page">
+        <div class="page-head">
+          <div class="page-head-text">
+            <h1 class="t-title1" tabindex="-1">Generation jobs</h1>
+            <p class="t-caption muted num">Updated {{updated}} · refreshes every 5 s</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-ghost" type="button" aria-pressed="false">Pause updates</button>
+          </div>
+        </div>
+
+        <!-- Polling: the table re-renders every 5 s but is NOT a live region. Only this line announces count changes. -->
+        <p class="sr-only" role="status" aria-live="polite">{{countsLine}}</p>
+
+        <!-- ============ RETRIED: confirmation ============ -->
+        <sc-if value="{{isRetried}}" hint-placeholder-val="{{ false }}">
+          <div class="banner" role="status">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+            <p class="banner-text">3 jobs queued again.</p>
+            <button class="icon-btn" type="button" aria-label="Dismiss message"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+          </div>
+        </sc-if>
+
+        <section class="section" aria-labelledby="jb-h">
+          <h2 id="jb-h" class="sr-only">Jobs</h2>
+          <div class="dt-toolbar" role="group" aria-label="Filter by state">
+            <button class="filter-chip" type="button" aria-pressed="true">Not ready <span class="count">19</span></button>
+            <button class="filter-chip" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l5 5v8l-5 5H8l-5-5V8z"></path><path d="M12 8v5M12 16h.01"></path></svg>Failed <span class="count">{{failedCount}}</span></button>
+            <button class="filter-chip" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12M6 21h12M7 3v3a5 5 0 0 0 10 0V3M7 21v-3a5 5 0 0 1 10 0v3"></path></svg>Generating <span class="count">4</span></button>
+            <button class="filter-chip" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending <span class="count">{{pendingCount}}</span></button>
+            <button class="filter-chip" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>Ready <span class="count">389</span></button>
+          </div>
+
+          <!-- Live table behavior: rows are keyed by job id, so focus and selection are preserved across refreshes.
+               Polling pauses while focus is inside the table or any row is selected, and resumes when both clear.
+               Default filter "Not ready" = Failed + Generating + Pending; Ready jobs show only under the Ready chip. -->
+
+          <!-- ============ LIST: 3 failed rows selected ============ -->
+          <sc-if value="{{isList}}" hint-placeholder-val="{{ true }}">
+            <div class="dt-wrap">
+              <div class="bulkbar">
+                <p class="t-label num" role="status" style="margin-right: 8px;">3 selected</p>
+                <a class="btn btn-accent" href="Jobs-Retried.dc.html"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"></path></svg>Retry 3 jobs</a>
+                <button class="btn btn-ghost" type="button">Clear selection</button>
+              </div>
+              <table class="dt" style="table-layout: fixed;">
+                <caption class="sr-only">Generation jobs not ready yet: failed first, then generating, then pending in queue order. Rows 1 to 19 of 19. 3 failed jobs selected.</caption>
+                <colgroup><col style="width: 52px;"><col style="width: 180px;"><col style="width: 220px;"><col style="width: 140px;"><col style="width: 112px;"><col style="width: 96px;"><col><col style="width: 104px;"></colgroup>
+                <thead>
+                  <tr>
+                    <th scope="col" class="col-check" style="width: 52px;"><label class="check"><input type="checkbox" checked="" aria-label="Select all failed"></label></th>
+                    <th scope="col" style="width: 180px;">Company · role</th>
+                    <th scope="col" style="width: 194px;">Target</th>
+                    <th scope="col" style="width: 140px;">State</th>
+                    <th scope="col" class="r" style="width: 132px;">Started</th>
+                    <th scope="col" class="r" style="width: 104px;">Duration</th>
+                    <th scope="col">Error</th>
+                    <th scope="col" class="col-actions" style="width: 112px;"><span class="sr-only">Action</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Failed -->
+                  <tr aria-selected="true">
+                    <td class="col-check"><label class="check"><input type="checkbox" checked="" aria-label="Select Battery change procedure, Northwind Logistics"></label></td>
+                    <td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Battery change procedure</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-strong"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l5 5v8l-5 5H8l-5-5V8z"></path><path d="M12 8v5M12 16h.01"></path></svg>Failed</span></td>
+                    <td class="r">10:40:21</td><td class="r">46 s</td>
+                    <td><span class="code" title='invalid JSON: missing "options"' style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere;">invalid JSON: missing "options"</span></td>
+                    <td class="col-actions"><button class="btn btn-secondary" type="button">Retry<span class="sr-only"> Battery change procedure, Northwind Logistics</span></button></td>
+                  </tr>
+                  <tr aria-selected="true">
+                    <td class="col-check"><label class="check"><input type="checkbox" checked="" aria-label="Select Late check-out requests, Tallis Hotels"></label></td>
+                    <td><div class="cell-main">Tallis Hotels</div><div class="cell-sub">Front desk agent</div></td>
+                    <td><div class="cell-main">Late check-out requests</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-strong"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l5 5v8l-5 5H8l-5-5V8z"></path><path d="M12 8v5M12 16h.01"></path></svg>Failed</span></td>
+                    <td class="r">10:38:14</td><td class="r">60 s</td>
+                    <td><span class="code" title="timeout after 60 s" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere;">timeout after 60 s</span></td>
+                    <td class="col-actions"><button class="btn btn-secondary" type="button">Retry<span class="sr-only"> Late check-out requests, Tallis Hotels</span></button></td>
+                  </tr>
+                  <tr aria-selected="true">
+                    <td class="col-check"><label class="check"><input type="checkbox" checked="" aria-label="Select Allergen changeover, Bluefield Foods"></label></td>
+                    <td><div class="cell-main">Bluefield Foods</div><div class="cell-sub">Sanitation tech</div></td>
+                    <td><div class="cell-main">Allergen changeover</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-strong"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l5 5v8l-5 5H8l-5-5V8z"></path><path d="M12 8v5M12 16h.01"></path></svg>Failed</span></td>
+                    <td class="r">10:30:40</td><td class="r">48 s</td>
+                    <td><span class="code" title="quote not found in source text" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere;">quote not found in source text</span></td>
+                    <td class="col-actions"><button class="btn btn-secondary" type="button">Retry<span class="sr-only"> Allergen changeover, Bluefield Foods</span></button></td>
+                  </tr>
+                  <!-- Generating -->
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Pedestrian right of way</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-tint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12M6 21h12M7 3v3a5 5 0 0 0 10 0V3M7 21v-3a5 5 0 0 1 10 0v3"></path></svg>Generating</span></td>
+                    <td class="r">10:42:02</td><td class="r">13 s so far</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Load center distance</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-tint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12M6 21h12M7 3v3a5 5 0 0 0 10 0V3M7 21v-3a5 5 0 0 1 10 0v3"></path></svg>Generating</span></td>
+                    <td class="r">10:41:48</td><td class="r">27 s so far</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Pre-shift inspection</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-tint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12M6 21h12M7 3v3a5 5 0 0 0 10 0V3M7 21v-3a5 5 0 0 1 10 0v3"></path></svg>Generating</span></td>
+                    <td class="r">10:41:33</td><td class="r">42 s so far</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Lumen Retail Group</div><div class="cell-sub">Warehouse picker</div></td>
+                    <td><div class="cell-main">Store picking SOP</div><div class="cell-sub">Document text</div></td>
+                    <td><span class="chip chip-tint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12M6 21h12M7 3v3a5 5 0 0 0 10 0V3M7 21v-3a5 5 0 0 1 10 0v3"></path></svg>Generating</span></td>
+                    <td class="r">10:41:10</td><td class="r">65 s so far</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <!-- Pending (queue order) -->
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Two-person lift above 23 kg</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:35</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Fork height when traveling</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:35</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Ramp and slope driving</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:35</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Horn at blind corners</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:35</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Loads that block the view</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:35</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Overhead clearance</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:35</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Charging area rules</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:35</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Parking and key removal</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:35</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Seat belt on at all times</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:35</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Spill and leak reporting</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:35</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Shift handover checks</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:35</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Lumen Retail Group</div><div class="cell-sub">Warehouse picker</div></td>
+                    <td><div class="cell-main">2 documents</div><div class="cell-sub">Curriculum</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:41</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                </tbody>
+              </table>
+              <nav class="pager" aria-label="Job pages">
+                <p class="t-caption muted num">1–19 of 19</p>
+                <div class="pager-btns">
+                  <button class="icon-btn" type="button" aria-label="Previous page" disabled=""><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button>
+                  <button class="icon-btn" type="button" aria-label="Next page" disabled=""><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button>
+                </div>
+              </nav>
+            </div>
+          </sc-if>
+
+          <!-- ============ RETRIED: failed jobs queued again, selection cleared ============ -->
+          <sc-if value="{{isRetried}}" hint-placeholder-val="{{ false }}">
+            <div class="dt-wrap">
+              <table class="dt" style="table-layout: fixed;">
+                <caption class="sr-only">Generation jobs not ready yet: generating first, then pending in queue order. Rows 1 to 19 of 19. No failed jobs; 3 jobs were just queued again.</caption>
+                <colgroup><col style="width: 52px;"><col style="width: 180px;"><col style="width: 220px;"><col style="width: 140px;"><col style="width: 112px;"><col style="width: 96px;"><col><col style="width: 104px;"></colgroup>
+                <thead>
+                  <tr>
+                    <th scope="col" class="col-check" style="width: 52px;"><span class="sr-only">Selection</span></th>
+                    <th scope="col" style="width: 180px;">Company · role</th>
+                    <th scope="col" style="width: 194px;">Target</th>
+                    <th scope="col" style="width: 140px;">State</th>
+                    <th scope="col" class="r" style="width: 132px;">Started</th>
+                    <th scope="col" class="r" style="width: 104px;">Duration</th>
+                    <th scope="col">Error</th>
+                    <th scope="col" class="col-actions" style="width: 112px;"><span class="sr-only">Action</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Generating -->
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Pedestrian right of way</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-tint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12M6 21h12M7 3v3a5 5 0 0 0 10 0V3M7 21v-3a5 5 0 0 1 10 0v3"></path></svg>Generating</span></td>
+                    <td class="r">10:42:02</td><td class="r">18 s so far</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Load center distance</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-tint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12M6 21h12M7 3v3a5 5 0 0 0 10 0V3M7 21v-3a5 5 0 0 1 10 0v3"></path></svg>Generating</span></td>
+                    <td class="r">10:41:48</td><td class="r">32 s so far</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Pre-shift inspection</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-tint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12M6 21h12M7 3v3a5 5 0 0 0 10 0V3M7 21v-3a5 5 0 0 1 10 0v3"></path></svg>Generating</span></td>
+                    <td class="r">10:41:33</td><td class="r">47 s so far</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Lumen Retail Group</div><div class="cell-sub">Warehouse picker</div></td>
+                    <td><div class="cell-main">Store picking SOP</div><div class="cell-sub">Document text</div></td>
+                    <td><span class="chip chip-tint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12M6 21h12M7 3v3a5 5 0 0 0 10 0V3M7 21v-3a5 5 0 0 1 10 0v3"></path></svg>Generating</span></td>
+                    <td class="r">10:41:10</td><td class="r">70 s so far</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <!-- Pending (queue order; the 3 retried jobs join the end) -->
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Two-person lift above 23 kg</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:35</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Fork height when traveling</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:35</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Ramp and slope driving</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:35</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Horn at blind corners</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:35</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Loads that block the view</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:35</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Overhead clearance</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:35</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Charging area rules</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:35</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Parking and key removal</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:35</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Seat belt on at all times</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:35</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Spill and leak reporting</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:35</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Shift handover checks</div><div class="cell-sub">Concept questions</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:35</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Lumen Retail Group</div><div class="cell-sub">Warehouse picker</div></td>
+                    <td><div class="cell-main">2 documents</div><div class="cell-sub">Curriculum</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:41</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <!-- The 3 retried jobs: marked only by the "Retried 10:42 · attempt 2" meta line (no selection ground) -->
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Northwind Logistics</div><div class="cell-sub">Forklift operator</div></td>
+                    <td><div class="cell-main">Battery change procedure</div><div class="cell-sub">Retried 10:42 · attempt 2</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:42</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Tallis Hotels</div><div class="cell-sub">Front desk agent</div></td>
+                    <td><div class="cell-main">Late check-out requests</div><div class="cell-sub">Retried 10:42 · attempt 2</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:42</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"></td><td><div class="cell-main">Bluefield Foods</div><div class="cell-sub">Sanitation tech</div></td>
+                    <td><div class="cell-main">Allergen changeover</div><div class="cell-sub">Retried 10:42 · attempt 2</div></td>
+                    <td><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Pending</span></td>
+                    <td class="r">Queued 10:42</td><td class="r">—</td><td></td><td class="col-actions"></td>
+                  </tr>
+                </tbody>
+              </table>
+              <nav class="pager" aria-label="Job pages">
+                <p class="t-caption muted num">1–19 of 19</p>
+                <div class="pager-btns">
+                  <button class="icon-btn" type="button" aria-label="Previous page" disabled=""><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button>
+                  <button class="icon-btn" type="button" aria-label="Next page" disabled=""><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button>
+                </div>
+              </nav>
+            </div>
+          </sc-if>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light"},"state":{"editor":"enum","options":["list","retried"],"default":"list"},"$preview":{"width":1440,"height":1640}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.props.state ?? 'list';
+    const retried = s === 'retried';
+    return {
+      theme: this.props.theme ?? 'light',
+      isList: !retried,
+      isRetried: retried,
+      updated: retried ? '10:42:20' : '10:42:15',
+      failedCount: retried ? '0' : '3',
+      pendingCount: retried ? '15' : '12',
+      countsLine: retried
+        ? '0 failed, 4 generating, 15 pending, 389 ready.'
+        : '3 failed, 4 generating, 12 pending, 389 ready.',
+    };
+  }
+}
+</script>
+</body>
+</html>

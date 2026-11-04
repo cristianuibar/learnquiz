@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Partner portal navigation</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div style="display: contents">
+  <!-- Desktop (>= 1024): side navigation -->
+  <nav class="sidenav" aria-label="Northwind Logistics portal">
+    <div class="nav-org">
+      <svg class="org-logo" viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#5B2A6E"></rect><path d="M9 23V9l14 14V9" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      <span class="nav-org-name">Northwind Logistics</span>
+    </div>
+    <ul class="nav-list">
+      <li><a class="nav-item" href="{{hOverview}}" aria-current="{{cOverview}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"></path></svg>Overview</a></li>
+      <li><a class="nav-item" href="{{hRoles}}" aria-current="{{cRoles}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"></path></svg>Roles</a></li>
+      <li><a class="nav-item" href="{{hQuestions}}" aria-current="{{cQuestions}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.7M12 17h.01"></path></svg>Questions</a></li>
+      <li><a class="nav-item" href="{{hPeople}}" aria-current="{{cPeople}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"></path></svg>People</a></li>
+      <li><a class="nav-item" href="{{hSettings}}" aria-current="{{cSettings}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"></path><circle cx="16" cy="6" r="2"></circle><circle cx="10" cy="12" r="2"></circle><circle cx="18" cy="18" r="2"></circle></svg>Settings</a></li>
+    </ul>
+    <div class="nav-foot">
+      <sc-if value="{{notReadonly}}" hint-placeholder-val="{{ true }}">
+        <div class="nav-user">
+          <span class="avatar" aria-hidden="true">DW</span>
+          <div style="display: flex; flex-direction: column; min-width: 0; flex: 1;">
+            <span class="t-label">Dana Whitaker</span>
+            <span class="t-caption muted">Owner</span>
+          </div>
+          <button class="icon-btn" type="button" aria-label="Sign out"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H4"></path></svg></button>
+        </div>
+      </sc-if>
+      <sc-if value="{{readonly}}" hint-placeholder-val="{{ false }}">
+        <div class="nav-user">
+          <span class="ro-pill"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>Read only</span>
+          <span class="t-caption muted">Staff view</span>
+        </div>
+      </sc-if>
+      <div class="nav-poweredby">
+        <svg viewBox="0 0 64 64" width="20" height="20" aria-hidden="true"><mask id="lqm-pnav" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="#fff"></rect><circle cx="48" cy="48" r="13"></circle></mask><circle cx="32" cy="32" r="19" fill="none" stroke="var(--brand)" stroke-width="14" mask="url(#lqm-pnav)"></circle><circle cx="48" cy="48" r="9" fill="#F2A900"></circle></svg>
+        <span>Learn Quiz</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Below 1024: top bar; the menu button opens the same list as a sheet -->
+  <header class="topbar">
+    <div class="nav-org">
+      <svg class="org-logo" viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#5B2A6E"></rect><path d="M9 23V9l14 14V9" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      <span class="nav-org-name">Northwind Logistics</span>
+    </div>
+    <button class="icon-btn" type="button" aria-label="Menu" aria-expanded="false" aria-controls="portal-menu"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"></path></svg></button>
+  </header>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"active":{"editor":"enum","options":["overview","roles","questions","people","settings"],"default":"overview"},"readonly":{"editor":"boolean","default":false},"$preview":{"width":248,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const a = this.props.active ?? 'overview';
+    const ro = this.props.readonly === true || this.props.readonly === 'true';
+    const cur = (k) => (a === k ? 'page' : undefined);
+    const h = ro
+      ? { hOverview: 'RO-Overview.dc.html', hRoles: 'RO-RoleDetail.dc.html', hQuestions: 'RO-RoleDetail.dc.html', hPeople: 'RO-Overview.dc.html', hSettings: 'RO-Overview.dc.html' }
+      : { hOverview: 'Overview.dc.html', hRoles: 'Roles.dc.html', hQuestions: 'Questions.dc.html', hPeople: 'People.dc.html', hSettings: 'Settings.dc.html' };
+    return {
+      ...h,
+      cOverview: cur('overview'), cRoles: cur('roles'), cQuestions: cur('questions'), cPeople: cur('people'), cSettings: cur('settings'),
+      readonly: ro, notReadonly: !ro,
+    };
+  }
+}
+</script>
+</body>
+</html>

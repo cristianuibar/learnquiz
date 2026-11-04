@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Training progress · Northwind Logistics</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" style="position: relative;">
+  <div class="app">
+    <dc-import name="PortalNav" active="people" readonly="{{readonly}}" hint-size="248px,900px"></dc-import>
+    <main class="main">
+      <div class="page page-capped">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <nav aria-label="Breadcrumb">
+            <ol class="crumbs">
+              <li><a href="People.dc.html">People</a></li>
+              <li aria-hidden="true" style="display: flex;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></li>
+              <li><span aria-current="page" style="color: var(--ink);">{{personName}}</span></li>
+            </ol>
+          </nav>
+          <div class="page-head-text">
+            <h1 class="t-title1" tabindex="-1">Training progress</h1>
+            <p class="t-body">{{personLine}}</p>
+            <p class="t-caption muted" style="display: flex; align-items: center; gap: 6px;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>{{seesLine}}</p>
+          </div>
+        </div>
+
+        <!-- ============ NOT STARTED: benchmark card only ============ -->
+        <sc-if value="{{isNotStarted}}" hint-placeholder-val="{{ false }}">
+          <section class="card card-pad" aria-labelledby="pr-ns-h" style="max-width: 548px; display: flex; flex-direction: column; gap: 16px;">
+            <h2 id="pr-ns-h" class="t-title2 num">Day 1 of 30 · Benchmark 85%</h2>
+            <div class="bar bar-lg" role="progressbar" aria-label="Progress to benchmark" aria-valuemin="0" aria-valuemax="100" aria-valuetext="No sessions yet, benchmark 85%"><span class="bar-bench" style="left: calc(85% - 1px);"></span></div>
+            <p class="t-body muted">Progress shows after Luca's first session.</p>
+          </section>
+        </sc-if>
+
+        <!-- ============ IN PROGRESS: Jordan Reyes · hero (as in the learner app: benchmark card, then weekly trend) ============ -->
+        <sc-if value="{{isProgress}}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-direction: column; gap: 24px;">
+            <section class="card card-pad" aria-labelledby="pr-bench-h" style="display: flex; flex-direction: column; gap: 16px;">
+              <h2 id="pr-bench-h" class="sr-only">Progress to benchmark</h2>
+              <p style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;"><span class="t-display num">42%</span><span class="t-body-lg muted">of 85% benchmark</span></p>
+              <div class="bar bar-lg" role="progressbar" aria-label="Progress to benchmark" aria-valuemin="0" aria-valuemax="100" aria-valuenow="42" aria-valuetext="42%, benchmark 85%"><span class="bar-fill" style="width: 42%;"></span><span class="bar-bench" style="left: calc(85% - 1px);"></span></div>
+              <hr class="divider">
+              <ul class="t-label num" style="display: flex; flex-wrap: wrap; gap: 8px 32px;">
+                <li>Day 9 of 30</li>
+                <li>Projected: Nov 20</li>
+                <li>Sessions: 2 this week · 9 total</li>
+              </ul>
+            </section>
+
+            <section class="card card-pad" aria-labelledby="pr-trend-h" style="display: flex; flex-direction: column; gap: 16px;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px 16px; flex-wrap: wrap;">
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                  <h2 id="pr-trend-h" class="t-title2">Weekly trend</h2>
+                  <p class="t-caption muted">Since Oct 26</p>
+                </div>
+                <div class="legend" aria-hidden="true">
+                  <span><i class="key-line"></i>Mastery</span>
+                  <span><i class="key-proj"></i>Projected</span>
+                  <span><i class="key-bench"></i>Benchmark</span>
+                </div>
+              </div>
+              <svg class="chart" viewBox="0 0 1000 192" role="img" aria-label="Weekly mastery since Oct 26: 18% in the week of Oct 26 and 42% so far in the week of Nov 2. Projected to reach the 85% benchmark on Nov 20.">
+                <line class="grid" x1="52" y1="16" x2="996" y2="16"></line>
+                <line class="grid" x1="52" y1="76" x2="996" y2="76"></line>
+                <line class="grid" x1="52" y1="136" x2="996" y2="136"></line>
+                <text class="axis-label" x="44" y="20" text-anchor="end">100%</text>
+                <text class="value-label" x="44" y="38" text-anchor="end">85%</text>
+                <text class="axis-label" x="44" y="80" text-anchor="end">50%</text>
+                <text class="axis-label" x="44" y="140" text-anchor="end">0%</text>
+                <line class="bench" x1="52" y1="34" x2="996" y2="34"></line>
+                <polyline class="s1" points="96,114.4 337.9,85.6"></polyline>
+                <line class="proj" x1="337.9" y1="85.6" x2="960" y2="34"></line>
+                <circle class="dot" cx="96" cy="114.4" r="4"></circle>
+                <circle class="dot" cx="337.9" cy="85.6" r="4"></circle>
+                <circle class="dot-open" cx="960" cy="34" r="5"></circle>
+                <text class="value-label" x="96" y="102" text-anchor="middle">18%</text>
+                <text class="value-label" x="337.9" y="73" text-anchor="middle">42%</text>
+                <text class="value-label" x="96" y="158" text-anchor="middle">Oct 26</text>
+                <text class="value-label" x="337.9" y="158" text-anchor="middle">Nov 2</text>
+                <text class="axis-label" x="960" y="158" text-anchor="middle">Nov 20</text>
+                <text class="axis-label" x="0" y="184">Sessions</text>
+                <text class="value-label" x="96" y="184" text-anchor="middle">7</text>
+                <text class="value-label" x="337.9" y="184" text-anchor="middle">2<tspan class="axis-label"> so far</tspan></text>
+              </svg>
+              <table class="sr-only">
+                <caption>Weekly mastery for Jordan Reyes since Oct 26, benchmark 85%</caption>
+                <thead><tr><th scope="col">Week of</th><th scope="col">Mastery</th><th scope="col">Sessions</th></tr></thead>
+                <tbody>
+                  <tr><td>Oct 26</td><td>18%</td><td>7</td></tr>
+                  <tr><td>Nov 2</td><td>42%</td><td>2 so far</td></tr>
+                  <tr><td>Nov 20 (projected)</td><td>85%</td><td>Not applicable</td></tr>
+                </tbody>
+              </table>
+            </section>
+          </div>
+        </sc-if>
+
+        <!-- ============ PROFICIENT: Amara Okafor · hero ============
+             Proficiency is history: reached 88% on Oct 22 over the four units that existed then. Returns (added Nov 2) does not recompute it. -->
+        <sc-if value="{{isProficient}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 24px;">
+            <section class="card card-pad" aria-labelledby="pr-bench-h2" style="display: flex; flex-direction: column; gap: 16px;">
+              <h2 id="pr-bench-h2" class="sr-only">Progress to benchmark</h2>
+              <p style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;"><span class="t-display num">88%</span><span class="t-body-lg muted">of 85% benchmark</span></p>
+              <div class="bar bar-lg" role="progressbar" aria-label="Progress to benchmark" aria-valuemin="0" aria-valuemax="100" aria-valuenow="88" aria-valuetext="88%, benchmark 85%"><span class="bar-fill" style="width: 88%;"></span><span class="bar-bench" style="left: calc(85% - 1px);"></span></div>
+              <hr class="divider">
+              <ul class="t-label num" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 32px;">
+                <li style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;"><span class="chip chip-mastered"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Proficient</span>Reached Oct 22 · in 21 days</li>
+                <li>Sessions: 1 this week · 23 total</li>
+              </ul>
+            </section>
+
+            <section class="card card-pad" aria-labelledby="pr-trend-h2" style="display: flex; flex-direction: column; gap: 16px;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px 16px; flex-wrap: wrap;">
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                  <h2 id="pr-trend-h2" class="t-title2">Weekly trend</h2>
+                  <p class="t-caption muted">Since Sep 28</p>
+                </div>
+                <div class="legend" aria-hidden="true">
+                  <span><i class="key-line"></i>Mastery</span>
+                  <span><i class="key-bench"></i>Benchmark</span>
+                </div>
+              </div>
+              <svg class="chart" viewBox="0 0 1000 192" role="img" aria-label="Weekly mastery since the week of Sep 28: 22%, then 51% in the week of Oct 5, 73% in the week of Oct 12, 88% in the week of Oct 19 (85% benchmark reached Oct 22), 87% in the week of Oct 26 and 88% so far in the week of Nov 2.">
+                <line class="grid" x1="52" y1="16" x2="996" y2="16"></line>
+                <line class="grid" x1="52" y1="76" x2="996" y2="76"></line>
+                <line class="grid" x1="52" y1="136" x2="996" y2="136"></line>
+                <text class="axis-label" x="44" y="20" text-anchor="end">100%</text>
+                <text class="value-label" x="44" y="38" text-anchor="end">85%</text>
+                <text class="axis-label" x="44" y="80" text-anchor="end">50%</text>
+                <text class="axis-label" x="44" y="140" text-anchor="end">0%</text>
+                <line class="bench" x1="52" y1="34" x2="996" y2="34"></line>
+                <polyline class="s1" points="96,109.6 268.8,74.8 441.6,48.4 614.4,30.4 787.2,31.6 960,30.4"></polyline>
+                <circle class="dot" cx="96" cy="109.6" r="4"></circle>
+                <circle class="dot" cx="268.8" cy="74.8" r="4"></circle>
+                <circle class="dot" cx="441.6" cy="48.4" r="4"></circle>
+                <circle class="dot" cx="614.4" cy="30.4" r="4"></circle>
+                <circle class="dot" cx="787.2" cy="31.6" r="4"></circle>
+                <circle class="dot" cx="960" cy="30.4" r="4"></circle>
+                <text class="value-label" x="96" y="97" text-anchor="middle">22%</text>
+                <text class="value-label" x="268.8" y="62" text-anchor="middle">51%</text>
+                <text class="value-label" x="441.6" y="66" text-anchor="middle">73%</text>
+                <text class="value-label" x="614.4" y="50" text-anchor="middle">88%</text>
+                <text class="value-label" x="787.2" y="51" text-anchor="middle">87%</text>
+                <text class="value-label" x="960" y="50" text-anchor="middle">88%</text>
+                <text class="value-label" x="96" y="158" text-anchor="middle">Sep 28</text>
+                <text class="value-label" x="268.8" y="158" text-anchor="middle">Oct 5</text>
+                <text class="value-label" x="441.6" y="158" text-anchor="middle">Oct 12</text>
+                <text class="value-label" x="614.4" y="158" text-anchor="middle">Oct 19</text>
+                <text class="value-label" x="787.2" y="158" text-anchor="middle">Oct 26</text>
+                <text class="value-label" x="960" y="158" text-anchor="middle">Nov 2</text>
+                <text class="axis-label" x="0" y="184">Sessions</text>
+                <text class="value-label" x="96" y="184" text-anchor="middle">6</text>
+                <text class="value-label" x="268.8" y="184" text-anchor="middle">7</text>
+                <text class="value-label" x="441.6" y="184" text-anchor="middle">5</text>
+                <text class="value-label" x="614.4" y="184" text-anchor="middle">3</text>
+                <text class="value-label" x="787.2" y="184" text-anchor="middle">1</text>
+                <text class="value-label" x="960" y="184" text-anchor="middle">1<tspan class="axis-label"> so far</tspan></text>
+              </svg>
+              <table class="sr-only">
+                <caption>Weekly mastery for Amara Okafor since the week of Sep 28, benchmark 85%</caption>
+                <thead><tr><th scope="col">Week of</th><th scope="col">Mastery</th><th scope="col">Sessions</th></tr></thead>
+                <tbody>
+                  <tr><td>Sep 28</td><td>22%</td><td>6</td></tr>
+                  <tr><td>Oct 5</td><td>51%</td><td>7</td></tr>
+                  <tr><td>Oct 12</td><td>73%</td><td>5</td></tr>
+                  <tr><td>Oct 19 (benchmark reached Oct 22)</td><td>88%</td><td>3</td></tr>
+                  <tr><td>Oct 26</td><td>87%</td><td>1</td></tr>
+                  <tr><td>Nov 2</td><td>88%</td><td>1 so far</td></tr>
+                </tbody>
+              </table>
+            </section>
+          </div>
+        </sc-if>
+
+        <!-- ============ BY UNIT (progress + proficient) ============
+             Unit % and chip: Mastered / Still learning from measured answers. A unit says "Placement estimate" only when none of its concepts is measured;
+             single unmeasured concepts carry the "Placement estimate" chip and a dashed bar. -->
+        <sc-if value="{{hasEvidence}}" hint-placeholder-val="{{ true }}">
+          <section class="section" aria-labelledby="pr-units-h">
+            <div class="section-head">
+              <h2 id="pr-units-h" class="t-title2">By unit</h2>
+            </div>
+            <div class="card">
+              <sc-for list="{{units}}" as="u" hint-placeholder-count="5">
+                <div style="{{u.wrapStyle}}">
+                  <h3>
+                    <button type="button" id="{{u.btnId}}" aria-expanded="{{u.expanded}}" aria-controls="{{u.panelId}}" onClick="{{u.toggle}}" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; width: 100%; min-height: 64px; padding: 10px 24px; border: 0; background: transparent; color: var(--ink); text-align: left; cursor: pointer;">
+                      <span style="flex: 1 1 240px; min-width: 0; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;">
+                        <span class="t-body-lg" style="font-weight: 600;">{{u.name}}</span>
+                        <sc-if value="{{u.hasNote}}" hint-placeholder-val="{{ false }}"><span class="t-caption muted">{{u.note}}</span></sc-if>
+                      </span>
+                      <span style="display: flex; align-items: center; gap: 12px; flex: 0 1 460px; min-width: 0;">
+                        <sc-if value="{{u.hasBar}}" hint-placeholder-val="{{ true }}">
+                          <span class="bar" aria-hidden="true" style="flex: 1 1 200px;">
+                            <sc-if value="{{u.isMeasured}}" hint-placeholder-val="{{ true }}"><span class="bar-fill" style="width: {{u.pct}}%;"></span></sc-if>
+                            <sc-if value="{{u.isEst}}" hint-placeholder-val="{{ false }}"><span class="bar-est" style="width: {{u.pct}}%;"></span></sc-if>
+                            <span class="bar-bench" style="left: calc(85% - 1px);"></span>
+                          </span>
+                        </sc-if>
+                        <sc-if value="{{u.noBar}}" hint-placeholder-val="{{ false }}"><span style="flex: 1 1 200px; min-width: 64px;"></span></sc-if>
+                        <span class="t-label num" style="width: 48px; flex: none; text-align: right;">{{u.pctText}}</span>
+                        <span style="width: 156px; flex: none; display: flex;">
+                          <sc-if value="{{u.isMastered}}" hint-placeholder-val="{{ false }}"><span class="chip chip-mastered"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Mastered</span></sc-if>
+                          <sc-if value="{{u.isLearning}}" hint-placeholder-val="{{ true }}"><span class="chip chip-learning"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"></path></svg>Still learning</span></sc-if>
+                          <sc-if value="{{u.isEst}}" hint-placeholder-val="{{ false }}"><span class="chip" style="padding: 0 10px;">Placement estimate</span></sc-if>
+                          <sc-if value="{{u.isNone}}" hint-placeholder-val="{{ false }}"><span class="t-label muted" style="display: inline-flex; align-items: center; gap: 6px; min-height: 28px;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-dasharray="2 3.2"></circle></svg>Not started</span></sc-if>
+                        </span>
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--ink-muted);"><path d="{{u.chevron}}"></path></svg>
+                      </span>
+                    </button>
+                  </h3>
+                  <sc-if value="{{u.isOpen}}" hint-placeholder-val="{{ false }}">
+                    <ul id="{{u.panelId}}" aria-labelledby="{{u.btnId}}">
+                      <sc-for list="{{u.concepts}}" as="c" hint-placeholder-count="6">
+                        <li style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 24px 12px 40px; border-top: 1px solid var(--border); min-height: 52px;">
+                          <span style="flex: 1 1 240px; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
+                            <span class="t-body">{{c.name}}</span>
+                            <sc-if value="{{c.critical}}" hint-placeholder-val="{{ false }}"><span class="chip chip-critical"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>Critical</span></sc-if>
+                          </span>
+                          <span style="display: flex; align-items: center; gap: 12px; flex: 0 1 460px; min-width: 0;">
+                            <sc-if value="{{c.hasBar}}" hint-placeholder-val="{{ true }}">
+                              <span class="bar" aria-hidden="true" style="flex: 1 1 200px;">
+                                <sc-if value="{{c.isMeasured}}" hint-placeholder-val="{{ true }}"><span class="bar-fill" style="width: {{c.pct}}%;"></span></sc-if>
+                                <sc-if value="{{c.isEst}}" hint-placeholder-val="{{ false }}"><span class="bar-est" style="width: {{c.pct}}%;"></span></sc-if>
+                                <span class="bar-bench" style="left: calc(85% - 1px);"></span>
+                              </span>
+                            </sc-if>
+                            <sc-if value="{{c.noBar}}" hint-placeholder-val="{{ false }}"><span style="flex: 1 1 200px; min-width: 64px;"></span></sc-if>
+                            <span class="t-body num" style="width: 48px; flex: none; text-align: right;">{{c.pctText}}</span>
+                            <span style="width: 156px; flex: none; display: flex;">
+                              <sc-if value="{{c.isMastered}}" hint-placeholder-val="{{ false }}"><span class="chip chip-mastered"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Mastered</span></sc-if>
+                              <sc-if value="{{c.isLearning}}" hint-placeholder-val="{{ true }}"><span class="chip chip-learning"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"></path></svg>Still learning</span></sc-if>
+                              <sc-if value="{{c.isEst}}" hint-placeholder-val="{{ false }}"><span class="chip" style="padding: 0 10px;">Placement estimate</span></sc-if>
+                              <sc-if value="{{c.isNone}}" hint-placeholder-val="{{ false }}"><span class="t-label muted" style="display: inline-flex; align-items: center; gap: 6px; min-height: 28px;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-dasharray="2 3.2"></circle></svg>Not started</span></sc-if>
+                            </span>
+                            <span style="width: 20px; flex: none;" aria-hidden="true"></span>
+                          </span>
+                        </li>
+                      </sc-for>
+                    </ul>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </section>
+        </sc-if>
+
+        <!-- ============ CONFIDENT ERRORS + FLAGS: Jordan ============ -->
+        <sc-if value="{{isProgress}}" hint-placeholder-val="{{ true }}">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 24px; align-items: start;">
+            <section class="card" aria-labelledby="pr-crit-h">
+              <div class="card-head"><h2 id="pr-crit-h" class="t-title2">Confident errors on critical steps</h2></div>
+              <ul class="rows">
+                <li style="flex-wrap: wrap; justify-content: space-between; gap: 8px 16px;">
+                  <div style="flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+                    <p style="font-weight: 600;">Confirm the location label before picking</p>
+                    <p class="t-caption muted">Picking · Answered with confidence, missed Nov 2</p>
+                  </div>
+                  <span class="chip chip-dashed"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Awaiting correction</span>
+                </li>
+                <li style="flex-wrap: wrap; justify-content: space-between; gap: 8px 16px;">
+                  <div style="flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+                    <p style="font-weight: 600;">Two-person lift above 23 kg</p>
+                    <p class="t-caption muted">Safety · Answered with confidence, missed Oct 28</p>
+                  </div>
+                  <span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>Corrected Oct 31</span>
+                </li>
+              </ul>
+            </section>
+
+            <section class="card" aria-labelledby="pr-flags-h">
+              <div class="card-head"><h2 id="pr-flags-h" class="t-title2">Flags from Jordan · progress unchanged</h2></div>
+              <ul class="rows">
+                <li style="align-items: flex-start;">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--ink-muted); margin-top: 4px;"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>
+                  <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px 12px; flex-wrap: wrap;">
+                      <p style="font-weight: 600;">Flagged a question · Nov 2</p>
+                      <span class="chip chip-dashed"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-dasharray="2 3.2"></circle><path d="M12 8v4"></path><path d="M12 16h.01"></path></svg>Open</span>
+                    </div>
+                    <p class="t-caption muted">Scanning · Double beep: put the item back and re-scan</p>
+                    <p class="t-body">The answer looks incorrect</p>
+                    <div><a class="link-btn" href="Questions-Flagged.dc.html" style="margin-left: -4px;">Open in Questions<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></a></div>
+                  </div>
+                </li>
+              </ul>
+            </section>
+          </div>
+        </sc-if>
+
+        <!-- ============ CONFIDENT ERRORS + FLAGS: Amara ============ -->
+        <sc-if value="{{isProficient}}" hint-placeholder-val="{{ false }}">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 24px; align-items: start;">
+            <section class="card" aria-labelledby="pr-crit-h2">
+              <div class="card-head"><h2 id="pr-crit-h2" class="t-title2">Confident errors on critical steps</h2></div>
+              <ul class="rows">
+                <li style="flex-wrap: wrap; justify-content: space-between; gap: 8px 16px;">
+                  <div style="flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+                    <p style="font-weight: 600;">Move chilled goods within 20 minutes</p>
+                    <p class="t-caption muted">Receiving · Answered with confidence, missed Oct 13</p>
+                  </div>
+                  <span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>Corrected Oct 15</span>
+                </li>
+                <li style="flex-wrap: wrap; justify-content: space-between; gap: 8px 16px;">
+                  <div style="flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+                    <p style="font-weight: 600;">Double beep: put the item back and re-scan</p>
+                    <p class="t-caption muted">Scanning · Answered with confidence, missed Oct 6</p>
+                  </div>
+                  <span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>Corrected Oct 9</span>
+                </li>
+              </ul>
+            </section>
+
+            <section class="card" aria-labelledby="pr-flags-h2">
+              <div class="card-head"><h2 id="pr-flags-h2" class="t-title2">Flags from Amara · progress unchanged</h2></div>
+              <ul class="rows">
+                <li style="align-items: flex-start;">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--ink-muted); margin-top: 4px;"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>
+                  <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px 12px; flex-wrap: wrap;">
+                      <p style="font-weight: 600;">Flagged a question · Nov 2</p>
+                      <span class="chip chip-dashed"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-dasharray="2 3.2"></circle><path d="M12 8v4"></path><path d="M12 16h.01"></path></svg>Open</span>
+                    </div>
+                    <p class="t-caption muted">Question with no source quote</p>
+                    <p class="t-body">It doesn't match how we do it here</p>
+                    <div><a class="link-btn" href="Questions-Flagged.dc.html" style="margin-left: -4px;">Open in Questions<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></a></div>
+                  </div>
+                </li>
+              </ul>
+            </section>
+          </div>
+        </sc-if>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light"},"state":{"editor":"enum","options":["progress","proficient","notstarted"],"default":"progress"},"$preview":{"width":1440,"height":1850}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { open: { receiving: true } };
+  }
+  renderVals() {
+    const s = this.props.state ?? 'progress';
+    // Canonical curriculum (CONCEPTS.md). [concept, percent, kind, critical]
+    // kind: m = mastered (>= 85), l = still learning, e = placement estimate (not yet practised), n = not started
+    const RETURNS_NOT_STARTED = { id: 'returns', name: 'Returns', note: 'Added Nov 2', pct: 0, kind: 'n', concepts: [
+      ['Check the return authorization', 0, 'n'],
+      ['Inspect and grade each item', 0, 'n'],
+      ['Refund only after inspection', 0, 'n', true],
+      ['Restock or quarantine', 0, 'n'],
+    ] };
+    const DATA = {
+      progress: [
+        // Overall 42% = mean of the 27 concepts in Receiving, Picking, Scanning, Safety; Returns (added Nov 2) is excluded for everyone.
+        { id: 'receiving', name: 'Receiving', pct: 58, kind: 'l', concepts: [
+          ['Check the delivery against the ASN', 86, 'm'],
+          ['Inspect pallets at the dock door', 80, 'l'],
+          ['Report damaged pallets before put-away', 66, 'l', true],
+          ['Move chilled goods within 20 minutes', 54, 'l', true],
+          ['Label each pallet with its LPN', 58, 'l'],
+          ['Count over and short deliveries', 36, 'l'],
+          ['Put away to the directed location', 26, 'e'],
+        ] },
+        { id: 'picking', name: 'Picking', pct: 45, kind: 'l', concepts: [
+          ['Start a pick wave on the handheld', 86, 'm'],
+          ['Use one tote per order', 62, 'l'],
+          ['Confirm the location label before picking', 38, 'l', true],
+          ['Pick first-expiry, first-out', 52, 'l'],
+          ['Pick the exact quantity', 40, 'l'],
+          ['Report a short pick', 44, 'l'],
+          ['Build stable pallets', 22, 'e'],
+          ['Drop completed orders at staging', 16, 'e'],
+        ] },
+        { id: 'scanning', name: 'Scanning', pct: 34, kind: 'l', concepts: [
+          ['Scan from 10 to 30 cm away', 56, 'l'],
+          ['Double beep: put the item back and re-scan', 40, 'l', true],
+          ['Read the screen before you confirm', 36, 'l'],
+          ['Key in a barcode only as a last resort', 30, 'l'],
+          ['Send unreadable labels to the help desk', 22, 'e'],
+          ['Return handhelds to the charger', 20, 'e'],
+        ] },
+        { id: 'safety', name: 'Safety', pct: 30, kind: 'l', concepts: [
+          ['Wear hi-vis and safety shoes on the floor', 32, 'e'],
+          ['Keep pedestrian lanes clear', 28, 'e', true],
+          ['Give way to forklifts at crossings', 30, 'e'],
+          ['Two-person lift above 23 kg', 44, 'l', true],
+          ['Report spills straight away', 24, 'e'],
+          ['Use the step ladder for top shelves', 22, 'e'],
+        ] },
+        RETURNS_NOT_STARTED,
+      ],
+      proficient: [
+        { id: 'receiving', name: 'Receiving', pct: 88, kind: 'm', concepts: [
+          ['Check the delivery against the ASN', 92, 'm'],
+          ['Inspect pallets at the dock door', 90, 'm'],
+          ['Report damaged pallets before put-away', 89, 'm', true],
+          ['Move chilled goods within 20 minutes', 86, 'm', true],
+          ['Label each pallet with its LPN', 88, 'm'],
+          ['Count over and short deliveries', 84, 'l'],
+          ['Put away to the directed location', 87, 'm'],
+        ] },
+        { id: 'picking', name: 'Picking', pct: 88, kind: 'm', concepts: [
+          ['Start a pick wave on the handheld', 93, 'm'],
+          ['Use one tote per order', 90, 'm'],
+          ['Confirm the location label before picking', 88, 'm', true],
+          ['Pick first-expiry, first-out', 85, 'm'],
+          ['Pick the exact quantity', 91, 'm'],
+          ['Report a short pick', 86, 'm'],
+          ['Build stable pallets', 83, 'l'],
+          ['Drop completed orders at staging', 88, 'm'],
+        ] },
+        { id: 'scanning', name: 'Scanning', pct: 87, kind: 'm', concepts: [
+          ['Scan from 10 to 30 cm away', 90, 'm'],
+          ['Double beep: put the item back and re-scan', 86, 'm', true],
+          ['Read the screen before you confirm', 88, 'm'],
+          ['Key in a barcode only as a last resort', 84, 'l'],
+          ['Send unreadable labels to the help desk', 87, 'm'],
+          ['Return handhelds to the charger', 87, 'm'],
+        ] },
+        { id: 'safety', name: 'Safety', pct: 89, kind: 'm', concepts: [
+          ['Wear hi-vis and safety shoes on the floor', 92, 'm'],
+          ['Keep pedestrian lanes clear', 90, 'm', true],
+          ['Give way to forklifts at crossings', 89, 'm'],
+          ['Two-person lift above 23 kg', 91, 'm', true],
+          ['Report spills straight away', 87, 'm'],
+          ['Use the step ladder for top shelves', 85, 'm'],
+        ] },
+        RETURNS_NOT_STARTED,
+      ],
+    };
+    const kindVals = (kind, pct) => ({
+      pct,
+      hasBar: kind !== 'n', noBar: kind === 'n',
+      isMeasured: kind === 'm' || kind === 'l',
+      isMastered: kind === 'm', isLearning: kind === 'l', isEst: kind === 'e', isNone: kind === 'n',
+      pctText: kind === 'n' ? '' : (kind === 'e' ? '~' + pct + '%' : pct + '%'),
+    });
+    const open = (this.state && this.state.open) || { receiving: true };
+    const units = (DATA[s] || []).map((u, i) => {
+      const isOpen = !!open[u.id];
+      return {
+        ...kindVals(u.kind, u.pct),
+        name: u.name,
+        note: u.note || '',
+        hasNote: !!u.note,
+        wrapStyle: i === 0 ? '' : 'border-top: 1px solid var(--border);',
+        btnId: 'pr-unit-' + u.id,
+        panelId: 'pr-panel-' + u.id,
+        isOpen,
+        expanded: isOpen ? 'true' : 'false',
+        chevron: isOpen ? 'm6 15 6-6 6 6' : 'm6 9 6 6 6-6',
+        toggle: () => {
+          const cur = (this.state && this.state.open) || { receiving: true };
+          this.setState({ open: { ...cur, [u.id]: !cur[u.id] } });
+        },
+        concepts: u.concepts.map(([name, pct, kind, critical]) => ({ name, critical: !!critical, ...kindVals(kind, pct) })),
+      };
+    });
+    const people = {
+      progress: { name: 'Jordan Reyes', line: 'Jordan Reyes · Warehouse picker', sees: 'Jordan sees this same page in the app.' },
+      proficient: { name: 'Amara Okafor', line: 'Amara Okafor · Warehouse picker', sees: 'Amara sees this same page in the app.' },
+      notstarted: { name: 'Luca Moretti', line: 'Luca Moretti · Warehouse picker · Joined Nov 3', sees: 'Luca sees this same page in the app.' },
+    };
+    const p = people[s] || people.progress;
+    return {
+      theme: this.props.theme ?? 'light',
+      readonly: false,
+      personName: p.name, personLine: p.line, seesLine: p.sees,
+      isProgress: s === 'progress', isProficient: s === 'proficient', isNotStarted: s === 'notstarted',
+      hasEvidence: s === 'progress' || s === 'proficient',
+      units,
+    };
+  }
+}
+</script>
+</body>
+</html>
