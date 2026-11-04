@@ -7,6 +7,7 @@ import { QuestionBody } from '@/components/question/question-body'
 import { RevealOverlay } from '@/components/reveal/reveal-overlay'
 import { ErrorRow } from '@/components/session/ErrorRow'
 import { QuestionDock } from '@/components/session/QuestionDock'
+import { ReadAloudButton } from '@/components/session/ReadAloudButton'
 import { SessionFrame } from '@/components/session/SessionFrame'
 import { SheetHost } from '@/components/sheet/sheet-host'
 import { AlertRow } from '@/components/ui/AlertRow'
@@ -286,7 +287,13 @@ function ActiveSession({ sessionId, announceReady }: { sessionId: string; announ
         branding={branding}
       />
     ) : null}>
-      <SessionFrame progress={view?.progress} onEnd={endSession} inert={reveal !== null} dock={dock}>
+      <SessionFrame progress={view?.progress} onEnd={endSession} inert={reveal !== null} dock={dock} trailing={
+        <ReadAloudButton
+          item={view?.ended ? null : item ?? null}
+          itemKey={item ? `${item.id}:${view.progress.position}` : null}
+          blocked={busy || reveal !== null}
+        />
+      }>
         {error?.kind === 'load' ? (
           <View style={{ gap: space[3] }}>
             <AlertRow>{error.message}</AlertRow>
