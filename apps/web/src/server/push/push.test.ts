@@ -510,14 +510,18 @@ it('measures the local day and window end in the learner timezone', async () => 
   expect(JSON.parse(http.mock.calls.find(([d]) => String(d) === expoUrl)![1]!.body as string).ttl).toBe(3600)
 })
 
-it('delivers in the company window when the learner kept personal UTC hours from before joining', async () => {
+it.each([
+  // 17:00Z is after the saved 09:00-17:00 UTC hours but 09:00 in Los Angeles, inside the company window.
+  { zone: 'America/Los_Angeles', at: '2026-11-02T17:00:00Z' },
+  // 03:00Z is before the saved UTC hours but 12:00 in Tokyo, inside the company window.
+  { zone: 'Asia/Tokyo', at: '2026-11-02T03:00:00Z' },
+])('delivers in the $zone company window when the learner kept personal UTC hours from before joining', async ({ zone, at }) => {
   await seedLearner()
   raw.prepare('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, ?)').run('o1', 'Acme', 'acme', noon)
   raw.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, ?)').run('m1', 'o1', 'learner', 'member', noon)
   raw.prepare('INSERT INTO org_settings (org_id, company_name, timezone, working_hours_json) VALUES (?, ?, ?, ?)')
-    .run('o1', 'Acme', 'America/Los_Angeles', JSON.stringify({ days: [1, 2, 3, 4, 5], start: '09:00', end: '17:00' }))
-  // 17:00Z is after the saved 09:00-17:00 UTC hours but 09:00 in Los Angeles, inside the company window.
-  vi.setSystemTime(new Date('2026-11-02T17:00:00Z'))
+    .run('o1', 'Acme', zone, JSON.stringify({ days: [1, 2, 3, 4, 5], start: '09:00', end: '17:00' }))
+  vi.setSystemTime(new Date(at))
   expect(await sendDuePushes(Date.now(), holder.db as Db)).toBe(2)
   expect(pushLogRows()).toEqual([{ item_id: 'i-old', outcome: 'accepted' }, { item_id: 'i-old', outcome: 'accepted' }])
   expect(http).toHaveBeenCalledTimes(2)
