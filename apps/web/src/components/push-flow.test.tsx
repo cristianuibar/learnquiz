@@ -8,6 +8,7 @@ import { Route as doneRoute } from '@/routes/play.$sessionId_.done'
 import { Route as quickRoute } from '@/routes/play.quick.$itemId'
 import { Route as signInRoute } from '@/routes/sign-in'
 import { Route as meRoute } from '@/routes/me.index'
+import { Route as optInRoute } from '@/routes/opt-in'
 import { endSession, startMiniSession } from '@/server/play'
 import { getPushSettings, savePushPreferences } from '@/server/push'
 import { getSessionFn } from '@/server/session-fn'
@@ -39,7 +40,8 @@ async function renderApp(entry: string) {
   const play = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId', component: () => <main>One question</main> })
   const signIn = createRoute({ getParentRoute: () => rootRoute, path: '/sign-in', validateSearch: signInRoute.options.validateSearch, component: () => <main>Sign in</main> })
   const me = createRoute({ getParentRoute: () => rootRoute, path: '/me', beforeLoad: meRoute.options.beforeLoad, loader: meRoute.options.loader, component: meRoute.options.component })
-  const router = createRouter({ routeTree: rootRoute.addChildren([done, quick, play, signIn, me]), history: createMemoryHistory({ initialEntries: [entry] }) })
+  const optIn = createRoute({ getParentRoute: () => rootRoute, path: '/opt-in', beforeLoad: optInRoute.options.beforeLoad, loader: optInRoute.options.loader, component: optInRoute.options.component })
+  const router = createRouter({ routeTree: rootRoute.addChildren([done, quick, play, signIn, me, optIn]), history: createMemoryHistory({ initialEntries: [entry] }) })
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -48,32 +50,29 @@ async function renderApp(entry: string) {
 }
 
 it.each([
-  { total: 0, canPrompt: false, standalone: false, expected: false },
-  { total: 1, canPrompt: true, standalone: false, expected: true },
-  { total: 1, canPrompt: true, standalone: true, expected: true },
-  { total: 1, canPrompt: false, standalone: false, expected: false },
-])('offers opt-in after the first completed summary (total=$total, first=$canPrompt, standalone=$standalone)', async ({ total, canPrompt, standalone, expected }) => {
+  { total: 0, canPrompt: false, endpoints: [], expected: false },
+  { total: 1, canPrompt: true, endpoints: [], expected: true },
+  { total: 1, canPrompt: true, endpoints: ['https://fcm.googleapis.com/fcm/send/x'], expected: false },
+  { total: 1, canPrompt: false, endpoints: [], expected: false },
+])('continues to the push opt-in only after the first completed session (total=$total, first=$canPrompt)', async ({ total, canPrompt, endpoints, expected }) => {
   vi.mocked(endSession).mockResolvedValue({ sessionId: 's1', kind: 'session', topicId: 't1', durationMs: 1000, correct: total, total, ungraded: 0, xp: 0,
     streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], benchmark: null, reviewsLeft: 0, nextLine: 'Come back soon.', endedEarly: false } satisfies SummaryView)
-  vi.mocked(getPushSettings).mockResolvedValue({ publicKey: 'public-key', isStaff: false, endpoints: [], canPrompt,
+  vi.mocked(getPushSettings).mockResolvedValue({ publicKey: 'public-key', isStaff: false, endpoints, canPrompt,
     prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' }, schedule })
-  vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('iPhone')
-  vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({ matches: standalone && query === '(display-mode: standalone)' }) as MediaQueryList)
   const requestPermission = vi.fn()
   vi.stubGlobal('Notification', { requestPermission })
-  vi.stubGlobal('PushManager', class {})
-  const registration = { pushManager: { getSubscription: async () => null } }
-  Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: { register: async () => registration, ready: Promise.resolve(registration) } })
-  const { container, cleanup } = await renderApp('/play/s1/done')
+  const { container, router, cleanup } = await renderApp('/play/s1/done')
   try {
     expect(container.querySelector('h1')?.textContent).toContain('Session done')
-    expect(container.textContent?.includes('Keep learning with a one-question reminder')).toBe(expected)
-    if (expected) {
-      expect(container.textContent?.includes('Add to home screen')).toBe(!standalone)
-      expect([...container.querySelectorAll('button')].some((button) => button.textContent === 'Enable notifications')).toBe(standalone)
+    const next = container.querySelector<HTMLAnchorElement>('a[href="/opt-in"]')
+    expect(Boolean(next)).toBe(expected)
+    if (next) {
+      await act(async () => next.click())
+      expect(router.state.location.pathname).toBe('/opt-in')
+      expect(container.querySelector('h1')?.textContent).toBe('Get a question during your shift?')
     }
     expect(requestPermission).not.toHaveBeenCalled()
-  } finally { await cleanup(); Reflect.deleteProperty(navigator, 'serviceWorker') }
+  } finally { await cleanup() }
 })
 
 it.each([0, 3])('shows the not-graded count on the summary only when answers were ungraded (ungraded=%s)', async (ungraded) => {
