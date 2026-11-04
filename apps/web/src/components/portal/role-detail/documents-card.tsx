@@ -180,6 +180,7 @@ export function DocumentsCard({ detail, readOnly, pasteOpen, pasteFor, onToggleP
               name={sending ? state.file.name : finishing!.name}
               loaded={sending ? state.loaded : finishing!.size}
               total={sending ? state.total : finishing!.size}
+              sent={!sending || Boolean(state.sent)}
               onCancel={cancel}
             />
           )}
@@ -191,6 +192,7 @@ export function DocumentsCard({ detail, readOnly, pasteOpen, pasteFor, onToggleP
               note={doc.status === 'failed' ? undefined : `v${doc.version} stays live until v${doc.version + 1} is ready.`}
               loaded={sending ? state.loaded : finishing!.size}
               total={sending ? state.total : finishing!.size}
+              sent={!sending || Boolean(state.sent)}
               onCancel={cancel}
             />
           ) : (

@@ -165,10 +165,12 @@ it('counts only ready concepts when a build ends with a failed concept', async (
     const list = Array.from({ length: 31 }, (_, i) => concept(`c${i}`, `Concept ${i}`, i < readyN ? 'ready' : i < readyN + failedN ? 'failed' : 'pending'))
     return makeDetail({ status, documents: [pdf], units: unit(list) })
   }
-  const { router, status } = await mount(build(30, 'generating'))
-  vi.mocked(getRoleDetail).mockResolvedValue(build(30, 'ready', 1) as never)
+  const { container, router, status } = await mount(build(29, 'generating'))
+  vi.mocked(getRoleDetail).mockResolvedValue(build(29, 'ready', 2) as never)
   await act(() => router.invalidate())
-  expect(status()).toBe('30 of 31 concepts ready. Curriculum ready.')
+  expect(status()).toBe('29 of 31 concepts ready. 2 concepts failed.')
+  expect(container.textContent).toContain('Curriculum built · 29 of 31 concepts ready · 2 failed')
+  expect(container.textContent).not.toContain('Curriculum ready')
 })
 
 it('retries a failed concept', async () => {
@@ -237,6 +239,9 @@ it('keeps the old row live while a replacement uploads', async () => {
   expect(rows[0]!.textContent).toContain('1.6 of 2.5 MB')
   expect(container.querySelector('[role="progressbar"]')!.getAttribute('aria-label')).toBe('Uploading Till handbook v3')
   expect(rows[1]!.textContent).toContain('Closing notes')
+  expect(button('Cancel upload')!.getAttribute('aria-disabled')).toBeNull()
+  await act(async () => { xhr.upload.onload?.() })
+  expect(button('Cancel upload')!.getAttribute('aria-disabled')).toBe('true')
 })
 
 const failed: Doc = { ...pdf, id: 'd3', title: 'Scanned SOP', version: 1, status: 'failed', error: 'No selectable text found. This looks like a scan.', pageCount: null, sizeBytes: 3.1 * 1048576, chars: 0 }
@@ -289,7 +294,7 @@ it('shows the page and pasted-text meta on file rows', async () => {
 
 class FakeXhr {
   static instances: FakeXhr[] = []
-  upload: { onprogress: ((e: { loaded: number; total: number }) => void) | null } = { onprogress: null }
+  upload: { onprogress: ((e: { loaded: number; total: number }) => void) | null; onload: (() => void) | null } = { onprogress: null, onload: null }
   onload: (() => void | Promise<void>) | null = null
   onerror: (() => void) | null = null
   status = 0
@@ -362,6 +367,25 @@ it('cancels an upload in flight and removes its row', async () => {
   expect(FakeXhr.instances[0]!.abort).toHaveBeenCalled()
   expect(container.querySelector('[role="progressbar"]')).toBeNull()
   expect(container.querySelector('[role="alert"]')).toBeNull()
+})
+
+it('keeps an upload whose body was sent when Cancel is pressed, and shows the stored document', async () => {
+  vi.stubGlobal('XMLHttpRequest', FakeXhr)
+  FakeXhr.instances = []
+  const { container, button } = await mount(makeDetail())
+  await pickFile(container, new File(['%PDF'], 'sop.pdf', { type: 'application/pdf' }))
+  const xhr = FakeXhr.instances[0]!
+  await act(async () => { xhr.upload.onload?.() })
+  expect(button('Cancel upload')!.getAttribute('aria-disabled')).toBe('true')
+  await act(async () => { button('Cancel upload')!.click() })
+  expect(xhr.abort).not.toHaveBeenCalled()
+  expect(container.querySelector('[role="progressbar"]')).not.toBeNull()
+  vi.mocked(getRoleDetail).mockResolvedValue(makeDetail({ documents: [{ ...pdf, id: 'new1', title: 'sop' }] }) as never)
+  xhr.status = 200
+  xhr.responseText = JSON.stringify({ sourceId: 'new1', topicId: 't1', r2Key: 'k', chars: 10, version: 1 })
+  await act(async () => { await xhr.onload!() })
+  await vi.waitFor(() => expect(container.querySelector('[role="progressbar"]')).toBeNull())
+  expect(button('Replace sop')).not.toBeNull()
 })
 
 it('swaps the uploading row for the new document, announces it and moves focus to Replace', async () => {
