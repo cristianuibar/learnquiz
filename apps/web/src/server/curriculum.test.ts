@@ -328,6 +328,73 @@ it('builds from a document replaced between the first read and the claim, never 
     .toEqual([{ source_id: 'packing' }, { source_id: 'receiving-v2' }])
 })
 
+const requestOf = (call = 0) => JSON.parse(fetchModel.mock.calls[call][1]!.body as string)
+const minItems = (request: any) => {
+  const units = request.response_format.json_schema.schema.properties.units
+  return { units: units.minItems, concepts: units.items.properties.concepts.minItems }
+}
+const sopSteps = [
+  'Scan the bay label before picking.',
+  'Check the pick quantity against the ticket.',
+  'Place each item in the tote without stacking.',
+  'Scan the tote label when the bay is done.',
+  'Report any mismatch to the supervisor.',
+]
+const sop = 'Bay picking SOP\n' + sopSteps.map((s, i) => `${i + 1}. ${s}`).join('\n')
+const sizedRules = ['Never make a concept from a document title, heading or identity line.', 'Never make two concepts from the same sentence or step.']
+
+it('builds a one-unit path from a short single-document SOP with the small-document schema and prompt', async () => {
+  expect(sop.length).toBeLessThan(1000)
+  raw.exec("UPDATE sources SET deleted_at = 1 WHERE topic_id = 'picker-topic'")
+  raw.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, created_at) VALUES ('sop', 'picker-topic', 'text', 'Bay picking SOP', ?, 5)").run(sop)
+  const picked = sopSteps.slice(0, 3)
+  fetchModel.mockImplementation(async () => modelReply({ units: [{
+    name: 'Bay picking', summary: 'Pick from one bay.',
+    concepts: picked.map((quote, i) => ({
+      name: `Bay step ${i + 1}`, summary: quote, critical: i === 0, visual: i === 0, source_quote: quote,
+      prerequisites: i ? [`Bay step ${i}`] : [], misconceptions: ['Skipping the required check.'],
+    })),
+  }] }))
+  await expect(generate()).resolves.toEqual({ topicId: 'picker-topic' })
+  expect(topicState()).toEqual({ status: 'ready' })
+  expect(storedPath()).toEqual({ units: { n: 1 }, concepts: { n: 3 }, edges: { n: 2 } })
+  expect(raw.prepare("SELECT name FROM concepts WHERE topic_id = 'picker-topic' ORDER BY \"order\"").all())
+    .toEqual([{ name: 'Bay step 1' }, { name: 'Bay step 2' }, { name: 'Bay step 3' }])
+  expect(fetchModel).toHaveBeenCalledTimes(1)
+  const request = requestOf()
+  const system = request.messages[0].content as string
+  expect(system).toContain('1 to 2 units. 2 to 6 concepts in total.')
+  expect(system).not.toContain('4 to 10 units. 4 to 8 concepts per unit.')
+  for (const rule of sizedRules) expect(system).toContain(rule)
+  expect(minItems(request)).toEqual({ units: 1, concepts: 1 })
+})
+
+it('keeps the full minimums for a long document', async () => {
+  const long = 'Warehouse picking notes.\n' + 'Preparation notes.\n'.repeat(320) + procedures.flatMap((u) => u.steps.map((s) => s[1])).join('\n')
+  expect(long.length).toBeGreaterThan(5000)
+  raw.exec("UPDATE sources SET deleted_at = 1 WHERE topic_id = 'picker-topic'")
+  raw.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, created_at) VALUES ('long', 'picker-topic', 'text', 'Long SOP', ?, 5)").run(long)
+  await expect(generate()).resolves.toEqual({ topicId: 'picker-topic' })
+  const request = requestOf()
+  const system = request.messages[0].content as string
+  expect(system).toContain('4 to 10 units. 4 to 8 concepts per unit.')
+  expect(system).not.toContain('2 to 6 concepts in total')
+  for (const rule of sizedRules) expect(system).toContain(rule)
+  expect(minItems(request)).toEqual({ units: 4, concepts: 4 })
+})
+
+it.each([
+  { sourceText: undefined },
+  { sourceText: sop },
+])('keeps the full minimums for a personal topic (sourceText: $sourceText)', async ({ sourceText }) => {
+  await curriculum.createTopic({ data: { topic: 'Warehouse picker', sourceText } })
+  const request = requestOf()
+  const system = request.messages[0].content as string
+  expect(system).toContain('4 to 10 units. 4 to 8 concepts per unit.')
+  expect(system).not.toContain('2 to 6 concepts in total')
+  expect(minItems(request)).toEqual({ units: 4, concepts: 4 })
+})
+
 const retireReceiving = () => raw.exec("UPDATE sources SET retired_at = 1 WHERE id = 'receiving'")
 const noPath = { units: { n: 0 }, concepts: { n: 0 }, edges: { n: 0 } }
 

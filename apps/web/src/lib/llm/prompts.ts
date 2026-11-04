@@ -1,4 +1,5 @@
 import { MAX_ROLE_DOCUMENT_CHARS, MAX_SOURCE_TEXT_CHARS } from '@/lib/limits'
+import { curriculumSize } from '@/lib/curriculum/size'
 import type { ItemPayload } from '@/lib/llm/schemas'
 
 type Prompt = { system: string; user: string }
@@ -20,17 +21,23 @@ export function curriculumPrompt(a: {
   sourceDocuments?: readonly { title: string; bodyText: string }[]
 }): Prompt {
   const source = a.sourceText?.slice(0, SOURCE_CAP)
+  const size = a.sourceDocuments?.length ? curriculumSize(a.sourceDocuments) : null
+  const sizeRule = !size ? '4 to 10 units. 4 to 8 concepts per unit.'
+    : size.totalConcepts ? `${size.units[0]} to ${size.units[1]} units. ${size.totalConcepts[0]} to ${size.totalConcepts[1]} concepts in total.`
+    : `${size.units[0]} to ${size.units[1]} units. ${size.conceptsPerUnit[0]} to ${size.conceptsPerUnit[1]} concepts per unit.`
   return {
     system: `You are a curriculum designer for a quiz-based learning app. Output JSON only.
 Rules:
-- 4 to 10 units. 4 to 8 concepts per unit. When documents are supplied, preserve their procedure order in the units and concepts, including prerequisites. Otherwise order from foundations to advanced.
+- ${sizeRule} When documents are supplied, preserve their procedure order in the units and concepts, including prerequisites. Otherwise order from foundations to advanced.
 - A concept is the smallest teachable idea, testable with 1 to 3 questions. Names are short and unique across the whole curriculum.
 - summary: one or two sentences, at most 300 characters. misconceptions: 1 or 2 common mistakes learners make on that concept, each under 200 characters.
 - visual: true for procedures that benefit from a step-by-step diagram or flowchart; false for other concepts.
 - prerequisites: exact names of other concepts in this curriculum that must be learned first. Direct prerequisites only, no transitive ones, no cycles. Use [] for foundations.
 - source_quote: when source text is given, a short verbatim passage (at most 200 characters) from it that supports the concept, copied exactly; null when none fits. Always null when no source text is given.
 - critical: true for concepts where a mistake affects safety, compliance or money. Required safety precautions and barcode scanning or verification steps are critical. Otherwise false.
-- Ground every claim in the source text when it is given. Do not invent facts.`,
+- Ground every claim in the source text when it is given. Do not invent facts.${
+      size ? '\n- Never make a concept from a document title, heading or identity line.\n- Never make two concepts from the same sentence or step.' : ''
+    }`,
     user: `Topic: ${a.topic}
 Learner goal: ${a.goal?.trim() || 'not stated'}
 Learner level hint: ${levelLabel(a.levelHint)}. Cover the whole topic from the basics up; do not assume more than this level.${
