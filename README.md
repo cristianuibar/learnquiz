@@ -258,7 +258,7 @@ pnpm --filter @learnquiz/web deploy
 Set `FACEBOOK_APP_ID` and `FACEBOOK_APP_SECRET` as well if using Facebook login.
 In the Cloudflare dashboard, add a WAF rate limiting rule for your zone: POST
 requests to the app hostname, 10 per minute per IP, block. The Worker also caps model
-calls per UTC day: **20 per guest**, **150 per account**, and **400 per company**.
+calls per UTC day: **150 per guest**, **500 per account**, and **400 per company**.
 Retries, voice transcriptions and image generations count toward the applicable caps.
 
 ### Apex domain cutover

@@ -1,3 +1,4 @@
+import { GUEST_DAILY_MODEL_CALL_CAP } from '@/lib/limits'
 import { readFileSync, readdirSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
@@ -161,10 +162,10 @@ it.each([
 
 it('enforces the daily cap for voice without logging an extra call', async () => {
   const insert = raw.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-  for (let i = 0; i < 20; i++) insert.run(`call-${i}`, 'u1', 'items', 'muse-spark-1.3', 0, 1, Date.now())
+  for (let i = 0; i < GUEST_DAILY_MODEL_CALL_CAP; i++) insert.run(`call-${i}`, 'u1', 'items', 'muse-spark-1.3', 0, 1, Date.now())
   await expect(transcribeAnswer(upload())).rejects.toMatchObject({ status: 429 })
   expect(fetchModel).not.toHaveBeenCalled()
-  expect(row('SELECT COUNT(*) AS n FROM model_calls').n).toBe(20)
+  expect(row('SELECT COUNT(*) AS n FROM model_calls').n).toBe(GUEST_DAILY_MODEL_CALL_CAP)
 })
 
 it.each([

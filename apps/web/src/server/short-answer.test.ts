@@ -1,3 +1,4 @@
+import { GUEST_DAILY_MODEL_CALL_CAP } from '@/lib/limits'
 import { readFileSync, readdirSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
@@ -126,9 +127,11 @@ it.each([
 })
 
 it.each([
-  { who: 'guest', anonymous: true, calls: 20, graded: false },
-  { who: 'signed-in learner', anonymous: false, calls: 20, graded: true },
-  { who: 'signed-in learner', anonymous: false, calls: 150, graded: false },
+  { who: 'guest', anonymous: true, calls: 149, graded: true },
+  { who: 'guest', anonymous: true, calls: 150, graded: false },
+  { who: 'signed-in learner', anonymous: false, calls: 150, graded: true },
+  { who: 'signed-in learner', anonymous: false, calls: 499, graded: true },
+  { who: 'signed-in learner', anonymous: false, calls: 500, graded: false },
 ])('grades a $who with $calls calls today only below their daily cap', async ({ anonymous, calls, graded }) => {
   raw.prepare('INSERT INTO user (id, name, email, is_anonymous) VALUES (?, ?, ?, ?)').run('u1', 'Learner', 'u1@learnquiz.test', anonymous ? 1 : 0)
   const insert = raw.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
@@ -157,7 +160,7 @@ it.each([
   // A guest one call below the cap: a failed first grade spends the last call, so the second hits the cap.
   raw.prepare('INSERT INTO user (id, name, email, is_anonymous) VALUES (?, ?, ?, ?)').run('u1', 'Learner', 'u1@learnquiz.test', graded ? 0 : 1)
   const insert = raw.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-  for (let i = 0; i < 19; i++) insert.run(`call-${i}`, 'u1', 'items', 'muse-spark-1.3', 0, 1, Date.now())
+  for (let i = 0; i < GUEST_DAILY_MODEL_CALL_CAP - 1; i++) insert.run(`call-${i}`, 'u1', 'items', 'muse-spark-1.3', 0, 1, Date.now())
   fetchModel.mockImplementation(() => graded ? completion({ score: 1, feedback: 'Correct.', missing_points: [] }) : new Response('Unavailable', { status: 503 }))
   const topicBefore = row('SELECT * FROM learner_topic')
 

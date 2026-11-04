@@ -13,9 +13,10 @@ it('counts only the current UTC day towards the daily cap', () => {
 })
 
 it.each([
-  { who: 'guest', cap: GUEST_DAILY_MODEL_CALL_CAP },
-  { who: 'account', cap: ACCOUNT_DAILY_MODEL_CALL_CAP },
-])('blocks a $who at exactly its daily cap', ({ cap }) => {
+  { who: 'guest', cap: GUEST_DAILY_MODEL_CALL_CAP, expected: 150 },
+  { who: 'account', cap: ACCOUNT_DAILY_MODEL_CALL_CAP, expected: 500 },
+])('blocks a $who at exactly its daily cap', ({ cap, expected }) => {
+  expect(cap).toBe(expected)
   expect(isOverDailyCap(cap - 1, cap)).toBe(false)
   expect(isOverDailyCap(cap, cap)).toBe(true)
   expect(isOverDailyCap(cap + 5, cap)).toBe(true)

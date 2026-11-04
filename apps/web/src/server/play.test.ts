@@ -1,3 +1,4 @@
+import { GUEST_DAILY_MODEL_CALL_CAP } from '@/lib/limits'
 import { DatabaseSync } from 'node:sqlite'
 import { readFileSync, readdirSync } from 'node:fs'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
@@ -230,9 +231,9 @@ describe('Wonder session planning', () => {
   })
 
   it.each([
-    { name: 'guest at 20 calls', account: false, calls: 20, local: false, requests: 0 },
-    { name: 'account at 20 calls', account: true, calls: 20, local: false, requests: 1 },
-    { name: 'account at 150 calls', account: true, calls: 150, local: false, requests: 0 },
+    { name: 'guest at 150 calls', account: false, calls: 150, local: false, requests: 0 },
+    { name: 'account at 150 calls', account: true, calls: 150, local: false, requests: 1 },
+    { name: 'account at 500 calls', account: true, calls: 500, local: false, requests: 0 },
     { name: 'local profile', account: false, calls: 0, local: true, requests: 0 },
   ])('respects the daily cap and model routing for $name', async ({ account, calls, local, requests }) => {
     if (account) raw.prepare('INSERT INTO user (id, name, email, is_anonymous) VALUES (?, ?, ?, ?)').run('u1', 'Learner', 'u1@example.test', 0)
@@ -887,7 +888,7 @@ describe('learner practice and unit unlocks', () => {
   ])('handles the daily cap with a $frontier frontier and hasDue=$hasDue', async ({ itemCount, hasDue }) => {
     seedFrontier(raw, itemCount, hasDue)
     const log = raw.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    for (let i = 0; i < 20; i++) log.run(`call-${i}`, 'u1', 'items', 'muse-spark-1.3', 0, 1, Date.now())
+    for (let i = 0; i < GUEST_DAILY_MODEL_CALL_CAP; i++) log.run(`call-${i}`, 'u1', 'items', 'muse-spark-1.3', 0, 1, Date.now())
 
     const result = startSession({ data: { topicId: 't1' } })
     if (hasDue) {
@@ -901,13 +902,13 @@ describe('learner practice and unit unlocks', () => {
       expect(scalar(raw, 'SELECT COUNT(*) AS n FROM sessions').n).toBe(0)
     }
     expect(chatJson).not.toHaveBeenCalled()
-    expect(scalar(raw, 'SELECT COUNT(*) AS n FROM model_calls').n).toBe(20)
+    expect(scalar(raw, 'SELECT COUNT(*) AS n FROM model_calls').n).toBe(GUEST_DAILY_MODEL_CALL_CAP)
   })
 
   it('refuses both overlapping Starts at the daily cap with 429 when only seen items are stored', async () => {
     seedFrontier(raw, 6, false)
     const log = raw.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    for (let i = 0; i < 20; i++) log.run(`call-${i}`, 'u1', 'items', 'muse-spark-1.3', 0, 1, Date.now())
+    for (let i = 0; i < GUEST_DAILY_MODEL_CALL_CAP; i++) log.run(`call-${i}`, 'u1', 'items', 'muse-spark-1.3', 0, 1, Date.now())
 
     const results = await Promise.allSettled([startSession({ data: { topicId: 't1' } }), startSession({ data: { topicId: 't1' } })])
     expect(results).toMatchObject([{ status: 'rejected', reason: { status: 429 } }, { status: 'rejected', reason: { status: 429 } }])
@@ -919,7 +920,7 @@ describe('learner practice and unit unlocks', () => {
   it('refuses Start at the daily cap with 429 instead of joining a stale generation claim', async () => {
     seedFrontier(raw, 6, false)
     const log = raw.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    for (let i = 0; i < 20; i++) log.run(`call-${i}`, 'u1', 'items', 'muse-spark-1.3', 0, 1, Date.now())
+    for (let i = 0; i < GUEST_DAILY_MODEL_CALL_CAP; i++) log.run(`call-${i}`, 'u1', 'items', 'muse-spark-1.3', 0, 1, Date.now())
     vi.useFakeTimers({ toFake: ['setTimeout', 'Date'] })
     onTestFinished(() => { vi.useRealTimers() })
     raw.prepare("UPDATE concepts SET gen_status = 'generating', gen_started_at = ? WHERE id = 'c1'").run(Date.now() - 11 * 60 * 1000)
@@ -934,8 +935,8 @@ describe('learner practice and unit unlocks', () => {
   it('joins a preparation that reserved the final cap slot instead of refusing Start', async () => {
     seedFrontier(raw, 1, false)
     const log = raw.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, error, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-    for (let i = 0; i < 19; i++) log.run(`call-${i}`, 'u1', 'items', 'muse-spark-1.3', 0, 1, null, Date.now())
-    // Preparation holds the concept claim and the 20th, pending slot while its model call is in flight.
+    for (let i = 0; i < GUEST_DAILY_MODEL_CALL_CAP - 1; i++) log.run(`call-${i}`, 'u1', 'items', 'muse-spark-1.3', 0, 1, null, Date.now())
+    // Preparation holds the concept claim and the final, pending slot while its model call is in flight.
     log.run('call-prep', 'u1', 'items', 'muse-spark-1.3', 0, 0, 'pending', Date.now())
     raw.prepare("UPDATE concepts SET gen_status = 'generating', gen_started_at = ? WHERE id = 'c1'").run(Date.now())
     setTimeout(() => {
@@ -948,7 +949,7 @@ describe('learner practice and unit unlocks', () => {
     const plan = JSON.parse(scalar(raw, 'SELECT plan_json FROM sessions WHERE id = ?', sessionId).plan_json as string)
     expect(plan.queue).toContain('i-prep')
     expect(chatJson).not.toHaveBeenCalled()
-    expect(scalar(raw, 'SELECT COUNT(*) AS n FROM model_calls').n).toBe(20)
+    expect(scalar(raw, 'SELECT COUNT(*) AS n FROM model_calls').n).toBe(GUEST_DAILY_MODEL_CALL_CAP)
   })
 
   it.each([new LlmError('Provider rate limit', 429), new Error('Unexpected generation failure')])(
