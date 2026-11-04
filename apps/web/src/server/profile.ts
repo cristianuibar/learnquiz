@@ -107,10 +107,12 @@ export const getProfile = createServerFn({ method: 'GET' })
           if (error && error.correctedAt === null) error.correctedAt = attempt.at
         }
       }
+      // Attempts on retired concepts stay in the history but not in the live curriculum's average.
+      const live = conceptRows.map((c) => known.get(c.id) ?? 0)
       return {
         date,
-        mastery: mean([...known.values()]),
-        gap: mean([...known.values()].map((p) => Math.max(0, benchmark - p))),
+        mastery: mean(live),
+        gap: mean(live.map((p) => Math.max(0, benchmark - p))),
         attempts: attemptCount,
         sessions: sessionRows.filter((s) => s.endedAt !== null && s.endedAt >= date && s.endedAt < Math.min(date + DAY, now + 1)).length,
       }

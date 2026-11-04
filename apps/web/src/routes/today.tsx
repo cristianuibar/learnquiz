@@ -1,6 +1,6 @@
-import { useEffect, useId } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { createFileRoute, Link, redirect, useRouter, useRouterState } from '@tanstack/react-router'
-import { todayView } from '@learnquiz/api/today'
+import { todayView, type Today as TodayData } from '@learnquiz/api/today'
 import { RouteError } from '@/components/inline-error'
 import { buttonVariants } from '@/components/ui/button'
 import { DoneCard } from '@/components/today/done-card'
@@ -27,8 +27,10 @@ export const Route = createFileRoute('/today')({
 type Branding = { name: string; logoUrl: string | null } | null
 
 function Today() {
-  const today = Route.useLoaderData()
+  const loaded = Route.useLoaderData()
   const router = useRouter()
+  const [polled, setPolled] = useState<{ from: TodayData; today: TodayData } | null>(null)
+  const today = polled?.from === loaded ? polled.today : loaded
   const view = todayView(today, new Date())
   const branding = useRouterState({
     select: (s) => (s.matches[0]?.loaderData as { branding?: Branding } | undefined)?.branding ?? null,
@@ -42,11 +44,25 @@ function Today() {
 
   useEffect(() => {
     if (!building) return
+    // Poll without reloading the route: a fetch that fails mid-flight (e.g. connectivity drops)
+    // would otherwise replace Today with the route error, so failures keep the current Today.
+    let active = true
     const timer = setInterval(() => {
-      if (document.visibilityState === 'visible' && navigator.onLine) void router.invalidate()
+      if (document.visibilityState !== 'visible' || !navigator.onLine) return
+      getToday().then(
+        (next) => {
+          if (!active) return
+          if (!next.topic && !next.role) void router.navigate({ to: '/start' })
+          else setPolled({ from: loaded, today: next })
+        },
+        () => {},
+      )
     }, 15000)
-    return () => clearInterval(timer)
-  }, [building, router])
+    return () => {
+      active = false
+      clearInterval(timer)
+    }
+  }, [building, loaded, router])
 
   const topicId = today.topic?.id ?? null
   const placement = today.plan ? today.plan.start === 'placement' : !today.topic?.placed && !!today.topic?.placeable

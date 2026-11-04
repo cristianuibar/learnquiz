@@ -1,9 +1,11 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, count, desc, eq } from 'drizzle-orm'
+import { and, asc, count, desc, eq, ne } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '@/db'
-import { conceptEdges, concepts, items, learnerConcept, learnerItem, learnerTopic, learnerUnit, placements, sources, topics, units } from '@/db/schema'
+import { conceptEdges, concepts, items, jobRoles, learnerConcept, learnerItem, learnerTopic, learnerUnit, memberRoleAssignments, placements, sources, topics, units } from '@/db/schema'
 import { validateSkeleton, fallbackSkeleton } from '@/lib/curriculum/validate'
+import { conceptStatus, roleMastery, unitState } from '@/lib/learning/path'
+import { onboardingDay } from '@/lib/learning/profile'
 import { streakShown } from '@/lib/learning/session'
 import { chatJson, jobModel, LlmError } from '@/lib/llm/client'
 import { curriculumPrompt } from '@/lib/llm/prompts'
@@ -15,6 +17,8 @@ import { requireOrgAdmin } from '@/server/authz'
 import { requireLearnerId } from '@/server/session'
 import { retryFailedConcept } from '@/server/concept-retry'
 import { learnerCanAccess, notFlaggedBy, rolePlayable, roleCompany, seedLearnerTopic } from '@/server/topic-access'
+import { loadFrontier } from '@/server/play'
+import type { TopicPath } from '@learnquiz/api/progress'
 import { buildRoleCurriculum, curriculumWrites } from '@/server/role-curriculum'
 
 export const createTopic = createServerFn({ method: 'POST' })
@@ -102,7 +106,7 @@ export const retryConceptGeneration = createServerFn({ method: 'POST' })
 
 export const getTopicPath = createServerFn({ method: 'GET' })
   .validator(z.object({ topicId: z.string().min(1) }))
-  .handler(async ({ data }) => {
+  .handler(async ({ data }): Promise<TopicPath> => {
     const learnerId = await requireLearnerId()
     const db = getDb()
     const [row] = await db
@@ -117,14 +121,19 @@ export const getTopicPath = createServerFn({ method: 'GET' })
     const placeable = jobRoleId !== null ? await rolePlayable(db, topic) : true
     const company = jobRoleId !== null ? await roleCompany(db, jobRoleId) : null
 
-    const [unitRows, conceptRows, edges, counts, known, [lt], [placement]] = await Promise.all([
+    const [unitRows, conceptRows, edges, counts, known, [lt], [placement], role, stored, frontier] = await Promise.all([
       db
         .select({ id: units.id, order: units.order, name: units.name, summary: units.summary, unlockedAt: learnerUnit.unlockedAt })
         .from(units)
         .leftJoin(learnerUnit, and(eq(learnerUnit.unitId, units.id), eq(learnerUnit.learnerId, learnerId)))
         .where(eq(units.topicId, topic.id))
         .orderBy(asc(units.order)),
-      db.select().from(concepts).where(eq(concepts.topicId, topic.id)).orderBy(asc(concepts.order)),
+      db
+        .select({ concept: concepts, source: { title: sources.title, version: sources.version } })
+        .from(concepts)
+        .leftJoin(sources, eq(sources.id, concepts.sourceId))
+        .where(eq(concepts.topicId, topic.id))
+        .orderBy(asc(concepts.order)),
       db.select({ fromId: conceptEdges.fromId, toId: conceptEdges.toId }).from(conceptEdges).where(eq(conceptEdges.topicId, topic.id)),
       db
         .select({ conceptId: items.conceptId, n: count() })
@@ -147,7 +156,23 @@ export const getTopicPath = createServerFn({ method: 'GET' })
         .where(and(eq(placements.learnerId, learnerId), eq(placements.topicId, topic.id)))
         .orderBy(desc(placements.createdAt))
         .limit(1),
+      jobRoleId === null
+        ? undefined
+        : db
+            .select({ benchmark: jobRoles.benchmark, onboardingDays: jobRoles.onboardingDays, assignedAt: memberRoleAssignments.assignedAt })
+            .from(jobRoles)
+            .leftJoin(memberRoleAssignments, and(eq(memberRoleAssignments.jobRoleId, jobRoles.id), eq(memberRoleAssignments.orgId, jobRoles.orgId), eq(memberRoleAssignments.userId, learnerId)))
+            .where(eq(jobRoles.id, jobRoleId))
+            .get(),
+      db
+        .select({ conceptId: items.conceptId, n: count() })
+        .from(items)
+        .where(and(eq(items.topicId, topic.id), eq(items.status, 'active'), ne(items.format, 'short')))
+        .groupBy(items.conceptId),
+      loadFrontier(db, learnerId, topic.id),
     ])
+    const benchmark = role?.benchmark ?? 0.85
+    const storedCount = new Map(stored.map((c) => [c.conceptId, c.n]))
     const pKnown = new Map(known.map((r) => [r.conceptId, r.pKnown]))
     const attempted = new Set(known.filter((r) => r.nAttempts > 0).map((r) => r.conceptId))
     const answeredCount = new Map(counts.map((c) => [c.conceptId, c.n]))
@@ -156,6 +181,10 @@ export const getTopicPath = createServerFn({ method: 'GET' })
       preparing,
       placeable,
       company,
+      benchmark,
+      onboarding: role && role.assignedAt !== null ? { day: onboardingDay(role.assignedAt, Date.now(), role.onboardingDays), days: role.onboardingDays } : null,
+      mastery: roleMastery(conceptRows.map(({ concept: c }) => ({ conceptId: c.id, pKnown: pKnown.get(c.id) ?? 0 })), conceptRows.map(({ concept: c }) => c.id)),
+      nextUnitId: frontier[0]?.concept.unitId ?? null,
       // The reveal line lives in placements.log_json as { log, levelLine }.
       learner: {
         level: lt?.level ?? 3,
@@ -166,9 +195,9 @@ export const getTopicPath = createServerFn({ method: 'GET' })
         streak: lt ? streakShown(lt, Date.now()) : 0,
       },
       units: unitRows.map((u) => {
-        const unitConcepts = conceptRows
-          .filter((c) => c.unitId === u.id)
-          .map((c) => ({
+        const inUnit = conceptRows.filter(({ concept }) => concept.unitId === u.id)
+        const unitConcepts = inUnit
+          .map(({ concept: c }) => ({
             id: c.id,
             order: c.order,
             name: c.name,
@@ -178,7 +207,10 @@ export const getTopicPath = createServerFn({ method: 'GET' })
             critical: c.critical,
             answeredCount: answeredCount.get(c.id) ?? 0,
             pKnown: pKnown.get(c.id) ?? 0,
+            measured: attempted.has(c.id),
+            status: conceptStatus(attempted.has(c.id), pKnown.get(c.id) ?? 0, benchmark),
           }))
+        const unlocked = u.unlockedAt !== null
         return {
           id: u.id,
           order: u.order,
@@ -186,8 +218,12 @@ export const getTopicPath = createServerFn({ method: 'GET' })
           summary: u.summary,
           mastery: mean(unitConcepts.map((c) => c.pKnown)),
           // True once any concept in the unit has an answer behind its pKnown; false means the number is a placement estimate.
-          measured: unitConcepts.some((c) => attempted.has(c.id)),
-          unlocked: u.unlockedAt !== null,
+          measured: unitConcepts.some((c) => c.measured),
+          unlocked,
+          state: unitState({ concepts: unitConcepts, placed: Boolean(placement), unlocked, benchmark }),
+          criticalCount: unitConcepts.filter((c) => c.critical).length,
+          canPractice: unlocked && !preparing && (jobRoleId === null || unitConcepts.some((c) => (storedCount.get(c.id) ?? 0) > 0)),
+          source: inUnit[0]?.source ?? null,
           concepts: unitConcepts,
         }
       }),

@@ -162,6 +162,7 @@ export function RevealSheet({
       <>
         {mine && <Row label={label}>{mine}</Row>}
         <Row label={revealCopy.theAnswer}>{correct}</Row>
+        {reveal.feedback && <p className="text-body">{reveal.feedback}</p>}
         {explanation}
         {quote}
       </>

@@ -722,3 +722,56 @@ test.each(['offline', 'error'] as const)('empty Today has one working retry in %
   expect(mockApi).toHaveBeenCalledTimes(2)
   expect(screen.queryByText('No training yet')).toBeNull()
 })
+
+test('a learner retry that joins a request crossing midnight stays busy until the recovery request finishes', async () => {
+  jest.useFakeTimers({ now: Date.UTC(2035, 1, 4, 23, 59, 50) })
+  mockApi.mockRejectedValueOnce(new ApiError(null, 'Offline'))
+  await render(createElement(ThemeProvider, { children: createElement(TodayScreen) }))
+  expect(mockApi).toHaveBeenCalledTimes(1)
+  let finishYesterday!: (today: Today) => void
+  let failRecovery!: (error: Error) => void
+  mockApi
+    .mockReturnValueOnce(new Promise<Today>((done) => { finishYesterday = done }))
+    .mockReturnValueOnce(new Promise<Today>((_done, fail) => { failRecovery = fail }))
+  // A foreground refetch is sent before midnight, and the learner's tap joins it.
+  await act(async () => { appStateListener?.('active') })
+  expect(mockApi).toHaveBeenCalledTimes(2)
+  await fireEvent.press(screen.getByRole('button', { name: 'Try again' }))
+  expect(mockApi).toHaveBeenCalledTimes(2)
+  expect(screen.getByRole('button', { name: 'Try again' })).toHaveProp('accessibilityState', { disabled: true, busy: true })
+  await act(async () => { await jest.advanceTimersByTimeAsync(15_000) })
+  // Yesterday's answer lands after midnight: it is dropped, and exactly one
+  // recovery request starts. The retry is still busy while it runs.
+  await act(async () => { finishYesterday(todayFixtures.normal) })
+  expect(mockApi).toHaveBeenCalledTimes(3)
+  expect(screen.getByRole('button', { name: 'Try again' })).toHaveProp('accessibilityState', { disabled: true, busy: true })
+  await act(async () => { failRecovery(new ApiError(null, 'Offline')) })
+  expect(screen.getByRole('button', { name: 'Try again' })).toHaveProp('accessibilityState', { disabled: false, busy: false })
+})
+
+test.each(['ready', 'loading'] as const)('empty Today keeps its Try again while the plan is %s', async (status) => {
+  jest.useFakeTimers({ now: Date.UTC(2035, 1, 4, 12) })
+  const empty: Today = { topic: null, role: null, plan: null }
+  let finishLoad!: (today: Today) => void
+  if (status === 'ready') mockApi.mockResolvedValueOnce(empty)
+  else {
+    // The cached empty plan paints while its request is still loading.
+    mockLoadCache.mockResolvedValue(cacheEntry('u1', empty))
+    mockApi.mockReturnValueOnce(new Promise<Today>((done) => { finishLoad = done }))
+  }
+  await render(createElement(ThemeProvider, { children: createElement(TodayScreen) }))
+  expect(screen.getByText('No training yet')).toBeOnTheScreen()
+  expect(screen.queryByRole('status')).toBeNull()
+  expect(screen.getAllByRole('button', { name: 'Try again' })).toHaveLength(1)
+  mockApi.mockResolvedValueOnce(todayFixtures.normal)
+  await fireEvent.press(screen.getByRole('button', { name: 'Try again' }))
+  if (status === 'ready') {
+    // A ready plan sends a fresh request.
+    expect(mockApi).toHaveBeenCalledTimes(2)
+  } else {
+    // A loading plan joins the request already in flight.
+    expect(mockApi).toHaveBeenCalledTimes(1)
+    await act(async () => { finishLoad(todayFixtures.normal) })
+  }
+  expect(screen.queryByText('No training yet')).toBeNull()
+})
