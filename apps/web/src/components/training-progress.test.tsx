@@ -43,7 +43,7 @@ beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   vi.mocked(getProfile).mockReset()
   vi.mocked(getToday).mockReset()
-  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'learner', name: 'Learner', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [{ name: 'Acme', slug: 'acme' }] })
+  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'learner', name: 'Learner', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, companyMember: true, adminCompanies: [{ name: 'Acme', slug: 'acme' }] })
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -97,6 +97,14 @@ describe('Training progress', () => {
     root = createRoot(container)
     await mount('/org/acme/people/learner')
     expect(flagLink()).toBeUndefined()
+  })
+
+  it('offers no flag link to a learner outside any company', async () => {
+    vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'learner', name: 'Learner', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] })
+    vi.mocked(getProfile).mockResolvedValue(profile({ confidentErrors: [{ id: 'e1', conceptId: 'c9', concept: 'Emergency exits', at: start, correctedAt: null }] }))
+    await mount('/me/profile')
+    expect(text()).toContain('Emergency exits')
+    expect([...container.querySelectorAll('a')].some((a) => a.textContent === 'Flag an unfair result')).toBe(false)
   })
 
   it('shows the empty card and starts the first placement from the learner page', async () => {

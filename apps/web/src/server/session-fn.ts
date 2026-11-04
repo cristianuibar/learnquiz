@@ -24,21 +24,23 @@ export const getSessionFn = createServerFn({ method: 'GET' }).handler(
         .where(and(eq(member.userId, user.id), isNull(consents.userId)))
         .limit(1)
         .get())
-    const adminCompanies =
+    const companies =
       user && !user.isAnonymous
-        ? (await getDb()
+        ? await getDb()
             .select({ name: organization.name, slug: organization.slug, role: member.role })
             .from(member)
             .innerJoin(organization, eq(organization.id, member.organizationId))
             .where(eq(member.userId, user.id))
-            .orderBy(asc(member.createdAt), asc(organization.id)))
-            .filter(({ role }) => role.split(',').some((r) => r === 'owner' || r === 'admin'))
-            .map(({ name, slug }) => ({ name, slug }))
+            .orderBy(asc(member.createdAt), asc(organization.id))
         : []
+    const adminCompanies = companies
+      .filter(({ role }) => role.split(',').some((r) => r === 'owner' || r === 'admin'))
+      .map(({ name, slug }) => ({ name, slug }))
     return {
       user: user && { id: user.id, name: user.name, isAnonymous: Boolean(user.isAnonymous), role: user.role },
       facebookEnabled: facebookEnabled(),
       needsDisclosure: Boolean(unconsented),
+      companyMember: companies.length > 0,
       adminCompanies,
     }
   },
