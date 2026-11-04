@@ -1,8 +1,10 @@
 import { createElement as h, type ReactNode } from 'react'
 import { act, fireEvent, render, screen } from '@testing-library/react-native'
-import { AccessibilityInfo } from 'react-native'
+import { AccessibilityInfo, Dimensions } from 'react-native'
+import { themes } from '@learnquiz/tokens/native'
 import type { ItemView } from '@learnquiz/api'
 import SessionScreen from './app/play/[sessionId]/index'
+import QuickSessionScreen from './app/play/quick/[itemId]'
 import { useHeadingFocus } from './components/ui/Screen'
 import { ReadAloudButton } from './components/session/ReadAloudButton'
 import { api, postForm } from './lib/api'
@@ -11,12 +13,15 @@ import { ThemeProvider } from './theme/ThemeProvider'
 jest.mock('expo-router', () => {
   const router = { replace: jest.fn() }
   return {
-    useLocalSearchParams: () => ({ sessionId: 'session-337', announceReady: '1' }),
+    useLocalSearchParams: () => ({ sessionId: 'session-337', itemId: 'item-337', announceReady: '1' }),
     useRouter: () => router,
     useFocusEffect: jest.fn(),
   }
 })
 jest.mock('expo-image', () => ({ Image: require('react-native').Image }))
+jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 24, bottom: 0, left: 0, right: 0 }) }))
+jest.mock('react-native-keyboard-controller', () => ({ KeyboardAvoidingView: require('react-native').View }))
+jest.mock('./lib/haptics', () => ({ resultHaptic: jest.fn() }))
 jest.mock('./components/question/diagram-image', () => ({ DiagramImage: () => null }))
 type MockOnBuffer = (chunk: { data: ArrayBuffer; sampleRate: number; channels: number }) => void
 jest.mock('expo-audio', () => {
@@ -115,6 +120,40 @@ test('multiple choice keeps its stem heading and heading focus', async () => {
   expect(await screen.findByRole('header', { name: mcq.stem })).toBeOnTheScreen()
   expect(useHeadingFocus).toHaveBeenCalledTimes(1)
   expect(screen.getByRole('radio', { name: 'Receiving' })).toBeOnTheScreen()
+})
+
+describe.each(['light', 'dark'] as const)('%s multi-select stem', (scheme) => {
+  test.each(['session', 'quick'] as const)('%s groups one caption under the focused heading at 200%% font scale', async (route) => {
+    const windowSize = Dimensions.get('window')
+    Dimensions.set({ window: { ...windowSize, width: 320, fontScale: 2 } })
+    try {
+      const question: ItemView = {
+        ...item, format: 'multi', stem: 'Which cartons need a lead’s sign-off?', blank: null,
+        options: [{ id: 'hazmat', text: 'Hazmat cartons' }, { id: 'seal', text: 'Broken seal' }],
+      }
+      jest.mocked(api).mockResolvedValueOnce(route === 'quick' ? { sessionId: 'session-337' } : {
+        id: 'session-337', item: question, ended: false, progress: { position: 1, total: 20 },
+      }).mockResolvedValue({ id: 'session-337', item: question, ended: false, progress: { position: 1, total: 20 } })
+      await render(h(ThemeProvider, { scheme, children: h(route === 'quick' ? QuickSessionScreen : SessionScreen) }))
+      const heading = await screen.findByRole('header', { name: question.stem })
+      const caption = screen.getByText('Choose all that apply')
+      expect(screen.getAllByText('Choose all that apply')).toHaveLength(1)
+      expect(caption.parent).toBe(heading.parent)
+      expect(heading.parent).toHaveStyle({ gap: 4 })
+      expect(caption).toHaveStyle({ color: themes[scheme].inkMuted, fontSize: 13, lineHeight: 18 })
+      for (const text of [heading, caption]) {
+        expect(text.props.numberOfLines).toBeUndefined()
+        expect(text.props.allowFontScaling).not.toBe(false)
+        expect(text.props.maxFontSizeMultiplier).toBeUndefined()
+      }
+      if (route === 'session') expect(heading.parent!.parent).toHaveStyle({ gap: 24 })
+      expect(screen.getByLabelText(question.stem)).toHaveProp('accessibilityHint', 'Choose all that apply')
+      expect(screen.getByRole('checkbox', { name: 'Hazmat cartons' })).toBeOnTheScreen()
+      expect(useHeadingFocus).toHaveBeenCalledTimes(1)
+    } finally {
+      Dimensions.set({ window: windowSize })
+    }
+  })
 })
 
 test.each([true, false])('cloze exposes one sentence and a separate labelled field (numeric: %s)', async (numeric) => {

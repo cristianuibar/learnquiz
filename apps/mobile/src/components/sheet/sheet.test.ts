@@ -99,14 +99,17 @@ test('band and foot wrappers exist only when provided', async () => {
   expect(screen.getByText('Foot')).toBeOnTheScreen()
 })
 
-test('the grabber is a decorative 36 x 4 bar TalkBack skips', async () => {
-  const view = await render(mount())
+test.each(['light', 'dark'] as const)('%s grabber overlays the band as a decorative 36 x 4 bar TalkBack skips', async (scheme) => {
+  const view = await render(mount({}, scheme))
   const bars = () => hosts((_, style) => style.height === 4 && style.width === 36)
   expect(bars()).toHaveLength(0)
-  await view.rerender(mount({ grabber: true }))
+  await view.rerender(mount({ grabber: true, band: h(Text, null, 'Band') }, scheme))
   const [bar] = bars()
   expect(bar.props).toMatchObject({ importantForAccessibility: 'no-hide-descendants', accessibilityElementsHidden: true })
-  expect(bar).toHaveStyle({ backgroundColor: light.borderStrong, alignSelf: 'center', marginTop: 8 })
+  expect(bar).toHaveStyle({ backgroundColor: themes[scheme].borderStrong, position: 'absolute', top: 8, zIndex: 1, alignSelf: 'center' })
+  expect(StyleSheet.flatten(bar.props.style).marginTop).toBeUndefined()
+  expect(bar).toHaveProp('pointerEvents', 'none')
+  expect(screen.getByText('Band').parent).toHaveStyle({ flexShrink: 0 })
   expect(StyleSheet.flatten(bar.props.style).borderRadius).toBe(9999)
   expect(bar.props.onResponderGrant).toBeUndefined()
 })
@@ -129,10 +132,15 @@ test('reduced motion shows the sheet in place immediately', async () => {
 })
 
 test('swapping the content does not replay the rise', async () => {
-  const view = await render(mount({ band: h(Text, null, 'Band') }))
+  const view = await render(mount({ band: h(Text, null, 'Band'), grabber: true }))
   await act(() => jest.advanceTimersByTime(300))
-  await view.rerender(mount({ band: h(Text, null, 'Report'), body: h(Text, null, 'Other') }))
+  expect(screen.getByTestId('sheet-grabber', { includeHiddenElements: true })).toBeOnTheScreen()
+  await view.rerender(mount({ band: h(Text, null, 'Report'), body: h(Text, null, 'Other'), grabber: false }))
+  expect(screen.queryByTestId('sheet-grabber', { includeHiddenElements: true })).toBeNull()
   expect(screen.getByText('Report').parent?.parent).toHaveAnimatedStyle({ opacity: 1, transform: [{ translateY: 0 }] })
+  await view.rerender(mount({ band: h(Text, null, 'Band'), grabber: true }))
+  expect(screen.getByTestId('sheet-grabber', { includeHiddenElements: true })).toBeOnTheScreen()
+  expect(sheetBox()).toHaveAnimatedStyle({ opacity: 1, transform: [{ translateY: 0 }] })
 })
 
 describe('hardware Back', () => {

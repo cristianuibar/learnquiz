@@ -25,17 +25,17 @@ export function ResultBand({ model, compact, ref }: ResultBandProps) {
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        gap: space[3],
+        gap: compact ? space[2] : space[3],
         paddingTop: compact ? space[3] : space[6],
         paddingBottom: compact ? space[3] : space[4],
         paddingHorizontal: space[4],
         backgroundColor: tint,
       }}
     >
-      <View style={{ width: space[8], height: space[8], borderRadius: radius.full, alignItems: 'center', justifyContent: 'center', backgroundColor: solid }}>
+      {compact ? <Icon size={space[6]} strokeWidth={2} color={solid} accessible={false} /> : <View style={{ width: space[8], height: space[8], borderRadius: radius.full, alignItems: 'center', justifyContent: 'center', backgroundColor: solid }}>
         <Icon size={space[6] - space[1]} strokeWidth={2.5} color={colors.onFeedback} accessible={false} />
-      </View>
-      <Text variant="title2" style={{ flex: 1, color: solid }}>{model.heading}</Text>
+      </View>}
+      <Text variant={compact ? 'title3' : 'title2'} style={{ flex: 1, color: solid }}>{model.heading}</Text>
       {model.xpText ? (
         <Text variant="label" num style={{ color: colors.inkMuted }}>{model.xpText}</Text>
       ) : model.counts ? (

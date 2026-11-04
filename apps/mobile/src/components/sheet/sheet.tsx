@@ -82,14 +82,16 @@ export function Sheet({ band, body, foot, grabber, onBack, focusRef }: SheetProp
             overflow: 'hidden',
           }, riseStyle]}
         >
+          {band ? <View style={{ flexShrink: 0 }}>{band}</View> : null}
           {grabber ? (
             <View
+              testID="sheet-grabber"
+              pointerEvents="none"
               accessibilityElementsHidden
               importantForAccessibility="no-hide-descendants"
-              style={{ alignSelf: 'center', width: space[8] + space[1], height: space[1], marginTop: space[2], borderRadius: radius.full, backgroundColor: colors.borderStrong }}
+              style={{ position: 'absolute', top: space[2], zIndex: 1, alignSelf: 'center', width: space[8] + space[1], height: space[1], borderRadius: radius.full, backgroundColor: colors.borderStrong }}
             />
           ) : null}
-          {band ? <View style={{ flexShrink: 0 }}>{band}</View> : null}
           <ScrollView persistentScrollbar keyboardShouldPersistTaps="handled" style={{ flexShrink: 1, flexGrow: 0 }}>
             {body}
           </ScrollView>

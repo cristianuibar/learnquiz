@@ -22,6 +22,7 @@ import { Text } from '@/components/ui/Text'
 import { api } from '@/lib/api'
 import { resultHaptic } from '@/lib/haptics'
 import { createQuickSession, type QuickSessionState } from '@/lib/quick-result'
+import { MULTI_CAPTION } from '@/lib/session/multi'
 import { useSession } from '@/lib/session-store'
 import { useTheme } from '@/theme/ThemeProvider'
 
@@ -207,11 +208,15 @@ function QuickSession({ itemId, pushId }: { itemId: string; pushId?: string }) {
 function QuickQuestion({ item, answer, onAnswer, busy, onSubmit }: {
   item: ItemView; answer: Answer; onAnswer(answer: Answer): void; busy: boolean; onSubmit(): void
 }) {
+  const { space } = useTheme()
   const headingRef = useRef<NativeText>(null)
   useHeadingFocus(headingRef)
   return (
     <>
-      <Text ref={headingRef} variant="title2" header>{item.stem}</Text>
+      <View style={{ gap: space[1] }}>
+        <Text ref={headingRef} variant="title2" header>{item.stem}</Text>
+        {item.format === 'multi' ? <Text variant="caption" muted>{MULTI_CAPTION}</Text> : null}
+      </View>
       <QuestionBody item={item} answer={answer} onAnswer={onAnswer} marks={null} disabled={busy} onSubmit={onSubmit} />
     </>
   )

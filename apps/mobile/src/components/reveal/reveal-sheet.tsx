@@ -51,6 +51,7 @@ export function useRevealSheet({ reveal, item, answer, reflection, onReflection,
   const Body = model.variant === 'notQuite' || model.variant === 'sureWrong' ? WrongBody : model.variant === 'partial' ? PartialBody : CorrectBody
 
   return {
+    grabber: true,
     band: <ResultBand model={model} ref={bandRef} />,
     body: <Body model={model} reveal={reveal} item={item} answer={answer} reflection={reflection} onReflection={onReflection} />,
     foot: (

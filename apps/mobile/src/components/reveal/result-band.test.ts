@@ -66,9 +66,22 @@ test('wrong and neutral bands show no right side text', async () => {
   expect(screen.getByRole('header', { name: 'Not quite' }).children).toHaveLength(2)
 })
 
-test('compact tightens the padding', async () => {
-  await band(models.correct, 'light', { compact: true })
-  expect(screen.getByRole('header', { name: 'Correct, 10 XP' })).toHaveStyle({ paddingTop: 12, paddingBottom: 12, paddingHorizontal: 16 })
+describe.each(['light', 'dark'] as const)('%s compact band', (scheme) => {
+  test.each(['correct', 'wrong'] as const)('%s uses an unboxed feedback icon and a wrapping 17/24 bold heading', async (tone) => {
+    const model = { ...models[tone], xpText: null, announcement: models[tone].heading }
+    await band(model, scheme, { compact: true })
+    const node = screen.getByRole('header', { name: model.announcement })
+    const solid = tone === 'correct' ? themes[scheme].feedbackCorrect : themes[scheme].feedbackWrong
+    expect(node).toHaveStyle({ gap: 8, paddingTop: 12, paddingBottom: 12, paddingHorizontal: 16 })
+    const icon = node.children[0] as unknown as { props: Record<string, unknown> }
+    expect(icon.props).toMatchObject({ width: 24, height: 24, accessible: false })
+    expect(icon.props.style).not.toEqual(expect.objectContaining({ borderRadius: 9999 }))
+    const heading = screen.getByText(model.heading)
+    expect(heading).toHaveStyle({ color: solid, flex: 1, fontSize: 17, lineHeight: 24, fontFamily: 'Inter_700Bold' })
+    expect(heading.props.numberOfLines).toBeUndefined()
+    expect(heading.props.allowFontScaling).not.toBe(false)
+    expect(screen.queryByText(/XP/)).toBeNull()
+  })
 })
 
 test('the ref reaches the band so the sheet can focus it', async () => {
