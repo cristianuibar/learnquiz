@@ -309,6 +309,11 @@ export const startSession = createServerFn({ method: 'POST' })
     const rulesQueue = composeSession({ size: SESSION_SIZE, due, frontier: frontierInput, closers, targetDifficulty })
     if (!rulesQueue.length) {
       if (topic.jobRoleId !== null) throw httpError(`${await preparingMessage(db, topic.jobRoleId)}. Try again in a few minutes.`, 503)
+      // A join that timed out leaves generation running; that is a wait, not an empty topic.
+      const pending = top.length
+        ? await db.select({ id: concepts.id }).from(concepts).where(and(inArray(concepts.id, top.map((f) => f.concept.id)), eq(concepts.genStatus, 'generating'))).limit(1)
+        : []
+      if (pending.length) throw httpError('Your questions are still being written. Try again in a moment.', 503)
       throw httpError('Nothing to practice yet', 409)
     }
 
