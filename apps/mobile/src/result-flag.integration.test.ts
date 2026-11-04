@@ -54,7 +54,10 @@ jest.mock('expo-constants', () => ({
 
 const profile = { name: 'Ana', role: null, started: true, mastery: 0.66, benchmark: 0.85,
   onboarding: { day: 16, days: 30 }, proficiency: { achievedAt: null, projectedAt: null }, weeks: [], units: [],
-  confidentErrors: [{ id: 'a', conceptId: 'concept-1', concept: 'Check sign-off', at: 0, correctedAt: null }] }
+  confidentErrors: [
+    { id: 'a', conceptId: 'concept-1', concept: 'Check sign-off', at: 0, correctedAt: null },
+    { id: 'b', conceptId: 'concept-2', concept: 'Record damage', at: 1, correctedAt: null },
+  ] }
 let signInToken = 'token-a'
 let flagReply: () => Promise<{ status: number; data: unknown }>
 const flagRequests = () => jest.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith('/api/v1/me/result-flags'))
@@ -84,7 +87,7 @@ afterEach(() => { jest.restoreAllMocks() })
 async function openFlag() {
   const navigation = renderRouter('src/app', { initialUrl: '/profile' })
   await navigation
-  await fireEvent.press(await screen.findByRole('button', { name: 'Flag an unfair result' }))
+  await fireEvent.press(await screen.findByRole('button', { name: 'Flag an unfair result for Check sign-off' }))
   expect(await screen.findByText('Tell your training team what looks wrong. A person reviews every flag.')).toBeOnTheScreen()
   expect(navigation.getPathname()).toBe('/flag')
   return { navigation }
@@ -101,6 +104,8 @@ test('opens the concept flag from Profile, sends the note, returns and announces
   const note = screen.getByLabelText('Note')
   expect(note.props.multiline).toBe(true)
   expect(note.props.maxLength).toBe(500)
+  expect(screen.getByText('Up to 500 characters')).toBeOnTheScreen()
+  expect(note.props.accessibilityHint).toBe('Up to 500 characters')
   expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
   await fireEvent.changeText(note, ' \n\t ')
   expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
@@ -114,6 +119,11 @@ test('opens the concept flag from Profile, sends the note, returns and announces
   expect(flagRequests()[0][1]).toMatchObject({ method: 'POST', headers: { Authorization: 'Bearer token-a' },
     body: JSON.stringify({ conceptId: 'concept-1', note: 'My answer followed the procedure.' }) })
   expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledWith('Flag sent')
+  // Only the arrival focus remains after mockClear above. The old same-tick
+  // announcement ran before this focus and was interrupted by TalkBack.
+  expect(focus.mock.invocationCallOrder.at(-1)).toBeLessThan(
+    jest.mocked(AccessibilityInfo.announceForAccessibility).mock.invocationCallOrder[0],
+  )
 })
 
 test('keeps the note on failure, and allows a retry', async () => {
@@ -172,7 +182,7 @@ test('Back cancels the pending form and its late success does not announce', asy
   flagReply = () => new Promise((resolve) => { finish = resolve })
   await fireEvent.changeText(screen.getByLabelText('Note'), 'Please check this answer.')
   await fireEvent.press(screen.getByRole('button', { name: 'Send' }))
-  await fireEvent.press(screen.getByRole('button', { name: 'Back' }))
+  await fireEvent.press(screen.getByRole('button', { name: 'Back to Training progress' }))
   expect(await screen.findByText('Training progress')).toBeOnTheScreen()
   expect(flagRequests()[0][1]?.signal?.aborted).toBe(true)
   await act(async () => { finish({ status: 200, data: { ok: true } }) })
@@ -186,4 +196,22 @@ test('a direct route without a concept cannot send', async () => {
   await fireEvent.changeText(screen.getByLabelText('Note'), 'Please check this answer.')
   expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
   expect(flagRequests()).toHaveLength(0)
+})
+
+test('each critical-step button names and opens its own concept', async () => {
+  await renderRouter('src/app', { initialUrl: '/profile' })
+  expect(await screen.findByRole('button', { name: 'Flag an unfair result for Check sign-off' })).toBeOnTheScreen()
+  await fireEvent.press(screen.getByRole('button', { name: 'Flag an unfair result for Record damage' }))
+  await fireEvent.changeText(await screen.findByLabelText('Note'), 'Please review this result.')
+  await fireEvent.press(screen.getByRole('button', { name: 'Send' }))
+  expect(flagRequests()[0][1]?.body).toBe(JSON.stringify({ conceptId: 'concept-2', note: 'Please review this result.' }))
+})
+
+test('Back from a directly opened flag falls back to Training progress', async () => {
+  const navigation = renderRouter('src/app', { initialUrl: '/flag?conceptId=concept-1' })
+  await navigation
+  expect(router.canGoBack()).toBe(false)
+  await fireEvent.press(await screen.findByRole('button', { name: 'Back to Training progress' }))
+  expect(await screen.findByText('Training progress')).toBeOnTheScreen()
+  expect(navigation.getPathname()).toBe('/profile')
 })

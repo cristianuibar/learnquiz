@@ -8,14 +8,17 @@ export const TREND_LABEL_FONT = 13
 export const MAX_TREND_FONT_SCALE = 1.5
 // The artboard's height, which a larger font may grow but never shrink.
 export const TREND_MIN_HEIGHT = 188
-// A conservative average advance for Inter digits and short words, in em.
+// Average advance for dates, counts and short words, in em.
 const CHAR_EM = 0.6
+// Inter Bold "100%" spans about 2.8em. Leave room for its wide percent glyph
+// and rounding when clamping percentage labels to the chart edges.
+const PERCENT_CHAR_EM = 0.72
 const LABEL_GAP = 4
 
 export type Span = { left: number; right: number }
 
 export function textWidth(text: string, fontSize: number): number {
-  return text.length * fontSize * CHAR_EM
+  return text.length * fontSize * (text.endsWith('%') ? PERCENT_CHAR_EM : CHAR_EM)
 }
 
 // Font sizes and baselines below the plot for a font scale. Scale 1 keeps the

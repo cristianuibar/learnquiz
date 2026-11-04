@@ -25,3 +25,11 @@ test('only a confirmed response for the current request succeeds', () => {
   expect(resultFlagOutcome({ response: { ok: true } }, false)).toEqual({ kind: 'ignore' })
   expect(resultFlagOutcome({ error: new Error('offline') }, false)).toEqual({ kind: 'ignore' })
 })
+
+test.each([403, 404])('%s explains that the result cannot be flagged without suggesting a retry', (status) => {
+  expect(resultFlagOutcome({ error: { status } }, true)).toEqual({ kind: 'error', message: "You can't flag this result." })
+})
+
+test.each([null, 500, 503])('%s failures keep the retry message', (status) => {
+  expect(resultFlagOutcome({ error: { status } }, true)).toEqual({ kind: 'error', message: 'Could not send your flag. Try again.' })
+})

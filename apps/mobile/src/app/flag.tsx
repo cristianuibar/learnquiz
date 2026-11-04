@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
-import { AccessibilityInfo, View, type Text as NativeText } from 'react-native'
+import { View, type Text as NativeText } from 'react-native'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
-import { ArrowLeft } from 'lucide-react-native'
+import { ChevronLeft } from 'lucide-react-native'
 import { AlertRow } from '@/components/ui/AlertRow'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
@@ -11,6 +11,7 @@ import { TextField } from '@/components/ui/TextField'
 import { api } from '@/lib/api'
 import { getToken } from '@/lib/auth'
 import { flagNoteValid, resultFlagBody, resultFlagOutcome } from '@/lib/result-flag'
+import { queueFlagSent } from '@/lib/profile-announcement'
 import { useSession } from '@/lib/session-store'
 import { useTheme } from '@/theme/ThemeProvider'
 
@@ -58,8 +59,8 @@ function FlagForm({ token, conceptId }: { token: string; conceptId: string | und
     const outcome = resultFlagOutcome(result, current())
     if (outcome.kind === 'ignore') return
     if (outcome.kind === 'sent') {
+      queueFlagSent(token)
       router.dismissTo('/(tabs)/profile')
-      AccessibilityInfo.announceForAccessibility('Flag sent')
     } else {
       pending.current = null
       setBusy(false)
@@ -73,12 +74,15 @@ function FlagForm({ token, conceptId }: { token: string; conceptId: string | und
       <Button size="lg" disabled={!validConcept || !flagNoteValid(note)} busy={busy} onPress={() => { void send() }}>Send</Button>
     }>
       <View style={{ minHeight: sizes.topbarH, justifyContent: 'center' }}>
-        <IconButton icon={ArrowLeft} accessibilityLabel="Back" onPress={() => router.back()} />
+        <IconButton icon={ChevronLeft} accessibilityLabel="Back to Training progress" onPress={() => {
+          if (router.canGoBack()) router.back()
+          else router.replace('/(tabs)/profile')
+        }} />
       </View>
       <Text ref={headingRef} header variant="title1">Flag an unfair result</Text>
       <Text>Tell your training team what looks wrong. A person reviews every flag.</Text>
       {!validConcept && <AlertRow>Open a result from Training progress to flag it.</AlertRow>}
-      <TextField label="Note" multiline maxLength={500} value={note} onChangeText={setNote}
+      <TextField label="Note" helper="Up to 500 characters" multiline maxLength={500} value={note} onChangeText={setNote}
         editable={!busy} textAlignVertical="top" style={{ minHeight: sizes.target * 3 }} />
       {error && <AlertRow>{error}</AlertRow>}
     </Screen>

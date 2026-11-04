@@ -13,8 +13,9 @@ type Outcome = { kind: 'sent' } | { kind: 'ignore' } | { kind: 'error'; message:
 
 export function resultFlagOutcome(result: Result, current: boolean): Outcome {
   if (!current) return { kind: 'ignore' }
-  if ('error' in result && result.error && typeof result.error === 'object' && 'status' in result.error && result.error.status === 401) {
-    return { kind: 'ignore' }
+  if ('error' in result && result.error && typeof result.error === 'object' && 'status' in result.error) {
+    if (result.error.status === 401) return { kind: 'ignore' }
+    if (result.error.status === 403 || result.error.status === 404) return { kind: 'error', message: "You can't flag this result." }
   }
   if ('response' in result && result.response && typeof result.response === 'object' && 'ok' in result.response && result.response.ok === true) {
     return { kind: 'sent' }

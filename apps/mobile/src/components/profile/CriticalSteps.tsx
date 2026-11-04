@@ -25,7 +25,8 @@ export function CriticalSteps({ confidentErrors }: Pick<Profile, 'confidentError
               <Text>{row.concept}</Text>
               <Text variant="caption" muted num>{row.caption}</Text>
             </View>
-            <Button variant="secondary" onPress={() => router.push({ pathname: '/flag', params: { conceptId: row.conceptId } })}>
+            <Button variant="secondary" accessibilityLabel={`Flag an unfair result for ${row.concept}`}
+              onPress={() => router.push({ pathname: '/flag', params: { conceptId: row.conceptId } })}>
               Flag an unfair result
             </Button>
           </View>
