@@ -31,7 +31,7 @@ export function Stat({ label, value, unit, to }: {
 }) {
   const body = (
     <>
-      <span className="text-[14px]/[20px] font-medium text-ink-muted group-hover/stat:text-ink group-hover/stat:underline">{label}</span>
+      <span className={cn('text-[14px]/[20px] font-medium text-ink-muted', to && 'group-hover/stat:text-ink group-hover/stat:underline')}>{label}</span>
       <span className={VALUE}>
         {value === null ? (
           <>
@@ -55,5 +55,5 @@ export function Stat({ label, value, unit, to }: {
       </Link>
     )
   }
-  return <div className={cn(STAT, 'group/stat')}>{body}</div>
+  return <div className={STAT}>{body}</div>
 }

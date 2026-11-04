@@ -864,8 +864,14 @@ export const reportItem = createServerFn({ method: 'POST' })
         .where(and(eq(attempts.id, data.attemptId), eq(attempts.learnerId, learnerId), eq(attempts.itemId, item.id)))
       if (!own) throw httpError('Attempt not found', 404)
     }
-    // One open flag per learner and item; a repeat is a no-op.
-    if (await openFlag(db, learnerId, item.id)) return { ok: true }
+    // One open flag per learner and item; a repeat replaces its details with the latest report.
+    const open = await openFlag(db, learnerId, item.id)
+    if (open) {
+      await db.update(itemFlags)
+        .set({ reason: data.reason, note: data.note || null, sourceVersion: item.sourceVersion, ...(data.attemptId ? { attemptId: data.attemptId } : {}) })
+        .where(eq(itemFlags.id, open.id))
+      return { ok: true }
+    }
     await db.insert(itemFlags).values({
       id: crypto.randomUUID(), itemId: item.id, userId: learnerId, reason: data.reason, note: data.note || null,
       attemptId: data.attemptId ?? null, sourceVersion: item.sourceVersion, createdAt: Date.now(),

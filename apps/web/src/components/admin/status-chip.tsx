@@ -1,9 +1,12 @@
 import {
-  Archive, Ban, Check, CircleCheck, CircleDashed, CircleDot, Clock, Contrast, File, Flag, Hourglass, Link,
-  OctagonAlert, Radio, Shield, type LucideIcon,
+  Archive, Ban, Check, CircleCheck, CircleDashed, CircleDot, Clock, File, Flag, Hourglass, Link,
+  OctagonAlert, Radio, Shield,
 } from 'lucide-react'
-import type { ReactNode } from 'react'
+import type { ComponentType, ReactNode } from 'react'
+import { DashedAlert, HalfDisc } from '@/components/status-icons'
 import { cn } from '@/lib/utils'
+
+type ChipIcon = ComponentType<{ className?: string; 'aria-hidden'?: boolean }>
 
 export type StatusTone = 'dashed' | 'tint' | 'settled' | 'strong' | 'muted' | 'mastered' | 'learning' | 'critical'
 
@@ -21,7 +24,7 @@ const TONE: Record<StatusTone, string> = {
 /** Operational status chip: icon + word, shape and ground carry emphasis (never hue alone). */
 export function StatusChip({ tone, icon: Icon, children, className }: {
   tone: StatusTone
-  icon: LucideIcon
+  icon: ChipIcon
   children: ReactNode
   className?: string
 }) {
@@ -44,7 +47,7 @@ export const STATUS = {
   Invited: { tone: 'dashed', icon: Link },
   Queued: { tone: 'dashed', icon: Clock },
   Pending: { tone: 'dashed', icon: Clock },
-  Unreviewed: { tone: 'dashed', icon: CircleDashed },
+  Unreviewed: { tone: 'dashed', icon: DashedAlert },
   'No documents yet': { tone: 'dashed', icon: File },
   Uploading: { tone: 'tint', icon: Hourglass },
   'Preparing training': { tone: 'tint', icon: Hourglass },
@@ -65,10 +68,10 @@ export const STATUS = {
   Revoked: { tone: 'muted', icon: Ban },
   Rejected: { tone: 'muted', icon: Ban },
   Proficient: { tone: 'mastered', icon: Check },
-  'Still learning': { tone: 'learning', icon: Contrast },
+  'Still learning': { tone: 'learning', icon: HalfDisc },
   Estimate: { tone: 'settled', icon: CircleDashed },
   Critical: { tone: 'critical', icon: Shield },
-} as const satisfies Record<string, { tone: StatusTone; icon: LucideIcon }>
+} as const satisfies Record<string, { tone: StatusTone; icon: ChipIcon }>
 
 export function Status({ word, className }: { word: keyof typeof STATUS; className?: string }) {
   const { tone, icon } = STATUS[word]

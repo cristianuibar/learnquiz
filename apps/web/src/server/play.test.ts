@@ -415,7 +415,7 @@ it('keeps the proficiency stamp when a concurrent answer drops the benchmark rig
   expect(scalar(raw, 'SELECT proficient_at FROM member_role_assignments WHERE user_id = ?', 'u1').proficient_at).toBe(now)
 })
 
-it('hides a reported question from the reporter only, and keeps one open flag per learner', async () => {
+it('hides a reported question from the reporter only, and keeps one open flag per learner with the latest details', async () => {
   seedTopicAndLearner(raw, 0)
   raw.prepare('INSERT INTO user (id, name, email) VALUES (?, ?, ?)').run('u1', 'Learner', 'learner@example.test')
   seedFrontier(raw, 2, true)
@@ -427,9 +427,14 @@ it('hides a reported question from the reporter only, and keeps one open flag pe
   await expect(reportItem({ data: { itemId: 'i1', attemptId: 'nope' } })).rejects.toMatchObject({ status: 404 })
 
   await reportItem({ data: { itemId: 'i1', reason: 'unclear', note: 'Which x?', attemptId } })
-  await reportItem({ data: { itemId: 'i1', reason: 'incorrect', note: '', attemptId: null } })
   expect(raw.prepare('SELECT user_id, reason, note, attempt_id, source_version FROM item_flags').all()).toEqual([
     { user_id: 'u1', reason: 'unclear', note: 'Which x?', attempt_id: attemptId, source_version: 3 },
+  ])
+  // Reporting again updates the open flag rather than dropping the new details; the attempt stays linked.
+  raw.prepare('UPDATE items SET source_version = 4 WHERE id = ?').run('i1')
+  await reportItem({ data: { itemId: 'i1', reason: 'incorrect', note: 'The answer is 2', attemptId: null } })
+  expect(raw.prepare('SELECT user_id, reason, note, attempt_id, source_version FROM item_flags').all()).toEqual([
+    { user_id: 'u1', reason: 'incorrect', note: 'The answer is 2', attempt_id: attemptId, source_version: 4 },
   ])
   expect(scalar(raw, 'SELECT status FROM items WHERE id = ?', 'i1').status).toBe('active')
   expect(await getConceptItems({ data: { conceptId: 'c1' } })).toEqual({ items: [] })
