@@ -37,7 +37,7 @@ function MyProfile() {
           <Link to="/me/settings" data-focus="settings" aria-label="Settings"><SlidersHorizontal aria-hidden className="size-6" /></Link>
         </Button>
       )}
-      action={first && <StartButton topicId={first.topicId} placement={first.placement} size="lg">Play first session</StartButton>}
+      action={first && <StartButton topicId={first.topicId} placement={first.placement} size="lg" className="whitespace-normal py-2">Play first session</StartButton>}
     />
   )
 }
