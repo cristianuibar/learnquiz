@@ -62,6 +62,7 @@ beforeEach(() => {
 afterEach(() => {
   raw.exec('ROLLBACK')
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
 })
 
 it('generates the flowchart once with one model call and then serves the stored graph', async () => {
@@ -101,6 +102,27 @@ it('releases the claim when the model call fails', async () => {
   await expect(getUnitProcedure({ data: { unitId: 'unit' } })).rejects.toThrow()
   expect(raw.prepare('SELECT procedure_started_at AS s FROM units').get()).toEqual({ s: null })
   expect(await getUnitProcedure({ data: { unitId: 'unit' } })).toMatchObject({ status: 'ready' })
+})
+
+it('keeps the claim while a slow model call is still retrying, then stores its graph', async () => {
+  let reply!: (r: Response) => void
+  fetchModel.mockImplementationOnce(() => new Promise<Response>((resolve) => { reply = resolve }))
+  const start = Date.now()
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(start)
+  const first = getUnitProcedure({ data: { unitId: 'unit' } })
+  await vi.waitFor(() => expect(fetchModel).toHaveBeenCalledTimes(1))
+  clock.mockReturnValue(start + 221_000)
+  expect(await getUnitProcedure({ data: { unitId: 'unit' } })).toEqual({ status: 'pending' })
+  expect(fetchModel).toHaveBeenCalledTimes(1)
+  reply(Response.json({ choices: [{ message: { content: JSON.stringify(graph) }, finish_reason: 'stop' }] }))
+  expect(await first).toMatchObject({ status: 'ready', graph })
+  expect(raw.prepare('SELECT procedure_json IS NOT NULL AS stored, procedure_started_at AS s FROM units').get()).toEqual({ stored: 1, s: null })
+})
+
+it('takes over a claim left by a crashed request after ten minutes', async () => {
+  run('UPDATE units SET procedure_started_at = ?', Date.now() - 10 * 60 * 1000 - 1)
+  expect(await getUnitProcedure({ data: { unitId: 'unit' } })).toMatchObject({ status: 'ready' })
+  expect(fetchModel).toHaveBeenCalledTimes(1)
 })
 
 it('returns 429 for a company topic over the company cap, with no model call', async () => {
