@@ -219,6 +219,24 @@ describe('Training progress', () => {
   const unitButton = (name: string) => [...section('By unit').querySelectorAll('h3 > button')].find((b) => b.textContent?.startsWith(name)) as HTMLButtonElement
   const panelOf = (button: HTMLButtonElement) => document.getElementById(button.getAttribute('aria-controls')!)!
 
+  it('shows a partner an unpracticed concept in a practiced unit as a placement estimate', async () => {
+    const mixed: Profile['units'] = [{ id: 'u1', name: 'Receiving', mastery: 0.48, state: 'learning', concepts: [concept('c1', 'u1', 'Check the seal'), concept('c3', 'u1', 'Count the cartons', { pKnown: 0.26, measured: false, status: 'not_started' })] }]
+    vi.mocked(getProfile).mockResolvedValue(profile({ units: mixed }))
+    await mount('/org/acme/people/learner')
+    const panel = panelOf(unitButton('Receiving'))
+    expect(panel.textContent).toContain('~26%')
+    expect(panel.textContent).toContain('Placement estimate')
+    expect(panel.textContent).not.toContain('Not started')
+  })
+
+  it('keeps a partner the weekly trend when proficiency was reached before the shown weeks', async () => {
+    vi.mocked(getProfile).mockResolvedValue(profile({ proficiency: { achievedAt: start - 60 * day, days: 21, estimatedDays: null, projectedAt: null } }))
+    await mount('/org/acme/people/learner')
+    expect(text()).toContain('Reached Sep 3 · in 21 days')
+    expect(container.querySelector('[role="img"]')).not.toBeNull()
+    expect(text()).not.toContain('No weekly mastery recorded yet.')
+  })
+
   it('toggles a unit panel from its button and keeps focus on it', async () => {
     vi.mocked(getProfile).mockResolvedValue(profile({ units }))
     await mount('/me/profile')

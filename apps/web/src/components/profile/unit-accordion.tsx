@@ -52,7 +52,7 @@ function UnitItem({ unit, index, benchmark, portal }: { unit: Unit; index: numbe
           {unit.concepts.map((concept) => (
             <li key={concept.id} className="flex flex-col gap-2">
               <p className="text-body">{concept.name}</p>
-              {portal && !concept.measured && estimate ? (
+              {portal && !concept.measured && (estimate || concept.pKnown > 0) ? (
                 <>
                   <div className="flex items-center gap-3">
                     <MasteryBar
@@ -97,7 +97,7 @@ function UnitItem({ unit, index, benchmark, portal }: { unit: Unit; index: numbe
   )
 }
 
-// `portal` (company admin view) shows unmeasured concepts of an estimate unit as a dashed estimate bar.
+// `portal` (company admin view) shows unmeasured concepts with a placement value as a dashed estimate bar.
 export function UnitAccordion({ units, benchmark, portal = false }: { units: Profile['units']; benchmark: number; portal?: boolean }) {
   const id = useId()
   if (units.length === 0) return null
