@@ -158,6 +158,15 @@ it('offers only times inside the company window', async () => {
   expect(savePushPreferences).toHaveBeenCalledExactlyOnceWith({ data: { ...prefs, startMinute: 420, endMinute: 1080 } })
 })
 
+it('keeps saved times selected when company hours start off the half hour', async () => {
+  await render({ push: { company: { ...company, startMinute: 555, endMinute: 1020 }, prefs: { ...prefs, startMinute: 555, endMinute: 1020 } } })
+  const select = (id: string) => container.querySelector(id) as unknown as HTMLSelectElement
+  expect(select('#settings-from').value).toBe('555')
+  expect(select('#settings-to').value).toBe('1020')
+  expect(select('#settings-to').selectedOptions[0].textContent).toBe('5:00 PM')
+  expect(select('#settings-from').selectedOptions[0].textContent).toBe('9:15 AM')
+})
+
 it('shows staff links and the test push only to staff', async () => {
   const endpoint = 'https://push.example/staff'
   await render({

@@ -154,8 +154,8 @@ function Settings() {
         <HoursField
           start={prefs.startMinute}
           end={prefs.endMinute}
-          startOptions={timeOptions(company, 0, prefs.endMinute - 30)}
-          endOptions={timeOptions(company, prefs.startMinute + 30, 1440)}
+          startOptions={timeOptions(company, 0, prefs.endMinute - 30, prefs.startMinute)}
+          endOptions={timeOptions(company, prefs.startMinute + 30, 1440, prefs.endMinute)}
           caption={company && `Inside ${company.name}’s hours: ${formatMinute(company.startMinute)}–${formatMinute(company.endMinute)}`}
           disabled={saving}
           onStart={(startMinute) => void save({ ...prefs, startMinute })}
