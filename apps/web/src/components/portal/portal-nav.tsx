@@ -39,11 +39,11 @@ function Header({ shell }: { shell: Shell }) {
   )
 }
 
-function Foot({ shell }: { shell: Shell }) {
+function Foot({ shell, readonly }: { shell: Shell; readonly: boolean }) {
   const { busy, error, signOut } = useSignOut({ keepPlace: false })
   return (
     <>
-      {shell.readOnly ? (
+      {readonly ? (
         <div className="flex items-center gap-2 px-2">
           <span className="inline-flex h-7 items-center gap-1 rounded-full border border-border-strong px-2.5 text-caption font-semibold text-ink">
             <Icon size={16}><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></Icon>
@@ -83,20 +83,20 @@ function Foot({ shell }: { shell: Shell }) {
 }
 
 // `current` false (a not-found page under the portal) leaves every item unmarked.
-export function PortalNav({ shell, current = true, children }: { shell: Shell; current?: boolean; children: ReactNode }) {
+export function PortalNav({ shell, current = true, readonly = false, children }: { shell: Shell; current?: boolean; readonly?: boolean; children: ReactNode }) {
   const links = usePortalLinks()
-  const items = [
+  const all = [
     { to: links.overview, label: 'Overview', icon: icons.overview },
     { to: links.roles, label: 'Roles', icon: icons.roles },
     { to: links.questions(), label: 'Questions', icon: icons.questions },
     { to: links.people, label: 'People', icon: icons.people },
     { to: links.settings, label: 'Settings', icon: icons.settings },
   ]
-  // Learn Quiz staff get read-only Overview and People; the server 403s them on Roles, Questions and Settings.
+  // The staff portal only has Overview and Roles routes today; a follow-on issue adds Questions, People and Settings.
+  const items = readonly ? all.slice(0, 2) : all
   const marked = current ? items : items.map((i) => ({ ...i, to: { ...i.to, activeOptions: { ...('activeOptions' in i.to ? i.to.activeOptions : {}), exact: true } } }))
-  const shown = shell.readOnly ? marked.filter((i) => i.label === 'Overview' || i.label === 'People') : marked
   return (
-    <SideNav label={`${shell.name} portal`} header={<Header shell={shell} />} items={shown} foot={<Foot shell={shell} />}>
+    <SideNav label={`${shell.name} portal`} header={<Header shell={shell} />} items={marked} foot={<Foot shell={shell} readonly={readonly} />} band={readonly}>
       {children}
     </SideNav>
   )

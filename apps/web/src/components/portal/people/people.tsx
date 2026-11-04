@@ -121,7 +121,6 @@ export function People({ org, invite = false }: { org: Org; invite?: boolean }) 
     return (
       <Page>
         <PageHeader title="People" />
-        {org.readOnly && <p className="text-body text-ink-muted">Staff view · Read only</p>}
         {error && <Banner kind="alert" className="max-w-[720px]">{error}</Banner>}
         <Card className="max-w-[720px] flex-row flex-wrap items-center justify-between gap-4 p-6">
           <p className="text-body-lg text-ink">No one invited yet.</p>
@@ -209,7 +208,6 @@ export function People({ org, invite = false }: { org: Org; invite?: boolean }) 
   return (
     <Page>
       <PageHeader title="People" actions={inviteButton} />
-      {org.readOnly && <p className="text-body text-ink-muted">Staff view · Read only</p>}
       <section aria-label={`People in ${org.name}`} className="flex flex-col gap-4">
         {error && <Banner kind="alert">{error}</Banner>}
         {toolbar}

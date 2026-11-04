@@ -2,22 +2,25 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
+import { listRoles } from './org'
 import * as detail from './role-detail'
+import { uploadRoleDocument } from './role-documents'
 
 // Keep the handlers, validation, authorization, model client and database real.
 // Only the transport, session provider, Worker bindings and model HTTP are faked.
 const holder = vi.hoisted(() => ({ db: null as unknown, userId: 'owner' as string | null }))
 vi.mock('@tanstack/react-start', () => ({
+  createServerOnlyFn: (fn: unknown) => fn,
   createServerFn: () => ({
-    validator: (schema: { parse: (data: unknown) => unknown }) => ({
-      handler: (fn: (args: { data: unknown }) => unknown) => (args: { data: unknown }) => fn({ data: schema.parse(args.data) }),
+    validator: (schema: { parse: (data: unknown) => unknown } | ((data: unknown) => unknown)) => ({
+      handler: (fn: (args: { data: unknown }) => unknown) => (args: { data: unknown }) => fn({ data: typeof schema === 'function' ? schema(args.data) : schema.parse(args.data) }),
     }),
   }),
 }))
 vi.mock('@tanstack/react-start/server', () => ({ getRequestHeaders: () => new Headers() }))
 vi.mock('@/db', () => ({ getDb: () => holder.db }))
 vi.mock('@/server/auth', () => ({
-  getAuth: () => ({ api: { getSession: async () => holder.userId ? { user: { id: holder.userId } } : null } }),
+  getAuth: () => ({ api: { getSession: async () => holder.userId ? { user: { id: holder.userId, role: holder.userId.startsWith('staff') ? 'admin' : null } } : null } }),
 }))
 vi.mock('cloudflare:workers', () => ({
   env: { LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://llm.example', LLM_MODEL: 'muse-spark-1.3' },
@@ -53,13 +56,13 @@ beforeAll(() => {
     }
   })
   holder.db = db
-  for (const id of ['owner', 'employee', 'other-owner']) {
-    raw.prepare('INSERT INTO user (id, name, email) VALUES (?, ?, ?)').run(id, id === 'owner' ? 'Owner Name' : id, `${id}@learnquiz.test`)
+  for (const id of ['owner', 'employee', 'other-owner', 'staff', 'staff-owner']) {
+    raw.prepare('INSERT INTO user (id, name, email, role) VALUES (?, ?, ?, ?)').run(id, id === 'owner' ? 'Owner Name' : id, `${id}@learnquiz.test`, id.startsWith('staff') ? 'admin' : null)
   }
   for (const [id, slug] of [['northwind', 'northwind'], ['other-org', 'other-company']]) {
     raw.prepare('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, 1)').run(id, slug, slug)
   }
-  for (const [userId, orgId, role] of [['owner', 'northwind', 'owner'], ['employee', 'northwind', 'member'], ['other-owner', 'other-org', 'owner']]) {
+  for (const [userId, orgId, role] of [['owner', 'northwind', 'owner'], ['employee', 'northwind', 'member'], ['other-owner', 'other-org', 'owner'], ['staff-owner', 'northwind', 'owner']]) {
     raw.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, 1)').run(userId, orgId, userId, role)
   }
   for (const [id, orgId] of [['picker', 'northwind'], ['other-role', 'other-org']]) {
@@ -151,4 +154,24 @@ it('persists a concept edit and critical toggle, and refuses members and other c
   await expect(async () => detail.updateRoleConcept({ data: { slug: 'northwind', conceptId: 'scan-bin' } })).rejects.toThrow('Change at least one field')
   await expect(detail.updateRoleConcept({ data: { slug: 'northwind', conceptId: 'foreign-concept', critical: true } })).rejects.toMatchObject({ status: 404 })
   expect(conceptRow('foreign-concept')).toMatchObject({ critical: 0 })
+})
+
+it('lets staff outside the company read a role but not change it', async () => {
+  holder.userId = 'staff'
+  await expect(read()).resolves.toMatchObject({ readOnly: true, role: { id: 'picker' } })
+  const roles = await listRoles({ data: { slug: 'northwind' } })
+  expect(roles.readOnly).toBe(true)
+  expect(roles.roles.map((r) => r.id)).toContain('picker')
+  await expect(detail.updateRoleConcept({ data: { slug: 'northwind', conceptId: 'scan-bin', critical: false } })).rejects.toMatchObject({ status: 403 })
+  const form = new FormData()
+  for (const [key, value] of [['slug', 'northwind'], ['roleId', 'picker'], ['title', 'Staff SOP'], ['text', 'Staff text']]) form.set(key, value)
+  await expect(uploadRoleDocument({ data: form })).rejects.toMatchObject({ status: 403 })
+  expect(raw.prepare("SELECT id FROM sources WHERE title = 'Staff SOP'").get()).toBeUndefined()
+  expect(conceptRow('scan-bin')).toMatchObject({ critical: 1 })
+})
+
+it('keeps the full portal for staff who own the company', async () => {
+  holder.userId = 'staff-owner'
+  await expect(read()).resolves.toMatchObject({ readOnly: false })
+  await expect(listRoles({ data: { slug: 'northwind' } })).resolves.toMatchObject({ readOnly: false })
 })

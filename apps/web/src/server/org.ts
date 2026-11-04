@@ -151,9 +151,9 @@ export const createCompany = createServerFn({ method: 'POST' })
 export const listRoles = createServerFn({ method: 'GET' })
   .validator(Slug)
   .handler(async ({ data }) => {
-    const { org } = await requireOrgAdmin(data.slug)
+    const { org, readOnly } = await requireOrgReader(data.slug)
     const roles = await roleSummaries(org.id)
-    return { name: org.name, slug: org.slug, roles: roles.map(({ people, documents, ...role }) => ({ ...role, peopleCount: people, documentCount: documents })) }
+    return { name: org.name, slug: org.slug, readOnly, roles: roles.map(({ people, documents, ...role }) => ({ ...role, peopleCount: people, documentCount: documents })) }
   })
 
 // Partners pick roles by name, so two active roles in one company must not share a name.

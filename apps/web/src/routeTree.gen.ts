@@ -44,11 +44,15 @@ import { Route as OrgSlugSettingsRouteImport } from './routes/org.$slug.settings
 import { Route as PlaySessionIdDoneRouteImport } from './routes/play.$sessionId_.done'
 import { Route as PlayQuickItemIdRouteImport } from './routes/play.quick.$itemId'
 import { Route as TTopicIdPathRouteImport } from './routes/t.$topicId.path'
+import { Route as AdminCompaniesSlugPortalRouteImport } from './routes/admin_.companies.$slug.portal'
 import { Route as ApiInvitesInvitationIdLogoRouteImport } from './routes/api/invites.$invitationId.logo'
 import { Route as ApiOrgOrgIdLogoRouteImport } from './routes/api/org.$orgId.logo'
 import { Route as OrgSlugPeopleIdRouteImport } from './routes/org.$slug.people_.$id'
 import { Route as OrgSlugRolesRoleIdRouteImport } from './routes/org.$slug.roles_.$roleId'
 import { Route as TTopicIdUUnitIdRouteImport } from './routes/t.$topicId.u.$unitId'
+import { Route as AdminCompaniesSlugPortalIndexRouteImport } from './routes/admin_.companies.$slug.portal.index'
+import { Route as AdminCompaniesSlugPortalRolesRouteImport } from './routes/admin_.companies.$slug.portal.roles'
+import { Route as AdminCompaniesSlugPortalRolesRoleIdRouteImport } from './routes/admin_.companies.$slug.portal.roles_.$roleId'
 import { Route as ApiOrgOrgIdRolesRoleIdDocumentsRouteImport } from './routes/api/org.$orgId.roles.$roleId.documents'
 
 const IndexRoute = IndexRouteImport.update({
@@ -226,6 +230,12 @@ const TTopicIdPathRoute = TTopicIdPathRouteImport.update({
   path: '/t/$topicId/path',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminCompaniesSlugPortalRoute =
+  AdminCompaniesSlugPortalRouteImport.update({
+    id: '/admin_/companies/$slug/portal',
+    path: '/admin/companies/$slug/portal',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiInvitesInvitationIdLogoRoute =
   ApiInvitesInvitationIdLogoRouteImport.update({
     id: '/api/invites/$invitationId/logo',
@@ -252,6 +262,24 @@ const TTopicIdUUnitIdRoute = TTopicIdUUnitIdRouteImport.update({
   path: '/t/$topicId/u/$unitId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminCompaniesSlugPortalIndexRoute =
+  AdminCompaniesSlugPortalIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AdminCompaniesSlugPortalRoute,
+  } as any)
+const AdminCompaniesSlugPortalRolesRoute =
+  AdminCompaniesSlugPortalRolesRouteImport.update({
+    id: '/roles',
+    path: '/roles',
+    getParentRoute: () => AdminCompaniesSlugPortalRoute,
+  } as any)
+const AdminCompaniesSlugPortalRolesRoleIdRoute =
+  AdminCompaniesSlugPortalRolesRoleIdRouteImport.update({
+    id: '/roles_/$roleId',
+    path: '/roles/$roleId',
+    getParentRoute: () => AdminCompaniesSlugPortalRoute,
+  } as any)
 const ApiOrgOrgIdRolesRoleIdDocumentsRoute =
   ApiOrgOrgIdRolesRoleIdDocumentsRouteImport.update({
     id: '/api/org/$orgId/roles/$roleId/documents',
@@ -295,11 +323,15 @@ export interface FileRoutesByFullPath {
   '/play/quick/$itemId': typeof PlayQuickItemIdRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
   '/org/$slug/': typeof OrgSlugIndexRoute
+  '/admin/companies/$slug/portal': typeof AdminCompaniesSlugPortalRouteWithChildren
   '/api/invites/$invitationId/logo': typeof ApiInvitesInvitationIdLogoRoute
   '/api/org/$orgId/logo': typeof ApiOrgOrgIdLogoRoute
   '/org/$slug/people/$id': typeof OrgSlugPeopleIdRoute
   '/org/$slug/roles/$roleId': typeof OrgSlugRolesRoleIdRoute
   '/t/$topicId/u/$unitId': typeof TTopicIdUUnitIdRoute
+  '/admin/companies/$slug/portal/roles': typeof AdminCompaniesSlugPortalRolesRoute
+  '/admin/companies/$slug/portal/': typeof AdminCompaniesSlugPortalIndexRoute
+  '/admin/companies/$slug/portal/roles/$roleId': typeof AdminCompaniesSlugPortalRolesRoleIdRoute
   '/api/org/$orgId/roles/$roleId/documents': typeof ApiOrgOrgIdRolesRoleIdDocumentsRoute
 }
 export interface FileRoutesByTo {
@@ -341,6 +373,9 @@ export interface FileRoutesByTo {
   '/org/$slug/people/$id': typeof OrgSlugPeopleIdRoute
   '/org/$slug/roles/$roleId': typeof OrgSlugRolesRoleIdRoute
   '/t/$topicId/u/$unitId': typeof TTopicIdUUnitIdRoute
+  '/admin/companies/$slug/portal/roles': typeof AdminCompaniesSlugPortalRolesRoute
+  '/admin/companies/$slug/portal': typeof AdminCompaniesSlugPortalIndexRoute
+  '/admin/companies/$slug/portal/roles/$roleId': typeof AdminCompaniesSlugPortalRolesRoleIdRoute
   '/api/org/$orgId/roles/$roleId/documents': typeof ApiOrgOrgIdRolesRoleIdDocumentsRoute
 }
 export interface FileRoutesById {
@@ -380,11 +415,15 @@ export interface FileRoutesById {
   '/play/quick/$itemId': typeof PlayQuickItemIdRoute
   '/t/$topicId/path': typeof TTopicIdPathRoute
   '/org/$slug/': typeof OrgSlugIndexRoute
+  '/admin_/companies/$slug/portal': typeof AdminCompaniesSlugPortalRouteWithChildren
   '/api/invites/$invitationId/logo': typeof ApiInvitesInvitationIdLogoRoute
   '/api/org/$orgId/logo': typeof ApiOrgOrgIdLogoRoute
   '/org/$slug/people_/$id': typeof OrgSlugPeopleIdRoute
   '/org/$slug/roles_/$roleId': typeof OrgSlugRolesRoleIdRoute
   '/t/$topicId/u/$unitId': typeof TTopicIdUUnitIdRoute
+  '/admin_/companies/$slug/portal/roles': typeof AdminCompaniesSlugPortalRolesRoute
+  '/admin_/companies/$slug/portal/': typeof AdminCompaniesSlugPortalIndexRoute
+  '/admin_/companies/$slug/portal/roles_/$roleId': typeof AdminCompaniesSlugPortalRolesRoleIdRoute
   '/api/org/$orgId/roles/$roleId/documents': typeof ApiOrgOrgIdRolesRoleIdDocumentsRoute
 }
 export interface FileRouteTypes {
@@ -425,11 +464,15 @@ export interface FileRouteTypes {
     | '/play/quick/$itemId'
     | '/t/$topicId/path'
     | '/org/$slug/'
+    | '/admin/companies/$slug/portal'
     | '/api/invites/$invitationId/logo'
     | '/api/org/$orgId/logo'
     | '/org/$slug/people/$id'
     | '/org/$slug/roles/$roleId'
     | '/t/$topicId/u/$unitId'
+    | '/admin/companies/$slug/portal/roles'
+    | '/admin/companies/$slug/portal/'
+    | '/admin/companies/$slug/portal/roles/$roleId'
     | '/api/org/$orgId/roles/$roleId/documents'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -471,6 +514,9 @@ export interface FileRouteTypes {
     | '/org/$slug/people/$id'
     | '/org/$slug/roles/$roleId'
     | '/t/$topicId/u/$unitId'
+    | '/admin/companies/$slug/portal/roles'
+    | '/admin/companies/$slug/portal'
+    | '/admin/companies/$slug/portal/roles/$roleId'
     | '/api/org/$orgId/roles/$roleId/documents'
   id:
     | '__root__'
@@ -509,11 +555,15 @@ export interface FileRouteTypes {
     | '/play/quick/$itemId'
     | '/t/$topicId/path'
     | '/org/$slug/'
+    | '/admin_/companies/$slug/portal'
     | '/api/invites/$invitationId/logo'
     | '/api/org/$orgId/logo'
     | '/org/$slug/people_/$id'
     | '/org/$slug/roles_/$roleId'
     | '/t/$topicId/u/$unitId'
+    | '/admin_/companies/$slug/portal/roles'
+    | '/admin_/companies/$slug/portal/'
+    | '/admin_/companies/$slug/portal/roles_/$roleId'
     | '/api/org/$orgId/roles/$roleId/documents'
   fileRoutesById: FileRoutesById
 }
@@ -541,6 +591,7 @@ export interface RootRouteChildren {
   PlaySessionIdDoneRoute: typeof PlaySessionIdDoneRoute
   PlayQuickItemIdRoute: typeof PlayQuickItemIdRoute
   TTopicIdPathRoute: typeof TTopicIdPathRoute
+  AdminCompaniesSlugPortalRoute: typeof AdminCompaniesSlugPortalRouteWithChildren
   ApiInvitesInvitationIdLogoRoute: typeof ApiInvitesInvitationIdLogoRoute
   ApiOrgOrgIdLogoRoute: typeof ApiOrgOrgIdLogoRoute
   TTopicIdUUnitIdRoute: typeof TTopicIdUUnitIdRoute
@@ -794,6 +845,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TTopicIdPathRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin_/companies/$slug/portal': {
+      id: '/admin_/companies/$slug/portal'
+      path: '/admin/companies/$slug/portal'
+      fullPath: '/admin/companies/$slug/portal'
+      preLoaderRoute: typeof AdminCompaniesSlugPortalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/invites/$invitationId/logo': {
       id: '/api/invites/$invitationId/logo'
       path: '/api/invites/$invitationId/logo'
@@ -828,6 +886,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/t/$topicId/u/$unitId'
       preLoaderRoute: typeof TTopicIdUUnitIdRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/admin_/companies/$slug/portal/': {
+      id: '/admin_/companies/$slug/portal/'
+      path: '/'
+      fullPath: '/admin/companies/$slug/portal/'
+      preLoaderRoute: typeof AdminCompaniesSlugPortalIndexRouteImport
+      parentRoute: typeof AdminCompaniesSlugPortalRoute
+    }
+    '/admin_/companies/$slug/portal/roles': {
+      id: '/admin_/companies/$slug/portal/roles'
+      path: '/roles'
+      fullPath: '/admin/companies/$slug/portal/roles'
+      preLoaderRoute: typeof AdminCompaniesSlugPortalRolesRouteImport
+      parentRoute: typeof AdminCompaniesSlugPortalRoute
+    }
+    '/admin_/companies/$slug/portal/roles_/$roleId': {
+      id: '/admin_/companies/$slug/portal/roles_/$roleId'
+      path: '/roles/$roleId'
+      fullPath: '/admin/companies/$slug/portal/roles/$roleId'
+      preLoaderRoute: typeof AdminCompaniesSlugPortalRolesRoleIdRouteImport
+      parentRoute: typeof AdminCompaniesSlugPortalRoute
     }
     '/api/org/$orgId/roles/$roleId/documents': {
       id: '/api/org/$orgId/roles/$roleId/documents'
@@ -884,6 +963,25 @@ const OrgSlugRouteChildren: OrgSlugRouteChildren = {
 const OrgSlugRouteWithChildren =
   OrgSlugRoute._addFileChildren(OrgSlugRouteChildren)
 
+interface AdminCompaniesSlugPortalRouteChildren {
+  AdminCompaniesSlugPortalRolesRoute: typeof AdminCompaniesSlugPortalRolesRoute
+  AdminCompaniesSlugPortalIndexRoute: typeof AdminCompaniesSlugPortalIndexRoute
+  AdminCompaniesSlugPortalRolesRoleIdRoute: typeof AdminCompaniesSlugPortalRolesRoleIdRoute
+}
+
+const AdminCompaniesSlugPortalRouteChildren: AdminCompaniesSlugPortalRouteChildren =
+  {
+    AdminCompaniesSlugPortalRolesRoute: AdminCompaniesSlugPortalRolesRoute,
+    AdminCompaniesSlugPortalIndexRoute: AdminCompaniesSlugPortalIndexRoute,
+    AdminCompaniesSlugPortalRolesRoleIdRoute:
+      AdminCompaniesSlugPortalRolesRoleIdRoute,
+  }
+
+const AdminCompaniesSlugPortalRouteWithChildren =
+  AdminCompaniesSlugPortalRoute._addFileChildren(
+    AdminCompaniesSlugPortalRouteChildren,
+  )
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
@@ -908,6 +1006,7 @@ const rootRouteChildren: RootRouteChildren = {
   PlaySessionIdDoneRoute: PlaySessionIdDoneRoute,
   PlayQuickItemIdRoute: PlayQuickItemIdRoute,
   TTopicIdPathRoute: TTopicIdPathRoute,
+  AdminCompaniesSlugPortalRoute: AdminCompaniesSlugPortalRouteWithChildren,
   ApiInvitesInvitationIdLogoRoute: ApiInvitesInvitationIdLogoRoute,
   ApiOrgOrgIdLogoRoute: ApiOrgOrgIdLogoRoute,
   TTopicIdUUnitIdRoute: TTopicIdUUnitIdRoute,

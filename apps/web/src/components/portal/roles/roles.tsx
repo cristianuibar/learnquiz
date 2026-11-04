@@ -6,7 +6,7 @@ import { DataTable, type Column } from '@/components/admin/data-table'
 import { Page, PageHeader } from '@/components/admin/page'
 import { RowMenu } from '@/components/admin/row-menu'
 import { Status } from '@/components/admin/status-chip'
-import { usePortalLinks } from '@/components/portal/portal-context'
+import { usePortal, usePortalLinks } from '@/components/portal/portal-context'
 import { Button } from '@/components/ui/button'
 import { roleTrainingStatus } from '@/lib/training-status'
 import { plural } from '@/lib/utils'
@@ -20,8 +20,9 @@ const sub = 'text-[13px]/[18px] text-ink-muted'
 
 const failed = (r: Role) => roleTrainingStatus(r) === 'Training failed'
 
-export function Roles({ org }: { org: Org }) {
+export function Roles({ org, readOnly = false }: { org: Org; readOnly?: boolean }) {
   const links = usePortalLinks()
+  const { base } = usePortal()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const opener = useRef<Element | null>(null)
@@ -35,7 +36,7 @@ export function Roles({ org }: { org: Org }) {
     else document.querySelector<HTMLElement>('h1')?.focus()
   }
   const openDialog = () => { opener.current = document.activeElement; created.current = false; setOpen(true) }
-  const openRole = (roleId: string) => void navigate({ to: '/org/$slug/roles/$roleId', params: { slug: org.slug, roleId } })
+  const openRole = (roleId: string) => void navigate(links.role(roleId))
 
   const fresh = org.roles.length === 1 && org.roles[0].documentCount === 0
   const failedRoles = org.roles.filter(failed)
@@ -57,7 +58,7 @@ export function Roles({ org }: { org: Org }) {
             </div>
           )
         }
-        if (status === 'No documents yet') {
+        if (status === 'No documents yet' && !readOnly) {
           return (
             <div className="flex flex-wrap items-center gap-2">
               <Status word="No documents yet" />
@@ -79,14 +80,14 @@ export function Roles({ org }: { org: Org }) {
     <Page>
       <PageHeader
         title="Roles"
-        actions={
+        actions={readOnly ? undefined : (
           <Button variant={fresh ? 'secondary' : 'primary'} aria-haspopup="dialog" onClick={openDialog}>
             <Plus aria-hidden />
             Create role
           </Button>
-        }
+        )}
       />
-      {failedRoles.map((r) => {
+      {!readOnly && failedRoles.map((r) => {
         // A build that failed on readable documents is rebuilt from the role; only failed or missing documents need fixing.
         const action = r.failedDocuments > 0 ? 'Fix documents' : r.documentCount > 0 ? 'Open role' : 'Upload SOP'
         return (
@@ -106,27 +107,30 @@ export function Roles({ org }: { org: Org }) {
       })}
       <DataTable
         stack
+        band={base === 'staff'}
         caption="Job roles with training status, benchmark, onboarding period and people assigned"
         columns={columns}
         rows={org.roles}
         rowKey={(r) => r.id}
-        actions={(r) => (
+        actions={readOnly ? undefined : (r) => (
           <RowMenu
             label={r.name}
             items={[
               { label: 'Open role', onSelect: () => openRole(r.id) },
-              { label: 'Review questions', onSelect: () => void navigate({ to: '/org/$slug/questions', params: { slug: org.slug }, search: { role: r.id } }) },
+              { label: 'Review questions', onSelect: () => void navigate(links.questions({ role: r.id })) },
             ]}
           />
         )}
       />
-      <RoleDialog
-        open={open}
-        onOpenChange={setOpen}
-        slug={org.slug}
-        onSaved={(id) => { created.current = true; setOpen(false); openRole(id) }}
-        onCloseAutoFocus={restoreFocus}
-      />
+      {!readOnly && (
+        <RoleDialog
+          open={open}
+          onOpenChange={setOpen}
+          slug={org.slug}
+          onSaved={(id) => { created.current = true; setOpen(false); openRole(id) }}
+          onCloseAutoFocus={restoreFocus}
+        />
+      )}
     </Page>
   )
 }

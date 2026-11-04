@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { Link } from '@tanstack/react-router'
+import { Link, useRouteContext } from '@tanstack/react-router'
+import { RouteError } from '@/components/inline-error'
 import { LearnQuizMark } from '@/components/learn-quiz-mark'
 import { Button } from '@/components/ui/button'
 
@@ -26,4 +27,13 @@ export function StaffDenied({ email, home }: { email: string; home: string }) {
       </main>
     </div>
   )
+}
+
+// Route error boundary for staff-only routes: 403 shows the denied page, anything else the usual error.
+export function StaffRouteError(props: { error: unknown; reset: () => void }) {
+  const { user, adminCompanies } = useRouteContext({ from: '__root__' })
+  if ((props.error as { status?: unknown } | null)?.status !== 403) return <RouteError {...props} />
+  // The first company the person owns or administers, by membership date.
+  const first = adminCompanies[0]
+  return <StaffDenied email={user?.email ?? ''} home={first ? `/org/${first.slug}` : '/today'} />
 }
