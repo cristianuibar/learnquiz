@@ -130,6 +130,17 @@ it.each<[string, string, boolean]>([
 })
 
 it.each<[string, string, boolean]>([
+  ['1000', '1,000', true],
+  ['50', '50%', true],
+  ['1,000', '1000', true],
+  ['50%', '50', true],
+  ['100001', '100,000', false],
+  ['51', '50%', false],
+])('cloze compares numbers with commas or percent signs: %j vs accepted %j', (text, accepted, correct) => {
+  expect(gradeAnswer({ ...base, format: 'cloze', accepted_answers: [accepted] }, { text }).correct).toBe(correct)
+})
+
+it.each<[string, string, boolean]>([
   ['7', '-7', false],
   ['-7', '7', false],
   ['0.5', '-0.5', false],
