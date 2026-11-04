@@ -5,16 +5,19 @@ import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Route as playRoute } from '@/routes/play.$sessionId'
 import { Route as appRootRoute } from '@/routes/__root'
+import { Route as doneRoute } from '@/routes/play.$sessionId_.done'
 import { answerItem, endSession, getSession, nextItem, prepareNextSession, reportItem, transcribeAnswer } from '@/server/play'
 import { getModelTrace } from '@/server/model-trace'
+import { getPushSettings } from '@/server/push'
 import { generateConceptDiagram } from '@/server/diagrams'
 import { getCompanyBranding } from '@/server/org-settings'
 import type { ItemView, Reveal, SessionView } from '@learnquiz/api'
 
 vi.mock('motion/react', async (original) => ({ ...(await original<typeof import('motion/react')>()), useReducedMotion: () => true }))
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
-vi.mock('@/server/play', () => ({ prepareNextSession: vi.fn(async () => ({ ok: true })), answerItem: vi.fn(), getSession: vi.fn(), transcribeAnswer: vi.fn(), nextItem: vi.fn(), endSession: vi.fn(), reportItem: vi.fn() }))
+vi.mock('@/server/play', () => ({ prepareNextSession: vi.fn(async () => ({ ok: true })), answerItem: vi.fn(), getSession: vi.fn(), transcribeAnswer: vi.fn(), nextItem: vi.fn(), endSession: vi.fn(), reportItem: vi.fn(), startSession: vi.fn() }))
 vi.mock('@/server/model-trace', () => ({ getModelTrace: vi.fn() }))
+vi.mock('@/server/push', () => ({ getPushSettings: vi.fn() }))
 vi.mock('@/server/diagrams', () => ({ generateConceptDiagram: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: vi.fn(async () => null) }))
@@ -77,8 +80,9 @@ async function renderPlay(voiceEnabled: boolean | null = true, permissionPending
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
   const play = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId', loader: playRoute.options.loader, gcTime: playRoute.options.gcTime, component: playRoute.options.component })
   const today = createRoute({ getParentRoute: () => rootRoute, path: '/today', component: () => <p>Today page</p> })
+  const done = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId/done', loader: doneRoute.options.loader, component: doneRoute.options.component })
   const router = createRouter({
-    routeTree: rootRoute.addChildren([play, today]),
+    routeTree: rootRoute.addChildren([play, today, done]),
     history: createMemoryHistory(fromToday ? { initialEntries: ['/today', '/play/s1'], initialIndex: 1 } : { initialEntries: ['/play/s1'] }),
   })
   const container = document.createElement('div')
@@ -679,21 +683,47 @@ describe('reveal overlay', () => {
     } finally { await cleanup() }
   })
 
+  // The modal dialog aria-hides the page, so the announcement must land in a region a screen reader can hear.
+  const heard = () => [...document.querySelectorAll('[role="status"]')].filter((n) => !n.closest('[aria-hidden="true"]')).map((n) => n.textContent)
+  async function sendReport() {
+    await act(async () => { type(dialog()!.querySelector('input')!, '  Because it matters  ') })
+    await click(linkByText('Report this question'))
+    await click(document.querySelector<HTMLElement>('[role="radiogroup"] [role="radio"]'))
+    await click(linkByText('Send report'))
+  }
+
   it('sends the report, then continues with the reflection, and announces it on the next question', async () => {
     const { container, initial, cleanup } = await check(sureWrong)
     try {
       vi.mocked(reportItem).mockReset().mockResolvedValue({} as never)
-      vi.mocked(nextItem).mockResolvedValueOnce({ ...initial, progress: { position: 2, total: 2 }, item: { ...initial.item!, id: 'i2', stem: 'Second question' } })
-      await act(async () => { type(dialog()!.querySelector('input')!, '  Because it matters  ') })
-      await click(linkByText('Report this question'))
-      await click(document.querySelector<HTMLElement>('[role="radiogroup"] [role="radio"]'))
-      await click(linkByText('Send report'))
+      let advance!: (view: SessionView) => void
+      vi.mocked(nextItem).mockReturnValueOnce(new Promise<SessionView>((resolve) => { advance = resolve }))
+      await sendReport()
       expect(reportItem).toHaveBeenCalledWith({ data: expect.objectContaining({ itemId: 'i1', reason: expect.any(String), attemptId: 'a1' }) })
       expect(nextItem).toHaveBeenCalledWith({ data: { sessionId: 's1', why: 'Because it matters' } })
       expect(vi.mocked(reportItem).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(nextItem).mock.invocationCallOrder[0])
+      // Not while the dialog still hides the live region.
+      expect([...document.querySelectorAll('[role="status"]')].map((n) => n.textContent)).not.toContain('Report sent')
+      await act(async () => { advance({ ...initial, progress: { position: 2, total: 2 }, item: { ...initial.item!, id: 'i2', stem: 'Second question' } }) })
       expect(dialog()).toBeNull()
       expect(container.querySelector('h1')!.textContent).toBe('Second question')
-      expect([...document.querySelectorAll('[role="status"]')].map((n) => n.textContent)).toContain('Report sent')
+      expect(heard()).toContain('Report sent')
+    } finally { await cleanup() }
+  })
+
+  it('announces a report sent on the last question on the session summary', async () => {
+    const { container, initial, router, cleanup } = await check(sureWrong)
+    try {
+      vi.mocked(reportItem).mockReset().mockResolvedValue({} as never)
+      vi.mocked(nextItem).mockResolvedValueOnce({ ...initial, ended: true, item: null })
+      vi.mocked(endSession).mockReset().mockResolvedValue({ sessionId: 's1', kind: 'session', topicId: 't1', durationMs: 1000, correct: 0, total: 1, ungraded: 0, xp: 0,
+        streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], benchmark: null, reviewsLeft: 0, nextLine: 'Come back soon.', endedEarly: false })
+      vi.mocked(getPushSettings).mockResolvedValue({ canPrompt: false, endpoints: [] } as never)
+      await sendReport()
+      await act(async () => {})
+      expect(router.state.location.pathname).toBe('/play/s1/done')
+      expect(container.querySelector('h1')!.textContent).toContain('Session done')
+      expect(heard()).toContain('Report sent')
     } finally { await cleanup() }
   })
 
