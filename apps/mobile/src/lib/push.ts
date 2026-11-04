@@ -50,7 +50,8 @@ const RETRY_BACKOFF_MS = 15_000
 let generation = 0
 let cachedToken: string | null | undefined
 // Keep only in memory after a 401; local storage still clears immediately.
-let unregisterToken: { endpoint: string; bearer: string } | null = null
+let unregisterToken: { endpoint: string; userId: string | null } | null = null
+let pushUserId: string | null = null
 let writes: Promise<unknown> = Promise.resolve()
 const registrations = new Set<Promise<unknown>>()
 
@@ -83,7 +84,7 @@ function current(deps: PushDeps, gen: number, bearer: string | null): boolean {
 async function removeMarker(deps: PushDeps): Promise<void> {
   try { await store(deps).remove?.(PUSH_TOKEN_KEY) } catch { /* Best effort on logout. */ }
 }
-async function forget(deps: PushDeps, hadToken: boolean, keepForUnregister: string | null = null): Promise<void> {
+async function forget(deps: PushDeps, hadToken: boolean, keepForUnregister = false, userId: string | null = pushUserId): Promise<void> {
   await persist(async () => {
     // A native write may have finished while cleanup waited for this queue.
     let shouldDelete = hadToken || cachedToken != null
@@ -91,8 +92,8 @@ async function forget(deps: PushDeps, hadToken: boolean, keepForUnregister: stri
     catch { /* Continue with what is already known. */ }
     if (shouldDelete) {
       if (keepForUnregister) {
-        rememberForUnregister(keepForUnregister, cachedToken)
-        try { rememberForUnregister(keepForUnregister, await secure(deps).getItemAsync(PUSH_SECURE_KEY)) }
+        rememberForUnregister(userId, cachedToken)
+        try { rememberForUnregister(userId, await secure(deps).getItemAsync(PUSH_SECURE_KEY)) }
         catch { /* Keep any endpoint already known in memory. */ }
       }
       try { await secure(deps).deleteItemAsync(PUSH_SECURE_KEY) } catch { /* Logout still completes. */ }
@@ -101,11 +102,23 @@ async function forget(deps: PushDeps, hadToken: boolean, keepForUnregister: stri
     await removeMarker(deps)
   })
 }
-function rememberForUnregister(bearer: string | null, endpoint: string | null | undefined): void {
-  if (endpoint && bearer) unregisterToken = { endpoint, bearer }
+// Called for a confirmed session and before publishing a sign-in bearer. An
+// endpoint survives token renewal only for the same learner; an unknown owner
+// is cleared rather than attributed to a newly signed-in learner.
+export function setPushUser(userId: string | null): void {
+  if (unregisterToken && (userId === null || unregisterToken.userId !== userId)) unregisterToken = null
+  if (pushUserId !== null && pushUserId !== userId) {
+    generation++
+    cachedToken = null
+  }
+  pushUserId = userId
+}
+
+function rememberForUnregister(userId: string | null, endpoint: string | null | undefined): void {
+  if (endpoint) unregisterToken = { endpoint, userId }
 }
 async function postToken(deps: PushDeps, token: string): Promise<void> {
-  rememberForUnregister(authToken(deps), token)
+  rememberForUnregister(pushUserId, token)
   const body = { token, timezone: timezone(deps) }
   const request = Promise.resolve().then(() => deps.putExpoToken
     ? deps.putExpoToken(body)
@@ -289,9 +302,9 @@ export function observePushForeground(
 // A synchronous empty result preserves immediate logout when storage is absent.
 // Otherwise auth awaits this before clearing its bearer, including a cold restart.
 export function unregisterPush(deps: PushDeps = {}): Promise<void> | null {
-  const bearer = authToken(deps)
-  // A retained endpoint after 401 may only be deleted by its original bearer.
-  if (unregisterToken && unregisterToken.bearer !== bearer) unregisterToken = null
+  const userId = pushUserId
+  // Ownership follows the learner across renewed bearers, never the token.
+  if (unregisterToken && unregisterToken.userId !== pushUserId) unregisterToken = null
   const knownToken = cachedToken ?? unregisterToken?.endpoint ?? cachedToken
   generation++
   cachedToken = null
@@ -308,7 +321,7 @@ export function unregisterPush(deps: PushDeps = {}): Promise<void> | null {
       await Promise.allSettled([...registrations])
       await writes
       if (!endpoint && enrolledHere) endpoint = await secure(deps).getItemAsync(PUSH_SECURE_KEY)
-      if (endpoint && authToken(deps)) {
+      if (endpoint && pushUserId === userId && authToken(deps)) {
         attemptedDelete = true
         try {
           const body = { endpoint }
@@ -328,12 +341,21 @@ export function unregisterPush(deps: PushDeps = {}): Promise<void> | null {
 // Network-free, so a registration/DELETE 401 cannot deadlock its own cleanup.
 export async function clearPushLocal(deps: PushDeps = {}): Promise<void> {
   const knownToken = cachedToken
-  const bearer = authToken(deps)
-  rememberForUnregister(bearer, knownToken)
+  let userId = pushUserId
+  rememberForUnregister(userId, knownToken)
   generation++
   cachedToken = null
   let hadToken = knownToken != null
   try { hadToken ||= enrolled(await store(deps).getJSON<unknown>(PUSH_TOKEN_KEY)) }
   catch { /* Missing or unreadable storage must not block auth cleanup. */ }
-  await forget(deps, hadToken, bearer)
+  // Cold startup may not have rendered SessionProvider yet. Capture the last
+  // confirmed learner before auth erases lq:session, even though its bearer is
+  // already null. Only the endpoint and learner id remain, in memory.
+  if (userId === null) {
+    try {
+      const saved = await store(deps).getJSON<{ user?: { id?: unknown } }>('lq:session')
+      if (typeof saved?.user?.id === 'string') userId = saved.user.id
+    } catch { /* An unknown owner cannot be reassigned on the next sign-in. */ }
+  }
+  await forget(deps, hadToken, true, userId)
 }

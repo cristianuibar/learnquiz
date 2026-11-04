@@ -1,3 +1,4 @@
+import { tokenFingerprint } from './token-fingerprint'
 import { PUSH_TOKEN_KEY, SKIPS_KEY, readPromptCounts, recordSkip } from './push-prompt'
 
 jest.mock('./kv', () => ({ getJSON: jest.fn(), setJSON: jest.fn(), remove: jest.fn() }))
@@ -346,7 +347,11 @@ function authHarness(marker: unknown = true) {
   jest.resetModules()
   const events: string[] = []
   const secure = memoryStrings({ 'lq.token': 'bearer', 'lq.push-token': 'ExponentPushToken[abc]' })
-  const store = memoryStore(marker == null ? {} : { [PUSH_TOKEN_KEY]: marker })
+  const store = memoryStore({
+    ...(marker == null ? {} : { [PUSH_TOKEN_KEY]: marker }),
+    // The confirmed session survives a process restart, then is erased by 401.
+    'lq:session': { user: { id: 'learner-a', name: 'Ana', isAnonymous: false }, needsDisclosure: false, branding: null, owner: tokenFingerprint('bearer') },
+  })
   const clearPrefix = jest.fn(async (prefix: string) => {
     for (const key of store.data.keys()) if (key.startsWith(prefix)) store.data.delete(key)
   })
@@ -595,21 +600,64 @@ test('enable deadline stops native work but keeps a late permission grant for re
   expect(s.store.data.get(PUSH_TOKEN_KEY)).toEqual({ pending: true })
 })
 
-test('signOut never deletes a retained token under a new bearer after 401 cleanup', async () => {
+async function expiredPhone(warm = false) {
   const s = authHarness()
   await s.auth.loadToken()
+  if (warm) {
+    s.fetch.mockImplementation(async () => jsonResponse(200, { token: 'bearer', user: { id: 'learner-a' } }))
+    await s.auth.signIn('learner@example.com', 'password')
+    await s.push.enablePush()
+  }
   s.fetch.mockImplementation(async () => jsonResponse(401, { error: 'Expired' }))
   await expect(s.client.api('/today')).rejects.toMatchObject({ status: 401 })
+  expect(s.auth.getToken()).toBeNull()
   expect(s.secure.data.size).toBe(0)
   expect(s.store.data.has(PUSH_TOKEN_KEY)).toBe(false)
-  s.fetch.mockImplementation(async () => jsonResponse(200, { token: 'renewed-bearer' }))
+  expect(s.store.data.has('lq:session')).toBe(false)
+  return s
+}
+
+test('signOut can unregister after 401 cleanup and reauthentication', async () => {
+  // Cold: no token has been cached in push.ts during this process. Recover its
+  // owner from the saved session before real auth.ts erases all lq: data.
+  const s = await expiredPhone()
+  s.fetch.mockImplementation(async () => jsonResponse(200, { token: 'renewed-bearer', user: { id: 'learner-a' } }))
   await s.auth.signIn('learner@example.com', 'password')
   await s.auth.signOut()
   const deletion = s.fetch.mock.calls.find(([, init]) => init.method === 'DELETE')
-  expect(deletion).toBeUndefined()
+  expect(deletion).toBeDefined()
+  expect(deletion![0]).toMatch(/\/api\/v1\/push\/expo$/)
+  expect(deletion![1].headers).toMatchObject({ Authorization: 'Bearer renewed-bearer' })
+  expect(JSON.parse(deletion![1].body as string)).toEqual({ endpoint: 'ExponentPushToken[abc]' })
   expect(s.secure.data.size).toBe(0)
 })
 
+test.each([
+  { warm: true, userId: 'learner-a', deletes: true },
+  { warm: false, userId: 'learner-b', deletes: false },
+  { warm: true, userId: 'learner-b', deletes: false },
+])('401 then sign-in and sign-out enforces learner ownership (warm: $warm, user: $userId)', async ({ warm, userId, deletes }) => {
+  const s = await expiredPhone(warm)
+  s.fetch.mockImplementation(async () => jsonResponse(200, { token: 'renewed-bearer', user: { id: userId } }))
+  await s.auth.signIn(`${userId}@example.com`, 'password')
+  await s.auth.signOut()
+  const deletions = s.fetch.mock.calls.filter(([, init]) => init.method === 'DELETE')
+  expect(deletions).toHaveLength(deletes ? 1 : 0)
+  if (deletes) {
+    expect(deletions[0][1].headers).toMatchObject({ Authorization: 'Bearer renewed-bearer' })
+    expect(JSON.parse(deletions[0][1].body as string)).toEqual({ endpoint: 'ExponentPushToken[abc]' })
+  }
+  expect(s.auth.getToken()).toBeNull()
+  expect(s.secure.data.size).toBe(0)
+})
+
+test('a sign-in without a confirmed learner cannot delete the retained endpoint', async () => {
+  const s = await expiredPhone()
+  s.fetch.mockImplementation(async () => jsonResponse(200, { token: 'renewed-bearer' }))
+  await s.auth.signIn('learner@example.com', 'password')
+  await s.auth.signOut()
+  expect(s.fetch.mock.calls.some(([, init]) => init.method === 'DELETE')).toBe(false)
+})
 
 test('network PUT failures back off and remain retryable beyond the token budget', async () => {
   jest.useFakeTimers({ now: Date.UTC(2035, 1, 4, 12) })
@@ -678,24 +726,26 @@ test('foreground token hangs time out and a later foreground retries successfull
   expect(s.putExpoToken).toHaveBeenCalledTimes(1)
 })
 
-test.each([false, true])('retained unregister endpoint cannot move to another bearer (warm: %s)', async (warm) => {
+test.each([false, true])('retained unregister endpoint cannot move to another learner (warm: %s)', async (warm) => {
   const s = setup()
+  s.push.setPushUser('learner-a')
   if (warm) await s.push.enablePush(s.deps)
   else {
     s.secure.data.set(s.push.PUSH_SECURE_KEY, 'ExponentPushToken[abc]')
     s.store.data.set(PUSH_TOKEN_KEY, true)
   }
   await s.push.clearPushLocal(s.deps)
+  s.push.setPushUser('learner-b')
   await s.push.unregisterPush({ ...s.deps, getAuthToken: () => 'another-users-bearer' })
   expect(s.deleteExpoToken).not.toHaveBeenCalled()
   expect(s.secure.data.size).toBe(0)
 })
 
-test('retained endpoint can still unregister with the original bearer', async () => {
+test('retained endpoint unregisters for the same learner with a renewed bearer', async () => {
   const s = setup()
   await s.push.enablePush(s.deps)
   await s.push.clearPushLocal(s.deps)
-  await s.push.unregisterPush(s.deps)
+  await s.push.unregisterPush({ ...s.deps, getAuthToken: () => 'renewed-bearer' })
   expect(s.deleteExpoToken).toHaveBeenCalledWith({ endpoint: 'ExponentPushToken[abc]' }, 5000)
 })
 
@@ -705,4 +755,22 @@ test('a legacy exhausted marker gets a fresh bounded token retry window', async 
   await expect(s.push.retryPendingPush(s.deps)).resolves.toBe('granted')
   expect(s.notifications.getExpoPushTokenAsync).toHaveBeenCalledTimes(1)
   expect(s.store.data.get(PUSH_TOKEN_KEY)).toBe(true)
+})
+
+
+test('a learner change while unregister waits never deletes the previous endpoint', async () => {
+  const s = setup()
+  s.push.setPushUser('learner-a')
+  let finishPost!: () => void
+  s.putExpoToken.mockImplementationOnce(() => new Promise((resolve) => {
+    finishPost = () => resolve({ subscribed: true })
+  }))
+  const enabling = s.push.enablePush(s.deps)
+  await flush()
+  const removing = s.push.unregisterPush(s.deps)
+  await flush()
+  s.push.setPushUser('learner-b')
+  finishPost()
+  await Promise.all([enabling, removing])
+  expect(s.deleteExpoToken).not.toHaveBeenCalled()
 })

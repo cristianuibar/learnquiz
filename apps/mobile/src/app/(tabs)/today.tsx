@@ -82,7 +82,7 @@ export default function TodayScreen() {
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingTop: space[2], paddingHorizontal: space[4], paddingBottom: space[6], gap: space[6] }}
       >
-        {notice && view?.hero.kind !== 'empty' && (
+        {notice && (
           <TodayNotice
             status={status}
             refreshing={retrying}
@@ -94,7 +94,7 @@ export default function TodayScreen() {
         {!view ? (
           <Skeleton />
         ) : view.hero.kind === 'empty' ? (
-          <EmptyState onRetry={retry} onSignOut={() => { void endSession() }} />
+          <EmptyState onRetry={notice ? undefined : retry} onSignOut={() => { void endSession() }} />
         ) : status === 'offline' ? (
           <>
             <OfflineLead hero={view.hero} onPlay={play} />

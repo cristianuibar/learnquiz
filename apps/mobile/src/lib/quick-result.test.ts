@@ -589,21 +589,19 @@ test('dispose lets the end call finish and suppresses its late counter', async (
 })
 
 
-test.each([
-  ['retired', 'This question has been retired'],
-  ['flagged', 'Question not found'],
-  ['unready topic', 'This topic is not ready yet'],
-  ['answered', 'Already answered. Continue to the next question.'],
-])('quick creation reports the correct state for %s', async (reason, message) => {
+test.each<[string, number, string]>([
+  ['retired', 404, 'Question not found'],
+  ['flagged', 404, 'Question not found'],
+  ['unready topic', 409, 'This topic is not ready yet'],
+])('quick creation reports the correct state for %s', async (_reason, status, message) => {
   const { handle, onRequest } = setup()
-  onRequest(async () => { throw new ApiError(409, message) })
+  onRequest(async () => { throw new ApiError(status, message) })
   await handle.load()
-  expect(handle.getState()).toEqual({ status: reason === 'answered' ? 'answered' : 'unavailable' })
+  expect(handle.getState()).toEqual({ status: 'unavailable' })
 })
 
 test.each([
   ['retired', 'This question has been retired', 0, 'unavailable'],
-  ['flagged', 'That is not the current question', 0, 'unavailable'],
   ['answered', 'Already answered. Continue to the next question.', 1, 'answered'],
 ])('check distinguishes a %s auto-ended session using its answer count', async (_reason, message, total, status) => {
   const { handle, calls, onRequest } = await loadQuestion(setup())
@@ -619,7 +617,7 @@ test.each([
   expect(handle.getState()).toEqual({ status })
 })
 
-test('an unavailable question auto-ended before load is not labelled answered', async () => {
+test.each(['retired', 'flagged'])('a %s question auto-ended on GET before load is not labelled answered', async () => {
   const { handle, onRequest } = setup()
   onRequest(async (path) => {
     if (path === '/sessions/quick') return { sessionId: 'session-1' }
@@ -628,4 +626,19 @@ test('an unavailable question auto-ended before load is not labelled answered', 
   })
   await handle.load()
   expect(handle.getState()).toEqual({ status: 'unavailable' })
+})
+
+
+test('flagging an already open quick question does not invent an answer conflict', async () => {
+  const { handle, onRequest } = await loadQuestion(setup())
+  // answerItem does not filter flags: an item flagged after load can still be
+  // answered. Flags prevent creation or the next GET from selecting the item.
+  onRequest(async (path) => {
+    if (path.endsWith('/answer')) return revealWith('A', true)
+    if (path.endsWith('/end')) return { total: 1, reviewsLeft: 0 }
+    throw new Error(`unexpected ${path}`)
+  })
+  handle.changeDraft({ answer: { optionId: 'a' }, confidence: 'sure' })
+  await handle.check()
+  expect(handle.getState()).toMatchObject({ status: 'done' })
 })

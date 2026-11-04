@@ -2,6 +2,7 @@ import { createElement, useLayoutEffect } from 'react'
 import { AccessibilityInfo, AppState, Text, type AppStateStatus } from 'react-native'
 import { act, fireEvent, render, screen } from '@testing-library/react-native'
 import { todayFixtures, todayView, type Today, type TodayView } from '@learnquiz/api/today'
+import { offlineTitle, todayError } from '@learnquiz/api/system-copy'
 import { api, ApiError } from './api'
 import { getToken } from './auth'
 import { useSession, type Branding } from './session-store'
@@ -194,7 +195,7 @@ describe('useToday', () => {
   })
 
   test('polls every 15 s only while questions are building', async () => {
-    jest.useFakeTimers()
+    jest.useFakeTimers({ now: Date.UTC(2035, 1, 4, 12) })
     mockApi.mockResolvedValue(building(28))
     await render(createElement(Probe))
     expect(mockApi).toHaveBeenCalledTimes(1)
@@ -209,7 +210,7 @@ describe('useToday', () => {
   })
 
   test('does not poll while the app is in the background', async () => {
-    jest.useFakeTimers()
+    jest.useFakeTimers({ now: Date.UTC(2035, 1, 4, 12) })
     mockApi.mockResolvedValue(building(28))
     await render(createElement(Probe))
     await act(async () => { appStateListener?.('background') })
@@ -218,7 +219,7 @@ describe('useToday', () => {
   })
 
   test('does not poll when the screen is not focused', async () => {
-    jest.useFakeTimers()
+    jest.useFakeTimers({ now: Date.UTC(2035, 1, 4, 12) })
     mockBlurred = true
     mockApi.mockResolvedValue(building(28))
     await render(createElement(Probe))
@@ -613,19 +614,63 @@ test.each(['user', 'token', 'day'] as const)('first committed render hides the p
   expect(committed[0].view).toBeNull()
 })
 
-test('a response crossing UTC midnight never paints or saves yesterday as today', async () => {
-  jest.useFakeTimers({ now: Date.UTC(2035, 1, 4, 23, 59, 30) })
-  let resolve!: (today: Today) => void
-  mockApi.mockReturnValueOnce(new Promise<Today>((done) => { resolve = done }))
+test('a cold request crossing midnight recovers automatically without painting or saving yesterday', async () => {
+  jest.useFakeTimers({ now: Date.UTC(2035, 1, 4, 23, 59, 50) })
+  let finishYesterday!: (today: Today) => void
+  let finishToday!: (today: Today) => void
+  mockApi
+    .mockReturnValueOnce(new Promise<Today>((done) => { finishYesterday = done }))
+    .mockReturnValueOnce(new Promise<Today>((done) => { finishToday = done }))
   await render(createElement(Probe))
-  jest.setSystemTime(Date.UTC(2035, 1, 5, 0, 0, 10))
-  await act(async () => { resolve(todayFixtures.normal) })
+  await act(async () => { await jest.advanceTimersByTimeAsync(20_000) })
+  await act(async () => { finishYesterday(todayFixtures.basics) })
+  expect(mockApi).toHaveBeenCalledTimes(2)
+  expect(current.today).toBeNull()
+  expect(current.status).toBe('loading')
+  expect(mockSaveCache).not.toHaveBeenCalled()
+  expect(committed.some((view) => view.today === todayFixtures.basics)).toBe(false)
+  await act(async () => { finishToday(todayFixtures.normal) })
+  expect(current.status).toBe('ready')
+  expect(current.today).toBe(todayFixtures.normal)
+  expect(mockSaveCache).toHaveBeenCalledTimes(1)
+  expect(mockSaveCache).toHaveBeenCalledWith('u1', todayFixtures.normal, null, Date.UTC(2035, 1, 5, 0, 0, 10))
+})
+
+test('midnight expiry joins a poll then recovers automatically and keeps its polling cadence', async () => {
+  jest.useFakeTimers({ now: Date.UTC(2035, 1, 4, 23, 59, 40) })
+  let finishYesterday!: (today: Today) => void
+  let finishToday!: (today: Today) => void
+  mockApi
+    .mockResolvedValueOnce(building(10))
+    .mockReturnValueOnce(new Promise<Today>((done) => { finishYesterday = done }))
+    .mockReturnValueOnce(new Promise<Today>((done) => { finishToday = done }))
+    .mockResolvedValue(building(36))
+  await render(createElement(Probe))
+  mockSaveCache.mockClear()
+  await act(async () => { await jest.advanceTimersByTimeAsync(15_000) })
+  expect(mockApi).toHaveBeenCalledTimes(2) // Poll sent at 23:59:55.
+  await act(async () => { await jest.advanceTimersByTimeAsync(5_000) })
+  expect(mockApi).toHaveBeenCalledTimes(2) // Midnight expiry joins that poll.
+  expect(current.today).toBeNull()
+  committed.length = 0
+  await act(async () => { await jest.advanceTimersByTimeAsync(15_000) })
+  const yesterday = building(35)
+  await act(async () => { finishYesterday(yesterday) })
+  expect(mockApi).toHaveBeenCalledTimes(3) // Exactly one fresh request after release.
   expect(current.today).toBeNull()
   expect(mockSaveCache).not.toHaveBeenCalled()
-  mockApi.mockRejectedValueOnce(new ApiError(null, 'Offline'))
-  await act(async () => { await current.refresh() })
-  expect(current.status).toBe('offline')
-  expect(current.today).toBeNull()
+  expect(committed.every((view) => view.today === null)).toBe(true)
+  const fresh = building(36)
+  await act(async () => { finishToday(fresh) })
+  expect(current.status).toBe('ready')
+  expect(current.today).toBe(fresh)
+  expect(mockSaveCache).toHaveBeenCalledTimes(1)
+  expect(mockSaveCache).toHaveBeenCalledWith('u1', fresh, null, Date.UTC(2035, 1, 5, 0, 0, 15))
+  // The original poll still fires at 00:00:25, rather than restarting at :30.
+  await act(async () => { await jest.advanceTimersByTimeAsync(10_000) })
+  expect(mockApi).toHaveBeenCalledTimes(4)
+  expect(current.status).toBe('ready')
+  expect(committed.some((view) => view.today === yesterday)).toBe(false)
 })
 
 test('cache timestamp is captured at request send, before a same-day response', async () => {
@@ -640,7 +685,7 @@ test('cache timestamp is captured at request send, before a same-day response', 
 })
 
 test('Today retry stays enabled during building polls and is busy for a learner retry', async () => {
-  jest.useFakeTimers()
+  jest.useFakeTimers({ now: Date.UTC(2035, 1, 4, 12) })
   mockLoadCache.mockResolvedValue(cacheEntry('u1', building(10)))
   mockApi.mockRejectedValueOnce(new ApiError(null, 'Offline'))
   await render(createElement(ThemeProvider, { children: createElement(TodayScreen) }))
@@ -665,9 +710,15 @@ test.each(['offline', 'error'] as const)('empty Today has one working retry in %
   mockApi.mockRejectedValueOnce(new ApiError(status === 'offline' ? null : 500, 'Failed'))
   await render(createElement(ThemeProvider, { children: createElement(TodayScreen) }))
   expect(screen.getByText('No training yet')).toBeOnTheScreen()
+  expect(screen.getByRole('status')).toHaveProp('accessibilityLiveRegion', 'polite')
+  expect(screen.getByText(status === 'offline' ? offlineTitle : todayError)).toBeOnTheScreen()
   expect(screen.getAllByRole('button', { name: 'Try again' })).toHaveLength(1)
-  mockApi.mockResolvedValueOnce(todayFixtures.normal)
+  let finish!: (today: Today) => void
+  mockApi.mockReturnValueOnce(new Promise<Today>((resolve) => { finish = resolve }))
   await fireEvent.press(screen.getByRole('button', { name: 'Try again' }))
+  expect(screen.getByRole('button', { name: 'Try again' })).toBeDisabled()
+  expect(screen.getByRole('status')).toBeOnTheScreen()
+  await act(async () => { finish(todayFixtures.normal) })
   expect(mockApi).toHaveBeenCalledTimes(2)
   expect(screen.queryByText('No training yet')).toBeNull()
 })
