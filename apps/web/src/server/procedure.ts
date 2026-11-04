@@ -6,8 +6,6 @@ import { getDb } from '@/db'
 import { concepts, sources, topics, units } from '@/db/schema'
 import { chatJson } from '@/lib/llm/client'
 import { procedurePrompt } from '@/lib/llm/prompts'
-import { findSourceQuote } from '@/lib/curriculum/validate'
-import { MAX_SOURCE_TEXT_CHARS } from '@/lib/limits'
 import { ProcedureGraph } from '@/lib/llm/schemas'
 import { httpError } from '@/server/helpers'
 import { assertWithinCompanyCap } from '@/server/model-cap'
@@ -32,15 +30,6 @@ function parseStored(json: string | null): Stored | null {
   }
 }
 
-// The prompt keeps MAX_SOURCE_TEXT_CHARS of the document. A longer document is cut around the unit's concept
-// quotes, so a procedure deep in a long SOP is not replaced by its preamble.
-export function unitSourceWindow(bodyText: string, quotes: (string | null)[]): string {
-  if (bodyText.length <= MAX_SOURCE_TEXT_CHARS) return bodyText
-  const at = quotes.map((q) => findSourceQuote(q, bodyText)).flatMap((m) => (m ? [bodyText.indexOf(m)] : []))
-  const start = at.length ? Math.max(0, Math.min(Math.min(...at) - 2_000, bodyText.length - MAX_SOURCE_TEXT_CHARS)) : 0
-  return bodyText.slice(start, start + MAX_SOURCE_TEXT_CHARS)
-}
-
 // The flowchart is stored once per unit and shared by everyone who can open the topic; it is rebuilt only when the
 // unit's source changes version. Returns null when the unit has no usable source (no model call, no claim).
 export const getUnitProcedure = createServerFn({ method: 'GET' })
@@ -55,7 +44,7 @@ export const getUnitProcedure = createServerFn({ method: 'GET' })
     const { unit, topic } = row
 
     // First usable source by concept order; a blank body counts as unusable, so scan for the first non-blank one.
-    const linked = await db.select({ id: sources.id, title: sources.title, version: sources.version, bodyText: sources.bodyText, quote: concepts.sourceQuote })
+    const linked = await db.select({ id: sources.id, title: sources.title, version: sources.version, bodyText: sources.bodyText })
       .from(concepts).innerJoin(sources, eq(sources.id, concepts.sourceId))
       .where(and(eq(concepts.unitId, unit.id), isNull(sources.retiredAt), isNull(sources.deletedAt), eq(sources.status, 'ready')))
       .orderBy(asc(concepts.order))
@@ -81,7 +70,7 @@ export const getUnitProcedure = createServerFn({ method: 'GET' })
         purpose: 'procedure',
         schema: ProcedureGraph,
         schemaName: 'procedure_graph',
-        ...procedurePrompt({ topic: topic.title, unit: { name: unit.name, summary: unit.summary }, sourceText: unitSourceWindow(usable.bodyText, linked.filter((s) => s.id === usable.id).map((s) => s.quote)) }),
+        ...procedurePrompt({ topic: topic.title, unit: { name: unit.name, summary: unit.summary }, sourceText: usable.bodyText }),
         learnerId,
         orgId: topic.orgId,
         topicId: topic.id,
