@@ -23,6 +23,7 @@ const holder = vi.hoisted(() => ({ db: null as unknown }))
 // Run the real routes and server handlers; replace only transport, bindings and authentication.
 vi.mock('@tanstack/react-start', () => ({
   useServerFn: (fn: unknown) => fn,
+  createServerOnlyFn: (fn: unknown) => fn,
   createServerFn: () => {
     const builder = { validator: () => builder, handler: (fn: unknown) => fn }
     return builder
@@ -122,9 +123,9 @@ async function renderApp(initialEntry = '/sign-in') {
 }
 
 it.each([
-  ['owner', '/org/northwind', 'Northwind'],
-  ['admin', '/org/northwind', 'Northwind'],
-  ['combined', '/org/northwind', 'Northwind'],
+  ['owner', '/org/northwind', 'Overview'],
+  ['admin', '/org/northwind', 'Overview'],
+  ['combined', '/org/northwind', 'Overview'],
   ['employee', '/start', 'What do you want to learn?'],
   ['standalone', '/start', 'What do you want to learn?'],
 ])('signs in %s and lands on %s', async (id, pathname, heading) => {
@@ -176,9 +177,9 @@ it('sends an owner home to their portal, drawn in the company nav instead of the
     expect(router.state.location.pathname).toBe('/org/northwind')
     expect(container.querySelector('nav[aria-label="Northwind portal"] img')?.getAttribute('src')).toBe('/api/org/northwind/logo?v=northwind-logo')
     expect(container.querySelector('a[href="/today"], a[href="/"]')).toBeNull()
-    expect(container.querySelector('h1')?.textContent).toBe('Northwind')
+    expect(container.querySelector('h1')?.textContent).toBe('Overview')
     await act(async () => { await router.navigate({ to: '/org/$slug', params: { slug: 'contoso' } }) })
-    expect(container.querySelector('h1')?.textContent).toBe('Contoso')
+    expect(container.querySelector('h1')?.textContent).toBe('Overview')
     expect(container.querySelector('nav[aria-label="Contoso portal"]')).not.toBeNull()
   } finally { await cleanup() }
 })
@@ -194,7 +195,7 @@ it('requires disclosure before sending an owner to the portal', async () => {
       container.querySelector<HTMLButtonElement>('main button')!.click()
       await vi.waitFor(() => expect(router.state.location.pathname).toBe('/org/northwind'))
     })
-    expect(container.querySelector('h1')?.textContent).toBe('Northwind')
+    expect(container.querySelector('h1')?.textContent).toBe('Overview')
   } finally { await cleanup() }
 })
 

@@ -6,14 +6,16 @@ import { z } from 'zod'
 import { dbSchema } from '@/db'
 import { getAuth } from '@/server/auth'
 import { getSessionUser } from '@/server/session'
-import { createRole, getPeople, getOrgOverview, listRoles } from '@/server/org'
-import { getCompanies, getCompany, getContentFlags, getGenerationJobs, getStaffSession, listUsers, resolveFlag, retryJobConcept, setUserBan } from './admin'
+import { createRole, getOrgOverview, listRoles } from '@/server/org'
+import { getPeople } from '@/server/people'
+import { getContentFlags, getGenerationJobs, getStaffSession, listUsers, resolveFlag, retryJobConcept, setUserBan } from './admin'
 
 const boundary = vi.hoisted(() => ({ db: null as unknown, headers: new Headers(), status: 200, background: [] as unknown[] }))
 
 // Only the request transport and database binding are replaced. Authorization,
 // validation, queries, Better Auth and its admin plugin execute for real.
 vi.mock('@tanstack/react-start', () => ({
+  createServerOnlyFn: (fn: unknown) => fn,
   createServerFn: () => {
     let validator: z.ZodType | undefined
     const builder = {
@@ -101,8 +103,6 @@ it('refuses every admin function for non-staff, including a company owner', asyn
   boundary.headers = new Headers({ cookie: accounts.get('learner')!.cookie })
   for (const call of [
     () => getStaffSession(),
-    () => getCompanies(),
-    () => getCompany({ data: { slug: 'alpha' } }),
     () => listUsers({ data: { search: '', field: 'email', offset: 0 } }),
     () => setUserBan({ data: { userId: accounts.get('outsider')!.id, banned: true } }),
     () => setUserBan({ data: { userId: accounts.get('outsider')!.id, banned: false } }),
@@ -119,29 +119,9 @@ it('refuses every admin function for non-staff, including a company owner', asyn
   await expect(getStaffSession()).rejects.toMatchObject({ status: 401 })
 })
 
-it('returns company members, roles, documents, distinct active learners and scoped spend for staff', async () => {
-  await expect(getStaffSession()).resolves.toMatchObject({ id: accounts.get('staff')!.id })
-  await expect(getCompanies()).resolves.toEqual([
-    { id: 'alpha', name: 'alpha', slug: 'alpha', members: 1, roles: 1, documents: 1, activeLearners: 1, modelSpend: 0.125 },
-    { id: 'beta', name: 'beta', slug: 'beta', members: 1, roles: 1, documents: 0, activeLearners: 0, modelSpend: 9 },
-    { id: 'empty', name: 'empty', slug: 'empty', members: 0, roles: 0, documents: 0, activeLearners: 0, modelSpend: 0 },
-  ])
-  await expect(getCompany({ data: { slug: 'alpha' } })).resolves.toMatchObject({
-    members: [{ name: 'learner', role: 'owner', jobRole: 'alpha role' }],
-    roles: [{ id: 'alpha', name: 'alpha role', status: 'active', topicStatus: 'draft' }],
-    documents: [{ id: 'alpha-sop', title: 'alpha SOP', role: 'alpha role' }],
-    activeLearners: 1, modelSpend: 0.125,
-  })
-  sqlite.prepare('INSERT INTO job_roles (id, org_id, name, created_at) VALUES (?, ?, ?, ?)').run('ready-role', 'empty', 'Ready role', NOW)
-  sqlite.prepare('INSERT INTO topics (id, job_role_id, title, status, created_at) VALUES (?, ?, ?, ?, ?)').run('ready-topic', 'ready-role', 'Ready role', 'ready', NOW)
-  await expect(getCompany({ data: { slug: 'empty' } })).resolves.toMatchObject({ roles: [{ id: 'ready-role', status: 'active', topicStatus: 'ready' }] })
-  await expect(getCompany({ data: { slug: 'beta' } })).resolves.toMatchObject({ documents: [] })
-  await expect(getCompany({ data: { slug: 'missing' } })).rejects.toMatchObject({ status: 404 })
-})
-
 it('allows staff to read the company portal without invite secrets or company write access', async () => {
   await expect(getOrgOverview({ data: { slug: 'alpha' } })).resolves.toMatchObject({ name: 'alpha', roles: [{ id: 'alpha', name: 'alpha role' }], readOnly: true })
-  await expect(getPeople({ data: { slug: 'alpha' } })).resolves.toMatchObject({ readOnly: true, members: [{ email: 'learner@staff.test' }], invites: [] })
+  await expect(getPeople({ data: { slug: 'alpha' } })).resolves.toMatchObject({ readOnly: true, people: [{ kind: 'member', email: 'learner@staff.test' }] })
   await expect(listRoles({ data: { slug: 'alpha' } })).rejects.toMatchObject({ status: 403 })
   await expect(createRole({ data: { slug: 'alpha', name: 'Staff-created role' } })).rejects.toMatchObject({ status: 403 })
   const response = await authRequest('organization/invite-member', {
@@ -150,15 +130,15 @@ it('allows staff to read the company portal without invite secrets or company wr
   expect(response.status).toBe(400)
   expect(await response.json()).toMatchObject({ code: 'MEMBER_NOT_FOUND' })
   boundary.headers = new Headers({ cookie: accounts.get('learner')!.cookie })
-  await expect(getPeople({ data: { slug: 'alpha' } })).resolves.toMatchObject({ readOnly: false, invites: [{ id: 'private-invite' }] })
+  await expect(getPeople({ data: { slug: 'alpha' } })).resolves.toMatchObject({ readOnly: false, people: expect.arrayContaining([expect.objectContaining({ kind: 'invite', invitationId: 'private-invite' })]) })
   await expect(getOrgOverview({ data: { slug: 'beta' } })).rejects.toMatchObject({ status: 403 })
 })
 
 it('gives staff who own a company the full portal for that company', async () => {
   sqlite.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, ?)').run('staff-owner', 'alpha', accounts.get('staff')!.id, 'owner', NOW)
-  await expect(getPeople({ data: { slug: 'alpha' } })).resolves.toMatchObject({ readOnly: false, invites: [{ id: 'private-invite' }] })
+  await expect(getPeople({ data: { slug: 'alpha' } })).resolves.toMatchObject({ readOnly: false, people: expect.arrayContaining([expect.objectContaining({ kind: 'invite', invitationId: 'private-invite' })]) })
   await expect(getOrgOverview({ data: { slug: 'alpha' } })).resolves.toMatchObject({ readOnly: false })
-  await expect(getPeople({ data: { slug: 'beta' } })).resolves.toMatchObject({ readOnly: true, invites: [] })
+  await expect(getPeople({ data: { slug: 'beta' } })).resolves.toMatchObject({ readOnly: true, people: [expect.objectContaining({ kind: 'member', email: 'outsider@staff.test' })] })
 })
 
 it('searches users through the admin plugin and bans, revokes sessions, blocks sign-in and unbans', async () => {
