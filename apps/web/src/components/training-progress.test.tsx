@@ -130,6 +130,18 @@ describe('Training progress', () => {
     expect(getToday).not.toHaveBeenCalled()
   })
 
+  it('draws the weekly trend rules to the chart edge and its markers in the card fill', async () => {
+    vi.mocked(getProfile).mockResolvedValue(profile())
+    await mount('/me/profile')
+    const svg = section('Weekly trend').querySelector('svg[role="img"]')!
+    expect(svg.closest('figure')!.classList).toContain('bg-surface-card')
+    const width = svg.getAttribute('viewBox')!.split(' ')[2]
+    expect([...svg.querySelectorAll('line')].filter((l) => !l.getAttribute('stroke-dasharray')?.startsWith('6')).map((l) => l.getAttribute('x2'))).toEqual([width, width, width, width])
+    const [projected, ...weeks] = [...svg.querySelectorAll('circle')]
+    expect(projected.getAttribute('class')).toBe('fill-surface-card stroke-brand')
+    expect(weeks.map((c) => c.getAttribute('class'))).toEqual(['fill-brand stroke-surface-card', 'fill-brand stroke-surface-card'])
+  })
+
   it.each([
     ['reached', { achievedAt: start, days: 16, estimatedDays: null, projectedAt: null }, 'Reached Nov 2', ['Projected:']],
     ['projected', { achievedAt: null, days: null, estimatedDays: 2, projectedAt: start + 10 * day }, 'Projected: Nov 12', ['Reached']],
