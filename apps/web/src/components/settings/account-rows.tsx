@@ -10,7 +10,7 @@ export function AccountRows({ email, companies, isAdmin, signingOut, error, onSi
   return (
     <div className="flex flex-col gap-4">
       <ul className="flex flex-col divide-y divide-border rounded-lg border border-border bg-surface-card px-4">
-        {email && <li className={row}><span>Email</span><span className="min-w-0 truncate text-ink-muted">{email}</span></li>}
+        {email && <li className={row}><span className="shrink-0 whitespace-nowrap">Email</span><span className="min-w-0 truncate text-ink-muted">{email}</span></li>}
         <li><Link to="/welcome" search={{ review: 1 as unknown as '1' }} className={row}>What we record<ChevronRight aria-hidden className="size-5 text-ink-muted" /></Link></li>
         {companies.map((company) => (
           <li key={company.slug}>
