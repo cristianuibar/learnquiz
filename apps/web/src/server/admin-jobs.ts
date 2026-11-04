@@ -10,6 +10,7 @@ import { drainConceptQueue } from '@/server/concept-gen'
 import { retryFailedConcept } from '@/server/concept-retry'
 import { runInBackground } from '@/server/env'
 import { liveConcept } from '@/server/live-concept'
+import { COMPANY_CAP_MESSAGE, dailyCapError } from '@/server/model-cap'
 import { claimRoleBuild, releaseStaleBuild } from '@/server/role-curriculum'
 
 export const JOB_FILTERS = ['notReady', 'failed', 'generating', 'pending', 'ready'] as const
@@ -62,6 +63,9 @@ export const getGenerationJobs = createServerFn({ method: 'GET' })
   })
 
 const status = (e: unknown) => (e as { status?: number } | null)?.status
+// A daily-cap refusal keeps its cap message through the build; a provider rate limit is also a 429 but is a failure.
+const capMessages = [dailyCapError().message, COMPANY_CAP_MESSAGE]
+const capRefused = (e: unknown) => status(e) === 429 && e instanceof Error && capMessages.includes(e.message)
 
 // Retries failed jobs one by one; jobs that are no longer retryable are skipped, not failed.
 export const retryJobs = createServerFn({ method: 'POST' })
@@ -109,7 +113,7 @@ export const retryJobs = createServerFn({ method: 'POST' })
     const results = await Promise.allSettled(runs.map((run) => run()))
     for (const r of results) {
       if (r.status === 'fulfilled') queued++
-      else if (status(r.reason) === 429) skipped++
+      else if (capRefused(r.reason)) skipped++
       else failed++
     }
     return { queued, skipped, failed }

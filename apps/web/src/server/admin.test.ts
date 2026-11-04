@@ -4,7 +4,7 @@ import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { dbSchema } from '@/db'
-import { DailyCapError } from '@/lib/llm/client'
+import { DailyCapError, LlmError } from '@/lib/llm/client'
 import { getAuth } from '@/server/auth'
 import { getSessionUser } from '@/server/session'
 import { createRole, getOrgOverview, listRoles } from '@/server/org'
@@ -320,6 +320,9 @@ it('counts a role build refused by the owner daily cap as skipped, not failed', 
   let calls = 0
   boundary.chatJson = () => Promise.reject(calls++ ? new DailyCapError() : new Error('timeout'))
   await expect(retryJobs({ data: { ids: ['curriculum:retry-topic', 'curriculum:capped-topic'] } })).resolves.toEqual({ queued: 0, skipped: 1, failed: 1 })
+  // A provider rate limit is not a cap refusal: the build failed again.
+  boundary.chatJson = () => Promise.reject(new LlmError('Rate limited by the provider.', 429))
+  await expect(retryJobs({ data: { ids: ['curriculum:retry-topic'] } })).resolves.toEqual({ queued: 0, skipped: 0, failed: 1 })
 })
 
 it('lists an abandoned role build as failed and lets it be retried', async () => {
