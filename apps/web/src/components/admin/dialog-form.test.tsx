@@ -96,13 +96,17 @@ describe('dialogs and form controls', () => {
     await render(<Harness onConfirm={vi.fn()} consequences={many} />)
     await click(button('Retire'))
     const dialog = document.querySelector('[role="dialog"]')!
-    const list = [...dialog.querySelectorAll('ul')].find((u) => u.getAttribute('aria-label') === 'Consequences')!
-    expect(list.querySelectorAll('li')).toHaveLength(20)
-    expect(dialog.getAttribute('aria-describedby')).toBe(list.id)
-    expect(list.tabIndex).toBe(0)
-    await act(async () => { list.focus() })
-    expect(document.activeElement).toBe(list)
-    for (const name of ['Cancel', 'Ban user']) expect(list.contains(button(name))).toBe(false)
+    const region = dialog.querySelector<HTMLElement>('[role="region"][aria-label="Consequences"]')!
+    // The dialog is described by the consequences themselves, not by the region's label.
+    const description = document.getElementById(dialog.getAttribute('aria-describedby')!)!
+    expect(description.hasAttribute('aria-label')).toBe(false)
+    expect(description.querySelectorAll('li')).toHaveLength(20)
+    expect(description.textContent).toContain('Concept 20 is also in Site guide v2.')
+    expect(region.contains(description)).toBe(true)
+    expect(region.tabIndex).toBe(0)
+    await act(async () => { region.focus() })
+    expect(document.activeElement).toBe(region)
+    for (const name of ['Cancel', 'Ban user']) expect(region.contains(button(name))).toBe(false)
   })
 
   it('stays open and shows an alert when confirming fails', async () => {
