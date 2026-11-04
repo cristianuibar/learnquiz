@@ -26,7 +26,7 @@ export function Curriculum({ detail, readOnly, controls, error, announce }: {
   const running = role.topicStatus === 'generating' || concepts.some((c) => c.genStatus === 'pending' || c.genStatus === 'generating')
   const [openById, setOpenById] = useState<Record<string, boolean>>({})
   const [finished, setFinished] = useState(false)
-  const bucket = useRef<number | null>(null)
+  const bucket = useRef<string | null>(null)
   const wasRunning = useRef(false)
   const announceRef = useRef(announce)
   announceRef.current = announce
@@ -34,10 +34,11 @@ export function Curriculum({ detail, readOnly, controls, error, announce }: {
   useEffect(() => {
     if (running) {
       wasRunning.current = true
-      const next = Math.floor(ready / 5)
+      // Before concepts exist the unit list shows "Finding concepts…"; the first count is announced once they arrive.
+      const next = total ? `${total}:${Math.floor(ready / 5)}` : ''
       if (bucket.current !== next) {
         bucket.current = next
-        announceRef.current(`${ready} of ${total} concepts ready`)
+        announceRef.current(total ? `${ready} of ${total} concepts ready` : 'Finding concepts…')
       }
     } else if (wasRunning.current) {
       wasRunning.current = false

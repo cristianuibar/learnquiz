@@ -139,6 +139,14 @@ it('announces build progress every five concepts and when the curriculum is read
   expect(container.textContent).toContain('31 concepts · 12 live questions · 5 critical questions')
 })
 
+it('announces finding concepts while a build has none yet, then the first count', async () => {
+  const { router, status } = await mount(makeDetail({ status: 'generating', documents: [pdf] }))
+  expect(status()).toBe('Finding concepts…')
+  vi.mocked(getRoleDetail).mockResolvedValue(makeDetail({ status: 'generating', documents: [pdf], units: unit([concept('c1', 'Cash float', 'pending'), concept('c2', 'Card reader', 'pending')]) }) as never)
+  await act(() => router.invalidate())
+  expect(status()).toBe('0 of 2 concepts ready')
+})
+
 it('retries a failed concept', async () => {
   vi.mocked(retryConceptGeneration).mockResolvedValue({ ok: true } as never)
   const { button } = await mount(makeDetail({ status: 'ready', documents: [pdf], units: unit([concept('c9', 'Safe drop', 'failed', { genError: 'No draft passed' })]) }))
