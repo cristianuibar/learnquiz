@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { X } from 'lucide-react'
@@ -31,16 +31,32 @@ export function SessionLoading({ topicId, start, unitId }: { topicId: string; st
   const mounted = useRef(false)
   const started = useRef<number | null>(null)
   // Cancel or Back may still be loading its target while this screen stays mounted; a late start must not override it.
+  // Forward back here before that target commits clears the flag, and a start that finished meanwhile opens then.
   const left = useRef(false)
+  const finished = useRef<string | null>(null)
   const [attempt, setAttempt] = useState(0)
   const [slow, setSlow] = useState(false)
   const [failure, setFailure] = useState<Failure | null>(null)
 
   useEffect(() => heading.current?.focus(), [])
 
-  useEffect(() => router.subscribe('onBeforeNavigate', ({ pathChanged }) => {
-    if (pathChanged) left.current = true
-  }), [router])
+  const openSession = useCallback((sessionId: string) => {
+    finished.current = sessionId
+    if (!mounted.current || left.current) return
+    finished.current = null
+    void navigate({ to: '/play/$sessionId', params: { sessionId }, replace: true })
+  }, [navigate])
+
+  useEffect(() => {
+    const offBefore = router.subscribe('onBeforeNavigate', ({ pathChanged }) => { left.current = pathChanged })
+    const offResolved = router.subscribe('onResolved', ({ pathChanged }) => {
+      if (!pathChanged && finished.current !== null) openSession(finished.current)
+    })
+    return () => {
+      offBefore()
+      offResolved()
+    }
+  }, [router, openSession])
 
   useEffect(() => {
     // StrictMode replays mount, cleanup, mount; only a real unmount leaves this false.
@@ -54,7 +70,7 @@ export function SessionLoading({ topicId, start, unitId }: { topicId: string; st
       request.then(
         ({ sessionId }) => {
           clearTimeout(timer)
-          if (mounted.current && !left.current) void navigate({ to: '/play/$sessionId', params: { sessionId }, replace: true })
+          openSession(sessionId)
         },
         (err: unknown) => {
           clearTimeout(timer)
@@ -66,7 +82,7 @@ export function SessionLoading({ topicId, start, unitId }: { topicId: string; st
       mounted.current = false
       clearTimeout(timer)
     }
-  }, [attempt, topicId, start, unitId, runSession, runPlacement, navigate])
+  }, [attempt, topicId, start, unitId, runSession, runPlacement, openSession])
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col px-4">

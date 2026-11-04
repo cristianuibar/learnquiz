@@ -208,7 +208,7 @@ function People() {
             return (
               <li key={m.id} className="p-4">
                 {m.training ? (
-                  <PortalMasteryBar name={name} label={m.name} mastery={m.training.mastery} benchmark={m.training.benchmark} />
+                  <PortalMasteryBar name={name} label={m.name} mastery={m.training.mastery} stage={m.training.stage} />
                 ) : (
                   <p className="text-label">{name} <span className="font-normal text-ink-muted">No job role</span></p>
                 )}

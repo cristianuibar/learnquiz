@@ -147,7 +147,10 @@ it('shows status chip, mastery bar and last active for each person', async () =>
     id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles: [], readOnly: false,
     invites: [{ id: 'inv1', name: 'Ana', email: 'ana@acme.test', jobRole: 'Cashier', expiresAt: 0, expired: false }],
     members: [
-      { id: 'm1', userId: 'u1', name: 'Ben', email: 'ben@acme.test', role: 'member', jobRole: 'Cashier', lastActiveAt: Date.UTC(2026, 2, 5), training: { ...training, mastery: 100 } },
+      { id: 'm1', userId: 'u1', name: 'Ben', email: 'ben@acme.test', role: 'member', jobRole: 'Cashier', lastActiveAt: Date.UTC(2026, 2, 5), training: { ...training, stage: 'proficient', mastery: 100 } },
+      // Above the benchmark on average but a critical concept is still below it: not yet proficient.
+      { id: 'm4', userId: 'u4', name: 'Eve', email: 'eve@acme.test', role: 'member', jobRole: 'Cashier', lastActiveAt: null, training: { ...training, mastery: 90 } },
+      { id: 'm5', userId: 'u5', name: 'Flo', email: 'flo@acme.test', role: 'owner', jobRole: null, lastActiveAt: null, training: null },
       { id: 'm2', userId: 'u2', name: 'Cy', email: 'cy@acme.test', role: 'member', jobRole: 'Cashier', lastActiveAt: null, training: { ...training, mastery: 62 } },
       { id: 'm3', userId: 'u3', name: 'Di', email: 'di@acme.test', role: 'member', jobRole: 'Cashier', lastActiveAt: null, training: { ...training, mastery: 0 } },
     ],
@@ -157,10 +160,11 @@ it('shows status chip, mastery bar and last active for each person', async () =>
     const items = [...container.querySelectorAll('li')].map((li) => li.textContent)
     expect(items.some((t) => t!.includes('Ana') && t!.includes('Invited'))).toBe(true)
     const row = (name: string) => [...container.querySelectorAll('li')].find((li) => li.textContent!.includes(name))!
-    for (const [name, status, value] of [['Ben', 'Mastered', 100], ['Cy', 'Still learning', 62], ['Di', 'Not started', 0]] as const) {
+    for (const [name, status, value] of [['Ben', 'Mastered', 100], ['Cy', 'Still learning', 62], ['Di', 'Not started', 0], ['Eve', 'Still learning', 90]] as const) {
       const li = row(name)
-      const chip = [...li.querySelectorAll('span')].find((s) => s.textContent === status)!
-      expect(chip.querySelector('svg')).not.toBeNull()
+      const chip = [...li.querySelectorAll('span')].find((s) => s.textContent === status)
+      expect(chip, `${name} shows ${status}`).toBeDefined()
+      expect(chip!.querySelector('svg')).not.toBeNull()
       const bar = li.querySelector('[role=progressbar]')!
       expect(bar.getAttribute('aria-valuenow')).toBe(String(value))
       expect(bar.getAttribute('aria-label')).toBe(`${name} mastery`)
@@ -168,6 +172,9 @@ it('shows status chip, mastery bar and last active for each person', async () =>
     }
     expect(row('Ben').textContent).toContain('Last active: 5 Mar 2026')
     expect(row('Cy').textContent).toContain('Last active: -')
+    expect(row('Eve').textContent).not.toContain('Mastered')
+    expect(row('Flo').textContent).toContain('No job role')
+    expect(row('Flo').textContent).not.toMatch(/Active|Proficient|Mastered/)
   } finally {
     await cleanup()
   }

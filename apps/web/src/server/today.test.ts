@@ -343,6 +343,20 @@ describe('getToday', () => {
       corrects.forEach((c, i) => session(`s${i}`, 'session', DAY_START - (i + 1) * DAY, 10, c))
       expect((await getToday()).plan).toMatchObject({ start: 'session', state, nextUnit })
     })
+
+    it('skips an unlocked unit whose only document was retired', async () => {
+      personal()
+      unit('un0', 0)
+      unit('un1', 1)
+      run('INSERT INTO sources (id, topic_id, kind, title, body_text, retired_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', 'src-old', 't1', 'text', 'Old', 'Old.', 1, 1)
+      concept('c0', 'un0')
+      run("UPDATE concepts SET source_id = 'src-old' WHERE id = 'c0'")
+      concept('c1', 'un1')
+      item('i1', 'c1')
+      place()
+      ;[3, 3, 3].forEach((c, i) => session(`s${i}`, 'session', DAY_START - (i + 1) * DAY, 10, c))
+      expect((await getToday()).plan).toMatchObject({ start: 'session', state: 'basics', nextUnit: 'Unit un1' })
+    })
   })
 
   describe('building', () => {

@@ -77,6 +77,27 @@ it.each([
   } finally { await cleanup() }
 })
 
+it('opens the iPhone Home Screen steps straight away on an iPhone Safari tab and focuses their heading', async () => {
+  vi.mocked(endSession).mockResolvedValue({ sessionId: 's1', kind: 'session', topicId: 't1', durationMs: 1000, correct: 1, total: 1, ungraded: 0, xp: 0,
+    streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], benchmark: null, reviewsLeft: 0, nextLine: 'Come back soon.', endedEarly: false } satisfies SummaryView)
+  vi.mocked(getPushSettings).mockResolvedValue({ publicKey: 'public-key', isStaff: false, endpoints: [], canPrompt: true,
+    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' }, schedule })
+  vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('iPhone')
+  vi.spyOn(window, 'matchMedia').mockImplementation(() => ({ matches: false }) as MediaQueryList)
+  const { container, router, cleanup } = await renderApp('/play/s1/done')
+  let paintedTurnOn = false
+  const observer = new MutationObserver(() => { paintedTurnOn ||= container.textContent?.includes('Turn on questions') ?? false })
+  observer.observe(container, { childList: true, subtree: true, characterData: true })
+  try {
+    await act(async () => container.querySelector<HTMLAnchorElement>('a[href="/opt-in"]')!.click())
+    expect(router.state.location.pathname).toBe('/opt-in')
+    const h1 = container.querySelector('h1')
+    expect(h1?.textContent).toBe('Add Learn Quiz to your Home Screen')
+    expect(document.activeElement).toBe(h1)
+    expect(paintedTurnOn).toBe(false)
+  } finally { observer.disconnect(); await cleanup() }
+})
+
 it.each([0, 3])('shows the not-graded count on the summary only when answers were ungraded (ungraded=%s)', async (ungraded) => {
   vi.mocked(endSession).mockResolvedValue({ sessionId: 's1', kind: 'session', topicId: 't1', durationMs: 1000, correct: 9, total: 10, ungraded, xp: 0,
     streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], benchmark: null, reviewsLeft: 0, nextLine: 'Come back soon.', endedEarly: false } satisfies SummaryView)

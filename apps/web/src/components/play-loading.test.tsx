@@ -148,4 +148,25 @@ describe('session Loading screen', () => {
     expect(pathname(router)).toBe('/today')
     expect(container.textContent).toContain('Today page')
   })
+  it.each([
+    ['finishes after Forward', false],
+    ['finishes before Forward', true],
+  ] as const)('lands on the session when the start %s, after Back while Today is still loading', async (_label, beforeForward) => {
+    let finishStart!: (v: { sessionId: string }) => void
+    vi.mocked(startSession).mockReturnValue(new Promise((r) => { finishStart = r }) as never)
+    let finishToday!: () => void
+    const todayLoader = vi.fn(() => new Promise<void>((r) => { finishToday = r }))
+    const { container, router } = await renderLoading('topicId=t1&start=session', false, todayLoader)
+    await act(async () => router.history.back())
+    expect(todayLoader).toHaveBeenCalled()
+    if (beforeForward) await act(async () => finishStart({ sessionId: 's1' }))
+    await act(async () => router.history.forward())
+    if (!beforeForward) await act(async () => finishStart({ sessionId: 's1' }))
+    await act(async () => {})
+    expect(pathname(router)).toBe('/play/s1')
+    expect(container.textContent).toContain('Question 1')
+    await act(async () => finishToday())
+    await act(async () => {})
+    expect(pathname(router)).toBe('/play/s1')
+  })
 })
