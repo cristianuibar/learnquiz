@@ -110,6 +110,15 @@ it.each([
   expect(row('SELECT answer_json, correct FROM attempts')).toEqual({ answer_json: '{"text":"1"}', correct: 1 })
 })
 
+it('stamps the company on the voice call of a company topic', async () => {
+  raw.exec(`
+    INSERT INTO organization (id, name, slug, created_at) VALUES ('o1', 'Acme', 'acme', 1);
+    UPDATE topics SET org_id = 'o1';
+  `)
+  expect(await transcribeAnswer(upload())).toBe('one')
+  expect(row('SELECT purpose, org_id, ok FROM model_calls')).toEqual({ purpose: 'voice', org_id: 'o1', ok: 1 })
+})
+
 it.each([
   { name: 'unsigned learner', status: 401, setup: () => { holder.learnerId = null } },
   { name: 'another learner’s session', status: 404, setup: () => { holder.learnerId = 'u2' } },

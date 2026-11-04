@@ -115,7 +115,7 @@ it('approves, moves focus to the next unreviewed question and announces the coun
   expect(vi.mocked(reviewQuestion).mock.calls[0]![0].data).toMatchObject({ itemId: 'q1', action: 'approve' })
   await vi.waitFor(() => expect(document.activeElement?.textContent).toBe('Stem 2'))
   expect(document.activeElement?.tagName).toBe('H4')
-  expect(c.querySelector('[role=status]')!.textContent).toBe('Approved. 1 unreviewed.')
+  expect([...c.querySelectorAll('[role=status]')].map((s) => s.textContent)).toContain('Approved. 1 unreviewed.')
 })
 
 it('approving moves to the next open question in the same concept even after the list re-sorts', async () => {
@@ -130,7 +130,7 @@ it('approving moves to the next open question in the same concept even after the
   await act(async () => button(c, 'Approve and next').click())
   await vi.waitFor(() => expect(document.activeElement?.textContent).toBe('Stem A2'))
   expect(document.activeElement!.closest('li')!.querySelector('button[aria-label="Hide details"]')!.getAttribute('aria-expanded')).toBe('true')
-  expect(c.querySelector('[role=status]')!.textContent).toBe('Approved. 2 unreviewed.')
+  expect([...c.querySelectorAll('[role=status]')].map((s) => s.textContent)).toContain('Approved. 2 unreviewed.')
 })
 
 it('expands and focuses the question named by ?item=', async () => {

@@ -88,6 +88,13 @@ it('routes the image job independently of text and records an unknown cost in it
   })
 })
 
+it('stamps the company on the diagram call of a company topic', async () => {
+  raw.prepare('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, ?)').run('org', 'Northwind', 'northwind', 1)
+  raw.prepare('UPDATE topics SET org_id = ? WHERE id = ?').run('org', 'topic')
+  expect(await generateConceptDiagram({ data: { conceptId: 'procedure' } })).toMatchObject({ status: 'ready' })
+  expect(raw.prepare('SELECT purpose, org_id, ok FROM model_calls').all()).toEqual([{ purpose: 'diagram', org_id: 'org', ok: 1 }])
+})
+
 it('generates one diagram across overlapping views, serves its bytes, and reuses it on Path and reveal', async () => {
   let finish!: (res: Response) => void
   let started!: () => void

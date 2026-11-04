@@ -343,3 +343,14 @@ it('refuses a company call after its 400th daily model call but not another comp
   await expect(call('org-y', 't-y')).resolves.toEqual({ answer: 'ok' })
   expect(fetchModel).toHaveBeenCalledTimes(1)
 })
+
+it('stores the company on the reserved model_calls row of a company call', async () => {
+  await db.insert(topics).values({ id: 't-x', orgId: 'org-x', title: 't-x', status: 'ready', createdAt: Date.now() })
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ choices: [{ message: { content: '{"answer":"ok"}' }, finish_reason: 'stop' }] })))
+  await chatJson({ ...answerRequest, purpose: 'items', orgId: 'org-x', topicId: 't-x' })
+  await chatJson({ ...answerRequest, purpose: 'grade' })
+  expect(raw.prepare('SELECT purpose, org_id, ok FROM model_calls ORDER BY created_at, purpose').all()).toEqual([
+    { purpose: 'grade', org_id: null, ok: 1 },
+    { purpose: 'items', org_id: 'org-x', ok: 1 },
+  ])
+})

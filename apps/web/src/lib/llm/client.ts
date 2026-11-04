@@ -200,13 +200,16 @@ async function callJson<T>(opts: ChatJsonOpts<T>, selected: ReturnType<typeof jo
 }
 
 // The one-shot voice contract uses a JSON request part and a WAV audio part.
-export async function transcribeAudio(opts: { audio: File; learnerId: string; sessionId: string; topicId: string }): Promise<string> {
+export async function transcribeAudio(opts: { audio: File; learnerId: string; sessionId: string; topicId: string; orgId?: string | null }): Promise<string> {
   if (!isVoiceEnabled()) throw new LlmError('Voice answers are unavailable.', 404)
   const selected = jobModel('voice')
   const model = selected.model
-  const log = { learnerId: opts.learnerId, sessionId: opts.sessionId, topicId: opts.topicId, purpose: 'voice', model }
-  const reservedId = await reserve({ ...log, id: crypto.randomUUID() })
-  if (reservedId === false) throw dailyCapError()
+  const log = { learnerId: opts.learnerId, sessionId: opts.sessionId, topicId: opts.topicId, orgId: opts.orgId ?? null, purpose: 'voice', model }
+  const reservedId = await reserve({ ...log, id: crypto.randomUUID() }, opts.orgId)
+  if (reservedId === false) {
+    if (opts.orgId && (await companyOverCap(opts.orgId))) throw new LlmError(COMPANY_CAP_MESSAGE, 429)
+    throw dailyCapError()
+  }
   const started = Date.now()
   try {
     const body = new FormData()
@@ -251,7 +254,7 @@ async function reserve(row: Parameters<typeof reserveModelCall>[1], orgId?: stri
 }
 
 async function logCall(
-  opts: { purpose: string; model: string; learnerId?: string | null; sessionId?: string | null; topicId?: string | null },
+  opts: { purpose: string; model: string; learnerId?: string | null; sessionId?: string | null; topicId?: string | null; orgId?: string | null },
   started: number,
   usage: Usage | undefined,
   error: string | null,
@@ -283,6 +286,7 @@ async function logCall(
         learnerId: opts.learnerId ?? null,
         sessionId: opts.sessionId ?? null,
         topicId: opts.topicId ?? null,
+        orgId: opts.orgId ?? null,
         purpose: opts.purpose,
         model,
         ...done,
@@ -298,7 +302,7 @@ async function logCall(
 export async function generateImage(opts: { prompt: string; learnerId: string; topicId: string; orgId?: string | null }): Promise<Uint8Array> {
   if (!isImageEnabled()) throw new LlmError('Diagrams are unavailable.', 404)
   const selected = jobModel('image')
-  const log = { purpose: 'diagram', learnerId: opts.learnerId, topicId: opts.topicId, model: selected.model }
+  const log = { purpose: 'diagram', learnerId: opts.learnerId, topicId: opts.topicId, orgId: opts.orgId ?? null, model: selected.model }
   const reservedId = await reserve({ ...log, id: crypto.randomUUID() }, opts.orgId)
   if (reservedId === false) {
     if (opts.orgId && (await companyOverCap(opts.orgId))) throw new LlmError(COMPANY_CAP_MESSAGE, 429)

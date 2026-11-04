@@ -1,4 +1,6 @@
 import type { ItemView } from '@learnquiz/api'
+import { MULTI_CAPTION } from './multi'
+import { ORDER_CAPTION } from './order'
 import { createReadAloud, speechSegments, type SpeechQuestion } from './speech'
 
 const item: ItemView = {
@@ -11,8 +13,8 @@ const item: ItemView = {
 describe('speechSegments', () => {
   test.each([
     ['mcq', ['What do you do first?', 'Record the damage', 'Move the pallet']],
-    ['multi', ['What do you do first?', 'Choose all that apply', 'Record the damage', 'Move the pallet']],
-    ['order', ['What do you do first?', 'Put the steps in order', 'Record the damage', 'Move the pallet']],
+    ['multi', ['What do you do first?', MULTI_CAPTION, 'Record the damage', 'Move the pallet']],
+    ['order', ['What do you do first?', ORDER_CAPTION, 'Record the damage', 'Move the pallet']],
     ['cloze', ['Wait blank minutes, then record blank.']],
     ['short', ['Describe the damage.']],
   ] as const)('reads %s in displayed order', (format, expected) => {
@@ -93,6 +95,34 @@ test('reads a repeated item at a new session position', async () => {
   await settle()
   expect(h.stop).toHaveBeenCalledTimes(1)
   expect(h.speak).toHaveBeenCalledTimes(6)
+})
+
+test('reads the same question again when Read aloud is turned off and back on', async () => {
+  const h = harness()
+  h.toggle()
+  await settle()
+  expect(h.speak).toHaveBeenCalledTimes(3)
+  h.toggle()
+  await settle()
+  expect(h.speak).toHaveBeenCalledTimes(3)
+  h.speak.mockClear()
+  h.toggle()
+  await settle()
+  expect(h.enabled.mock.calls).toEqual([[true], [false], [true]])
+  expect(h.speak.mock.calls.map(([text]) => text)).toEqual(['What do you do first?', 'Record the damage', 'Move the pallet'])
+})
+
+test.each([
+  ['multi', MULTI_CAPTION, 'Choose all that apply'],
+  ['order', ORDER_CAPTION, 'Tap the steps in order'],
+] as const)('speaks the %s instruction exactly as the screen shows it', async (format, caption, wording) => {
+  const h = harness()
+  h.update({ item: { ...item, format } })
+  h.toggle()
+  await settle()
+  const spoken = h.speak.mock.calls.map(([text]) => text)
+  expect(spoken[1]).toBe(caption)
+  expect(spoken[1]).toBe(wording)
 })
 
 test('stops on toggle off and does not read subsequent items', async () => {
