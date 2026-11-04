@@ -6,6 +6,7 @@ import { errorMessage, fieldErrors } from '@/components/inline-error'
 import { getSessionUser } from '@/server/session'
 import { createCompany, createRole, getOrgOverview, listRoles, updateRole } from './org'
 import { getPeople } from '@/server/people'
+import { getProfile } from '@/server/profile'
 
 const holder = vi.hoisted(() => ({ db: null as unknown, createOrganization: vi.fn() }))
 
@@ -190,11 +191,11 @@ it('reports assigned training stages, unresolved critical errors and company pro
   sqlite.prepare('INSERT INTO invitation (id, organization_id, email, status, expires_at, inviter_id, job_role_id, invitee_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
     .run('joined', 'org-a', 'joined@x.test', 'accepted', Date.now() + day, 'owner', 'legacy-role', 'Joined')
   attempt.run('corrected', 'member', 'scan-item', 'scan', start + 2 * day, '"scan"', 1, 1, 'sure')
-  // Mean 0.86 clears the 0.85 benchmark, but the critical concept at 0.60 does not, so progress stays at 0.60 / 0.85.
+  // Current critical mastery can fall below the benchmark without undoing earned proficiency.
   sqlite.prepare("UPDATE learner_concept SET p_known = CASE concept_id WHEN 'scan' THEN 0.6 ELSE 0.99 END WHERE learner_id = ?").run('admin')
   const people = (await getPeople({ data: { slug: 'alpha' } })).people
   expect(people).toEqual([
-    expect.objectContaining({ kind: 'member', name: 'admin', status: 'active', day: 11, proficientInDays: null, mastery: 86, benchmark: 85, openCriticalErrors: 0 }),
+    expect.objectContaining({ kind: 'member', name: 'admin', status: 'proficient', day: 11, proficientInDays: 4, mastery: 86, benchmark: 85, openCriticalErrors: 0 }),
     expect.objectContaining({ kind: 'invite', invitationId: 'lapsed', name: 'Lapsed', status: 'expired', expiresAt: expect.any(Number) }),
     expect.objectContaining({ kind: 'member', name: 'member', status: 'active', day: 11, proficientInDays: null, mastery: 13, benchmark: 85, openCriticalErrors: 1 }),
     expect.objectContaining({ kind: 'invite', invitationId: 'waiting', status: 'invited' }),
@@ -202,7 +203,51 @@ it('reports assigned training stages, unresolved critical errors and company pro
   expect(people.some((p) => p.name === 'owner' || p.name === 'Joined')).toBe(false)
   sqlite.prepare('UPDATE job_roles SET onboarding_days = 5 WHERE id = ?').run('legacy-role')
   expect((await getPeople({ data: { slug: 'alpha' } })).people.filter((p) => p.kind === 'member').map((p) => [p.name, p.day, p.onboardingDays])).toEqual([['admin', 5, 5], ['member', 5, 5]])
-  expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { employees: 3, proficientEmployees: 0, daysToProficiency: null, criticalErrorsThisWeek: 1, documentsToReview: 0, firstProficientUserId: null } })
+  expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { employees: 3, proficientEmployees: 1, daysToProficiency: 4, criticalErrorsThisWeek: 1, documentsToReview: 0, firstProficientUserId: 'admin' } })
+})
+
+it.each([true, false])('preserves earned proficiency when a live concept is added (critical: %s)', async (critical) => {
+  const day = 86_400_000
+  const start = Date.UTC(2026, 9, 20)
+  const reachedAt = start + 4 * day
+  vi.spyOn(Date, 'now').mockReturnValue(start + 10 * day)
+  try {
+    sqlite.prepare("UPDATE topics SET status = 'ready' WHERE job_role_id = 'legacy-role'").run()
+    const topic = sqlite.prepare('SELECT id FROM topics WHERE job_role_id = ?').get('legacy-role')!.id as string
+    const assignment = sqlite.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at, proficient_at) VALUES (?, ?, ?, ?, ?)')
+    assignment.run('admin', 'org-a', 'legacy-role', start, reachedAt)
+    assignment.run('member', 'org-a', 'legacy-role', start, null)
+    const unit = sqlite.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)')
+    unit.run('original-unit', topic, 0, 'Receiving')
+    const source = sqlite.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, created_at) VALUES (?, ?, 'text', ?, '', ?)")
+    source.run('original-doc', topic, 'Original handbook', start)
+    const concept = sqlite.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary, critical, source_id) VALUES (?, ?, ?, 0, ?, \'\', ?, ?)')
+    concept.run('original', topic, 'original-unit', 'Check delivery', 1, 'original-doc')
+    const known = sqlite.prepare('INSERT INTO learner_concept (learner_id, concept_id, p_known, updated_at) VALUES (?, ?, ?, ?)')
+    for (const userId of ['admin', 'member']) known.run(userId, 'original', 0.95, reachedAt)
+    sqlite.prepare("INSERT INTO attempts (id, learner_id, item_id, concept_id, at, answer_json, correct, score, confidence, response_ms, rating, p_known_before, p_known_after) VALUES ('earned', 'admin', 'original-item', 'original', ?, '\"checked\"', 1, 1, 'sure', 1000, 3, 0.8, 0.95)").run(reachedAt)
+    const input = { data: { slug: 'alpha' } }
+    const profileInput = { data: { org: 'alpha', learnerId: 'admin' } }
+    expect((await getPeople(input)).people).toContainEqual(expect.objectContaining({ userId: 'admin', status: 'proficient', proficientInDays: 4, mastery: 95 }))
+    expect((await getOrgOverview(input)).training).toMatchObject({ proficientEmployees: 2, daysToProficiency: 4 })
+    const before = await getProfile(profileInput)
+    expect(before).toMatchObject({ mastery: 0.95, proficiency: { achievedAt: reachedAt, days: 4 } })
+
+    source.run('added-doc', topic, 'Returns handbook', reachedAt + day)
+    unit.run('added-unit', topic, 1, 'Returns')
+    concept.run('added', topic, 'added-unit', 'Inspect returns', Number(critical), 'added-doc')
+
+    const people = (await getPeople(input)).people
+    expect.soft(people).toContainEqual(expect.objectContaining({ userId: 'admin', status: 'proficient', proficientInDays: 4, mastery: 95 }))
+    expect.soft(people).toContainEqual(expect.objectContaining({ userId: 'member', status: 'active', proficientInDays: null, mastery: 48 }))
+    expect.soft((await getOrgOverview(input)).training).toMatchObject({ proficientEmployees: 1, daysToProficiency: 4, firstProficientUserId: 'admin' })
+    const after = await getProfile(profileInput)
+    expect.soft(after).toMatchObject({ mastery: before.mastery, proficiency: before.proficiency, weeks: before.weeks, reachedWeeks: before.reachedWeeks })
+    expect.soft(after.units).toContainEqual(expect.objectContaining({ id: 'added-unit', mastery: 0, state: 'not_started', concepts: [expect.objectContaining({ id: 'added', pKnown: 0, measured: false, status: 'not_started' })] }))
+    expect(sqlite.prepare('SELECT proficient_at FROM member_role_assignments WHERE user_id = ?').get('admin')).toEqual({ proficient_at: reachedAt })
+  } finally {
+    vi.restoreAllMocks()
+  }
 })
 
 it('ignores concepts of a retired document when deciding an employee is proficient', async () => {
