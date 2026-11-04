@@ -131,7 +131,7 @@ function VoiceAnswer(props: QuestionBodyProps & { sessionId: string }) {
           ))}
         </View>
       ) : null}
-      <MicButton ref={stopRef} recording={recording} disabled={readOnly || step === 'requesting'} onPress={() => voice.tap()} />
+      <MicButton ref={stopRef} recording={recording} disabled={!recording && (readOnly || step === 'requesting')} onPress={() => voice.tap()} />
       <Text variant="label" style={recording ? undefined : { marginTop: space[2] }}>{recording ? voiceCopy.recording : voiceCopy.idle}</Text>
       {!recording && !state.alert ? (
         <LinkButton disabled={readOnly || step === 'requesting'} onPress={() => voice.typeInstead()}>Type instead</LinkButton>

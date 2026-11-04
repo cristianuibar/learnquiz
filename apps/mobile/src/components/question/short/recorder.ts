@@ -75,7 +75,7 @@ export function useVoiceAnswer({ sessionId, itemId, text, onText, disabled, focu
   // Leaving the app drops the recording and frees the microphone.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (next) => {
-      if (next !== 'active') voice.discard()
+      if (next !== 'active') voice.background()
     })
     return () => subscription.remove()
   }, [voice])
@@ -88,7 +88,8 @@ export function useVoiceAnswer({ sessionId, itemId, text, onText, disabled, focu
     return () => subscription.remove()
   }, [capturing, voice])
 
-  // End session and leaving the question unmount the body.
+  // End session and leaving the question unmount the body. The stream's own
+  // release also stops the native AudioRecord, whichever cleanup runs first.
   useEffect(() => () => voice.dispose(), [voice])
 
   return { state, voice }

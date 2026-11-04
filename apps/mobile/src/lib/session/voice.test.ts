@@ -296,3 +296,37 @@ test('a blank or malformed transcript is a failure', async () => {
     expect(t.answer()).toBe('')
   }
 })
+
+test('the permission dialog pausing the app does not cancel the first recording', async () => {
+  const t = setup()
+  const answer = deferred<VoicePermission>()
+  t.ports.permission.mockReturnValueOnce(answer.promise)
+  t.voice.tap()
+  expect(t.voice.background()).toBe(false)
+  answer.resolve({ granted: true, canAskAgain: true })
+  await flush()
+  expect(t.ports.start).toHaveBeenCalledTimes(1)
+  expect(t.voice.getState().step).toBe('recording')
+})
+
+test('going to the background while recording drops the recording', async () => {
+  const t = setup({ text: 'Typed before' })
+  await recording(t)
+  t.voice.buffer(speech())
+  expect(t.voice.background()).toBe(true)
+  expect(t.ports.stop).toHaveBeenCalledTimes(1)
+  expect(t.ports.upload).not.toHaveBeenCalled()
+  expect(t.answer()).toBe('Typed before')
+  expect(t.voice.getState()).toMatchObject({ step: 'review', alert: null })
+})
+
+test('a busy screen cannot block stopping a recording', async () => {
+  const t = setup()
+  await recording(t)
+  t.voice.buffer(speech())
+  t.voice.setDisabled(true)
+  t.voice.tap()
+  expect(t.ports.stop).toHaveBeenCalledTimes(1)
+  expect(t.ports.upload).toHaveBeenCalledTimes(1)
+  expect(t.voice.getState().step).toBe('transcribing')
+})

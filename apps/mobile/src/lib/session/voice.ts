@@ -99,9 +99,10 @@ export class VoiceAnswerController {
   }
 
   // The one mic button: start from idle or review, stop while recording.
+  // Stopping is never blocked, even while the screen is busy.
   tap() {
-    if (this.disabled || !this.state.available) return
     if (this.state.step === 'recording') return this.finish()
+    if (this.disabled || !this.state.available) return
     if (this.state.step === 'idle' || this.state.step === 'review') void this.start()
   }
 
@@ -141,6 +142,12 @@ export class VoiceAnswerController {
     if (this.state.step !== 'recording') return
     this.ports.stop()
     this.fail(false)
+  }
+
+  // The app left the foreground. Android's permission dialog pauses the app
+  // too, so a pending permission request is kept; anything recorded is dropped.
+  background(): boolean {
+    return this.state.step === 'requesting' ? false : this.discard()
   }
 
   // Background, End session or Back: drop the recording and free the microphone.
