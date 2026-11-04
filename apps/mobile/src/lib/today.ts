@@ -6,6 +6,7 @@ import { api, ApiError } from './api'
 import { getToken } from './auth'
 import { useSession, type Branding } from './session-store'
 import { loadTodayCache, saveTodayCache } from './today-cache'
+import { watchReachability } from './reachability'
 
 // The session Loading route makes the start call; Today only navigates there.
 export const PLAY_LOADING = '/play/loading'
@@ -90,7 +91,7 @@ export function useStreakPop(reward: boolean): boolean {
 type Identity = { id: string | null; branding: Branding | null; token: string | null }
 type Owner = { id: string; token: string | null }
 
-export function useToday(): {
+export function useToday({ monitorConnectivity = false }: { monitorConnectivity?: boolean } = {}): {
   today: Today | null
   view: TodayView | null
   status: TodayStatus
@@ -109,6 +110,10 @@ export function useToday(): {
   const [today, setToday] = useState<Today | null>(fixture)
   const [payloadDay, setPayloadDay] = useState<string | null>(null)
   const [status, setStatus] = useState<TodayStatus>(fixture ? 'ready' : 'loading')
+  const [unreachable, setUnreachable] = useState(false)
+  // Either a successful payload request or probe proves connectivity.
+  const needsRecovery = useRef(false)
+  const visibleStatus = unreachable ? 'offline' : status
   const [refreshing, setRefreshing] = useState(false)
   // Keep polling a building plan through midnight until a fresh plan replaces it.
   const [building, setBuilding] = useState(false)
@@ -191,6 +196,8 @@ export function useToday(): {
         setToday(next)
         setBuilding(next.role?.building != null)
         setPayloadDay(requestDay)
+        needsRecovery.current = false
+        setUnreachable(false)
         setStatus('ready')
         // Persist only the confirmed network payload, for the identity that
         // fetched it. Storage failure is contained inside saveTodayCache.
@@ -201,7 +208,9 @@ export function useToday(): {
         // owned by auth (it signs out); it never surfaces as an error here.
         if (error instanceof ApiError && error.status === 401) return
         if (!stillCurrent(captured, requestToken, sequence)) return
-        setStatus(failureStatus(error))
+        const failedStatus = failureStatus(error)
+        if (failedStatus === 'offline') needsRecovery.current = true
+        setStatus(failedStatus)
       },
     ).finally(() => {
       if (inFlight.current === run) {
@@ -327,8 +336,21 @@ export function useToday(): {
     return () => clearInterval(timer)
   }, [fixture, building, focused, active, refresh])
 
+  useEffect(() => {
+    // Only the Today screen opts in; TabBar and Path also use this data hook.
+    if (!monitorConnectivity || fixture || !focused || !active) return
+    return watchReachability((reachable) => {
+      setUnreachable(!reachable)
+      if (!reachable) needsRecovery.current = true
+      else if (needsRecovery.current) {
+        needsRecovery.current = false
+        void refresh()
+      }
+    })
+  }, [monitorConnectivity, fixture, focused, active, refresh])
+
   const baseView = useMemo(() => (visibleToday ? todayView(visibleToday, new Date()) : null), [visibleToday])
-  const view = useMemo(() => viewForStatus(baseView, status), [baseView, status])
+  const view = useMemo(() => viewForStatus(baseView, visibleStatus), [baseView, visibleStatus])
 
   const step = useRef<number | null>(null)
   useEffect(() => {
@@ -339,5 +361,5 @@ export function useToday(): {
     step.current = next
   }, [visibleToday, view])
 
-  return { today: visibleToday, view, status, refreshing, refresh }
+  return { today: visibleToday, view, status: visibleStatus, refreshing, refresh }
 }

@@ -13,7 +13,7 @@ import { PLAY_LOADING, playParams, useStreakPop, useToday } from '@/lib/today'
 import { useTheme } from '@/theme/ThemeProvider'
 
 export default function TodayScreen() {
-  const { today, view, status, refreshing, refresh } = useToday()
+  const { today, view, status, refreshing, refresh } = useToday({ monitorConnectivity: true })
   const { colors, space } = useTheme()
   const insets = useSafeAreaInsets()
   const router = useRouter()

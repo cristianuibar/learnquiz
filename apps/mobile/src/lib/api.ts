@@ -12,6 +12,15 @@ import { getToken, handleUnauthorized } from './auth'
 export const API_URL =
   process.env.EXPO_PUBLIC_API_URL ?? 'https://app.learnquiz.com'
 
+// A static, same-origin HEAD avoids downloading Today or touching auth. Any
+// HTTP response proves reachability, including server errors. Bypass caches so
+// a stored response cannot hide airplane mode.
+export async function checkReachability(signal: AbortSignal): Promise<void> {
+  await fetch(`${API_URL}/manifest.webmanifest?reachability=${Date.now()}`, {
+    method: 'HEAD', credentials: 'omit', cache: 'no-store', signal,
+  })
+}
+
 const DEFAULT_TIMEOUT_MS = 90_000
 
 export class ApiError extends Error {
