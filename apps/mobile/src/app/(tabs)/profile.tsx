@@ -5,9 +5,11 @@ import { ChevronRight } from 'lucide-react-native'
 import type { Profile as ProfileData } from '@learnquiz/api/progress'
 import type { Today } from '@learnquiz/api/today'
 import { MasteryCard } from '@/components/profile/MasteryCard'
+import { CriticalSteps } from '@/components/profile/CriticalSteps'
 import { ProfileEmpty } from '@/components/profile/ProfileEmpty'
 import { ProfileHeader } from '@/components/profile/ProfileHeader'
 import { WeeklyTrend } from '@/components/profile/WeeklyTrend'
+import { UnitAccordion } from '@/components/profile/UnitAccordion'
 import { AlertRow } from '@/components/ui/AlertRow'
 import { Button } from '@/components/ui/Button'
 import { Screen } from '@/components/ui/Screen'
@@ -171,6 +173,8 @@ export default function Profile() {
             <>
               <MasteryCard profile={profile} />
               <WeeklyTrend profile={profile} />
+              <UnitAccordion units={profile.units} benchmark={profile.benchmark} />
+              <CriticalSteps confidentErrors={profile.confidentErrors} />
             </>
           ) : <ProfileEmpty profile={profile} />)}
         </>
