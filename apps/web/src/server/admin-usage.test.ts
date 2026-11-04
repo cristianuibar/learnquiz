@@ -121,6 +121,19 @@ it('aggregates settled calls for staff and agrees with a direct SQL sum', async 
   expect(usage.failures).toEqual([{ id: 'b2', createdAt: NOW - 1000, purpose: 'items', model: 'm1', orgId: 'beta', name: 'beta Co', slug: 'beta', error: 'upstream boom' }])
 })
 
+it('returns a per-day latency series, filtered to one job when given', async () => {
+  const all = await getModelUsage({ data: range })
+  expect(all.latency.days.map((d) => [d.day, d.partial, d.p50, d.p95])).toEqual(all.days.map((d) => [d.day, d.partial, d.p50, d.p95]))
+  const grade = await getModelUsage({ data: { ...range, job: 'grade' } })
+  expect(all.latency.total).toEqual({ p50: all.totals.p50, p95: all.totals.p95 })
+  expect(grade.latency.total).toEqual({ p50: 10, p95: 400 })
+  expect(grade.latency.days).toHaveLength(grade.days.length)
+  expect(grade.latency.days.filter((d) => d.p95 !== null).map((d) => [d.day, d.p50, d.p95])).toEqual([['2026-11-01', 10, 10], ['2026-11-02', 400, 400]])
+  expect(grade.latency.days.filter((d) => d.p95 === null).every((d) => d.p50 === null)).toBe(true)
+  expect(grade.days).toEqual(all.days)
+  expect(grade.totals).toEqual(all.totals)
+})
+
 it('refuses non-staff', async () => {
   boundary.headers = new Headers({ cookie: accounts.get('learner')!.cookie })
   await expect(getModelUsage({ data: range })).rejects.toMatchObject({ status: 403, message: 'Staff only' })
