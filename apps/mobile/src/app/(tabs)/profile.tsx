@@ -43,19 +43,24 @@ export default function Profile() {
   const settingsRef = useRef<View | null>(null)
   const returningFromSettings = useRef(false)
   const headingRef = useRef<NativeText | null>(null)
+  const retryRef = useRef<View | null>(null)
   const retryHadFocus = useRef(false)
   const retryStartedWithFocus = useRef(false)
   const prevStatus = useRef(status)
 
   // A successful retry removes its control. Preserve focus ownership while
-  // busy disables it, then return TalkBack to the stable screen heading.
+  // busy disables it, then return TalkBack to the stable screen heading. A retry
+  // that fails again (for example the profile loads and then Today fails) may
+  // replace the page Try again with the dock's, so focus the Try again on screen.
   useEffect(() => {
     const was = prevStatus.current
     prevStatus.current = status
-    if (was !== 'ready' && status === 'ready' && (retryHadFocus.current || retryStartedWithFocus.current)) {
+    const owned = retryHadFocus.current || retryStartedWithFocus.current
+    if (was === 'loading' && status !== 'loading' && owned) {
       retryHadFocus.current = false
       retryStartedWithFocus.current = false
-      const tag = headingRef.current && findNodeHandle(headingRef.current)
+      const target = status === 'ready' ? headingRef.current : retryRef.current
+      const tag = target && findNodeHandle(target)
       if (tag != null) AccessibilityInfo.setAccessibilityFocus(tag)
     }
     if (status !== 'loading') retryStartedWithFocus.current = false
@@ -124,7 +129,7 @@ export default function Profile() {
     setAttempt((value) => value + 1)
   }
   const retryButton = (
-    <Button variant="secondary" busy={status === 'loading'} onPress={retry}
+    <Button ref={retryRef} variant="secondary" busy={status === 'loading'} onPress={retry}
       onFocus={() => { retryHadFocus.current = true }} onBlur={() => { retryHadFocus.current = false }}>
       Try again
     </Button>

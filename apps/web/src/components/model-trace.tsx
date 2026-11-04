@@ -9,7 +9,7 @@ type Scope = { scope: 'session'; sessionId: string } | { scope: 'topic'; topicId
 type Trace = Awaited<ReturnType<typeof getModelTrace>>
 const usd = (cost: number | null) => cost === null ? 'Unknown' : cost.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 8 })
 
-export function ModelTrace({ scope }: { scope: Scope }) {
+export function ModelTrace({ scope, variant = 'secondary' }: { scope: Scope; variant?: 'secondary' | 'link' }) {
   const load = useServerFn(getModelTrace)
   const [trace, setTrace] = useState<Trace | null>(null)
   const [error, setError] = useState('')
@@ -31,7 +31,7 @@ export function ModelTrace({ scope }: { scope: Scope }) {
   return (
     <Dialog onOpenChange={(open) => { if (open) void refresh() }}>
       <DialogTrigger asChild>
-        <Button variant="secondary" className="mt-4 px-6">Model trace</Button>
+        <Button variant={variant} className={variant === 'link' ? 'self-start' : 'mt-4 px-6'}>Model trace</Button>
       </DialogTrigger>
       <DialogContent className="top-0 right-0 left-auto flex h-dvh max-w-full translate-x-0 translate-y-0 flex-col gap-6 overflow-y-auto rounded-none sm:max-w-xl">
         <DialogHeader className="pr-10 text-left">
@@ -47,7 +47,7 @@ export function ModelTrace({ scope }: { scope: Scope }) {
             <p className="text-lg font-semibold tabular-nums">
               {scope.scope === 'session' ? 'Session total' : 'Generation total'}: {usd(trace.totalCostUsd)}
             </p>
-            <p className="text-sm text-muted-foreground">USD costs are the logged estimates. Totals include priced calls only. Output tokens include reasoning tokens.</p>
+            <p className="text-sm text-ink-muted">USD costs are the logged estimates. Totals include priced calls only. Output tokens include reasoning tokens.</p>
             {trace.planning && (
               <section aria-label="Session plan">
                 <h2 className="font-semibold">{trace.planning.planner}</h2>
@@ -64,7 +64,7 @@ export function ModelTrace({ scope }: { scope: Scope }) {
                       <span>{call.purpose.replaceAll('_', ' ')}</span>
                       <span>{call.ok ? 'Succeeded' : 'Failed'}</span>
                     </div>
-                    <p className="mt-1 break-words text-sm text-muted-foreground">{call.model}</p>
+                    <p className="mt-1 break-words text-sm text-ink-muted">{call.model}</p>
                     <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm tabular-nums">
                       <dt>Latency</dt><dd className="text-right">{call.latencyMs.toLocaleString()} ms</dd>
                       <dt>Input tokens</dt><dd className="text-right">{call.promptTokens.toLocaleString()}</dd>

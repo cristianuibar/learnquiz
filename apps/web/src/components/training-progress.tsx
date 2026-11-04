@@ -19,7 +19,7 @@ export function TrainingProgress({ profile, back }: { profile: Profile; back: Re
     <main className="mx-auto w-full max-w-xl space-y-8 px-4 pt-6 pb-8">
       <header>
         {back}
-        <h1 className="text-3xl font-bold tracking-tight">Training progress</h1>
+        <h1 className="text-title-1 text-ink">Training progress</h1>
         <p className="mt-2 font-medium">{profile.name}</p>
         {topic ? <p className="mt-2 text-muted-foreground">{topic.title}{role && ` · ${role}`}</p> : (
           <p className="mt-2 text-muted-foreground">Choose a topic to begin tracking your training. <Link to="/start" className="font-medium text-primary underline">Start learning</Link></p>
