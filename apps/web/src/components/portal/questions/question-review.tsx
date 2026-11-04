@@ -190,10 +190,15 @@ export function QuestionReview({ data, slug, search }: { data: Review; slug: str
   const navigate = useNavigate()
   const searchRef = useRef<HTMLInputElement>(null)
   const patchFilters = (patch: FilterPatch) => void navigate({ to: '/org/$slug/questions', params: { slug }, search: (prev) => ({ role: prev.role, q: prev.q, unreviewed: prev.unreviewed, flagged: prev.flagged, critical: prev.critical, status: prev.status as ReviewSearch['status'], ...patch, item: undefined }), replace: true })
+  // Each Clear remounts the toolbar so a search still in its debounce is dropped; focus the new field after it mounts.
+  const [cleared, setCleared] = useState(0)
   const clear = () => {
     patchFilters({ q: undefined, unreviewed: undefined, flagged: undefined, critical: undefined, status: undefined })
-    searchRef.current?.focus()
+    setCleared((n) => n + 1)
   }
+  useEffect(() => {
+    if (cleared) searchRef.current?.focus()
+  }, [cleared])
   const all = data.units.flatMap((u) => u.concepts)
   const counts = {
     unreviewed: all.reduce((n, c) => n + c.questions.filter(isNew).length, 0),
@@ -217,7 +222,7 @@ export function QuestionReview({ data, slug, search }: { data: Review; slug: str
       {data.roles.length === 0 && (
         <p className="rounded-md bg-surface-sunken px-4 py-3 text-body text-ink-muted">No roles yet. <Link {...links.roles} className="underline">Roles</Link></p>
       )}
-      {data.role && <ReviewToolbar search={search} counts={counts} shown={shown} inputRef={searchRef} onChange={patchFilters} onClear={clear} />}
+      {data.role && <ReviewToolbar key={`${search.role ?? data.role.id}:${cleared}`} search={search} counts={counts} shown={shown} inputRef={searchRef} onChange={patchFilters} onClear={clear} />}
       <Body key={data.role?.id ?? 'none'} data={data} slug={slug} search={search} onClear={clear} />
     </Page>
   )
