@@ -52,7 +52,7 @@ export function Roles({ org, readOnly = false }: { org: Org; readOnly?: boolean 
         const status = roleTrainingStatus(r)
         if (status === 'Preparing training') {
           return (
-            <div className="flex flex-col items-start gap-1">
+            <div className="flex flex-wrap items-center gap-3">
               <Status word="Preparing training" />
               <span className={sub}>{r.conceptsReady} of {r.conceptsTotal} concepts</span>
             </div>
