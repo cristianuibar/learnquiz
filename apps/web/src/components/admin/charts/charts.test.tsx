@@ -71,6 +71,28 @@ describe('BarChart with a strip and many days', () => {
   })
 })
 
+describe('BarChart over a 365-day range ending today', () => {
+  it("keeps today's nonzero partial bars visible when the slot is narrower than the outline", async () => {
+    const points = Array.from({ length: 365 }, (_, i) => ({ label: String(i + 1), value: 100, partial: i === 364 }))
+    const el = await render(
+      <BarChart
+        title="Calls by day"
+        summary="Calls"
+        unit="Calls"
+        legend="Calls"
+        points={points}
+        strip={{ legend: 'Failure rate', values: points.map(() => 5), format: (n) => `${n}%` }}
+      />,
+    )
+    const outlines = [...el.querySelectorAll('svg[role="img"] rect.fill-surface-card')]
+    expect(outlines).toHaveLength(2)
+    for (const r of outlines) {
+      expect(Number(r.getAttribute('width'))).toBeGreaterThan(0)
+      expect(Number(r.getAttribute('height'))).toBeGreaterThan(0)
+    }
+  })
+})
+
 describe('LineChart', () => {
   it('keeps a day with no data in the table and draws no dot for it', async () => {
     const el = await render(

@@ -1,5 +1,12 @@
 import { AXIS_LABEL, ChartCard, ChartTable, LegendKey, VALUE_LABEL, VIEW, formatNumber, niceScale, tickShown, type ChartTableProps } from './chart-table'
 
+/** Insets a partial bar so its 2px outline sits inside the slot, never collapsing a nonzero bar to nothing on dense ranges. */
+function outlined(x: number, y: number, width: number, height: number) {
+  const dx = Math.min(1, width / 4)
+  const dy = Math.min(1, height / 4)
+  return { x: x + dx, y: y + dy, width: width - 2 * dx, height: height - 2 * dy }
+}
+
 /** Daily bars in brand; today's partial day is outlined, with direct labels on the peak and on today only. */
 export function BarChart({ title, summary, unit, points, legend, format = formatNumber, table, strip }: {
   title: string
@@ -78,21 +85,13 @@ export function BarChart({ title, summary, unit, points, legend, format = format
           return (
             <g key={i}>
               {p.partial ? (
-                <rect
-                  x={x + 1}
-                  y={top + 1}
-                  width={Math.max(barWidth - 2, 0)}
-                  height={Math.max(height - 2, 0)}
-                  rx={2}
-                  strokeWidth={2}
-                  className="fill-surface-card stroke-brand"
-                />
+                <rect {...outlined(x, top, barWidth, height)} rx={2} strokeWidth={2} className="fill-surface-card stroke-brand" />
               ) : (
                 <rect x={x} y={top} width={barWidth} height={height} rx={2} className="fill-brand" />
               )}
               {strip &&
                 (p.partial ? (
-                  <rect x={x + 1} y={sTop + 1} width={Math.max(barWidth - 2, 0)} height={Math.max(stripBottom - sTop - 2, 0)} rx={2} strokeWidth={2} className="fill-surface-card stroke-ink-muted" />
+                  <rect {...outlined(x, sTop, barWidth, stripBottom - sTop)} rx={2} strokeWidth={2} className="fill-surface-card stroke-ink-muted" />
                 ) : (
                   <rect x={x} y={sTop} width={barWidth} height={stripBottom - sTop} rx={2} className="fill-ink-muted" />
                 ))}
