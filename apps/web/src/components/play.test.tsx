@@ -590,6 +590,23 @@ it.each([
   } finally { await cleanup() }
 })
 
+it('keeps a failed End session and its Try again in a sticky bar below a question this app cannot show', async () => {
+  const { container, cleanup } = await renderPlay(false, false, 'mcq', false, { format: 'diagram' as ItemView['format'], options: [], stem: 'A long question. '.repeat(80) })
+  try {
+    vi.mocked(endSession).mockReset().mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValue({} as never)
+    await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="End session"]')!.click() })
+    const alert = container.querySelector('[role="alert"]')!
+    // Outside the scrolling form and pinned to the bottom, so a long question cannot push it below the fold.
+    expect(alert.closest('form#play')).toBeNull()
+    const bar = alert.closest('.sticky')!
+    expect(bar.classList).toContain('bottom-0')
+    expect(bar.contains(button(container, 'Try again'))).toBe(true)
+    await act(async () => { button(container, 'Try again').click() })
+    expect(endSession).toHaveBeenCalledTimes(2)
+    expect(container.textContent).toContain('Today page')
+  } finally { await cleanup() }
+})
+
 it('locks the answer and confidence while a check is in flight, so Try again sends what is shown', async () => {
   const { container, cleanup } = await renderPlay(false, false, 'mcq')
   try {
