@@ -182,6 +182,20 @@ it('replaces a document with version 2, retires its items and requeues the conce
   expect(state.background).toHaveLength(1)
 })
 
+it('drops the misconceptions drawn from the old version, so reveals stop correcting what V2 now requires', async () => {
+  seedV1()
+  sqlite.prepare("UPDATE concepts SET misconceptions_json = ? WHERE id = 'con-1'").run(JSON.stringify(['Placing 8 cones is enough']))
+  beforeSql = {
+    prefix: 'insert into "sources"',
+    fn: () => sqlite.prepare("INSERT INTO concepts (id, topic_id, unit_id, `order`, name, summary, source_id, misconceptions_json, gen_status) VALUES ('con-late', 'topic-role-a', 'unit-1', 1, 'Late', 'Late', 'src-1', '[\"Placing 8 cones is enough\"]', 'ready')").run(),
+  }
+  await uploadRoleDocument({ data: form({ replacesId: 'src-1', text: 'Place 8 cones around the dock.' }) })
+  expect(sqlite.prepare('SELECT id, misconceptions_json FROM concepts ORDER BY id').all()).toEqual([
+    { id: 'con-1', misconceptions_json: '[]' },
+    { id: 'con-late', misconceptions_json: '[]' },
+  ])
+})
+
 it('refuses a replacement while the curriculum is generating', async () => {
   seedV1('generating')
   await expect(uploadRoleDocument({ data: form({ replacesId: 'src-1', text: 'New text.' }) })).rejects.toMatchObject({ status: 409 })
