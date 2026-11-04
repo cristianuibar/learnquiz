@@ -124,6 +124,15 @@ async function submitSignIn() {
   expect(getToken()).toBe('token-a')
 }
 
+test('first-time learners can open web sign-up from Sign in', async () => {
+  await renderRouter('src/app', { initialUrl: '/sign-in' })
+  expect(screen.getByText('New to Learn Quiz? Create your account on the web, then sign in here.')).toBeOnTheScreen()
+  await fireEvent.press(screen.getByRole('button', { name: 'Open web sign-up, opens browser' }))
+  expect(Linking.openURL).toHaveBeenCalledWith('https://app.learnquiz.com/sign-in')
+  expect(screen.getByLabelText('Email')).toBeOnTheScreen()
+  expect(screen.getByLabelText('Password')).toBeOnTheScreen()
+})
+
 test("the layout leaves '/' to index even when its effect sees '/' before index's focus", async () => {
   const navigation = renderRouter('src/app', { initialUrl: '/sign-in' })
   await navigation

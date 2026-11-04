@@ -15,6 +15,8 @@ type State = {
   user: SessionUser | null
   needsDisclosure: boolean
   branding: Branding | null
+  // Optional for sessions cached by an older bundle, before membership was retained.
+  companyMember?: boolean
   // The stored session is shown without the server (no signal or a 5xx); user is
   // null when no session was confirmed on this phone yet. Retried on foreground.
   offline?: boolean
@@ -31,7 +33,7 @@ const SessionContext = createContext<Session | null>(null)
 // under: owner is a fingerprint of that token, never the token. It is an `lq:`
 // key, so sign-out and 401 cleanup erase it with the rest of the learner's data.
 const SESSION_KEY = 'lq:session'
-type SessionView = Pick<SessionResponse, 'needsDisclosure'> & { user: SessionUser; branding: Branding | null }
+type SessionView = Pick<SessionResponse, 'needsDisclosure'> & { user: SessionUser; branding: Branding | null; companyMember?: boolean }
 type StoredSession = SessionView & { owner: string }
 
 // Moves on sign-out and a 401 (both emit signedOut) and on a user switch, always
@@ -118,7 +120,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       token = await loadToken()
       if (current !== request.current) return
       if (!token) { setState(signedOut); return }
-      let session: Pick<SessionResponse, 'user' | 'needsDisclosure'>
+      let session: Pick<SessionResponse, 'user' | 'needsDisclosure' | 'companyMember'>
       try {
         session = await api<SessionResponse>('/session')
       } catch (error) {
@@ -130,7 +132,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         stored.current = last
         offline.current = true
         setState({ status: 'ready', user: last?.user ?? null, needsDisclosure: last?.needsDisclosure ?? false,
-          branding: last?.branding ?? null, offline: true, bearer: token })
+          branding: last?.branding ?? null, companyMember: last?.companyMember ?? (last?.branding ? true : undefined),
+          offline: true, bearer: token })
         return
       }
       if (stale()) return
@@ -155,7 +158,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         branding = last?.user.id === user.id ? last.branding : null
       }
       if (stale()) return
-      const next = { user, needsDisclosure: session.needsDisclosure, branding }
+      const next = { user, needsDisclosure: session.needsDisclosure, branding, companyMember: session.companyMember }
       const saved = await saveStored(token, next, epoch)
       if (stale()) return
       stored.current = saved

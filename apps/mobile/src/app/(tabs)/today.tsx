@@ -8,11 +8,12 @@ import { OfflineLead, TodayNotice } from '@/components/today/Notice'
 import { QuestCard } from '@/components/today/QuestCard'
 import { RoleCard } from '@/components/today/RoleCard'
 import { TodayTopBar } from '@/components/today/TodayTopBar'
-import { endSession } from '@/lib/session-store'
+import { endSession, useSession } from '@/lib/session-store'
 import { PLAY_LOADING, playParams, useStreakPop, useToday } from '@/lib/today'
 import { useTheme } from '@/theme/ThemeProvider'
 
 export default function TodayScreen() {
+  const { companyMember } = useSession()
   const { today, view, status, refreshing, refresh } = useToday({ monitorConnectivity: true })
   const { colors, space } = useTheme()
   const insets = useSafeAreaInsets()
@@ -94,7 +95,7 @@ export default function TodayScreen() {
         {!view ? (
           <Skeleton />
         ) : view.hero.kind === 'empty' ? (
-          <EmptyState onRetry={notice ? undefined : retry} onSignOut={() => { void endSession() }} />
+          <EmptyState companyMember={companyMember === true} onRetry={notice ? undefined : retry} onSignOut={() => { void endSession() }} />
         ) : status === 'offline' ? (
           <>
             <OfflineLead hero={view.hero} onPlay={play} />
