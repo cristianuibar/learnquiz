@@ -1,15 +1,16 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, count, eq, exists, getTableColumns, gte, inArray, isNull, lt, lte, ne, sql, type SQL } from 'drizzle-orm'
+import { and, asc, count, eq, exists, getTableColumns, gte, inArray, isNotNull, isNull, lt, lte, ne, sql, type SQL } from 'drizzle-orm'
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core'
 import { z } from 'zod'
 import { getDb, type Db } from '@/db'
 import { member } from '@/db/auth-schema'
-import { attempts, concepts, itemFlags, items, jobRoles, learnerConcept, learnerItem, learnerTopic, learnerUnit, memberRoleAssignments, placements, pushLog, sessions, sources, topics, units } from '@/db/schema'
+import { attempts, concepts, itemFlags, items, jobRoles, learnerConcept, learnerItem, learnerTopic, learnerUnit, memberRoleAssignments, modelCalls, placements, pushLog, sessions, sources, topics, units } from '@/db/schema'
 import { BKT, guessFor, MASTERY, placementPrior, update } from '@/lib/learning/bkt'
 import { ratingFor, retrievability, review } from '@/lib/learning/fsrs'
 import { gradeAnswer, revealState, toItemView } from '@/lib/learning/grade'
 import { levelResult, nextLevel, pickNext, PLACEMENT, shouldStop } from '@/lib/learning/placement'
 import { composeSession, reinsert, SESSION_BONUS, streakAfter, xpFor } from '@/lib/learning/session'
+import { museModelIds } from '@learnquiz/api/models'
 import { reportReasons } from '@learnquiz/api/reveal'
 import type { Confidence, ItemView, Reveal, SessionPlanning, SessionView, SummaryView } from '@learnquiz/api'
 import { chatJson, chatJsonWithModel, DailyCapError, isVoiceEnabled, jobModel, transcribeAudio } from '@/lib/llm/client'
@@ -1001,7 +1002,7 @@ async function finalise(db: Db, learnerId: string, session: SessionRow, topic: T
 
 async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: TopicRow): Promise<SummaryView> {
   const plan = readPlan(session)
-  const [lt, [{ total }], wrong, mastery, frontier, [{ reviews }], reviewsLeft, role, [placement]] = await Promise.all([
+  const [lt, [{ total }], wrong, mastery, frontier, [{ reviews }], reviewsLeft, role, [placement], askedBy, calledModels] = await Promise.all([
     loadLearnerTopic(db, learnerId, topic.id),
     db.select({ total: count() }).from(attempts).where(eq(attempts.sessionId, session.id)),
     db
@@ -1025,6 +1026,17 @@ async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: 
       .select({ logJson: placements.logJson })
       .from(placements)
       .where(and(eq(placements.id, session.id), eq(placements.learnerId, learnerId))),
+    db
+      .selectDistinct({ model: items.generatedBy })
+      .from(attempts)
+      .innerJoin(items, eq(items.id, attempts.itemId))
+      .where(and(eq(attempts.sessionId, session.id), eq(attempts.learnerId, learnerId), isNotNull(items.generatedBy))),
+    // The calls the session's model trace lists, minus voice: transcribing the learner's answer generates nothing shown.
+    db
+      .select({ model: modelCalls.model })
+      .from(modelCalls)
+      .where(and(eq(modelCalls.sessionId, session.id), eq(modelCalls.learnerId, learnerId), eq(modelCalls.ok, true), ne(modelCalls.purpose, 'voice')))
+      .orderBy(asc(modelCalls.createdAt), asc(modelCalls.id)),
   ])
 
   const stored = placement ? (JSON.parse(placement.logJson) as { log?: { level: number }[]; levelLine?: string; levelLineModel?: string }) : null
@@ -1065,6 +1077,7 @@ async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: 
       .filter((u) => u.unitId in before && Math.round(u.mastery * 100) !== Math.round(before[u.unitId] * 100)) // shown as whole percents
       .map((u) => ({ unitId: u.unitId, unitName: u.unitName, before: before[u.unitId], after: u.mastery })),
     mistakes: [...mistakes.values()],
+    models: museModelIds([...askedBy.map((r) => r.model), ...calledModels.map((r) => r.model)]),
     benchmark: role?.benchmark ?? null,
     reviewsLeft,
     nextLine: firstSure ? `${line} ${firstSure.conceptName} comes back first.` : line,
