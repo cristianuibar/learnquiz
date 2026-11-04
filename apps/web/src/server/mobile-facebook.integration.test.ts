@@ -83,12 +83,11 @@ async function successfulOAuth(jar: ReturnType<typeof browser>, unrelatedCookie?
   expect(oauth.status).toBe(302)
   expect(oauth.headers.get('Location')).toBe(`https://app.learnquiz.com/api/v1/auth/facebook/callback?state=${pending.state}`)
   jar.collect(oauth)
-  // The successful OAuth response itself already expires mobile session cookies.
-  expect(oauth.headers.getSetCookie().some((value) => value.startsWith('__Secure-better-auth.session_token=;') && value.includes('Max-Age=0'))).toBe(true)
+  // The mobile handoff must not touch the browser's session cookies at all.
+  expect(oauth.headers.getSetCookie().filter((value) => /better-auth\.session_(token|data)/.test(value) || value.includes('dont_remember'))).toEqual([])
   const callback = await call(`/facebook/callback?state=${pending.state}`, { headers: { Cookie: [jar.headers().Cookie, unrelatedCookie].filter(Boolean).join('; ') } })
   expect(callback.status).toBe(302)
   jar.collect(callback)
-  expect(jar.headers().Cookie).not.toContain('better-auth.session_token')
   expect(callback.headers.getSetCookie().filter((value) => /better-auth\.session_(token|data)=/.test(value))).toEqual([])
   const deepLink = new URL(callback.headers.get('Location')!)
   const exchange = await call('/facebook/exchange', post({ code: deepLink.searchParams.get('facebookCode'), verifier: pending.verifier, redirectUri: MOBILE_AUTH_REDIRECT }))
@@ -106,8 +105,31 @@ async function successfulOAuth(jar: ReturnType<typeof browser>, unrelatedCookie?
   return { ...result, oldCookie }
 }
 
-it('completes real Better Auth OAuth and clears browser cookies while preserving the app bearer', async () => {
-  await successfulOAuth(browser())
+it('completes real Better Auth OAuth, leaves the browser without a session and preserves the app bearer', async () => {
+  const jar = browser()
+  await successfulOAuth(jar)
+  expect(jar.headers().Cookie).not.toContain('better-auth.session_token')
+})
+
+it.each(['anonymous', 'email'])('keeps the browser\'s existing %s web session through a mobile Facebook handoff', async (kind) => {
+  const jar = browser()
+  const auth = createAuth()
+  const original = kind === 'anonymous'
+    ? await auth.api.signInAnonymous({ asResponse: true })
+    : await auth.api.signUpEmail({ body: { email: 'web@example.com', password: 'password123', name: 'Web Learner' }, asResponse: true })
+  expect(original.status).toBe(200)
+  jar.collect(original)
+  const before = await auth.api.getSession({ headers: new Headers(jar.headers()) })
+  expect(before?.user.isAnonymous ?? false).toBe(kind === 'anonymous')
+  const cookies = jar.headers().Cookie
+  const result = await successfulOAuth(jar)
+  expect(result.user.id).not.toBe(before!.user.id)
+  expect(jar.headers().Cookie).toBe(cookies)
+  const after = await createAuth().api.getSession({ headers: new Headers(jar.headers()) })
+  expect(after?.user.id).toBe(before!.user.id)
+  expect(after?.session.token).toBe(before!.session.token)
+  expect(after?.user.isAnonymous ?? false).toBe(kind === 'anonymous')
+  expect(raw.prepare('SELECT COUNT(*) AS n FROM user WHERE id = ?').get(before!.user.id)).toMatchObject({ n: 1 })
 })
 
 it.each([false, true])('rejects an attacker OAuth leg naming the victim callback (forged additionalData: %s), then hands off the victim account', async (forgeNonce) => {
@@ -177,6 +199,27 @@ it.each([
   expect(response.headers.getSetCookie().filter((value) => /better-auth\.session_(token|data)=/.test(value))).toEqual([])
   jar.collect(response)
   expect((await createAuth().api.getSession({ headers: new Headers(jar.headers()) }))?.user.email).toBe('web@example.com')
+})
+
+it('refuses a cross-site start of an attacker flow and leaves the victim web session and the flow untouched', async () => {
+  const victim = browser()
+  const signup = await createAuth().api.signUpEmail({ body: { email: 'web@example.com', password: 'password123', name: 'Web Learner' }, asResponse: true })
+  expect(signup.status).toBe(200)
+  victim.collect(signup)
+  const fetch = vi.fn(() => { throw new Error('No provider calls allowed') })
+  vi.stubGlobal('fetch', fetch)
+  const pending = await (await call('/facebook/prepare', post({ redirectUri: MOBILE_AUTH_REDIRECT }))).json() as { state: string }
+  const response = await call(`/facebook/start?state=${pending.state}`, { headers: { ...victim.headers(), 'Sec-Fetch-Site': 'cross-site' } })
+  expect(response.status).toBe(302)
+  const location = new URL(response.headers.get('Location')!)
+  expect(location.protocol).toBe('learnquiz:')
+  expect(location.searchParams.get('facebookError')).toBe('expired')
+  expect(response.headers.getSetCookie().filter((value) => /^(__Secure-)?better-auth\.(state|session_)/.test(value))).toEqual([])
+  victim.collect(response)
+  expect((await createAuth().api.getSession({ headers: new Headers(victim.headers()) }))?.user.email).toBe('web@example.com')
+  const flow = JSON.parse((raw.prepare('SELECT value FROM verification WHERE id = ?').get(`mobile-facebook:flow:${pending.state}`) as { value: string }).value)
+  expect(flow.browserHash).toBeUndefined()
+  expect(fetch).not.toHaveBeenCalled()
 })
 
 it('cannot hand off a pre-existing email session without an OAuth leg', async () => {
