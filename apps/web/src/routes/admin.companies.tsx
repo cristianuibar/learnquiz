@@ -75,7 +75,7 @@ function Toolbar({ value, onChange, disabled, inputRef }: {
   inputRef?: RefObject<HTMLInputElement | null>
 }) {
   return (
-    <div role="search" className="border-b border-border p-4">
+    <div role="search">
       <SearchField
         ref={inputRef}
         label="Search companies"
@@ -129,25 +129,27 @@ function Companies() {
         {companies.length === 0 ? (
           <p>No companies have signed up yet.</p>
         ) : (
-          <DataTable
-            caption="Companies"
-            columns={columns}
-            rows={rows}
-            rowKey={(c) => c.id}
-            sort={sort}
-            onSort={onSort}
-            toolbar={<Toolbar value={input} onChange={setInput} inputRef={searchRef} />}
-            actions={(c) => (
-              <RowMenu
-                label={c.name}
-                items={[
-                  { label: 'Open company', onSelect: () => void navigate({ to: '/admin/companies/$slug', params: { slug: c.slug } }) },
-                  { label: 'View portal (read only)', onSelect: () => router.history.push(`/admin/companies/${c.slug}/portal`) },
-                ]}
-              />
-            )}
-            empty={<NoResults colSpan={7} clearLabel="Clear search" onClear={clear} searchRef={searchRef}>No companies match</NoResults>}
-          />
+          <>
+            <Toolbar value={input} onChange={setInput} inputRef={searchRef} />
+            <DataTable
+              caption="Companies"
+              columns={columns}
+              rows={rows}
+              rowKey={(c) => c.id}
+              sort={sort}
+              onSort={onSort}
+              actions={(c) => (
+                <RowMenu
+                  label={c.name}
+                  items={[
+                    { label: 'Open company', onSelect: () => void navigate({ to: '/admin/companies/$slug', params: { slug: c.slug } }) },
+                    { label: 'View portal (read only)', onSelect: () => router.history.push(`/admin/companies/${c.slug}/portal`) },
+                  ]}
+                />
+              )}
+              empty={<NoResults colSpan={7} clearLabel="Clear search" onClear={clear} searchRef={searchRef}>No companies match</NoResults>}
+            />
+          </>
         )}
       </Page>
     </div>
@@ -170,6 +172,7 @@ function CompaniesLoading() {
           <PageHeader title="Companies" />
           <Skel className="h-3 w-[88px]" />
         </div>
+        <Toolbar value="" disabled />
         <DataTable
           caption="Companies"
           columns={columns}
@@ -178,7 +181,6 @@ function CompaniesLoading() {
           sort={DEFAULT_SORT}
           loading={{ rows: 8, status: 'Loading companies' }}
           actions={() => null}
-          toolbar={<Toolbar value="" disabled />}
         />
       </Page>
     </div>

@@ -172,6 +172,34 @@ function Users() {
         )}
       </div>
       {failure && <Banner kind="alert">{failure}</Banner>}
+      <div className="flex flex-wrap items-center gap-3">
+        <form
+          role="search"
+          className="min-w-0 max-w-[400px] flex-1 basis-64"
+          onSubmit={(event) => {
+            event.preventDefault()
+            go({ search: query.trim() })
+          }}
+        >
+          <SearchField ref={searchRef} name="search" label="Search by email or name" value={query} onChange={(e) => setQuery(e.target.value)} maxLength={200} className="max-w-none" />
+        </form>
+        <label className="flex items-center gap-2">
+          <span className="text-label">Global role</span>
+          <Select className="w-32" value={search.role} onChange={(e) => go({ role: e.target.value as typeof search.role })}>
+            <option value="all">All</option>
+            <option value="admin">Admin</option>
+            <option value="user">User</option>
+          </Select>
+        </label>
+        <label className="flex items-center gap-2">
+          <span className="text-label">Status</span>
+          <Select className="w-32" value={search.status} onChange={(e) => go({ status: e.target.value as typeof search.status })}>
+            <option value="all">All</option>
+            <option value="active">Active</option>
+            <option value="banned">Banned</option>
+          </Select>
+        </label>
+      </div>
       <DataTable
         caption="Users"
         columns={columns}
@@ -182,36 +210,6 @@ function Users() {
           const sort = key as Search['sort']
           go({ sort, dir: sort === search.sort ? (search.dir === 'ascending' ? 'descending' : 'ascending') : sort === 'name' ? 'ascending' : 'descending' })
         }}
-        toolbar={
-          <div className="flex flex-wrap items-end gap-3 border-b border-border p-4">
-            <form
-              role="search"
-              className="min-w-0 flex-1 basis-64"
-              onSubmit={(event) => {
-                event.preventDefault()
-                go({ search: query.trim() })
-              }}
-            >
-              <SearchField ref={searchRef} name="search" label="Search by email or name" value={query} onChange={(e) => setQuery(e.target.value)} maxLength={200} className="max-w-none" />
-            </form>
-            <label className="flex flex-col gap-1">
-              <span className="text-label">Global role</span>
-              <Select value={search.role} onChange={(e) => go({ role: e.target.value as typeof search.role })}>
-                <option value="all">All</option>
-                <option value="admin">Admin</option>
-                <option value="user">User</option>
-              </Select>
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-label">Status</span>
-              <Select value={search.status} onChange={(e) => go({ status: e.target.value as typeof search.status })}>
-                <option value="all">All</option>
-                <option value="active">Active</option>
-                <option value="banned">Banned</option>
-              </Select>
-            </label>
-          </div>
-        }
         empty={
           search.offset > 0 ? (
             <tr role="row">
