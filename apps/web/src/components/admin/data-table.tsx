@@ -259,7 +259,8 @@ export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSo
                 ))}
                 {actions && (
                   <td role="cell" className={cn(td, 'text-right', bg, stack && 'max-md:col-start-3 max-md:row-start-1 max-md:block max-md:h-auto max-md:border-0 max-md:p-0')}>
-                    {actions(row)}
+                    {/* Pulls the 44px menu button into the padding so the row keeps the 56px skeleton height. */}
+                    <div className={cn('-my-1.5', stack && 'max-md:my-0')}>{actions(row)}</div>
                   </td>
                 )}
               </tr>
