@@ -12,7 +12,7 @@ vi.mock('@/server/push', () => ({ getPushSettings: vi.fn(), subscribe: vi.fn(), 
 const window_ = { startMinute: 540, endMinute: 1020, days: [1, 2, 3, 4, 5], timezone: 'UTC', source: 'default' as const }
 const prefs = { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' }
 const settings = (schedule: Partial<{ phase: 'onboarding' | 'steady'; preview: string | null }> = {}) => ({
-  publicKey: 'cHVibGljLWtleQ', isStaff: false, endpoints: ['https://push.example/old'], canPrompt: true, prefs,
+  publicKey: 'cHVibGljLWtleQ', isStaff: false, endpoints: ['https://push.example/old'], canPrompt: true, prefs: { ...prefs, days: [1, 2, 3, 4, 5] }, company: null,
   schedule: { window: window_, dailyCap: 5, steadyCap: 2, phase: 'onboarding' as const, preview: 'Which valve closes first?', ...schedule },
 })
 

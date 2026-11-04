@@ -284,6 +284,7 @@ export const pushPrefs = sqliteTable('push_prefs', {
   startMinute: integer('start_minute').notNull().default(540),
   endMinute: integer('end_minute').notNull().default(1020),
   timezone: text('timezone').notNull().default('UTC'),
+  days: text('days_json', { mode: 'json' }).$type<number[]>(), // null follows the company's days
   updatedAt: integer('updated_at').notNull(),
 })
 
