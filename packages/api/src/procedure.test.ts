@@ -82,4 +82,12 @@ describe('describeProcedure', () => {
     expect(text).toContain('If yes, go to step 3, Label y')
     expect(text).toContain('If no, go to step 4, Label n')
   })
+
+  it('does not double the question mark on a decision label that already has one', () => {
+    const graph: ProcedureGraph = {
+      nodes: [{ id: 'd', kind: 'decision', label: 'Is stock available?', critical: false }, node('y')],
+      edges: [{ from: 'd', to: 'y', label: 'yes' }],
+    }
+    expect(describeProcedure(graph).split('\n')[0]).toBe('1. Is stock available? If yes, go to step 2, Label y.')
+  })
 })
