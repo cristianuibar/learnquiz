@@ -81,6 +81,7 @@ export class VoiceAnswerController {
   private pending: Uint8Array | null = null
   private request: AbortController | null = null
   private run = 0 // bumps on every discard so late async results are dropped
+  private starting: number | null = null // the run of a microphone start still in flight
   private lastLevelAt = -Infinity
   private disabled = false
 
@@ -103,6 +104,8 @@ export class VoiceAnswerController {
   tap() {
     if (this.state.step === 'recording') return this.finish()
     if (this.disabled || !this.state.available) return
+    // A cancelled start that has not settled yet still owns the stream; wait for it.
+    if (this.starting !== null) return
     if (this.state.step === 'idle' || this.state.step === 'review') void this.start()
   }
 
@@ -145,9 +148,10 @@ export class VoiceAnswerController {
   }
 
   // The app left the foreground. Android's permission dialog pauses the app
-  // too, so a pending permission request is kept; anything recorded is dropped.
+  // too, so a pending permission request is kept. A microphone start in flight,
+  // a recording or a transcription is dropped.
   background(): boolean {
-    return this.state.step === 'requesting' ? false : this.discard()
+    return this.state.step === 'requesting' && this.starting === null ? false : this.discard()
   }
 
   // Background, End session or Back: drop the recording and free the microphone.
@@ -195,11 +199,17 @@ export class VoiceAnswerController {
     this.seconds = 0
     this.pending = null
     this.lastLevelAt = -Infinity
+    // The start is its own attempt: Background, Back or End session while it
+    // is in flight bump the run, and a start that lands after that is stopped
+    // at once instead of recording.
+    this.starting = run
     try {
       await this.ports.start()
     } catch {
       if (run === this.run) this.fail(false)
       return
+    } finally {
+      this.starting = null
     }
     if (run !== this.run) {
       this.ports.stop()

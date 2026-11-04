@@ -1,4 +1,4 @@
-import { useCallback, useRef, type Ref } from 'react'
+import { useCallback, useEffect, useRef, type Ref } from 'react'
 import { AccessibilityInfo, findNodeHandle, Linking, Pressable, View, type TextInput } from 'react-native'
 import { Mic } from 'lucide-react-native'
 import { useReducedMotion } from 'react-native-reanimated'
@@ -47,7 +47,7 @@ function TypedAnswer({ answer, onAnswer, marks, disabled, fieldRef }: QuestionBo
 }
 
 function VoiceAnswer(props: QuestionBodyProps & { sessionId: string }) {
-  const { item, answer, onAnswer, marks, disabled, sessionId } = props
+  const { item, answer, onAnswer, marks, disabled, sessionId, onVoiceCapture } = props
   const { colors, space } = useTheme()
   const reducedMotion = useReducedMotion()
   const readOnly = disabled || marks !== null
@@ -71,6 +71,14 @@ function VoiceAnswer(props: QuestionBodyProps & { sessionId: string }) {
     disabled: readOnly,
     focus,
   })
+
+  const capturing = state.step === 'requesting' || state.step === 'recording' || state.step === 'transcribing'
+  const captureChanged = useRef(onVoiceCapture)
+  captureChanged.current = onVoiceCapture
+  useEffect(() => {
+    captureChanged.current?.(capturing)
+  }, [capturing])
+  useEffect(() => () => captureChanged.current?.(false), [])
 
   if (!state.available) return <TypedAnswer {...props} fieldRef={fieldRef} />
   const step = marks !== null ? 'review' : state.step
