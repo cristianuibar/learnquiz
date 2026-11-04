@@ -40,8 +40,9 @@ async function renderApp(entry: string) {
   const play = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId', component: () => <main>One question</main> })
   const signIn = createRoute({ getParentRoute: () => rootRoute, path: '/sign-in', validateSearch: signInRoute.options.validateSearch, component: () => <main>Sign in</main> })
   const me = createRoute({ getParentRoute: () => rootRoute, path: '/me', beforeLoad: meRoute.options.beforeLoad, loader: meRoute.options.loader, component: meRoute.options.component })
+  const today = createRoute({ getParentRoute: () => rootRoute, path: '/today', component: () => <main>Today stub</main> })
   const optIn = createRoute({ getParentRoute: () => rootRoute, path: '/opt-in', beforeLoad: optInRoute.options.beforeLoad, loader: optInRoute.options.loader, component: optInRoute.options.component })
-  const router = createRouter({ routeTree: rootRoute.addChildren([done, quick, play, signIn, me, optIn]), history: createMemoryHistory({ initialEntries: [entry] }) })
+  const router = createRouter({ routeTree: rootRoute.addChildren([done, quick, play, signIn, me, optIn, today]), history: createMemoryHistory({ initialEntries: [entry] }) })
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -64,13 +65,14 @@ it.each([
   const { container, router, cleanup } = await renderApp('/play/s1/done')
   try {
     expect(container.querySelector('h1')?.textContent).toContain('Session done')
-    const next = container.querySelector<HTMLAnchorElement>('a[href="/opt-in"]')
-    expect(Boolean(next)).toBe(expected)
-    if (next) {
-      await act(async () => next.click())
-      expect(router.state.location.pathname).toBe('/opt-in')
-      expect(container.querySelector('h1')?.textContent).toBe('Get a question during your shift?')
-    }
+    const next = [...container.querySelectorAll<HTMLAnchorElement>('a')].find((a) => a.textContent === 'Continue')
+    const path = expected ? '/opt-in' : '/today'
+    expect(next?.getAttribute('href')).toBe(path)
+    expect([...container.querySelectorAll('button')].some((b) => /turn on|notification/i.test(b.textContent ?? ''))).toBe(false)
+    await act(async () => next?.click())
+    expect(router.state.location.pathname).toBe(path)
+    if (expected) expect(container.querySelector('h1')?.textContent).toBe('Get a question during your shift?')
+    else expect(container.textContent).toContain('Today stub')
     expect(requestPermission).not.toHaveBeenCalled()
   } finally { await cleanup() }
 })
@@ -82,8 +84,8 @@ it.each([0, 3])('shows the not-graded count on the summary only when answers wer
     prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' }, schedule })
   const { container, cleanup } = await renderApp('/play/s1/done')
   try {
-    const score = [...container.querySelectorAll('span')].find((span) => span.textContent?.startsWith('9 of 10 correct'))
-    expect(score?.textContent).toBe(ungraded ? '9 of 10 correct · 3 not graded' : '9 of 10 correct')
+    const score = [...container.querySelectorAll('p')].find((p) => p.textContent?.startsWith('9 of 10 correct'))
+    expect(score?.textContent).toBe(ungraded ? '9 of 10 correct · 0:01 · 3 not graded' : '9 of 10 correct · 0:01')
   } finally { await cleanup() }
 })
 
@@ -94,8 +96,28 @@ it.each([true, false])('explains a placement that ended early only when it did (
     prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' }, schedule })
   const { container, cleanup } = await renderApp('/play/s1/done')
   try {
-    expect(container.querySelector('h1')?.textContent).toContain('level 3')
+    expect(container.querySelector('h1')?.textContent).toBe("You're at level 3 of 5")
     expect(container.textContent?.includes('Placement stopped early: it had enough answers to place you.')).toBe(endedEarly)
+  } finally { await cleanup() }
+})
+
+it('keeps mistakes collapsed until the disclosure is opened', async () => {
+  vi.mocked(endSession).mockResolvedValue({ sessionId: 's1', kind: 'session', topicId: 't1', durationMs: 1000, correct: 9, total: 10, ungraded: 0, xp: 0,
+    streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], benchmark: null, reviewsLeft: 0, nextLine: 'Come back soon.', endedEarly: false,
+    mistakes: [{ itemId: 'i1', conceptName: 'Pallet checks', stem: 'x', correctAnswer: 'y', wasSure: true, generatedBy: null }] } satisfies SummaryView)
+  vi.mocked(getPushSettings).mockResolvedValue({ publicKey: 'public-key', isStaff: false, endpoints: [], canPrompt: false,
+    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' }, schedule })
+  const { container, cleanup } = await renderApp('/play/s1/done')
+  try {
+    const toggle = [...container.querySelectorAll('button')].find((b) => b.textContent?.includes('Mistakes (1)'))
+    expect(toggle?.getAttribute('aria-expanded')).toBe('false')
+    const hiddenList = container.querySelector('a[href="/play/quick/i1"]')?.closest('[hidden]')
+    expect(hiddenList).not.toBeNull()
+    await act(async () => toggle?.click())
+    expect(toggle?.getAttribute('aria-expanded')).toBe('true')
+    const link = container.querySelector<HTMLAnchorElement>('a[href="/play/quick/i1"]')
+    expect(link?.getAttribute('aria-label')).toBe('Review: Pallet checks. You were sure')
+    expect(link?.closest('[hidden]')).toBeNull()
   } finally { await cleanup() }
 })
 

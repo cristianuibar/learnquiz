@@ -1,12 +1,12 @@
 import type { TodayStreak } from '@learnquiz/api/today'
 import { cn } from '@/lib/utils'
 
-export function StreakPill({ streak, variant = 'quiet' }: { streak: TodayStreak; variant?: 'quiet' | 'reward' }) {
+export function StreakPill({ streak, variant = 'quiet', popIn = false }: { streak: TodayStreak; variant?: 'quiet' | 'reward'; popIn?: boolean }) {
   return (
     <span
       className={cn(
         'inline-flex min-h-8 items-center gap-1 whitespace-nowrap rounded-full py-1 pl-2 pr-3 text-label tabular-nums',
-        variant === 'reward' ? 'bg-accent text-on-accent motion-safe:animate-pop-in' : 'border border-border bg-surface-card text-ink',
+        variant === 'reward' ? 'bg-accent text-on-accent motion-safe:animate-pop-in' : cn('border border-border bg-surface-card text-ink', popIn && 'motion-safe:animate-pop-in'),
       )}
     >
       <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
