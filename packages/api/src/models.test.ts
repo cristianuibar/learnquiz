@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { generatedByLine, modelDisplayName, museModelName } from './models.ts'
+import { generatedByLine, modelDisplayName, museModelIds, museModelName } from './models.ts'
 
 describe('museModelName', () => {
   it.each([
@@ -43,5 +43,13 @@ describe('generatedByLine', () => {
   it('is null when no Muse model is named', () => {
     expect(generatedByLine([])).toBeNull()
     expect(generatedByLine([null, undefined, 'gpt-4o'])).toBeNull()
+  })
+})
+
+describe('museModelIds', () => {
+  it('keeps each recorded Muse id once, in first-seen order, and drops the rest', () => {
+    expect(museModelIds(['muse-wonder-1.0', null, 'gpt-4o', 'accounts/fireworks/models/muse-glimmer', 'muse-wonder-1.0', undefined]))
+      .toEqual(['muse-wonder-1.0', 'accounts/fireworks/models/muse-glimmer'])
+    expect(museModelIds([])).toEqual([])
   })
 })

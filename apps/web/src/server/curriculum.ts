@@ -1,8 +1,8 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, count, desc, eq, ne } from 'drizzle-orm'
+import { and, asc, count, desc, eq, isNotNull, ne } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '@/db'
-import { conceptEdges, concepts, items, jobRoles, learnerConcept, learnerItem, learnerTopic, learnerUnit, memberRoleAssignments, placements, sources, topics, units } from '@/db/schema'
+import { conceptEdges, concepts, items, jobRoles, learnerConcept, learnerItem, learnerTopic, learnerUnit, memberRoleAssignments, modelCalls, placements, sources, topics, units } from '@/db/schema'
 import { validateSkeleton, fallbackSkeleton } from '@/lib/curriculum/validate'
 import { conceptStatus, roleMastery, unitState } from '@/lib/learning/path'
 import { onboardingDay } from '@/lib/learning/profile'
@@ -18,6 +18,7 @@ import { requireLearnerId } from '@/server/session'
 import { retryFailedConcept } from '@/server/concept-retry'
 import { learnerCanAccess, notFlaggedBy, rolePlayable, roleCompany, seedLearnerTopic } from '@/server/topic-access'
 import { loadFrontier } from '@/server/play'
+import { museModelIds } from '@learnquiz/api/models'
 import type { TopicPath } from '@learnquiz/api/progress'
 import { buildRoleCurriculum, curriculumWrites } from '@/server/role-curriculum'
 
@@ -121,7 +122,7 @@ export const getTopicPath = createServerFn({ method: 'GET' })
     const placeable = jobRoleId !== null ? await rolePlayable(db, topic) : true
     const company = jobRoleId !== null ? await roleCompany(db, jobRoleId) : null
 
-    const [unitRows, conceptRows, edges, counts, known, [lt], [placement], role, stored, frontier] = await Promise.all([
+    const [unitRows, conceptRows, edges, counts, known, [lt], [placement], role, stored, frontier, itemModels] = await Promise.all([
       db
         .select({ id: units.id, order: units.order, name: units.name, summary: units.summary, unlockedAt: learnerUnit.unlockedAt })
         .from(units)
@@ -170,7 +171,17 @@ export const getTopicPath = createServerFn({ method: 'GET' })
         .where(and(eq(items.topicId, topic.id), eq(items.status, 'active'), ne(items.format, 'short')))
         .groupBy(items.conceptId),
       loadFrontier(db, learnerId, topic.id),
+      db
+        .selectDistinct({ model: items.generatedBy })
+        .from(items)
+        .where(and(eq(items.topicId, topic.id), eq(items.status, 'active'), isNotNull(items.generatedBy))),
     ])
+    // model_calls has no topic index, so diagram calls are read only for a topic that has a diagram.
+    // Not scoped to the learner: a role topic's diagrams are generated outside the learner's sessions.
+    const diagramModels = conceptRows.some(({ concept }) => concept.imageKey)
+      ? await db.selectDistinct({ model: modelCalls.model }).from(modelCalls)
+        .where(and(eq(modelCalls.topicId, topic.id), eq(modelCalls.purpose, 'diagram'), eq(modelCalls.ok, true)))
+      : []
     const benchmark = role?.benchmark ?? 0.85
     const storedCount = new Map(stored.map((c) => [c.conceptId, c.n]))
     const pKnown = new Map(known.map((r) => [r.conceptId, r.pKnown]))
@@ -178,6 +189,7 @@ export const getTopicPath = createServerFn({ method: 'GET' })
     const answeredCount = new Map(counts.map((c) => [c.conceptId, c.n]))
     return {
       topic,
+      models: museModelIds([topic.generatedBy, ...itemModels.map((r) => r.model), ...diagramModels.map((r) => r.model)]),
       preparing,
       placeable,
       company,

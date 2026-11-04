@@ -98,6 +98,8 @@ export type SummaryView = {
   endedEarly: boolean // placement stopped before its question limit because it had enough answers
   masteryMoved: { unitId: string; unitName: string; before: number; after: number }[]
   mistakes: { itemId: string; conceptName: string; stem: string; correctAnswer: string; wasSure: boolean; generatedBy: string | null }[]
+  // Distinct Muse model ids behind the session's questions and its model calls (grading, planning). Older servers omit it.
+  models?: string[]
   benchmark: number | null // the role's benchmark; null for a personal topic
   reviewsLeft: number // active items due now on the topic after the session
   nextLine: string // coach: what happens next time

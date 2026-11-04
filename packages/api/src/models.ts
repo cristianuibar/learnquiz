@@ -21,6 +21,11 @@ export function museModelName(id: string | null | undefined): string | null {
   return MODEL_NAMES.get(bareId(id)) ?? null
 }
 
+// The recorded ids that name a Muse model, each once, in first-seen order.
+export function museModelIds(ids: readonly (string | null | undefined)[]): string[] {
+  return [...new Set(ids.filter((id): id is string => museModelName(id) !== null))]
+}
+
 // Display name for a recorded model id; an unknown id is shown as recorded, never guessed.
 export function modelDisplayName(id: string): string {
   return museModelName(id) ?? id

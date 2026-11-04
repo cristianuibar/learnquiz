@@ -3,6 +3,8 @@ export type ConceptStatus = 'mastered' | 'learning' | 'not_started'
 
 export type TopicPath = {
   topic: { id: string; title: string; goal: string | null; status: 'draft' | 'generating' | 'ready' | 'failed'; generatedBy: string | null }
+  // Distinct Muse model ids behind the curriculum, its questions and its diagrams. Older servers omit it.
+  models?: string[]
   preparing: boolean
   placeable: boolean
   company: string | null
