@@ -33,7 +33,7 @@ function SignIn() {
 
   return (
     <main className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pt-8 pb-16">
-      <h1 className="text-3xl font-bold tracking-tight">{heading}</h1>
+      <h1 className="text-title-1 text-ink">{heading}</h1>
       <CredentialsForm
         initial={initial}
         onModeChange={setMode}

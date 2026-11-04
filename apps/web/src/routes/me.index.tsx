@@ -40,7 +40,7 @@ function Me() {
   if (!user) return null
   return (
     <main className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pt-8 pb-8">
-      <h1 className="text-3xl font-bold tracking-tight">{user.isAnonymous ? 'Guest' : user.name}</h1>
+      <h1 className="text-title-1 text-ink">{user.isAnonymous ? 'Guest' : user.name}</h1>
       {user.isAnonymous && (
         <section aria-label="Your progress" className="flex flex-col gap-4">
           {today?.topic && (

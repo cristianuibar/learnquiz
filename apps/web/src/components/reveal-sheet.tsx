@@ -52,6 +52,7 @@ export function RevealSheet({
   item,
   answer,
   hasCompany,
+  basics,
   onContinue,
   onReport,
   busy,
@@ -64,6 +65,7 @@ export function RevealSheet({
   item: ItemView
   answer: Answer
   hasCompany: boolean
+  basics?: boolean
   onContinue(reflection: string): void
   onReport?(reflection: string): void // absent once a report has been sent
   busy?: boolean
@@ -72,7 +74,7 @@ export function RevealSheet({
   headingRef: Ref<HTMLHeadingElement>
   reportRef: Ref<HTMLButtonElement>
 }) {
-  const model = revealModel(reveal, { hasCompany })
+  const model = revealModel(reveal, { hasCompany, basics })
   const { variant } = model
   const tone = TONE[model.tone]
   const reflectionId = useId()
@@ -270,7 +272,7 @@ export function RevealSheet({
           disabled={busy}
           onClick={() => onContinue(variant === 'sureWrong' ? reflection.trim() : '')}
         >
-          {model.continueLabel}
+          Next question
         </Button>
         {onReport && (
           <Button

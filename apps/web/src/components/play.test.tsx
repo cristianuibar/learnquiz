@@ -35,7 +35,7 @@ beforeEach(() => {
 })
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); finishPermission = undefined; sessionStorage.clear() })
 
-async function renderPlay(voiceEnabled: boolean | null = true, permissionPending = false, format: 'cloze' | 'short' | 'mcq' = 'cloze', fromToday = false, overrides: Partial<ItemView> = {}) {
+async function renderPlay(voiceEnabled: boolean | null = true, permissionPending = false, format: 'cloze' | 'short' | 'mcq' = 'cloze', fromToday = false, overrides: Partial<ItemView> = {}, basics = false) {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   stopTrack = vi.fn()
   const mic = { getTracks: () => [{ stop: stopTrack }] } as unknown as MediaStream
@@ -67,6 +67,7 @@ async function renderPlay(voiceEnabled: boolean | null = true, permissionPending
   const initial: SessionView = {
     id: 's1', kind: 'session', topicId: 't1', topicTitle: 'Algebra', progress: { position: 1, total: 1 }, ended: false,
     ...(voiceEnabled === null ? {} : { voiceEnabled }),
+    ...(basics ? { basics } : {}),
     item: {
       id: 'i1', conceptId: 'c1', conceptName: 'Variables', format, difficulty: 1, generatedBy: 'gpt-test', image: null,
       stem: format === 'short' ? 'Explain why subtracting one preserves equality.' : format === 'mcq' ? 'x + 1 = 2; what is x?' : 'x + 1 = 2; x = ____',
@@ -127,7 +128,7 @@ it('keeps an unsent answer and confidence across a reload and clears them after 
     await act(async () => { button(reloaded.container, 'Check').click() })
     expect(answerItem).toHaveBeenCalledWith({ data: expect.objectContaining({ itemId: 'i1', answer: { text: 'one more' }, confidence: 'unsure' }) })
     expect(sessionStorage.length).toBe(0)
-    await act(async () => { button(reloaded.container, 'Continue').click() })
+    await act(async () => { button(reloaded.container, 'Next question').click() })
     expect(reloaded.container.querySelector<HTMLInputElement>('#answer')!.value).toBe('')
     expect(reloaded.container.querySelector<HTMLInputElement>('input[value="unsure"]')!.checked).toBe(false)
   } finally { await reloaded.cleanup() }
@@ -166,7 +167,7 @@ it.each([
       expect(document.querySelector('[role="dialog"]')!.textContent).toContain('Subtract one.')
     }
     await act(async () => {
-      const next = button(container, 'Continue')
+      const next = button(container, 'Next question')
       next.focus()
       next.click()
     })
@@ -227,7 +228,7 @@ it.each([
   })
   const { container, initial, cleanup } = await renderPlay(false)
   try {
-    expect(button(container, 'Model trace')).toBeUndefined()
+    expect(button(container, 'Show model trace')).toBeUndefined()
     await act(async () => {
       const input = container.querySelector<HTMLInputElement>('#answer')!
       type(input, '1')
@@ -236,8 +237,8 @@ it.each([
     await act(async () => { button(container, 'Check').click() })
     // The result sheet is modal, so the trace is reached on the screen after Continue.
     vi.mocked(nextItem).mockResolvedValueOnce({ ...initial, item: null })
-    await act(async () => { button(container, 'Continue').click() })
-    await act(async () => button(container, 'Model trace').click())
+    await act(async () => { button(container, 'Next question').click() })
+    await act(async () => button(container, 'Show model trace').click())
     expect(getModelTrace).toHaveBeenCalledWith({ data: { scope: 'session', sessionId: 's1' } })
     const dialog = document.querySelector('[role="dialog"]')!
     expect(dialog.textContent).toContain(planner)
@@ -255,10 +256,10 @@ it('keeps typed input after a transcription failure', async () => {
     const input = container.querySelector<HTMLTextAreaElement>('textarea#answer')!
     expect(document.activeElement).toBe(input)
     await act(async () => type(input, 'my draft'))
-    vi.mocked(transcribeAnswer).mockRejectedValueOnce(new Error('Voice transcription failed. Please try again.'))
+    vi.mocked(transcribeAnswer).mockRejectedValueOnce(new Error("Couldn't transcribe your answer. Record again or type it."))
     await click(button(container, 'Record again'))
     await click(byLabel(container, 'Stop recording'))
-    expect(container.querySelector('[role="alert"]')?.textContent).toBe('Voice transcription failed. Please try again.')
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe("Couldn't transcribe your answer. Record again or type it.")
     expect(container.querySelector<HTMLTextAreaElement>('textarea#answer')!.value).toBe('my draft')
     expect(container.querySelector<HTMLTextAreaElement>('textarea#answer')!.disabled).toBe(false)
   } finally { await cleanup() }
@@ -413,7 +414,7 @@ it.each([false, true])('submits a short answer and shows its reveal (ungraded=%s
       expect(dialog.textContent).toContain('Subtract the same amount from both sides.')
     }
     vi.mocked(nextItem).mockResolvedValueOnce({ ...initial, item: { ...initial.item!, id: 'i2', stem: 'Next question' } })
-    await act(async () => { button(container, ungraded ? 'Continue' : 'Got it').click() })
+    await act(async () => { button(container, 'Next question').click() })
     expect(nextItem).toHaveBeenCalledWith({ data: { sessionId: 's1', why: undefined } })
     expect(container.textContent).toContain('Next question')
   } finally { await cleanup() }
@@ -639,8 +640,8 @@ describe('reveal overlay', () => {
   } as unknown as Reveal
   const sureCorrect = { ...sureWrong, state: 'A', correct: true, xp: 10, sourceQuote: 'Quote', sourceTitle: 'Notes' } as unknown as Reveal
 
-  async function check(reveal: Reveal) {
-    const view = await renderPlay(false, false, 'mcq')
+  async function check(reveal: Reveal, basics = false) {
+    const view = await renderPlay(false, false, 'mcq', false, {}, basics)
     vi.mocked(answerItem).mockResolvedValueOnce(reveal)
     await act(async () => {
       view.container.querySelector<HTMLInputElement>('input[name="answer"]')!.click()
@@ -700,6 +701,14 @@ describe('reveal overlay', () => {
     } finally { await cleanup() }
   })
 
+  it('opens the Why disclosure immediately for a back-to-basics session', async () => {
+    const { cleanup } = await check(sureCorrect, true)
+    try {
+      expect(linkByText('Why').getAttribute('aria-expanded')).toBe('true')
+      expect(dialog()!.textContent).toContain('Add, then compare.')
+    } finally { await cleanup() }
+  })
+
   // The modal dialog aria-hides the page, so the announcement must land in a region a screen reader can hear.
   const heard = () => [...document.querySelectorAll('[role="status"]')].filter((n) => !n.closest('[aria-hidden="true"]')).map((n) => n.textContent)
   async function sendReport() {
@@ -744,7 +753,7 @@ describe('reveal overlay', () => {
     } finally { await cleanup() }
   })
 
-  it('returns to the result when continuing after a sent report fails, so Got it retries without reporting again', async () => {
+  it('returns to the result when continuing after a sent report fails, so Next question retries without reporting again', async () => {
     const { cleanup } = await check(sureWrong)
     try {
       vi.mocked(reportItem).mockReset().mockResolvedValue({} as never)
@@ -755,7 +764,7 @@ describe('reveal overlay', () => {
       await click(linkByText('Send report'))
       expect(dialog()!.querySelector('[role="alert"]')).not.toBeNull()
       expect(linkByText('Report this question')).toBeUndefined()
-      await click(linkByText('Got it'))
+      await click(linkByText('Next question'))
       expect(reportItem).toHaveBeenCalledTimes(1)
       expect(nextItem).toHaveBeenLastCalledWith({ data: { sessionId: 's1', why: 'Because it matters' } })
     } finally { await cleanup() }

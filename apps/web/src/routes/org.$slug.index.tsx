@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { RouteError } from '@/components/inline-error'
 import { getOrgOverview } from '@/server/org'
 
@@ -12,11 +12,11 @@ function Overview() {
   const org = Route.useLoaderData()
   const t = org.training
   return (
-    <main className="mx-auto w-full max-w-3xl px-4 pt-8 pb-16">
-      <h1 className="text-3xl font-bold tracking-tight">{org.name}</h1>
-      {org.readOnly && <p className="mt-4 text-muted-foreground">Staff view · Read only</p>}
-      <section className="mt-10" aria-labelledby="training-progress">
-        <h2 id="training-progress" className="text-xl font-semibold">Training progress</h2>
+    <main className="mx-auto w-full max-w-[1120px] px-4 pt-8 pb-16">
+      <h1 className="text-title-1 text-ink">{org.name}</h1>
+      {org.readOnly && <p className="mt-4 text-body text-ink-muted">Staff view · Read only</p>}
+      <section className="mt-8" aria-labelledby="training-progress">
+        <h2 id="training-progress" className="text-title-2">Training progress</h2>
         <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
           {[
             ['Employees', t.employees],
@@ -26,14 +26,21 @@ function Overview() {
             ['Documents waiting for review', t.documentsToReview],
           ].map(([label, value]) => (
             <div key={label} className="rounded-lg border p-4">
-              <dt className="text-sm text-muted-foreground">{label}</dt>
-              <dd className="text-2xl font-semibold">{value ?? '-'}</dd>
+              <dt className="text-caption text-ink-muted">{label}</dt>
+              <dd className="text-title-2 tabular-nums">{value ?? '-'}</dd>
             </div>
           ))}
         </dl>
       </section>
-      <section className="mt-10">
-        <h2 className="text-xl font-semibold">Job roles</h2>
+      <section className="mt-8">
+        <h2 className="text-title-2">Job roles</h2>
+        {org.roles.length === 0 ? (
+          <p className="mt-4 text-body text-ink-muted">
+            {org.readOnly ? 'No job roles yet.' : (
+              <Link to="/org/$slug/roles" params={{ slug: org.slug }} className="inline-flex min-h-11 items-center text-brand underline outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">Create your first job role.</Link>
+            )}
+          </p>
+        ) : (
         <ul className="mt-4 flex flex-col gap-2">
           {org.roles.map((r) => (
             <li key={r.id} className="font-medium">
@@ -41,6 +48,7 @@ function Overview() {
             </li>
           ))}
         </ul>
+        )}
       </section>
     </main>
   )

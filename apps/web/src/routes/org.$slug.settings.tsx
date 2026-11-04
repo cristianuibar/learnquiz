@@ -33,16 +33,16 @@ function Settings() {
       if (remove) remove.checked = false
       setSaved(true)
     } catch (err) {
-      setError(errorMessage(err, 'Could not save settings. Please try again.'))
+      setError(errorMessage(err, "Couldn't save settings. Check your connection and save again."))
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-4 pt-8 pb-16">
-      <h1 className="text-3xl font-bold tracking-tight">Company settings</h1>
-      <form className="mt-8 flex flex-col gap-6" onSubmit={save} onChange={() => setSaved(false)}>
+    <main className="mx-auto w-full max-w-[1120px] px-4 pt-8 pb-16">
+      <h1 className="text-title-1 text-ink">Company settings</h1>
+      <form className="mt-8 flex max-w-xl flex-col gap-6" onSubmit={save} onChange={() => setSaved(false)}>
         <input type="hidden" name="slug" value={settings.slug} />
         <div className="flex flex-col gap-2">
           <Label htmlFor="name">Company name</Label>
@@ -51,7 +51,7 @@ function Settings() {
         <div className="flex flex-col gap-2">
           <Label htmlFor="timezone">Timezone</Label>
           <Input id="timezone" name="timezone" defaultValue={settings.timezone} placeholder="Europe/London" maxLength={100} aria-describedby="timezone-help" required />
-          <p id="timezone-help" className="text-sm text-muted-foreground">Use a timezone such as Europe/London, America/New_York or UTC.</p>
+          <p id="timezone-help" className="text-caption text-ink-muted">Use a timezone such as Europe/London, America/New_York or UTC.</p>
         </div>
         <fieldset className="flex flex-col gap-3">
           <legend className="mb-3 font-medium">Working hours</legend>
@@ -73,21 +73,21 @@ function Settings() {
               <Input id="end" name="end" type="time" defaultValue={settings.workingHours.end} required />
             </div>
           </div>
-          <p className="text-sm text-muted-foreground">Times use the company timezone. The end time must be later on the same day.</p>
+          <p className="text-caption text-ink-muted">Times use the company timezone. The end time must be later on the same day.</p>
         </fieldset>
         <div className="flex flex-col gap-2">
           <Label htmlFor="logo">Company logo</Label>
           <Input id="logo" name="logo" type="file" accept="image/png,image/jpeg,image/webp" aria-describedby="logo-help" />
-          <p id="logo-help" className="text-sm text-muted-foreground">PNG, JPEG or WebP, up to 2 MB. Leave empty to keep the current logo.</p>
+          <p id="logo-help" className="text-caption text-ink-muted">PNG, JPEG or WebP, up to 2 MB. Leave empty to keep the current logo.</p>
           {settings.hasLogo && <label className="flex min-h-11 items-center gap-2"><input id="removeLogo" name="removeLogo" type="checkbox" className="size-4" />Remove current logo</label>}
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="accent">Accent color</Label>
           <Input id="accent" name="accent" defaultValue={settings.accent ?? ''} placeholder="#0E5A73" pattern="#[0-9a-fA-F]{6}" maxLength={7} aria-describedby="accent-help" />
-          <p id="accent-help" className="text-sm text-muted-foreground">Use a hex color such as #0E5A73. Green and red are reserved for answer feedback, and the color needs 4.5:1 contrast. Leave empty for the default brand.</p>
+          <p id="accent-help" className="text-caption text-ink-muted">Use a hex color such as #0E5A73. Green and red are reserved for answer feedback, so a green or red color is rejected. It needs 4.5:1 contrast against the page and its text. Leave empty for the default brand.</p>
         </div>
-        {error && <p role="alert" className="text-sm font-medium text-wrong">{error}</p>}
-        {saved && <p role="status" className="text-sm">Settings saved.</p>}
+        {error && <p role="alert" className="text-body font-medium text-wrong">{error}</p>}
+        {saved && <p role="status" className="text-body">Settings saved.</p>}
         <Button type="submit" className="self-end px-6" disabled={busy}>{busy ? 'Saving…' : 'Save settings'}</Button>
       </form>
     </main>

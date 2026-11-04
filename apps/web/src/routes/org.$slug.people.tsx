@@ -39,12 +39,12 @@ function InviteRow({ invite, link, isNew, onRevoke }: { invite: Invite; link: st
   return (
     <li ref={rowRef} className="scroll-m-4 flex flex-col gap-2 rounded-lg border p-4">
       <p className="font-medium">
-        {invite.name} <span className="font-normal text-muted-foreground">{invite.email}</span>
+        {invite.name} <span className="font-normal text-ink-muted">{invite.email}</span>
       </p>
-      <p className="text-sm">
+      <p className="text-body">
         {invite.jobRole} · {invite.expired ? 'Expired' : 'Invited'}
       </p>
-      {!invite.expired && <p className="text-sm break-all text-muted-foreground">{link}</p>}
+      {!invite.expired && <p className="text-caption break-all text-ink-muted">{link}</p>}
       <div className="flex flex-wrap gap-2">
         {!invite.expired && (
           <>
@@ -142,19 +142,19 @@ function People() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-4 pt-8 pb-16">
-      <h1 className="text-3xl font-bold tracking-tight">People at {org.name}</h1>
-      {org.readOnly && <p className="mt-4 text-muted-foreground">Staff view · Read only</p>}
-      {!org.readOnly && <form className="mt-8 flex flex-col gap-6" ref={formRef} onSubmit={invite}>
+    <main className="mx-auto w-full max-w-[1120px] px-4 pt-8 pb-16">
+      <h1 className="text-title-1 text-ink">People at {org.name}</h1>
+      {org.readOnly && <p className="mt-4 text-body text-ink-muted">Staff view · Read only</p>}
+      {!org.readOnly && <form className="mt-8 flex max-w-xl flex-col gap-6" ref={formRef} onSubmit={invite}>
         <div className="flex flex-col gap-2">
           <Label htmlFor="name">Name</Label>
           <Input id="name" name="name" maxLength={80} required aria-invalid={!!fields.name || undefined} aria-describedby={fields.name ? 'name-error' : undefined} />
-          {fields.name && <p id="name-error" role="alert" className="text-sm font-medium text-wrong">{fields.name}</p>}
+          {fields.name && <p id="name-error" role="alert" className="text-body font-medium text-wrong">{fields.name}</p>}
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="email">Email</Label>
           <Input id="email" name="email" type="email" required aria-invalid={!!fields.email || undefined} aria-describedby={fields.email ? 'email-error' : undefined} />
-          {fields.email && <p id="email-error" role="alert" className="text-sm font-medium text-wrong">{fields.email}</p>}
+          {fields.email && <p id="email-error" role="alert" className="text-body font-medium text-wrong">{fields.email}</p>}
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="role">Job role</Label>
@@ -172,7 +172,7 @@ function People() {
           </select>
         </div>
         {error && (
-          <p role="alert" className="text-sm font-medium text-wrong">
+          <p role="alert" className="text-body font-medium text-wrong">
             {error}
           </p>
         )}
@@ -181,8 +181,8 @@ function People() {
         </Button>
       </form>}
       {org.invites.length > 0 && (
-        <section className="mt-10">
-          <h2 className="text-xl font-semibold">Invited</h2>
+        <section className="mt-8">
+          <h2 className="text-title-2">Invited</h2>
           <ul className="mt-4 flex flex-col gap-3">
             {org.invites.map((i) => (
               <InviteRow key={i.id} invite={i} link={`${org.baseUrl}/join/${i.id}`} isNew={i.id === newInviteId} onRevoke={() => revoke(i.id)} />
@@ -190,12 +190,12 @@ function People() {
           </ul>
         </section>
       )}
-      <section className="mt-10">
-        <h2 className="text-xl font-semibold">Members</h2>
+      <section className="mt-8">
+        <h2 className="text-title-2">Members</h2>
         {!org.members.some((m) => m.training) && (
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <p className="text-muted-foreground">Invite your first employee.</p>
-            {!org.readOnly && <Button type="button" onClick={() => document.getElementById('name')?.focus()}>Invite an employee</Button>}
+            <p className="text-body text-ink-muted">Invite your first employee.</p>
+            {!org.readOnly && <Button type="button" variant="secondary" onClick={() => document.getElementById('name')?.focus()}>Invite an employee</Button>}
           </div>
         )}
         <ul className="mt-4 divide-y divide-border rounded-lg border border-border bg-surface-card">
@@ -210,17 +210,17 @@ function People() {
                 {m.training ? (
                   <PortalMasteryBar name={name} label={m.name} mastery={m.training.mastery} benchmark={m.training.benchmark} />
                 ) : (
-                  <p className="text-label">{name} <span className="font-normal text-muted-foreground">No job role</span></p>
+                  <p className="text-label">{name} <span className="font-normal text-ink-muted">No job role</span></p>
                 )}
-                <p className="mt-2 text-sm text-muted-foreground">
+                <p className="mt-2 text-caption text-ink-muted">
                   {[m.email, [m.role, m.jobRole].filter(Boolean).join(' · '), m.training?.daysToProficiency != null && `${plural(m.training.daysToProficiency, 'day', 'days')} to proficiency`].filter(Boolean).join(' · ')}
                 </p>
                 {m.training && m.training.criticalConfidentErrors > 0 && (
-                  <p className="mt-1 text-sm font-medium text-wrong">
+                  <p className="mt-1 text-body font-medium text-wrong">
                     {plural(m.training.criticalConfidentErrors, 'confident error', 'confident errors')} on a critical step
                   </p>
                 )}
-                <p className="mt-1 text-sm text-muted-foreground">Last active: {m.lastActiveAt === null ? '-' : date(m.lastActiveAt)}</p>
+                <p className="mt-1 text-caption text-ink-muted">Last active: {m.lastActiveAt === null ? '-' : date(m.lastActiveAt)}</p>
               </li>
             )
           })}

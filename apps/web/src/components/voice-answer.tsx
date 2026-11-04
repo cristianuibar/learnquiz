@@ -97,7 +97,7 @@ export function VoiceAnswer({ sessionId, itemId, voiceEnabled, text, onText, dis
       active.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data) }
       active.onerror = () => {
         release(true)
-        setError('Recording failed. Please try again or type your answer.')
+        setError('Recording failed. Record again or type your answer.')
       }
       active.onstop = async () => {
         release()

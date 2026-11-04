@@ -18,13 +18,17 @@ export function composeSession(input: {
   frontier: Frontier[]
   closers: { id: string; conceptId: string }[]
   targetDifficulty: number
+  basics?: Map<string, number> // back to basics: concept id -> weak-unit rank; lower ranks open the session, due or fresh
 }): string[] {
   const closers = input.closers.slice(0, 2)
   const conceptOf = new Map<string, string>()
+  // Back to basics: a lower weak-unit rank goes first (due or fresh), so it also survives the due cap.
+  const rank = (conceptId: string | undefined) => input.basics?.get(conceptId ?? '') ?? Infinity
   const due = [...input.due]
-    .sort((a, b) => Number(b.confidentError) - Number(a.confidentError) || a.retrievability - b.retrievability)
+    .sort((a, b) => (input.basics ? rank(a.conceptId) - rank(b.conceptId) : 0) ||
+      Number(b.confidentError) - Number(a.confidentError) || a.retrievability - b.retrievability)
     .slice(0, DUE_CAP)
-  const concepts = [...input.frontier].sort((a, b) => a.unitOrder - b.unitOrder || a.pKnown - b.pKnown)
+  const concepts = input.basics ? input.frontier : [...input.frontier].sort((a, b) => a.unitOrder - b.unitOrder || a.pKnown - b.pKnown)
   for (const c of concepts) for (const i of c.items) conceptOf.set(i.id, c.conceptId)
   for (const d of [...due, ...closers]) conceptOf.set(d.id, d.conceptId)
 
@@ -43,6 +47,7 @@ export function composeSession(input: {
   // Short on items: top up from the frontier one level easier.
   const spare = concepts.flatMap((c) => c.items).filter((i) => !picked.has(i.id))
   main.push(...nearest(spare, input.targetDifficulty - 1).map((i) => i.id))
+  if (input.basics) main.sort((a, b) => rank(conceptOf.get(a)) - rank(conceptOf.get(b))) // stable
 
   // Greedy: take the first queued item whose concept differs from the previous one.
   const queue = main.slice(0, room)

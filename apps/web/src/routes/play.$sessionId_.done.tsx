@@ -8,7 +8,6 @@ import { StartButton } from '@/components/start-button'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { endSession, prepareNextSession } from '@/server/play'
-import { PushSettings } from '@/components/push-settings'
 import { getPushSettings } from '@/server/push'
 
 export const Route = createFileRoute('/play/$sessionId_/done')({
@@ -18,7 +17,8 @@ export const Route = createFileRoute('/play/$sessionId_/done')({
   loader: async ({ params, context }) => {
     const summary = await endSession({ data: { sessionId: params.sessionId } }) // idempotent, so reloads work
     const settings = summary.total > 0 && context.user && !context.user.isAnonymous ? await getPushSettings() : null
-    return { ...summary, push: settings?.canPrompt && settings.endpoints.length === 0 ? settings : null }
+    // The first finished session on an account with no subscription continues to the push opt-in, once.
+    return { ...summary, optIn: Boolean(settings?.canPrompt && settings.endpoints.length === 0) }
   },
   errorComponent: RouteError,
   component: Done,
@@ -43,7 +43,7 @@ function Done() {
       <p role="status" className="sr-only">
         {announcement}
       </p>
-      <h1 className="text-3xl font-bold tracking-tight">
+      <h1 className="text-title-1 text-ink">
         {placed ? `You're at level ${s.level} of 5` : `Session done, ${clock(s.durationMs)}`}
       </h1>
       {placed && s.levelLine && <p className="mt-3 text-lg text-muted-foreground">{s.levelLine}</p>}
@@ -101,9 +101,12 @@ function Done() {
       <p className="mt-10 rounded-lg bg-learning-soft p-4">
         <span className="font-semibold">Coach:</span> {s.nextLine}
       </p>
-      {s.push && <div className="mt-10"><PushSettings {...s.push} prompt /></div>}
       <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center">
-        {placed ? (
+        {s.optIn ? (
+          <Button asChild className="w-full px-6 sm:w-auto">
+            <Link to="/opt-in">Continue</Link>
+          </Button>
+        ) : placed ? (
           <Button asChild className="w-full px-6 sm:w-auto">
             <Link to="/t/$topicId/path" params={{ topicId: s.topicId }}>
               See your path
@@ -111,10 +114,10 @@ function Done() {
           </Button>
         ) : (
           <>
-            <StartButton topicId={s.topicId}>Another session</StartButton>
+            <StartButton topicId={s.topicId}>Start another session</StartButton>
             <Button asChild variant="secondary" className="w-full px-6 sm:w-auto">
               <Link to="/t/$topicId/path" params={{ topicId: s.topicId }}>
-                Your path
+                Open your path
               </Link>
             </Button>
           </>

@@ -14,6 +14,7 @@ export function RevealOverlay({
   item,
   answer,
   hasCompany,
+  basics,
   company,
   busy,
   error,
@@ -24,6 +25,7 @@ export function RevealOverlay({
   item: ItemView
   answer: Answer
   hasCompany: boolean
+  basics?: boolean
   company?: string | null
   busy?: boolean
   error?: string | null
@@ -76,6 +78,7 @@ export function RevealOverlay({
                 item={item}
                 answer={answer}
                 hasCompany={hasCompany}
+                basics={basics}
                 busy={busy}
                 error={error}
                 headingId={resultId}

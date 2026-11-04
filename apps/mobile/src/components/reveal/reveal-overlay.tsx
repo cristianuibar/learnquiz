@@ -17,6 +17,8 @@ export type RevealOverlayProps = {
   busy: boolean
   error: string | null
   branding: Branding | null
+  /** A back-to-basics session opens the explanation by default. */
+  basics?: boolean
 }
 
 const consumeBack = () => true
@@ -27,7 +29,7 @@ const consumeBack = () => true
  * mounted (hidden) during Report so its Why state survives the round trip.
  * Key it by the reveal so a new question starts on the result.
  */
-export function RevealOverlay({ reveal, item, answer, confidence, onContinue, busy, error, branding }: RevealOverlayProps) {
+export function RevealOverlay({ reveal, item, answer, confidence, onContinue, busy, error, branding, basics }: RevealOverlayProps) {
   const [state, setState] = useState<OverlayState>(initialOverlay)
   const stateRef = useRef(state)
   const reportRef = useRef<View>(null)
@@ -57,6 +59,7 @@ export function RevealOverlay({ reveal, item, answer, confidence, onContinue, bu
     busy,
     error,
     branding,
+    basics,
     onBack: consumeBack,
     reportRef,
   })

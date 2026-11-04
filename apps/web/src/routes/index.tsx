@@ -68,7 +68,7 @@ function Landing() {
           maxLength={200}
         />
         <Button type="submit" className="px-6" disabled={busy}>
-          Start
+          Start learning
         </Button>
       </form>
       <div className="flex flex-col gap-3 sm:flex-row">

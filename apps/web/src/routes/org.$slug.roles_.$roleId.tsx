@@ -58,26 +58,26 @@ function RoleDetail() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 pt-8 pb-16">
+    <main className="mx-auto w-full max-w-[1120px] px-4 pt-8 pb-16">
       <Link to="/org/$slug/roles" params={{ slug }} className={`inline-flex min-h-11 items-center font-medium underline ${ring}`}>
         Job roles
       </Link>
-      <h1 className="mt-4 text-3xl font-bold tracking-tight">{role.name}</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
+      <h1 className="mt-4 text-title-1 text-ink">{role.name}</h1>
+      <p className="mt-2 text-caption text-ink-muted">
         Benchmark: {Math.round(role.benchmark * 100)}% · Onboarding: {plural(role.onboardingDays, 'day', 'days')} · Training: {TRAINING_STATUS[role.topicStatus]}
       </p>
       <div className="mt-8 flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-8">
         <section aria-labelledby="curriculum-heading" className="lg:order-1">
-          <h2 id="curriculum-heading" className="text-xl font-semibold">Curriculum</h2>
+          <h2 id="curriculum-heading" className="text-title-2">Curriculum</h2>
           {concepts.length > 0 && (
-            <p role="status" aria-live="polite" className="mt-2 text-sm text-muted-foreground">{done} of {plural(concepts.length, 'concept', 'concepts')} done</p>
+            <p role="status" aria-live="polite" className="mt-2 text-caption text-ink-muted">{done} of {plural(concepts.length, 'concept', 'concepts')} done</p>
           )}
           {units.length > 0 ? (
             <div className="mt-4 flex flex-col gap-6">
               {units.map((unit) => (
                 <div key={unit.id}>
-                  <h3 className="text-lg font-semibold">{unit.name}</h3>
-                  <p className="text-sm text-muted-foreground">{unit.summary}</p>
+                  <h3 className="text-title-3">{unit.name}</h3>
+                  <p className="text-caption text-ink-muted">{unit.summary}</p>
                   <ul className="mt-3 flex flex-col gap-3">
                     {unit.concepts.map((c) => (
                       <ConceptItem key={c.id} concept={c} slug={slug} readOnly={readOnly} />
@@ -87,13 +87,13 @@ function RoleDetail() {
               ))}
             </div>
           ) : (
-            <p className="mt-4 text-muted-foreground">
+            <p className="mt-4 text-body text-ink-muted">
               {role.topicStatus === 'generating' ? 'Building the curriculum…' : 'No curriculum yet. Upload documents, then build the curriculum.'}
             </p>
           )}
         </section>
         <section aria-labelledby="documents-heading" className="lg:order-2">
-          <h2 id="documents-heading" className="text-xl font-semibold">Documents</h2>
+          <h2 id="documents-heading" className="text-title-2">Documents</h2>
           {documents.length > 0 ? (
             <ul className="mt-4 flex flex-col gap-3">
               {documents.map((d) => (
@@ -101,7 +101,7 @@ function RoleDetail() {
               ))}
             </ul>
           ) : (
-            <p className="mt-4 text-muted-foreground">No documents yet. Upload the material this role is trained on.</p>
+            <p className="mt-4 text-body text-ink-muted">No documents yet. Upload the material this role is trained on.</p>
           )}
           {canUpload && (
             <>
@@ -111,7 +111,7 @@ function RoleDetail() {
                   <Button type="button" className="self-start px-6" disabled={building} onClick={buildCurriculum}>
                     {building ? 'Building…' : 'Build curriculum'}
                   </Button>
-                  {buildError && <p role="alert" className="text-sm font-medium text-wrong">{buildError}</p>}
+                  {buildError && <p role="alert" className="text-body font-medium text-wrong">{buildError}</p>}
                 </div>
               )}
             </>
@@ -168,12 +168,12 @@ function ConceptItem({ concept: c, slug, readOnly }: { concept: Concept; slug: s
     <li className="rounded-lg border p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <p className="font-medium">{c.name}</p>
-        <span className="text-sm font-medium">{STATUS[c.genStatus]}</span>
+        <span className="text-body font-medium">{STATUS[c.genStatus]}</span>
       </div>
-      <p className="text-sm text-muted-foreground">{c.summary}</p>
+      <p className="text-caption text-ink-muted">{c.summary}</p>
       {c.genStatus === 'failed' && (
         <div className="mt-2 flex flex-wrap items-center gap-3">
-          {c.genError && <p className="text-sm text-wrong">{c.genError}</p>}
+          {c.genError && <p className="text-body text-wrong">{c.genError}</p>}
           {!readOnly && (
             <Button type="button" variant="secondary" disabled={busy} onClick={() => run(() => retry({ data: { slug, conceptId: c.id } }))}>
               Retry
@@ -183,7 +183,7 @@ function ConceptItem({ concept: c, slug, readOnly }: { concept: Concept; slug: s
       )}
       {!readOnly && !editing && (
         <div className="mt-2 flex flex-wrap items-center gap-4">
-          <label className="inline-flex min-h-11 items-center gap-2 text-sm">
+          <label className="inline-flex min-h-11 items-center gap-2 text-body">
             <input
               type="checkbox"
               className={`size-5 ${ring}`}
@@ -198,13 +198,13 @@ function ConceptItem({ concept: c, slug, readOnly }: { concept: Concept; slug: s
           </Button>
         </div>
       )}
-      {readOnly && c.critical && <p className="mt-2 text-sm font-medium">Critical</p>}
+      {readOnly && c.critical && <p className="mt-2 text-body font-medium">Critical</p>}
       {editing && (
-        <form className="mt-3 flex flex-col gap-4" onSubmit={save}>
+        <form className="mt-3 flex max-w-xl flex-col gap-4" onSubmit={save}>
           <div className="flex flex-col gap-2">
             <Label htmlFor={`name-${c.id}`}>Concept name</Label>
             <Input id={`name-${c.id}`} name="name" defaultValue={c.name} maxLength={80} required aria-invalid={!!fields.name || undefined} aria-describedby={fields.name ? `name-${c.id}-error` : undefined} />
-            {fields.name && <p id={`name-${c.id}-error`} role="alert" className="text-sm font-medium text-wrong">{fields.name}</p>}
+            {fields.name && <p id={`name-${c.id}-error`} role="alert" className="text-body font-medium text-wrong">{fields.name}</p>}
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor={`summary-${c.id}`}>Summary</Label>
@@ -217,9 +217,9 @@ function ConceptItem({ concept: c, slug, readOnly }: { concept: Concept; slug: s
               required
               aria-invalid={!!fields.summary || undefined}
               aria-describedby={fields.summary ? `summary-${c.id}-error` : undefined}
-              className={`w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ${ring}`}
+              className={`w-full rounded-md border border-input bg-transparent px-3 py-2 text-body ${ring}`}
             />
-            {fields.summary && <p id={`summary-${c.id}-error`} role="alert" className="text-sm font-medium text-wrong">{fields.summary}</p>}
+            {fields.summary && <p id={`summary-${c.id}-error`} role="alert" className="text-body font-medium text-wrong">{fields.summary}</p>}
           </div>
           <div className="flex gap-2">
             <Button type="submit" className="px-6" disabled={busy}>{busy ? 'Saving…' : 'Save'}</Button>
@@ -227,7 +227,7 @@ function ConceptItem({ concept: c, slug, readOnly }: { concept: Concept; slug: s
           </div>
         </form>
       )}
-      {error && <p role="alert" className="mt-2 text-sm font-medium text-wrong">{error}</p>}
+      {error && <p role="alert" className="mt-2 text-body font-medium text-wrong">{error}</p>}
     </li>
   )
 }
@@ -255,14 +255,14 @@ function DocumentItem({ doc: d, slug, roleId, roleName, canChange }: { doc: Deta
   return (
     <li className="rounded-lg border p-3">
       <p className="font-medium break-words">{d.title}</p>
-      <p className="text-sm text-muted-foreground">Version {d.version} · Uploaded {date(d.createdAt)}</p>
+      <p className="text-caption text-ink-muted">Version {d.version} · Uploaded {date(d.createdAt)}</p>
       {canChange && (
         <>
           <RoleDocumentForm slug={slug} roleId={roleId} roleName={roleName} replaces={d} onUploaded={() => router.invalidate()} />
           <Button type="button" variant="secondary" className="mt-2" disabled={busy} onClick={run}>
             Retire<span className="sr-only"> {d.title}</span>
           </Button>
-          {error && <p role="alert" className="mt-2 text-sm font-medium text-wrong">{error}</p>}
+          {error && <p role="alert" className="mt-2 text-body font-medium text-wrong">{error}</p>}
         </>
       )}
     </li>

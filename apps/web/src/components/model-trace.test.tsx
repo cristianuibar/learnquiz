@@ -54,7 +54,7 @@ it.each(['topic', 'session'] as const)('opens the %s trace from its page and ret
   try {
     await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
     expect(container.querySelector('h1')?.textContent).toContain(scope === 'topic' ? 'Algebra' : 'Session done')
-    const trigger = [...container.querySelectorAll('button')].find((b) => b.textContent === 'Model trace')!
+    const trigger = [...container.querySelectorAll('button')].find((b) => b.textContent === 'Show model trace')!
     expect(getModelTrace).not.toHaveBeenCalled()
     await act(async () => trigger.click())
     const dialog = document.querySelector('[role="dialog"]')!

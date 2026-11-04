@@ -320,6 +320,7 @@ function Play({ initial }: { initial: SessionView }) {
           item={revealed.item}
           answer={answer}
           hasCompany={Boolean(branding)}
+          basics={view.basics === true}
           company={branding?.name ?? null}
           busy={busy}
           error={error?.message ?? null}
