@@ -170,6 +170,21 @@ it('retires a question in place', async () => {
   expect(button(c, 'Retire')).toBeUndefined()
 })
 
+it.each([
+  ['Retire', { status: 'retired' }, 'Retired', 'H4'],
+  ['Approve and next', { reviewedAt: Date.UTC(2026, 9, 31, 12) }, 'Approved Oct 31', 'BUTTON'],
+] as const)('%s keeps the acted-on row in view after the re-sort moves it past the first four', async (action, after, word, focused) => {
+  const old = Array.from({ length: 4 }, (_, i) => ({ id: `r${i}`, status: 'active', reviewedAt: Date.UTC(2026, 9, 30), payload: stemOf(`old ${i}`) }))
+  const q = { id: 'n', status: 'active', reviewedAt: null, payload: stemOf('new') }
+  // The server lists the unreviewed question first, then below the four reviewed ones once it is acted on.
+  const c = await mountAt(review([concept('c', [q, ...old])], 1), '/org/x/questions', review([concept('c', [...old, { ...q, ...after }])], 0))
+  await act(async () => button(c, action).click())
+  await vi.waitFor(() => expect(document.activeElement?.closest('li')?.textContent).toContain('Stem new'))
+  expect(document.activeElement!.tagName).toBe(focused)
+  expect(document.activeElement!.closest('li')!.textContent).toContain(word)
+  expect(c.textContent).not.toContain('Show 1 more')
+})
+
 it('shows who reported a flagged question and resolves the flag on approval', async () => {
   const flag = { id: 'f1', reporterId: 'u9', reporterName: 'Jordan Reyes', createdAt: Date.UTC(2026, 10, 2, 10, 14), reason: 'wrong', label: 'Wrong answer', note: 'Looks off', attempt: null }
   const c = await mountAt(review([concept('c', [{ id: 'q1', status: 'reported', reviewedAt: null, flags: [flag], payload: stemOf('1') }])], 0))

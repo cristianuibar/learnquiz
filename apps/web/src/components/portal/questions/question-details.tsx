@@ -8,7 +8,7 @@ import type { ItemPayload } from '@/lib/llm/schemas'
 import { reviewQuestion } from '@/server/question-review'
 import { FlagGroup } from './flag-group'
 import { QuestionEditor } from './question-editor'
-import { isFlagged, shortDate, type Question, type Review } from './question-row'
+import { isFlagged, shortDate, type Action, type Question, type Review } from './question-row'
 
 export const FORMAT: Record<string, string> = {
   mcq: 'Multiple choice', multi: 'Multiple answer', order: 'Order the steps', cloze: 'Fill in the blank', short: 'Short answer', image: 'Image choice',
@@ -21,13 +21,13 @@ function typeLine(q: Question) {
   return `${fmt} · Unreviewed · Generated ${shortDate(q.createdAt)}${q.source ? ` from ${q.source.title}` : ''}`
 }
 
-export function QuestionDetails({ question, slug, sources, stemId, onApprove, onAnnounce }: {
+export function QuestionDetails({ question, slug, sources, stemId, onAct, onAnnounce }: {
   question: Question
   slug: string
   sources: Review['sources']
   stemId: string
-  // Called when Approve is pressed; the returned callback runs once the approval is saved and the data refreshed.
-  onApprove: (id: string) => () => void
+  // Called when Approve or Retire is pressed; the returned callback runs once the action is saved and the data refreshed.
+  onAct: (id: string, action: Action) => () => void
   onAnnounce: (message: string) => void
 }) {
   const router = useRouter()
@@ -45,15 +45,14 @@ export function QuestionDetails({ question, slug, sources, stemId, onApprove, on
     if (!editing && refocusEdit.current) { refocusEdit.current = false; editButton.current?.focus() }
   }, [editing])
 
-  async function act(action: 'approve' | 'retire') {
+  async function act(action: Action) {
     setBusy(true)
     setError('')
-    const approved = action === 'approve' ? onApprove(question.id) : null
+    const done = onAct(question.id, action)
     try {
       await reviewQuestion({ data: { slug, itemId: question.id, action } })
       await router.invalidate()
-      if (approved) approved()
-      else document.getElementById(stemId)?.focus()
+      done()
     } catch (err) {
       setError(errorMessage(err))
     } finally {
