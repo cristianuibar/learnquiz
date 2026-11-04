@@ -155,3 +155,17 @@ it('builds from every document the unit cites and rebuilds when any of them is r
   await getUnitProcedure({ data: { unitId: 'unit' } })
   expect(fetchModel).toHaveBeenCalledTimes(2)
 })
+
+it('does not store or return the graph when the document is replaced during the model call, and rebuilds next time', async () => {
+  fetchModel.mockImplementationOnce(async () => {
+    run('INSERT INTO sources (id, topic_id, kind, title, body_text, version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', 'src-v4', 'topic', 'text', 'Dispatch SOP', 'Check stock. Weigh the parcel, then dispatch.', 4, 2)
+    run('UPDATE sources SET retired_at = 2 WHERE id = ?', 'src')
+    run('UPDATE concepts SET source_id = ?', 'src-v4')
+    return Response.json({ choices: [{ message: { content: JSON.stringify(graph) }, finish_reason: 'stop' }] })
+  })
+  expect(await getUnitProcedure({ data: { unitId: 'unit' } })).toEqual({ status: 'pending' })
+  expect(raw.prepare('SELECT procedure_json AS j, procedure_started_at AS s FROM units').get()).toEqual({ j: null, s: null })
+  expect(await getUnitProcedure({ data: { unitId: 'unit' } })).toMatchObject({ status: 'ready', source: { version: 4 } })
+  const prompt = (JSON.parse(fetchModel.mock.calls[1]![1].body as string) as { messages: { content: string }[] }).messages[1]!.content
+  expect(prompt).toContain('Weigh the parcel')
+})
