@@ -111,3 +111,12 @@ it('returns 429 for a company topic over the company cap, with no model call', a
   await expect(getUnitProcedure({ data: { unitId: 'unit' } })).rejects.toMatchObject({ status: 429 })
   expect(fetchModel).not.toHaveBeenCalled()
 })
+
+it('grounds a long document in the part the unit quotes, not its preamble', async () => {
+  const steps = 'Lock out the press before clearing a jam.'
+  run('UPDATE sources SET body_text = ?', `${'Company history. '.repeat(3_000)}${steps} ${'Appendix. '.repeat(2_000)}`)
+  run('UPDATE concepts SET source_quote = ?', steps)
+  await getUnitProcedure({ data: { unitId: 'unit' } })
+  const body = JSON.parse(fetchModel.mock.calls[0]![1].body as string) as { messages: { content: string }[] }
+  expect(body.messages[1]!.content).toContain(steps)
+})
