@@ -245,11 +245,24 @@ const topicStatus = () => (sqlite.prepare('SELECT status FROM topics WHERE id = 
 
 it('rebuilds a failed role curriculum once for the company owner', async () => {
   seedAlphaRoleBuild(['Step one: scan the box.'])
-  await expect(retryJobs({ data: { ids: ['curriculum:retry-topic'] } })).resolves.toEqual({ queued: 1, skipped: 0 })
+  const ids = ['curriculum:retry-topic']
+  // The claimed build runs inside the request and never settles (the model hangs); the losing call settles with a skip.
+  const a = retryJobs({ data: { ids } })
+  const b = retryJobs({ data: { ids } })
+  await expect(Promise.race([a, b])).resolves.toEqual({ queued: 0, skipped: 1 })
+  expect(topicStatus()).toBe('generating')
+  await expect(retryJobs({ data: { ids } })).resolves.toEqual({ queued: 0, skipped: 1 })
+  expect(boundary.background).toHaveLength(0)
+})
+
+it('lists an abandoned role build as failed and lets it be retried', async () => {
+  seedAlphaRoleBuild(['Step one: scan the box.'])
+  sqlite.prepare("UPDATE topics SET status = 'generating', gen_started_at = ? WHERE id = 'retry-topic'").run(NOW - 11 * 60_000)
+  const { rows } = await getGenerationJobs({ data: { filter: 'failed', offset: 0 } })
+  expect(rows).toContainEqual(expect.objectContaining({ id: 'curriculum:retry-topic', state: 'failed' }))
+  expect(topicStatus()).toBe('failed')
+  void retryJobs({ data: { ids: ['curriculum:retry-topic'] } })
   await vi.waitFor(() => expect(topicStatus()).toBe('generating'))
-  expect(boundary.background).toHaveLength(1)
-  await expect(retryJobs({ data: { ids: ['curriculum:retry-topic'] } })).resolves.toEqual({ queued: 0, skipped: 1 })
-  expect(boundary.background).toHaveLength(1)
 })
 
 it('skips a failed role build without usable documents or an owner', async () => {

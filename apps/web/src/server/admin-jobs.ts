@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, count, eq, inArray, isNull, sql } from 'drizzle-orm'
+import { and, asc, count, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '@/db'
 import { member, organization } from '@/db/auth-schema'
@@ -10,8 +10,7 @@ import { drainConceptQueue } from '@/server/concept-gen'
 import { retryFailedConcept } from '@/server/concept-retry'
 import { runInBackground } from '@/server/env'
 import { liveConcept } from '@/server/live-concept'
-import { assertWithinCompanyCap, assertWithinDailyCap } from '@/server/model-cap'
-import { buildRoleCurriculum } from '@/server/role-curriculum'
+import { claimRoleBuild, releaseStaleBuild } from '@/server/role-curriculum'
 
 export const JOB_FILTERS = ['notReady', 'failed', 'generating', 'pending', 'ready'] as const
 export type JobFilter = (typeof JOB_FILTERS)[number]
@@ -28,6 +27,8 @@ export const getGenerationJobs = createServerFn({ method: 'GET' })
   .handler(async ({ data }): Promise<{ counts: Record<JobState, number>; total: number; rows: JobRow[]; updatedAt: number }> => {
     await requireStaff()
     const db = getDb()
+    // A build abandoned in 'generating' (its request died) shows as failed so it can be retried.
+    await releaseStaleBuild(db)
     const states = statesOf(data.filter)
     const roleStates = states.filter((s): s is 'failed' | 'generating' => s === 'failed' || s === 'generating')
     const limit = data.offset + JOB_PAGE_SIZE
@@ -71,6 +72,7 @@ export const retryJobs = createServerFn({ method: 'POST' })
     let queued = 0
     let skipped = 0
     let conceptsQueued = 0
+    const runs: Array<() => Promise<unknown>> = []
     for (const id of new Set(data.ids)) {
       if (id.startsWith('concept:')) {
         try {
@@ -90,21 +92,18 @@ export const retryJobs = createServerFn({ method: 'POST' })
         if (!row) { skipped++; continue }
         const members = await db.select({ userId: member.userId, role: member.role }).from(member).where(eq(member.organizationId, row.orgId))
         const ownerId = members.find((m) => m.role.split(',').includes('owner'))?.userId
-        const docs = await db.select({ bodyText: sources.bodyText }).from(sources)
-          .where(and(eq(sources.topicId, topicId), isNull(sources.deletedAt), isNull(sources.retiredAt)))
-        if (!ownerId || !docs.length || docs.some((d) => !d.bodyText.trim())) { skipped++; continue }
+        if (!ownerId) { skipped++; continue }
         try {
-          await assertWithinDailyCap(db, ownerId)
-          await assertWithinCompanyCap(db, row.orgId)
+          runs.push(await claimRoleBuild({ orgId: row.orgId, ownerId, roleId: row.roleId }))
+          queued++
         } catch (e) {
-          if (status(e) !== 429) throw e
+          if (![404, 409, 422, 429].includes(status(e) ?? 0)) throw e
           skipped++
-          continue
         }
-        runInBackground(buildRoleCurriculum({ orgId: row.orgId, ownerId, roleId: row.roleId }))
-        queued++
       } else skipped++
     }
     if (conceptsQueued) runInBackground(drainConceptQueue())
+    // Awaited, not backgrounded: background work lasts about 30 s and a build can take minutes. A failed build marks its own topic failed.
+    await Promise.allSettled(runs.map((run) => run()))
     return { queued, skipped }
   })
