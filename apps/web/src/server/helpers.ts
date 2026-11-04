@@ -64,8 +64,6 @@ export async function ensureConceptItems(
   if (existing.length >= 6 && fresh > 0) return existing.map(asItem)
   // A retired document gets no new questions. This read only keeps the cap untouched; the claim below enforces it atomically.
   if (await sourceRetired(db, concept)) return existing.map(asItem)
-  // Only a real generation spends the cap; stored items stay readable at the cap.
-  await assertWithinDailyCap(db, learnerId)
   // One generation per concept: an atomic claim on the row; a concurrent caller joins the in-flight one.
   const now = Date.now()
   const claimed = await db
@@ -92,6 +90,8 @@ export async function ensureConceptItems(
   }
 
   try {
+    // Only a real generation spends the cap; stored items and a join of an in-flight, already-paid generation stay readable at the cap.
+    await assertWithinDailyCap(db, learnerId)
     const avoidStems = existing.slice(0, 3).map((r) => (JSON.parse(r.payloadJson) as ItemPayload).stem)
     const generated = await generateConceptItems(db, concept, topic, { targetDifficulty: opts.targetDifficulty, spread: opts.spread, avoidStems, want: 3, maxRounds: 2, learnerId, sessionId: opts.sessionId })
     return [...existing.map(asItem), ...generated]
