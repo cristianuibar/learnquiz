@@ -1,7 +1,6 @@
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from '@better-auth/drizzle-adapter'
 import { APIError, createAuthMiddleware, getOAuthState } from 'better-auth/api'
-import { deleteSessionCookie } from 'better-auth/cookies'
 import { admin, anonymous, bearer, organization } from 'better-auth/plugins'
 import type { BetterAuthPlugin } from 'better-auth'
 import { and, eq, inArray } from 'drizzle-orm'
@@ -9,6 +8,19 @@ import { getDb, authSchema } from '@/db'
 import { attempts, badges, itemFlags, jobRoles, learnerConcept, learnerItem, learnerTopic, learnerUnit, memberRoleAssignments, modelCalls, placements, sessions, topics } from '@/db/schema'
 import { getEnv } from '@/server/env'
 import { bindMobileFacebookSession } from './mobile-facebook-binding'
+
+// Removes the Set-Cookie entries the callback added for the new session (mirrors better-auth's internal removeSetCookieEntries), so the browser keeps the cookies it had.
+function dropSessionSetCookies(ctx: { responseHeaders?: Headers | null; context: { responseHeaders?: Headers | null; authCookies: { sessionToken: { name: string }; sessionData: { name: string }; dontRememberToken: { name: string } } } }) {
+  const names = [ctx.context.authCookies.sessionToken.name, ctx.context.authCookies.sessionData.name, ctx.context.authCookies.dontRememberToken.name]
+  for (const headers of new Set([ctx.responseHeaders, ctx.context.responseHeaders])) {
+    if (!headers) continue
+    const entries = headers.getSetCookie()
+    const kept = entries.filter((entry) => !names.some((name) => entry.startsWith(`${name}=`) || entry.startsWith(`${name}.`)))
+    if (kept.length === entries.length) continue
+    headers.delete('set-cookie')
+    for (const entry of kept) headers.append('set-cookie', entry)
+  }
+}
 
 export function facebookEnabled(): boolean {
   const { FACEBOOK_APP_ID, FACEBOOK_APP_SECRET } = getEnv()
@@ -77,8 +89,8 @@ export function createAuth(transportPlugins: BetterAuthPlugin[] = []) {
         if (ctx.path !== '/callback/:id' || ctx.params?.id !== 'facebook' || !ctx.context.newSession) return
         const state = await getOAuthState()
         if (!state?.callbackURL || typeof state.oauthState !== 'string') return
-        // Only mobile handoffs clear browser cookies; ordinary web sign-in keeps them.
-        if (await bindMobileFacebookSession(state.callbackURL, state.oauthState, ctx.context.newSession.session.token)) deleteSessionCookie(ctx)
+        // Mobile handoffs leave the browser's own cookies untouched (the app keeps the new session as its bearer); ordinary web sign-in sets them.
+        if (await bindMobileFacebookSession(state.callbackURL, state.oauthState, ctx.context.newSession.session.token)) dropSessionSetCookies(ctx)
       }),
     },
     plugins: [

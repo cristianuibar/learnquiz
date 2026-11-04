@@ -69,6 +69,9 @@ export async function handleMobileFacebook(request: Request): Promise<Response> 
     if (path === `${PREFIX}/facebook/start` && request.method === 'GET') {
       const state = url.searchParams.get('state')
       if (!validSecret(state)) return returnToApp('invalid', { error: 'expired' })
+      // The app opens this URL directly ('none'). A cross-site page must not start
+      // another party's flow in this browser and bind its next Facebook session.
+      if (request.headers.get('Sec-Fetch-Site') === 'cross-site') return returnToApp(state, { error: 'expired' })
       const row = await read(key('flow', state))
       if (!row) return returnToApp(state, { error: 'expired' })
       const flow: Flow = JSON.parse(row.value)
