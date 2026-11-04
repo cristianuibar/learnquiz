@@ -28,7 +28,7 @@ vi.mock('@/server/auth', () => ({ getAuth: () => ({ api: { getSession: async () 
 
 import { MAX_ROLE_DOCUMENT_BYTES, MAX_ROLE_DOCUMENT_CHARS } from '@/lib/limits'
 import { Route } from '@/routes/api/org.$orgId.roles.$roleId.documents'
-import { retireRoleDocument, uploadRoleDocument } from './role-documents'
+import { previewRetireRoleDocument, removeRoleDocument, retireRoleDocument, uploadRoleDocument } from './role-documents'
 
 let sqlite: DatabaseSync
 // One-shot hook: runs just before the next SQL statement that starts with the given prefix.
@@ -119,7 +119,7 @@ const sourceRows = () => sqlite.prepare('SELECT * FROM sources').all()
 it('stores an uploaded PDF in R2 and records its extracted text against the role topic', async () => {
   const result = await uploadRoleDocument({ data: form({ file: textPdf() }) })
   const key = `orgs/org-a/roles/role-a/sources/${result.sourceId}.pdf`
-  expect(result).toEqual({ sourceId: result.sourceId, topicId: 'topic-role-a', r2Key: key, chars: SENTENCE.length, version: 1 })
+  expect(result).toEqual({ sourceId: result.sourceId, topicId: 'topic-role-a', r2Key: key, chars: SENTENCE.length, version: 1, status: 'ready' })
   expect(state.bucket.put).toHaveBeenCalledTimes(1)
   expect(state.bucket.put.mock.calls[0][0]).toBe(key)
   expect(state.bucket.put.mock.calls[0][1].byteLength).toBe((await textPdf().arrayBuffer()).byteLength)
@@ -145,17 +145,42 @@ it.each([
   expect(sourceRows()).toEqual([])
 })
 
-it('rejects a PDF with no text layer without storing it', async () => {
-  await expect(uploadRoleDocument({ data: form({ file: pdf('') }) })).rejects.toMatchObject({ status: 422 })
+it('stores a PDF with no text layer as a failed source that keeps its original', async () => {
+  const result = await uploadRoleDocument({ data: form({ file: pdf('') }) })
+  const key = `orgs/org-a/roles/role-a/sources/${result.sourceId}.pdf`
+  expect(result).toEqual({ sourceId: result.sourceId, topicId: 'topic-role-a', r2Key: key, chars: 0, version: 1, status: 'failed' })
+  expect(state.bucket.put).toHaveBeenCalledTimes(1)
+  expect(state.bucket.put.mock.calls[0][0]).toBe(key)
+  expect(sourceRows()).toEqual([expect.objectContaining({
+    id: result.sourceId, status: 'failed', error: 'No selectable text found. This looks like a scan.', body_text: '', r2_key: key,
+    size_bytes: pdf('').size, page_count: 1, version: 1, title: 'Forklift Safety', deleted_at: null, retired_at: null,
+  })])
+})
+
+it('still refuses a replacement PDF with no text layer, leaving the live document alone', async () => {
+  seedV1()
+  await expect(uploadRoleDocument({ data: form({ replacesId: 'src-1', file: pdf('') }) })).rejects.toMatchObject({ status: 422 })
   expect(state.bucket.put).not.toHaveBeenCalled()
-  expect(sourceRows()).toEqual([])
+  expect(sqlite.prepare('SELECT id, retired_at, status FROM sources').all()).toEqual([{ id: 'src-1', retired_at: null, status: 'ready' }])
+})
+
+it('replacing a failed source removes it from the list and keeps its version', async () => {
+  const failed = await uploadRoleDocument({ data: form({ file: pdf('') }) })
+  const result = await uploadRoleDocument({ data: form({ replacesId: failed.sourceId, text: 'Wear a vest on the dock.', title: 'Dock rules' }) })
+  expect(result).toMatchObject({ version: 1, status: 'ready' })
+  expect(sqlite.prepare('SELECT id, status, version, retired_at, deleted_at IS NOT NULL AS deleted FROM sources ORDER BY created_at, id').all()).toEqual(
+    expect.arrayContaining([
+      { id: failed.sourceId, status: 'failed', version: 1, retired_at: null, deleted: 1 },
+      { id: result.sourceId, status: 'ready', version: 1, retired_at: null, deleted: 0 },
+    ]),
+  )
 })
 
 it('rejects pasted text over the cap and saves pasted text within it as a text source without R2', async () => {
   await expect(uploadRoleDocument({ data: form({ title: 'Too long', text: 'a'.repeat(MAX_ROLE_DOCUMENT_CHARS + 1) }) })).rejects.toMatchObject({ status: 413 })
   expect(sourceRows()).toEqual([])
   const result = await uploadRoleDocument({ data: form({ title: 'Dock rules', text: 'Wear a vest on the dock.' }) })
-  expect(result).toEqual({ sourceId: result.sourceId, topicId: 'topic-role-a', r2Key: null, chars: 24, version: 1 })
+  expect(result).toEqual({ sourceId: result.sourceId, topicId: 'topic-role-a', r2Key: null, chars: 24, version: 1, status: 'ready' })
   expect(sqlite.prepare('SELECT * FROM sources').all()).toEqual([expect.objectContaining({
     id: result.sourceId, kind: 'text', title: 'Dock rules', body_text: 'Wear a vest on the dock.', r2_key: null, version: 1, uploaded_by: 'owner-a',
   })])
@@ -178,7 +203,7 @@ const itemStatus = () => Object.fromEntries((sqlite.prepare('SELECT id, status F
 it('replaces a document with version 2, retires its items and requeues the concepts that cited it', async () => {
   seedV1()
   const result = await uploadRoleDocument({ data: form({ replacesId: 'src-1', text: 'Always wear a vest on the dock.' }) })
-  expect(result).toEqual({ sourceId: result.sourceId, topicId: 'topic-role-a', r2Key: null, chars: 31, version: 2 })
+  expect(result).toEqual({ sourceId: result.sourceId, topicId: 'topic-role-a', r2Key: null, chars: 31, version: 2, status: 'ready' })
   expect(sqlite.prepare('SELECT title, version, body_text FROM sources WHERE id = ?').get(result.sourceId)).toEqual({ title: 'Dock rules', version: 2, body_text: 'Always wear a vest on the dock.' })
   expect(sqlite.prepare("SELECT retired_at IS NOT NULL AS retired FROM sources WHERE id = 'src-1'").get()).toEqual({ retired: 1 })
   expect(sqlite.prepare("SELECT count(*) AS n FROM items WHERE source_id = 'src-1' AND status != 'retired'").get()).toEqual({ n: 0 })
@@ -276,6 +301,57 @@ it('refuses retiring a document for a plain member', async () => {
   expect(itemStatus()['item-1']).toBe('active')
 })
 
+const ids = { slug: 'acme', roleId: 'role-a' }
+
+it.each([
+  ['a failed document', 'failed', 'owner-a', 'topic-role-a', undefined],
+  ['a ready document', 'ready', 'owner-a', 'topic-role-a', 404],
+  ['a failed document of another role', 'failed', 'owner-a', 'topic-role-b', 404],
+  ['a failed document for a plain member', 'failed', 'member-a', 'topic-role-a', 403],
+] as const)('removeRoleDocument: %s', async (_label, status, user, topicId, refused) => {
+  sqlite.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, r2_key, version, status, created_at) VALUES ('src-x', ?, 'pdf', 'Scan', '', 'k/x.pdf', 1, ?, 1)").run(topicId, status)
+  state.user = user
+  const call = removeRoleDocument({ data: { ...ids, sourceId: 'src-x' } })
+  if (refused) {
+    await expect(call).rejects.toMatchObject({ status: refused })
+    expect(sqlite.prepare("SELECT deleted_at FROM sources WHERE id = 'src-x'").get()).toEqual({ deleted_at: null })
+    expect(state.bucket.delete).not.toHaveBeenCalled()
+  } else {
+    await expect(call).resolves.toEqual({ ok: true })
+    expect(sqlite.prepare("SELECT deleted_at IS NOT NULL AS deleted FROM sources WHERE id = 'src-x'").get()).toEqual({ deleted: 1 })
+    expect(state.bucket.delete).toHaveBeenCalledWith('k/x.pdf')
+    await expect(removeRoleDocument({ data: { ...ids, sourceId: 'src-x' } })).rejects.toMatchObject({ status: 404 })
+  }
+})
+
+// src-1 (Dock rules) also holds con-1 (quote in src-2 too) and con-2 (quote only in src-1); a failed scan never counts.
+function seedShared() {
+  seedV1()
+  sqlite.prepare("UPDATE sources SET body_text = 'Wear a vest on the dock. Stop at the red line.' WHERE id = 'src-1'").run()
+  sqlite.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, version, status, created_at) VALUES ('src-2', 'topic-role-a', 'text', 'Site guide', 'Everyone must Wear a  vest on the dock.', 3, 'ready', 2)").run()
+  sqlite.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, version, status, created_at) VALUES ('src-3', 'topic-role-a', 'pdf', 'Scan', '', 1, 'failed', 3)").run()
+  sqlite.prepare("INSERT INTO concepts (id, topic_id, unit_id, `order`, name, summary, source_id, source_quote, gen_status) VALUES ('con-2', 'topic-role-a', 'unit-1', 1, 'Line', 'Line', 'src-1', 'stop at the red line', 'ready')").run()
+}
+
+it('previews a retire: question count, concepts another document also covers, and orphans', async () => {
+  seedShared()
+  await expect(previewRetireRoleDocument({ data: { ...ids, sourceId: 'src-1' } })).resolves.toEqual({
+    questions: 2, alsoIn: [{ concept: 'Vests', document: 'Site guide v3' }], orphaned: 1,
+  })
+  expect(sqlite.prepare('SELECT count(*) AS n FROM sources WHERE retired_at IS NOT NULL').get()).toEqual({ n: 0 })
+})
+
+it('retiring repoints concepts another document covers and fails the orphans', async () => {
+  seedShared()
+  await retireRoleDocument({ data: { ...ids, sourceId: 'src-1' } })
+  expect(sqlite.prepare('SELECT id, source_id, source_quote, misconceptions_json, gen_status, gen_error FROM concepts ORDER BY id').all()).toEqual([
+    { id: 'con-1', source_id: 'src-2', source_quote: 'Wear a  vest', misconceptions_json: '[]', gen_status: 'pending', gen_error: null },
+    { id: 'con-2', source_id: 'src-1', source_quote: 'stop at the red line', misconceptions_json: '[]', gen_status: 'failed', gen_error: 'The document behind this concept was retired' },
+  ])
+  expect(drain).toHaveBeenCalledTimes(1)
+  expect(state.background).toHaveLength(1)
+})
+
 // The browser upload route: same handler as the server function, with the org and role taken from the URL.
 const post = (body: FormData, origin = 'http://127.0.0.1:8800') => (Route.options.server!.handlers as unknown as {
   POST: (ctx: { request: Request; params: { orgId: string; roleId: string } }) => Promise<Response>
@@ -289,7 +365,7 @@ it.each(['http://127.0.0.1:8800', 'https://app.learnquiz.com'])('stores a PDF po
   const result = await response.json() as { sourceId: string }
   const key = `orgs/org-a/roles/role-a/sources/${result.sourceId}.pdf`
   expect(response.status).toBe(200)
-  expect(result).toEqual({ sourceId: result.sourceId, topicId: 'topic-role-a', r2Key: key, chars: SENTENCE.length, version: 1 })
+  expect(result).toEqual({ sourceId: result.sourceId, topicId: 'topic-role-a', r2Key: key, chars: SENTENCE.length, version: 1, status: 'ready' })
   expect(state.bucket.put).toHaveBeenCalledTimes(1)
   expect(state.bucket.put.mock.calls[0][0]).toBe(key)
   expect(sqlite.prepare('SELECT topic_id, uploaded_by FROM sources WHERE id = ?').get(result.sourceId)).toEqual({ topic_id: 'topic-role-a', uploaded_by: 'owner-a' })

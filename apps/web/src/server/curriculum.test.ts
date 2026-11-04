@@ -273,6 +273,15 @@ it('refuses roles with no live document text before calling the model', async ()
   expect(fetchModel).not.toHaveBeenCalled()
 })
 
+it('builds without a document whose extraction failed, and refuses a role whose only document failed', async () => {
+  raw.exec("INSERT INTO sources (id, topic_id, kind, title, body_text, status, error, created_at) VALUES ('scan', 'picker-topic', 'pdf', 'Scan', '', 'failed', 'No selectable text found. This looks like a scan.', 0)")
+  await expect(generate()).resolves.toEqual({ topicId: 'picker-topic' })
+  raw.exec("UPDATE topics SET status = 'draft' WHERE id = 'picker-topic'")
+  raw.exec("UPDATE sources SET deleted_at = 1 WHERE topic_id = 'picker-topic' AND id != 'scan'")
+  await expect(generate()).rejects.toMatchObject({ status: 422, message: 'Add documents with extracted text before building the curriculum.' })
+  expect(fetchModel).toHaveBeenCalledTimes(1)
+})
+
 it('builds from a document replaced between the first read and the claim, never from the retired one', async () => {
   const revised = documents[0].replace('Preparation notes.', 'Revised preparation notes.')
   beforeClaim.hook = () => {

@@ -36,7 +36,9 @@ const slugify = (name: string) =>
 // Server-only so exporting them for People keeps the database out of the client bundle.
 export const rolesOf = createServerOnlyFn((orgId: string) =>
   getDb()
-    .select({ id: jobRoles.id, name: jobRoles.name, benchmark: jobRoles.benchmark, onboardingDays: jobRoles.onboardingDays, topicId: topics.id, topicStatus: topics.status })
+    .select({ id: jobRoles.id, name: jobRoles.name, benchmark: jobRoles.benchmark, onboardingDays: jobRoles.onboardingDays, topicId: topics.id, topicStatus: topics.status,
+      failedDocuments: sql<number>`(select count(*) from ${sources} where ${sources.topicId} = ${topics.id} and ${sources.status} = 'failed' and ${sources.deletedAt} is null and ${sources.retiredAt} is null)`.mapWith(Number),
+    })
     .from(jobRoles)
     .innerJoin(topics, eq(topics.jobRoleId, jobRoles.id))
     .where(and(eq(jobRoles.orgId, orgId), eq(jobRoles.status, 'active')))

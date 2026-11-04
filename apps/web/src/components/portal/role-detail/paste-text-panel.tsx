@@ -15,7 +15,7 @@ const fmt = (n: number) => n.toLocaleString('en-US')
 const overMessage = (count: number, max: number) =>
   `${fmt(count)} / ${fmt(max)} characters. Remove ${fmt(count - max)} or upload a PDF instead.`
 
-export function PasteTextPanel({ roleId, onClose, onAdded }: { roleId: string; onClose: () => void; onAdded: (current: boolean) => unknown }) {
+export function PasteTextPanel({ roleId, replacesId, onClose, onAdded }: { roleId: string; replacesId?: string; onClose: () => void; onAdded: (current: boolean) => unknown }) {
   const { slug } = usePortal()
   const upload = useServerFn(uploadRoleDocument)
   const uid = useId()
@@ -49,6 +49,7 @@ export function PasteTextPanel({ roleId, onClose, onAdded }: { roleId: string; o
     formData.set('roleId', roleId)
     formData.set('title', title)
     formData.set('text', text)
+    if (replacesId) formData.set('replacesId', replacesId)
     setErrors({})
     setGeneral('')
     setBusy(true)
