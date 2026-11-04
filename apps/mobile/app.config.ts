@@ -13,7 +13,6 @@ export default function config(): ExpoConfig {
       package: 'com.learnquiz.app',
       permissions: ['POST_NOTIFICATIONS'],
       blockedPermissions: [
-        'android.permission.RECORD_AUDIO',
         'android.permission.CAMERA',
         'android.permission.ACCESS_FINE_LOCATION',
         'android.permission.ACCESS_COARSE_LOCATION',
@@ -42,6 +41,8 @@ export default function config(): ExpoConfig {
       'expo-secure-store',
       'expo-splash-screen',
       'expo-sqlite',
+      // The microphone, only while a learner records a voice answer; no background audio service.
+      ['expo-audio', { recordAudioAndroid: true, enableBackgroundPlayback: false }],
     ],
     ...(process.env.EAS_PROJECT_ID && { extra: { eas: { projectId: process.env.EAS_PROJECT_ID } } }),
   }

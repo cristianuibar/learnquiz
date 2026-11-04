@@ -7,4 +7,6 @@ export type QuestionBodyProps = {
   marks: Record<string, 'correct' | 'wrong' | 'rest'> | null
   disabled: boolean
   onSubmit?(): void
+  // Set only when the session offers voice answers (never for role topics).
+  voiceSessionId?: string | null
 }

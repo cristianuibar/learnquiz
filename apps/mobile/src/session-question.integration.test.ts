@@ -16,6 +16,11 @@ jest.mock('expo-router', () => {
   }
 })
 jest.mock('expo-image', () => ({ Image: require('react-native').Image }))
+jest.mock('./components/question/diagram-image', () => ({ DiagramImage: () => null }))
+jest.mock('expo-audio', () => ({
+  useAudioStream: () => ({ stream: { start: jest.fn(async () => {}), stop: jest.fn() }, isStreaming: false }),
+  requestRecordingPermissionsAsync: jest.fn(async () => ({ granted: true, canAskAgain: true })),
+}))
 jest.mock('./lib/api', () => ({ api: jest.fn() }))
 jest.mock('./lib/session-store', () => ({ useSession: () => ({ branding: null }) }))
 jest.mock('./lib/session/draft', () => ({
@@ -38,9 +43,9 @@ const item: ItemView = {
   stem: 'The pallet limit is ____.', options: [], blank: { numeric: true }, image: null, difficulty: 1,
 }
 
-async function session(question: ItemView = item) {
+async function session(question: ItemView = item, voiceEnabled?: boolean) {
   jest.mocked(api).mockResolvedValue({
-    item: question, ended: false, progress: { position: 1, total: 20 },
+    id: 'session-337', item: question, ended: false, progress: { position: 1, total: 20 }, voiceEnabled,
   })
   await render(h(ThemeProvider, { children: h(SessionScreen) }))
 }
@@ -120,4 +125,21 @@ test.each([
   expect(screen.getByRole('text', { name: stem.replace('____', 'blank') })).toBeOnTheScreen()
   expect(suffix.parent).toBe(field.parent)
   expect(field.parent).toHaveStyle({ flexDirection: 'row', flexWrap: 'nowrap', gap: 0 })
+})
+
+const short: ItemView = { ...item, format: 'short', stem: 'A carton is stuck in the conveyor. What do you do?', blank: null }
+
+test('a short answer offers recording when the session allows voice', async () => {
+  await session(short, true)
+  expect(await screen.findByRole('togglebutton', { name: 'Record answer' })).toBeOnTheScreen()
+  expect(screen.getByText('Tap to record')).toBeOnTheScreen()
+  expect(screen.getByRole('button', { name: 'Type instead' })).toBeOnTheScreen()
+  expect(screen.queryByLabelText('Your answer')).toBeNull()
+})
+
+test.each([false, undefined])('a role topic or an older server (voiceEnabled %s) types the short answer only', async (voiceEnabled) => {
+  await session(short, voiceEnabled)
+  expect(await screen.findByLabelText('Your answer')).toBeOnTheScreen()
+  expect(screen.queryByRole('togglebutton', { name: 'Record answer' })).toBeNull()
+  expect(screen.queryByText('Tap to record')).toBeNull()
 })

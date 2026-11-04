@@ -29,8 +29,9 @@ test('can prebuild without Firebase, EAS or supplied icons', () => {
   expect(result.android?.adaptiveIcon).toBeUndefined()
   expect(result.plugins).toContainEqual(['expo-notifications', { color: expect.any(String) }])
   expect(result.android?.permissions).toEqual(['POST_NOTIFICATIONS'])
+  expect(result.plugins).toContainEqual(['expo-audio', { recordAudioAndroid: true, enableBackgroundPlayback: false }])
+  expect(result.android?.blockedPermissions).not.toContain('android.permission.RECORD_AUDIO')
   expect(result.android?.blockedPermissions).toEqual([
-    'android.permission.RECORD_AUDIO',
     'android.permission.CAMERA',
     'android.permission.ACCESS_FINE_LOCATION',
     'android.permission.ACCESS_COARSE_LOCATION',

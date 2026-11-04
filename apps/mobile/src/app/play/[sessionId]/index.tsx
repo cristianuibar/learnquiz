@@ -21,6 +21,7 @@ import { deleteDraft, draftForView, writeDraft } from '@/lib/session/draft'
 import { sessionRefetchError, type SessionError } from '@/lib/session/error'
 import { canAdvance, canLoadSession, noticeFor, revealMarks, type ContinueRequest } from '@/lib/session/overlay'
 import { createReadyAnnouncement } from '@/lib/session/ready'
+import { voiceSessionId } from '@/lib/session/voice'
 import { useSession } from '@/lib/session-store'
 import { useTheme } from '@/theme/ThemeProvider'
 
@@ -310,6 +311,7 @@ function ActiveSession({ sessionId, announceReady }: { sessionId: string; announ
             onAnswer={(answer) => changeDraft({ ...draftRef.current, answer })}
             disabled={busy || reveal !== null}
             onSubmit={() => { void check() }}
+            voiceSessionId={voiceSessionId(view)}
           />
         ) : !error ? <Text accessibilityLiveRegion="polite">{view?.ended ? 'Ending your session…' : 'Loading your session…'}</Text> : null}
       </SessionFrame>
@@ -317,7 +319,7 @@ function ActiveSession({ sessionId, announceReady }: { sessionId: string; announ
   )
 }
 
-function SessionQuestion({ item, notice, marks, answer, onAnswer, disabled, onSubmit }: {
+function SessionQuestion({ item, notice, marks, answer, onAnswer, disabled, onSubmit, voiceSessionId }: {
   item: ItemView
   notice: string | null
   marks: ReturnType<typeof revealMarks>
@@ -325,6 +327,7 @@ function SessionQuestion({ item, notice, marks, answer, onAnswer, disabled, onSu
   onAnswer(answer: Answer): void
   disabled: boolean
   onSubmit(): void
+  voiceSessionId: string | null
 }) {
   const { space } = useTheme()
   useEffect(() => {
@@ -334,7 +337,7 @@ function SessionQuestion({ item, notice, marks, answer, onAnswer, disabled, onSu
     <View style={{ gap: space[6] }}>
       {notice ? <Text variant="caption" muted>{notice}</Text> : null}
       {item.format !== 'cloze' ? <SessionStem stem={item.stem} /> : null}
-      <QuestionBody key={item.id} item={item} answer={answer} onAnswer={onAnswer} marks={marks} disabled={disabled} onSubmit={onSubmit} />
+      <QuestionBody key={item.id} item={item} answer={answer} onAnswer={onAnswer} marks={marks} disabled={disabled} onSubmit={onSubmit} voiceSessionId={voiceSessionId} />
     </View>
   )
 }
