@@ -1,4 +1,4 @@
-import { colors, contrast, brandProblem, deriveBrand } from '@learnquiz/tokens'
+import { colors, contrast, brandProblem } from '@learnquiz/tokens'
 import { RotateCw, Upload, ImageIcon } from 'lucide-react'
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Banner } from '@/components/admin/banner'
@@ -394,17 +394,21 @@ function CompanyForm({ settings, readOnly = settings.readOnly, onSaved }: FormPr
                 onChange={(e) => { edit(); setAccent(e.target.value.toUpperCase()) }}
               />
             </>}
-            {((accentOk && acc.ratio !== null) || readOnly) && (
+            {((accentValid && acc.ratio !== null) || readOnly) && (
               <figure className="m-0 flex flex-wrap items-center gap-3">
                 <span
                   className="inline-flex min-h-11 items-center rounded-md px-4 text-label"
-                  style={{ backgroundColor: accent || 'var(--brand)', color: accent ? deriveBrand(accent).light.onBrand : 'var(--on-brand)' }}
+                  style={{
+                    backgroundColor: accent || 'var(--brand)',
+                    color: acc.ratio === null ? 'var(--on-brand)' : acc.ratio >= contrast(accent, colors.ink[0]) ? colors['on-brand'][0] : colors.ink[0],
+                  }}
                 >
                   Start quiz
                 </span>
-                <figcaption className="text-caption text-ink-muted tabular-nums">
-                  <span className="sr-only">Learner app button preview: </span>
-                  {acc.ratio !== null ? `${acc.ratio.toFixed(1)}:1 on white · passes AA` : 'Default accent'}
+                <figcaption className={accentOk || (readOnly && !accent) ? 'text-caption text-ink-muted tabular-nums' : 'sr-only'}>
+                  <span className="sr-only">Learner app button preview{accentOk || (readOnly && !accent) ? ': ' : ''}</span>
+                  {accentOk && acc.ratio !== null && <>{acc.ratio.toFixed(1)}:1 on white · passes AA</>}
+                  {readOnly && !accent && 'Default accent'}
                 </figcaption>
               </figure>
             )}
