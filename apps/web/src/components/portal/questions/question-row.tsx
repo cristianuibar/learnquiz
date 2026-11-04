@@ -25,12 +25,13 @@ export type Action = 'approve' | 'retire'
 export const stemId = (id: string) => `stem-${id}`
 export const toggleId = (id: string) => `toggle-${id}`
 
-export function QuestionRow({ question, critical, expanded, slug, sources, onToggle, onAct, onAnnounce }: {
+export function QuestionRow({ question, critical, expanded, slug, sources, readOnly = false, onToggle, onAct, onAnnounce }: {
   question: Question
   critical: boolean
   expanded: boolean
   slug: string
   sources: Review['sources']
+  readOnly?: boolean
   onToggle: () => void
   onAct: (id: string, action: Action) => () => void
   onAnnounce: (message: string) => void
@@ -81,7 +82,7 @@ export function QuestionRow({ question, critical, expanded, slug, sources, onTog
       ))}
       {expanded && (
         <div id={bodyId} className="px-4 pb-4">
-          <QuestionDetails question={question} slug={slug} sources={sources} stemId={sid} editing={editing} onEditingChange={setEditing} onAct={onAct} onAnnounce={onAnnounce} />
+          <QuestionDetails readOnly={readOnly} question={question} slug={slug} sources={sources} stemId={sid} editing={editing} onEditingChange={setEditing} onAct={onAct} onAnnounce={onAnnounce} />
         </div>
       )}
     </li>

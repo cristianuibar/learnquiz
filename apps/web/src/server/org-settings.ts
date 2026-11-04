@@ -8,7 +8,7 @@ import { member, organization } from '@/db/auth-schema'
 import { orgSettings } from '@/db/schema'
 import { accessibleAccent, CompanySettings, defaultWorkingHours } from '@/lib/company-settings'
 import { getAuth } from '@/server/auth'
-import { requireOrgAdmin } from '@/server/authz'
+import { requireOrgAdmin, requireOrgReader } from '@/server/authz'
 import { getEnv } from '@/server/env'
 import { httpError } from '@/server/helpers'
 
@@ -17,10 +17,11 @@ const Slug = z.object({ slug: z.string().min(1).max(100) })
 export const getCompanySettings = createServerFn({ method: 'GET' })
   .validator(Slug)
   .handler(async ({ data }) => {
-    const { org } = await requireOrgAdmin(data.slug)
+    const { org, readOnly } = await requireOrgReader(data.slug)
     const settings = await getDb().select().from(orgSettings).where(eq(orgSettings.orgId, org.id)).get()
     return {
       slug: org.slug,
+      readOnly,
       name: settings?.companyName ?? org.name,
       timezone: settings?.timezone ?? 'UTC',
       workingHours: settings?.workingHours ?? defaultWorkingHours,

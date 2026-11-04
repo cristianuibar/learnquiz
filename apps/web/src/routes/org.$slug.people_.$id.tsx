@@ -9,7 +9,7 @@ export const Route = createFileRoute('/org/$slug/people_/$id')({
   loader: async ({ params }) => {
     const data = { org: params.slug, learnerId: params.id }
     try {
-      const [profile, flags] = await Promise.all([getProfile({ data }), getMemberFlags({ data })])
+      const [profile, { flags }] = await Promise.all([getProfile({ data }), getMemberFlags({ data })])
       return { profile, flags }
     } catch (err) {
       if ((err as { status?: unknown } | null)?.status === 404) throw notFound({ data: { what: 'person' } })

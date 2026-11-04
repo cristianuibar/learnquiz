@@ -9,7 +9,7 @@ import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import type { ItemPayload } from '@/lib/llm/schemas'
 import { FORMAT } from './question-details'
-import { statusWord, type Question, type Review } from './question-row'
+import { statusWord, stemId, type Question, type Review } from './question-row'
 
 const field = 'flex flex-col gap-2 text-label text-ink'
 const legend = 'mb-3 text-label text-ink'
@@ -26,7 +26,7 @@ export function QuestionEditor({ question, sources, onSave, onCancel, busy, erro
 }) {
   const p = question.payload
   const uid = useId()
-  const headingId = `${uid}-h`
+  const headingId = stemId(question.id)
   const diffId = `${uid}-diff`
   const quoteId = `quote-${question.id}`
   const heading = useRef<HTMLHeadingElement>(null)

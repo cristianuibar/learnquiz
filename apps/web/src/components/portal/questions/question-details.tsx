@@ -4,6 +4,7 @@ import { useRouter } from '@tanstack/react-router'
 import { errorMessage } from '@/components/inline-error'
 import { usePortal } from '@/components/portal/portal-context'
 import { Button } from '@/components/ui/button'
+import { DiagramImage } from '@/components/question/diagram-image'
 import type { ItemPayload } from '@/lib/llm/schemas'
 import { reviewQuestion } from '@/server/question-review'
 import { FlagGroup } from './flag-group'
@@ -21,19 +22,20 @@ function typeLine(q: Question) {
   return `${fmt} · Unreviewed · Generated ${shortDate(q.createdAt)}${q.source ? ` from ${q.source.title}` : ''}`
 }
 
-export function QuestionDetails({ question, slug, sources, stemId, editing, onEditingChange, onAct, onAnnounce }: {
+export function QuestionDetails({ question, slug, sources, stemId, editing, readOnly = false, onEditingChange, onAct, onAnnounce }: {
   question: Question
   slug: string
   sources: Review['sources']
   stemId: string
   editing: boolean
+  readOnly?: boolean
   onEditingChange: (editing: boolean) => void
   // Called when Approve or Retire is pressed; the returned callback runs once the action is saved and the data refreshed.
   onAct: (id: string, action: Action) => () => void
   onAnnounce: (message: string) => void
 }) {
   const router = useRouter()
-  const { readOnly } = usePortal()
+  const { readOnly: portalReadOnly } = usePortal()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const editButton = useRef<HTMLButtonElement>(null)
@@ -77,7 +79,7 @@ export function QuestionDetails({ question, slug, sources, stemId, editing, onEd
     }
   }
 
-  if (editing) {
+  if (editing && !readOnly && !portalReadOnly) {
     return (
       <QuestionEditor
         question={question}
@@ -90,34 +92,37 @@ export function QuestionDetails({ question, slug, sources, stemId, editing, onEd
     )
   }
 
-  const canEdit = !readOnly && question.status !== 'retired'
+  const canEdit = !readOnly && !portalReadOnly && question.status !== 'retired'
   const canReview = canEdit && question.status !== 'rejected'
   return (
     <div className="flex flex-col gap-4">
       <p className="text-caption text-ink-muted">{typeLine(question)}</p>
       {question.flags.map((f) => <FlagGroup key={f.id} flag={f} id={`flag-${question.id}-${f.id}`} />)}
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(320px,100%),1fr))] items-start gap-x-8 gap-y-4">
-        {typed ? (
-          <div className="flex flex-col gap-1">
-            <h5 className="text-label text-ink">Accepted answers</h5>
-            <ul className="list-disc pl-5 text-body text-ink">{(p.accepted_answers.length ? p.accepted_answers : [p.model_answer]).map((a, i) => <li key={i}>{a}</li>)}</ul>
-          </div>
-        ) : (
-          <ol aria-label="Answer options" className="flex flex-col gap-2">
-            {p.options.map((o, i) => (
-              <li key={o.id} className="flex gap-3 text-body text-ink">
-                <span aria-hidden className="w-5 shrink-0 text-label text-ink-muted">{ordered ? i + 1 : 'ABCDEFGH'[i]}</span>
-                <div className="flex min-w-0 flex-col">
-                  <span>{o.text}</span>
-                  {o.is_correct && !ordered ? (
-                    <span className="flex items-center gap-1 text-caption text-ink"><Check aria-hidden className="size-4 shrink-0" />Correct answer</span>
-                  ) : null}
-                  {ordered ? null : o.is_correct ? null : o.feedback ? <span className="text-caption text-ink-muted">{`Feedback: ${o.feedback}`}</span> : <span className="text-caption text-ink-muted">No feedback</span>}
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
+        <div className="flex min-w-0 flex-col gap-4">
+          {p.image && <DiagramImage key={question.id} image={{ ...p.image, src: `/media/items/${question.id}` }} />}
+          {typed ? (
+            <div className="flex flex-col gap-1">
+              <h5 className="text-label text-ink">Accepted answers</h5>
+              <ul className="list-disc pl-5 text-body text-ink">{(p.accepted_answers.length ? p.accepted_answers : [p.model_answer]).map((a, i) => <li key={i}>{a}</li>)}</ul>
+            </div>
+          ) : (
+            <ol aria-label="Answer options" className="flex flex-col gap-2">
+              {p.options.map((o, i) => (
+                <li key={o.id} className="flex gap-3 text-body text-ink">
+                  <span aria-hidden className="w-5 shrink-0 text-label text-ink-muted">{ordered ? i + 1 : 'ABCDEFGH'[i]}</span>
+                  <div className="flex min-w-0 flex-col">
+                    <span>{o.text}</span>
+                    {o.is_correct && !ordered ? (
+                      <span className="flex items-center gap-1 text-caption text-ink"><Check aria-hidden className="size-4 shrink-0" />Correct answer</span>
+                    ) : null}
+                    {ordered ? null : o.is_correct ? null : o.feedback ? <span className="text-caption text-ink-muted">{`Feedback: ${o.feedback}`}</span> : <span className="text-caption text-ink-muted">No feedback</span>}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
         <div className="flex min-w-0 flex-col gap-4">
           <div className="flex flex-col gap-1">
             <h5 className="text-label text-ink">Explanation</h5>

@@ -6,7 +6,7 @@ import { getMemberFlags, getProfile } from './profile'
 
 // Fake only the transport, request auth and Cloudflare database binding. Both
 // authorization helpers, the profile handler and its SQL run for real.
-const holder = vi.hoisted(() => ({ db: null as unknown, user: null as { id: string; name: string; isAnonymous: boolean } | null }))
+const holder = vi.hoisted(() => ({ db: null as unknown, user: null as { id: string; name: string; isAnonymous: boolean; role?: string } | null }))
 vi.mock('@/db', () => ({ getDb: () => holder.db }))
 vi.mock('@/server/env', () => ({}))
 vi.mock('@/server/auth', () => ({ getAuth: () => ({ api: { getSession: async () => holder.user ? { user: holder.user } : null } }) }))
@@ -123,7 +123,7 @@ it('lists the person’s flags on this company’s questions only, newest first'
   flag.run('f-other', 'item-a', 'colleague-a', 'unfair-result', null, start + 4, null)
   holder.user = { id: 'admin-a', name: 'Admin', isAnonymous: false }
   const base = { concept: 'Concept a', unit: 'Unit a', stem: 'Stem a', roleId: 'role-a', itemId: 'item-a' }
-  expect(await getMemberFlags({ data: { org: 'company-a', learnerId: 'learner-a' } })).toEqual([
+  expect((await getMemberFlags({ data: { org: 'company-a', learnerId: 'learner-a' } })).flags).toEqual([
     { ...base, id: 'f-new', label: 'custom-reason', note: null, createdAt: start + 2, resolvedAt: null },
     { ...base, id: 'f-old', label: 'The result seems unfair', note: 'Too hard', createdAt: start + 1, resolvedAt: start + 5 },
   ])
@@ -385,4 +385,16 @@ it.each([[0, 1], [15, 16], [45, 30]])('reports onboarding for a role assigned %i
 it('has no onboarding for a personal topic', async () => {
   seedWeek()
   expect((await getProfile({ data: {} })).onboarding).toBeNull()
+})
+
+
+it('lets staff read a member profile and flags while keeping the target membership check', async () => {
+  holder.user = { id: 'staff', name: 'Staff', isAnonymous: false, role: 'admin' }
+  const data = { org: 'company-a', learnerId: 'learner-a' }
+  expect(await getProfile({ data })).toMatchObject({ name: 'learner-a', readOnly: true })
+  expect(await getMemberFlags({ data })).toEqual({ readOnly: true, flags: [] })
+  for (const learnerId of ['learner-b', 'missing']) {
+    await expect(getProfile({ data: { ...data, learnerId } })).rejects.toMatchObject({ status: 404 })
+    await expect(getMemberFlags({ data: { ...data, learnerId } })).rejects.toMatchObject({ status: 404 })
+  }
 })

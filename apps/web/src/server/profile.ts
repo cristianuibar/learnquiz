@@ -4,11 +4,11 @@ import type { Profile } from '@learnquiz/api/progress'
 import { z } from 'zod'
 import { getDb, type Db } from '@/db'
 import { member, user } from '@/db/auth-schema'
-import { attempts, concepts, itemFlags, items, jobRoles, learnerConcept, learnerUnit, memberRoleAssignments, placements, sessions, topics, units } from '@/db/schema'
+import { attempts, concepts, itemFlags, items, jobRoles, learnerConcept, learnerUnit, memberRoleAssignments, placements, sessions, sources, topics, units } from '@/db/schema'
 import { conceptStatus, roleMastery, unitState } from '@/lib/learning/path'
 import type { ItemPayload } from '@/lib/llm/schemas'
 import { benchmarkMet, masterySeries, onboardingDay, WEEK } from '@/lib/learning/profile'
-import { requireOrgAdmin } from '@/server/authz'
+import { requireOrgReader } from '@/server/authz'
 import { httpError, mean } from '@/server/helpers'
 import { liveConcept } from '@/server/live-concept'
 import { reasonLabels } from '@/server/question-review'
@@ -32,8 +32,8 @@ export type MemberFlag = { id: string; label: string; note: string | null; conce
 // A person's question reports, scoped to this company's role topics.
 export const getMemberFlags = createServerFn({ method: 'GET' })
   .validator(z.object({ org: id, learnerId: id }).strict())
-  .handler(async ({ data }): Promise<MemberFlag[]> => {
-    const { org } = await requireOrgAdmin(data.org)
+  .handler(async ({ data }): Promise<{ readOnly: boolean; flags: MemberFlag[] }> => {
+    const { org, readOnly } = await requireOrgReader(data.org)
     const db = getDb()
     await requireMember(db, org.id, data.learnerId)
     const rows = await db.select({ f: itemFlags, payloadJson: items.payloadJson, roleId: topics.jobRoleId, concept: concepts.name, unit: units.name })
@@ -45,20 +45,23 @@ export const getMemberFlags = createServerFn({ method: 'GET' })
       .innerJoin(units, eq(units.id, concepts.unitId))
       .where(eq(itemFlags.userId, data.learnerId))
       .orderBy(desc(itemFlags.createdAt))
-    return rows.map((r) => ({
+    return { readOnly, flags: rows.map((r) => ({
       id: r.f.id, label: reasonLabels[r.f.reason] ?? r.f.reason, note: r.f.note, concept: r.concept, unit: r.unit,
       stem: (JSON.parse(r.payloadJson) as ItemPayload).stem, roleId: r.roleId!, itemId: r.f.itemId, createdAt: r.f.createdAt, resolvedAt: r.f.resolvedAt,
-    }))
+    })) }
   })
 
 export const getProfile = createServerFn({ method: 'GET' })
   .validator(ProfileInput)
-  .handler(async ({ data }): Promise<Profile> => {
+  .handler(async ({ data }): Promise<Profile & { readOnly: boolean }> => {
     const db = getDb()
     let learnerId: string
     let orgId: string | undefined
+    let readOnly = false
     if ('learnerId' in data) {
-      const { org } = await requireOrgAdmin(data.org)
+      const reader = await requireOrgReader(data.org)
+      const { org } = reader
+      readOnly = reader.readOnly
       orgId = org.id
       learnerId = data.learnerId
       await requireMember(db, org.id, learnerId)
@@ -88,8 +91,9 @@ export const getProfile = createServerFn({ method: 'GET' })
       db.select({ id: units.id, name: units.name, unlockedAt: learnerUnit.unlockedAt }).from(units)
         .leftJoin(learnerUnit, and(eq(learnerUnit.unitId, units.id), eq(learnerUnit.learnerId, learnerId)))
         .where(eq(units.topicId, topic.id)).orderBy(asc(units.order)),
-      db.select({ id: concepts.id, unitId: concepts.unitId, name: concepts.name, critical: concepts.critical, pKnown: learnerConcept.pKnown })
+      db.select({ id: concepts.id, unitId: concepts.unitId, name: concepts.name, critical: concepts.critical, pKnown: learnerConcept.pKnown, addedAt: sources.createdAt })
         .from(concepts)
+        .leftJoin(sources, and(eq(sources.id, concepts.sourceId), eq(sources.topicId, concepts.topicId)))
         .leftJoin(learnerConcept, and(eq(learnerConcept.conceptId, concepts.id), eq(learnerConcept.learnerId, learnerId)))
         .where(and(eq(concepts.topicId, topic.id), liveConcept())).orderBy(asc(concepts.order)),
       db.select({ id: attempts.id, itemId: attempts.itemId, conceptId: attempts.conceptId, at: attempts.at, correct: attempts.correct, confidence: attempts.confidence, before: attempts.pKnownBefore, after: attempts.pKnownAfter })
@@ -100,6 +104,9 @@ export const getProfile = createServerFn({ method: 'GET' })
       db.select({ id: placements.id }).from(placements)
         .where(and(eq(placements.learnerId, learnerId), eq(placements.topicId, topic.id))).limit(1).get(),
     ]) : [[], [], [], [], undefined]
+
+    // Keep later documents visible by unit without lowering the earned overall figure.
+    const overall = conceptRows.filter((c) => role?.proficientAt == null || c.addedAt === null || c.addedAt <= role.proficientAt)
 
     // Replay mastery so past days never use today's value for a practiced concept.
     const known = new Map(conceptRows.map((c) => [c.id, c.pKnown ?? 0]))
@@ -138,7 +145,7 @@ export const getProfile = createServerFn({ method: 'GET' })
         }
       }
       // Attempts on retired concepts stay in the history but not in the live curriculum's average.
-      const live = conceptRows.map((c) => known.get(c.id) ?? 0)
+      const live = overall.map((c) => known.get(c.id) ?? 0)
       return {
         date,
         mastery: mean(live),
@@ -155,7 +162,7 @@ export const getProfile = createServerFn({ method: 'GET' })
     // The last week is the one holding `end - 1`, so an `end` on a Monday boundary still yields six weeks.
     const weeksUntil = (end: number) => {
       const weeksFrom = history.length ? Math.max(mondayOf(history[0].at), mondayOf(end - 1) - 5 * WEEK) : end
-      const series = masterySeries(conceptRows.map((c) => c.id), history.map((a) => ({ ...a, pKnownAfter: a.after })), weeksFrom, end, knownBefore)
+      const series = masterySeries(overall.map((c) => c.id), history.map((a) => ({ ...a, pKnownAfter: a.after })), weeksFrom, end, knownBefore)
       return series.map(({ mastery }, k) => {
         const from = weeksFrom + k * WEEK
         return {
@@ -175,13 +182,14 @@ export const getProfile = createServerFn({ method: 'GET' })
     })
 
     return {
+      readOnly,
       name: person?.name ?? '',
       topic: topic ? { id: topic.id, title: topic.title } : null,
       role: role?.name ?? null,
       benchmark,
       started: history.length > 0,
       onboarding: role ? { day: onboardingDay(role.assignedAt, now, role.onboardingDays), days: role.onboardingDays } : null,
-      mastery: roleMastery(conceptViews.map((c) => ({ conceptId: c.id, pKnown: c.pKnown })), conceptViews.map((c) => c.id)),
+      mastery: roleMastery(overall.map((c) => ({ conceptId: c.id, pKnown: c.pKnown ?? 0 })), overall.map((c) => c.id)),
       units: unitRows.map((unit) => {
         const unitConcepts = conceptViews.filter((c) => c.unitId === unit.id)
         return {

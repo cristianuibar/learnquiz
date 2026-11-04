@@ -70,12 +70,13 @@ export const trainingOf = createServerOnlyFn(async (orgId: string) => {
   const now = Date.now()
   const correction = alias(attempts, 'correction')
   const [rows, errors] = await Promise.all([
-    db.select({ userId: memberRoleAssignments.userId, assignedAt: memberRoleAssignments.assignedAt, proficientAt: memberRoleAssignments.proficientAt, benchmark: jobRoles.benchmark, conceptId: concepts.id, critical: concepts.critical, pKnown: learnerConcept.pKnown })
+    db.select({ userId: memberRoleAssignments.userId, assignedAt: memberRoleAssignments.assignedAt, proficientAt: memberRoleAssignments.proficientAt, benchmark: jobRoles.benchmark, conceptId: concepts.id, critical: concepts.critical, pKnown: learnerConcept.pKnown, addedAt: sources.createdAt })
       .from(memberRoleAssignments)
       .innerJoin(member, and(eq(member.userId, memberRoleAssignments.userId), eq(member.organizationId, memberRoleAssignments.orgId)))
       .innerJoin(jobRoles, and(eq(jobRoles.id, memberRoleAssignments.jobRoleId), eq(jobRoles.orgId, memberRoleAssignments.orgId), eq(jobRoles.status, 'active')))
       .leftJoin(topics, and(eq(topics.jobRoleId, jobRoles.id), eq(topics.status, 'ready')))
       .leftJoin(concepts, and(eq(concepts.topicId, topics.id), liveConcept()))
+      .leftJoin(sources, and(eq(sources.id, concepts.sourceId), eq(sources.topicId, topics.id)))
       .leftJoin(learnerConcept, and(eq(learnerConcept.conceptId, concepts.id), eq(learnerConcept.learnerId, memberRoleAssignments.userId)))
       .where(eq(memberRoleAssignments.orgId, orgId)),
     db.selectDistinct({ userId: attempts.learnerId, itemId: attempts.itemId })
@@ -90,18 +91,20 @@ export const trainingOf = createServerOnlyFn(async (orgId: string) => {
         )),
       ))),
   ])
-  const progress = new Map<string, { assignedAt: number; proficientAt: number | null; benchmark: number; list: { id: string; critical: boolean; pKnown: number }[] }>()
+  const progress = new Map<string, { assignedAt: number; proficientAt: number | null; benchmark: number; list: { id: string; critical: boolean; pKnown: number; addedAt: number | null }[] }>()
   for (const row of rows) {
     const current = progress.get(row.userId) ?? { assignedAt: row.assignedAt, proficientAt: row.proficientAt, benchmark: row.benchmark, list: [] }
     if (row.conceptId !== null) {
-      current.list.push({ id: row.conceptId, critical: row.critical ?? false, pKnown: row.pKnown ?? 0 })
+      current.list.push({ id: row.conceptId, critical: row.critical ?? false, pKnown: row.pKnown ?? 0, addedAt: row.addedAt })
     }
     progress.set(row.userId, current)
   }
   const training = new Map<string, Training>()
   for (const [userId, progressRow] of progress) {
-    const proficient = benchmarkMet(progressRow.list, progressRow.benchmark)
     const reachedAt = progressRow.proficientAt
+    const proficient = reachedAt !== null || benchmarkMet(progressRow.list, progressRow.benchmark)
+    // Later documents still need practice, but do not dilute the earned overall figure.
+    const overall = progressRow.list.filter((c) => reachedAt === null || c.addedAt === null || c.addedAt <= reachedAt)
     training.set(userId, {
       assignedAt: progressRow.assignedAt,
       stage: proficient ? 'proficient' : 'onboarding',
@@ -109,7 +112,7 @@ export const trainingOf = createServerOnlyFn(async (orgId: string) => {
       progress: progressRow.list.length ? (progressRow.benchmark > 0 ? Math.min(1, ...[mean(progressRow.list.map((c) => c.pKnown)), ...progressRow.list.filter((c) => c.critical).map((c) => c.pKnown)].map((p) => p / progressRow.benchmark)) : 1) : 0,
       daysToProficiency: proficient && reachedAt !== null && reachedAt >= progressRow.assignedAt && reachedAt <= now ? Math.ceil((reachedAt - progressRow.assignedAt) / 86_400_000) : null,
       criticalConfidentErrors: 0,
-      mastery: Math.round(roleMastery(progressRow.list.map((c) => ({ conceptId: c.id, pKnown: c.pKnown })), progressRow.list.map((c) => c.id)) * 100),
+      mastery: Math.round(roleMastery(overall.map((c) => ({ conceptId: c.id, pKnown: c.pKnown })), overall.map((c) => c.id)) * 100),
       benchmark: Math.round(progressRow.benchmark * 100),
     })
   }

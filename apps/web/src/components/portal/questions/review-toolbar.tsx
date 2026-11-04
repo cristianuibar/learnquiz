@@ -73,3 +73,17 @@ export function ReviewToolbar({ search, counts, shown, inputRef, onChange, onCle
     </div>
   )
 }
+
+export const validateReviewSearch = (search: Record<string, unknown>): ReviewSearch => {
+  const on = (v: unknown) => v === true || v === 1 || v === '1' || v === 'true'
+  const q = typeof search.q === 'string' ? search.q.trim().slice(0, 200) : ''
+  return {
+    role: typeof search.role === 'string' ? search.role : undefined,
+    item: typeof search.item === 'string' ? search.item : undefined,
+    q: q || undefined,
+    unreviewed: on(search.unreviewed) ? true : undefined,
+    flagged: on(search.flagged) ? true : undefined,
+    critical: on(search.critical) ? true : undefined,
+    status: search.status === 'live' || search.status === 'retired' || search.status === 'rejected' ? search.status : undefined,
+  }
+}

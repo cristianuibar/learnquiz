@@ -44,11 +44,11 @@ const WORD = { invited: 'Invited', active: 'Active', proficient: 'Proficient', e
 
 const sub = 'text-[13px]/[18px] text-ink-muted'
 
-export function People({ org, invite = false }: { org: Org; invite?: boolean }) {
+export function People({ org, invite = false, readOnly = org.readOnly }: { org: Org; invite?: boolean; readOnly?: boolean }) {
   const links = usePortalLinks()
   const router = useRouter()
   const navigate = useNavigate()
-  const [open, setOpen] = useState(invite && !org.readOnly)
+  const [open, setOpen] = useState(invite && !readOnly)
   const [shown, setShown] = useState<InviteLink[] | null>(null)
   const [error, setError] = useState('')
   const opener = useRef<Element | null>(null)
@@ -97,13 +97,13 @@ export function People({ org, invite = false }: { org: Org; invite?: boolean }) 
     showLinks([res.invite])
   }
 
-  const inviteButton = !org.readOnly && (
+  const inviteButton = !readOnly && (
     <Button variant="accent" onClick={openInvite}>
       <Plus aria-hidden />
       Invite people
     </Button>
   )
-  const dialog = org.readOnly ? null : (
+  const dialog = readOnly ? null : (
     <>
       <InviteDialog
         open={open}
@@ -137,7 +137,7 @@ export function People({ org, invite = false }: { org: Org; invite?: boolean }) 
       key: 'name', header: 'Name', label: '', stack: 'wide',
       cell: (p) => (
         <div className="flex flex-col">
-          {p.kind === 'member' && !org.readOnly ? (
+          {p.kind === 'member' ? (
             <Link {...links.person(p.userId)} className="self-start font-semibold text-brand hover:underline focus-visible:outline-2">{p.name}</Link>
           ) : (
             <span className="font-semibold text-ink">{p.name}</span>
@@ -217,9 +217,9 @@ export function People({ org, invite = false }: { org: Org; invite?: boolean }) 
           columns={columns}
           rows={rows}
           rowKey={(p) => (p.kind === 'member' ? p.userId : p.invitationId)}
-          actionsClassName="max-md:row-start-2 max-md:self-center max-md:justify-self-end"
+          actionsClassName="max-md:row-start-2 max-md:self-center max-md:justify-self-end max-md:has-[>div:empty]:hidden"
           actions={(p) => {
-            if (org.readOnly || p.kind === 'member') return null
+            if (readOnly || p.kind === 'member') return null
             const items = p.status === 'expired'
               ? [{ label: 'Create new link', onSelect: () => void renew(p) }, { label: 'Remove', onSelect: () => void revoke(p) }]
               : [{ label: 'Show invite link', onSelect: () => showLinks([p]) }, { label: 'Revoke', onSelect: () => void revoke(p) }]

@@ -21,8 +21,8 @@ vi.mock('@tanstack/react-start', () => ({
 vi.mock('@tanstack/react-start/server', () => ({ getRequestHeaders: () => new Headers() }))
 vi.mock('@/db', () => ({ getDb: () => state.db }))
 vi.mock('@/server/env', () => ({ getEnv: () => ({ MEDIA: state.bucket }) }))
-vi.mock('@/server/session', () => ({ getSessionUser: async () => state.user ? { id: state.user, isAnonymous: state.anonymous } : null }))
-vi.mock('@/server/auth', () => ({ getAuth: () => ({ api: { getSession: async () => state.user ? { user: { id: state.user, isAnonymous: state.anonymous }, session: { activeOrganizationId: state.active } } : null } }) }))
+vi.mock('@/server/session', () => ({ getSessionUser: async () => state.user ? { id: state.user, isAnonymous: state.anonymous, role: state.user === 'staff' ? 'admin' : 'user' } : null }))
+vi.mock('@/server/auth', () => ({ getAuth: () => ({ api: { getSession: async () => state.user ? { user: { id: state.user, isAnonymous: state.anonymous, role: state.user === 'staff' ? 'admin' : 'user' }, session: { activeOrganizationId: state.active } } : null } }) }))
 
 import { getCompanyBranding, getCompanySettings, saveCompanySettings } from './org-settings'
 import { serveCompanyLogo } from './org-logo'
@@ -86,7 +86,7 @@ it('loads defaults, upserts settings for owners and admins, and returns branding
   await saveCompanySettings({ data: input })
   const key = state.bucket.put.mock.calls[0][0]
   expect(key).toMatch(/^org-logos\/org-a\//)
-  expect(await settings()).toEqual({ slug: 'alpha', name: 'Alpha Training', timezone: 'Europe/London', workingHours: { days: [1, 2, 3, 4, 5], start: '08:30', end: '17:30' }, accent: '#543189', hasLogo: true, logoUrl: `/api/org/org-a/logo?v=${encodeURIComponent(key)}` })
+  expect(await settings()).toEqual({ slug: 'alpha', readOnly: false, name: 'Alpha Training', timezone: 'Europe/London', workingHours: { days: [1, 2, 3, 4, 5], start: '08:30', end: '17:30' }, accent: '#543189', hasLogo: true, logoUrl: `/api/org/org-a/logo?v=${encodeURIComponent(key)}` })
   state.user = 'admin-a'
   input.delete('logo')
   input.set('timezone', 'America/New_York')
@@ -186,4 +186,16 @@ it('preserves existing settings when storage or the database fails during logo r
     expect(sqlite.prepare('SELECT logo_key FROM org_settings WHERE org_id = ?').get('org-a')).toEqual({ logo_key: oldKey })
     expect((await settings()).name).toBe('Alpha Training')
   } finally { sqlite.exec('DROP TRIGGER fail_company_update') }
+})
+
+
+it('lets staff read saved settings and the logo but refuses saving', async () => {
+  const input = form()
+  input.set('logo', logo())
+  await saveCompanySettings({ data: input })
+  state.bucket.get.mockResolvedValue({ body: await logo().arrayBuffer(), httpMetadata: { contentType: 'image/png' } })
+  state.user = 'staff'
+  expect(await settings()).toMatchObject({ readOnly: true, name: 'Alpha Training', timezone: 'Europe/London', accent: '#543189', hasLogo: true })
+  expect((await serveCompanyLogo('org-a')).status).toBe(200)
+  await expect(saveCompanySettings({ data: input })).rejects.toMatchObject({ status: 403 })
 })
