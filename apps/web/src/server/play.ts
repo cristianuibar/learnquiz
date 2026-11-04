@@ -1001,8 +1001,9 @@ async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: 
       .select({ reviews: count() })
       .from(learnerItem)
       .innerJoin(items, eq(items.id, learnerItem.itemId))
-      .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId), lte(learnerItem.due, Date.now() + DAY))),
-    dueCount(db, learnerId, topic.id, Date.now()),
+      .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId), lte(learnerItem.due, Date.now() + DAY),
+        topic.jobRoleId !== null ? ne(items.format, 'short') : undefined)),
+    dueCount(db, learnerId, topic.id, Date.now(), topic.jobRoleId !== null),
     topic.jobRoleId ? db.select({ benchmark: jobRoles.benchmark }).from(jobRoles).where(eq(jobRoles.id, topic.jobRoleId)).get() : undefined,
     db
       .select({ logJson: placements.logJson })

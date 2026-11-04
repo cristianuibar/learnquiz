@@ -488,7 +488,10 @@ it('reports the role benchmark, and a mini session earns no session bonus', asyn
   const second = await startMiniSession({ data: { itemId: 'i1' } })
   await answerItem({ data: { sessionId: second.sessionId, itemId: 'i1', answer: { text: '1' }, confidence: 'sure', responseMs: 1000 } })
   await nextItem({ data: { sessionId: second.sessionId } })
-  expect(await endSession({ data: { sessionId: second.sessionId } })).toMatchObject({ kind: 'mini', xp: 10, benchmark: 0.5 })
+  // A role session never serves short answers, so a due one is not a review left.
+  raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run('s1', 'c1', 't1', 'short', '{}', 1, 1)
+  raw.prepare('INSERT INTO learner_item (learner_id, item_id, due, stability, difficulty, state) VALUES (?, ?, ?, ?, ?, ?)').run('u1', 's1', now - 1, 1, 5, 2)
+  expect(await endSession({ data: { sessionId: second.sessionId } })).toMatchObject({ kind: 'mini', xp: 10, benchmark: 0.5, reviewsLeft: 0 })
   expect(scalar(raw, 'SELECT xp FROM learner_topic WHERE topic_id = ?', 't1').xp).toBe(20)
 })
 
@@ -814,6 +817,26 @@ describe('learner practice and unit unlocks', () => {
       await expect(result).rejects.toMatchObject({ status: 429 })
       expect(scalar(raw, 'SELECT COUNT(*) AS n FROM sessions').n).toBe(0)
     }
+    expect(chatJson).not.toHaveBeenCalled()
+    expect(scalar(raw, 'SELECT COUNT(*) AS n FROM model_calls').n).toBe(20)
+  })
+
+  it('joins a preparation that reserved the final cap slot instead of refusing Start', async () => {
+    seedFrontier(raw, 1, false)
+    const log = raw.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, error, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    for (let i = 0; i < 19; i++) log.run(`call-${i}`, 'u1', 'items', 'muse-spark-1.3', 0, 1, null, Date.now())
+    // Preparation holds the concept claim and the 20th, pending slot while its model call is in flight.
+    log.run('call-prep', 'u1', 'items', 'muse-spark-1.3', 0, 0, 'pending', Date.now())
+    raw.prepare("UPDATE concepts SET gen_status = 'generating', gen_started_at = ? WHERE id = 'c1'").run(Date.now())
+    setTimeout(() => {
+      raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) SELECT ?, concept_id, topic_id, format, payload_json, difficulty_prior, ? FROM items WHERE id = ?')
+        .run('i-prep', Date.now(), 'i1')
+      raw.prepare("UPDATE concepts SET gen_status = 'ready', gen_started_at = NULL WHERE id = 'c1'").run()
+    }, 50)
+
+    const { sessionId } = await startSession({ data: { topicId: 't1' } })
+    const plan = JSON.parse(scalar(raw, 'SELECT plan_json FROM sessions WHERE id = ?', sessionId).plan_json as string)
+    expect(plan.queue).toContain('i-prep')
     expect(chatJson).not.toHaveBeenCalled()
     expect(scalar(raw, 'SELECT COUNT(*) AS n FROM model_calls').n).toBe(20)
   })

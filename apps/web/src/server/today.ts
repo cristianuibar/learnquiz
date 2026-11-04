@@ -66,7 +66,7 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
       .where(and(eq(placements.learnerId, learnerId), eq(placements.topicId, topicId))).limit(1).get(),
     db.select({ xp: learnerTopic.xp, streakCount: learnerTopic.streakCount, lastSessionAt: learnerTopic.lastSessionAt }).from(learnerTopic)
       .where(and(eq(learnerTopic.learnerId, learnerId), eq(learnerTopic.topicId, topicId))).get(),
-    dueCount(db, learnerId, topicId, now),
+    dueCount(db, learnerId, topicId, now, Boolean(assigned)),
     loadFrontier(db, learnerId, topicId),
     basicsUnits(db, learnerId, topicId),
     hasAttemptOn(topicId),
@@ -86,7 +86,8 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
       )).get(),
     db.select({ at: min(learnerItem.due) }).from(learnerItem)
       .innerJoin(items, eq(items.id, learnerItem.itemId))
-      .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topicId), eq(items.status, 'active'), notFlaggedBy(db, learnerId), gt(learnerItem.due, now)))
+      .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topicId), eq(items.status, 'active'), notFlaggedBy(db, learnerId), gt(learnerItem.due, now),
+        assigned ? ne(items.format, 'short') : undefined))
       .get(),
     roleStats(),
   ])
