@@ -73,7 +73,7 @@ export function ConfirmDialog({ open, onOpenChange, title, consequences, verb, o
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/* Long consequence lists scroll inside the dialog so the confirm controls stay on screen. */}
-      <DialogContent initialFocus={askReason ? reasonRef : cancelRef} aria-describedby={description ? descId : listId}
+      <DialogContent initialFocus={askReason ? reasonRef : cancelRef} aria-describedby={description ? `${descId} ${listId}` : listId}
         className="flex flex-col md:max-h-[calc(100dvh-2rem)]"
         onCloseAutoFocus={(event) => {
           event.preventDefault()
