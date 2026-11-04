@@ -12,7 +12,7 @@ export type Today = {
 export type TodayStreak = { text: string; label: string }
 export type TodayAction = { label: string; accessibleLabel: string; disabled: boolean }
 export type TodayHero =
-  | { kind: 'building'; title: string; ready: number | null; total: number | null; status: string | null; play: TodayAction }
+  | { kind: 'building'; title: string; ready: number | null; total: number | null; status: string | null; note: string | null; play: TodayAction }
   | { kind: 'first' | 'basics' | 'normal'; title: string; meta: string; play: TodayAction }
   | { kind: 'done'; title: string; meta: string; action: TodayAction }
   | { kind: 'empty' }
@@ -48,6 +48,9 @@ function playAction(unit: string | null, disabled: boolean): TodayAction {
   }
 }
 
+const BUILDING_NOTE =
+  'Play unlocks as soon as your first questions are ready. This page updates on its own, so you can come back later.'
+
 function heroView(today: Today, now: Date): TodayHero {
   const { topic, role, plan } = today
   const disabled = !plan?.playable || role?.preparing === true
@@ -59,7 +62,8 @@ function heroView(today: Today, now: Date): TodayHero {
       title: 'Building your questions',
       ready: building?.ready ?? null,
       total: building?.total ?? null,
-      status: building ? `${building.ready} of ${building.total} topics ready` : null,
+      status: building ? `${building.ready} of ${building.total} topics ready` : 'No questions are ready yet',
+      note: plan === null || disabled ? BUILDING_NOTE : null,
       play: playAction(plan?.nextUnit ?? null, disabled),
     }
   }

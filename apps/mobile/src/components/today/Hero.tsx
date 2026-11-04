@@ -47,6 +47,9 @@ export function Hero({ hero, onPlay }: HeroProps) {
             {hero.status !== null && (
               <Text variant="body" num style={{ color: heroText }}>{hero.status}</Text>
             )}
+            {hero.note !== null && (
+              <Text variant="body" style={{ color: heroText }}>{hero.note}</Text>
+            )}
           </>
         ) : (
           <Text variant="body" num style={{ color: metaColor }}>{hero.meta}</Text>
