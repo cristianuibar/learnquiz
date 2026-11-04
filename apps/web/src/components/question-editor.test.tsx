@@ -80,3 +80,18 @@ it('saves reordered order steps with ids a, b, c and is_correct true', async () 
   expect(sent().options).toEqual([{ id: 'a', text: 'Text b', feedback: 'Why b', is_correct: true }, { id: 'b', text: 'Text a', feedback: 'Why a', is_correct: true }, { id: 'c', text: 'Text c', feedback: 'Why c', is_correct: true }])
   expect(sent().accepted_answers).toEqual([])
 })
+
+it('marks only the selected topic link as the current page', async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+  const review = { name: 'Acme', topics: [{ id: 't1', title: 'Till' }, { id: 't2', title: 'Safety' }], topic: { id: 't2', title: 'Safety' }, concepts: [] }
+  const rootRoute = createRootRoute({ component: PortalRoot })
+  const route = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug/questions', validateSearch: questionsRoute.options.validateSearch, component: questionsRoute.options.component, loader: () => review })
+  const router = createRouter({ routeTree: rootRoute.addChildren([route]), history: createMemoryHistory({ initialEntries: ['/org/x/questions?topicId=t2'] }) })
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  roots.push({ unmount: () => root.unmount(), container })
+  await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
+  const current = [...container.querySelectorAll('nav[aria-label="Topics"] a')].map((a) => [a.textContent, a.getAttribute('aria-current')])
+  expect(current).toEqual([['Till', null], ['Safety', 'page']])
+})
