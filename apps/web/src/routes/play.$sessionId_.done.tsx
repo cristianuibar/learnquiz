@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, createFileRoute, redirect, useLocation } from '@tanstack/react-router'
 import { RouteError } from '@/components/inline-error'
-import { MasteryBar } from '@/components/mastery-bar'
 import { ModelLabel } from '@/components/model-label'
 import { ModelTrace } from '@/components/model-trace'
+import { CoachLine, MasteryMoved, MistakesDisclosure, RewardChips, scoreLine } from '@/components/session-summary'
 import { StartButton } from '@/components/start-button'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { endSession, prepareNextSession } from '@/server/play'
 import { getPushSettings } from '@/server/push'
@@ -24,9 +23,6 @@ export const Route = createFileRoute('/play/$sessionId_/done')({
   component: Done,
 })
 
-const clock = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`
-const pct = (v: number) => `${Math.round(v * 100)}%`
-
 function Done() {
   const s = Route.useLoaderData()
   const placed = s.kind === 'placement' && s.level !== null
@@ -39,89 +35,35 @@ function Done() {
     if (placed) prepareNextSession({ data: { sessionId: s.sessionId } }).catch(() => {})
   }, [placed, s.sessionId])
   return (
-    <main className="mx-auto w-full max-w-xl px-4 pt-8 pb-8">
+    <main className="mx-auto flex w-full max-w-xl flex-col gap-8 px-4 pt-8">
       <p role="status" className="sr-only">
         {announcement}
       </p>
-      <h1 className="text-title-1 text-ink">
-        {placed ? `You're at level ${s.level} of 5` : `Session done, ${clock(s.durationMs)}`}
-      </h1>
-      {placed && s.levelLine && <p className="mt-3 text-lg text-muted-foreground">{s.levelLine}</p>}
-      {placed && s.levelLine && <ModelLabel model={s.levelLineModel} />}
-      <p className="mt-4 flex flex-wrap gap-x-6 text-lg font-medium">
-        <span>
-          {s.correct} of {s.total} correct{s.ungraded > 0 && ` · ${s.ungraded} not graded`}
-        </span>
-        {s.kind !== 'placement' && (
-          <>
-            <span>+{s.xp} xp</span>
-            <span>streak {s.streak}</span>
-          </>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 tabIndex={-1} className="text-title-1 text-ink">
+            {placed ? `You're at level ${s.level} of 5` : 'Session done'}
+          </h1>
+          <p className="text-body-lg text-ink-muted tabular-nums">{scoreLine(s)}</p>
+        </div>
+        {placed && s.levelLine && <p className="text-body-lg text-ink">{s.levelLine}</p>}
+        {placed && s.levelLine && <ModelLabel model={s.levelLineModel} />}
+        {s.kind === 'placement' && s.endedEarly && (
+          <p className="text-ink-muted">Placement stopped early: it had enough answers to place you.</p>
         )}
-      </p>
-      {s.kind === 'placement' && s.endedEarly && (
-        <p className="mt-2 text-muted-foreground">Placement stopped early: it had enough answers to place you.</p>
-      )}
-      <ModelTrace key={s.sessionId} scope={{ scope: 'session', sessionId: s.sessionId }} />
-      {s.masteryMoved.length > 0 && (
-        <section className="mt-10">
-          <h2 className="text-xl font-semibold">Mastery moved</h2>
-          <ul className="mt-4 flex flex-col gap-4">
-            {s.masteryMoved.map((m) => (
-              <li key={m.unitId}>
-                <div className="flex justify-between gap-4">
-                  <span className="font-medium">{m.unitName}</span>
-                  <span className="shrink-0 text-sm font-medium tabular-nums">
-                    {pct(m.before)} → {pct(m.after)}
-                  </span>
-                </div>
-                <MasteryBar className="mt-2" label={m.unitName} from={m.before} value={m.after} />
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-      {s.mistakes.length > 0 && (
-        <section className="mt-10">
-          <h2 className="text-xl font-semibold">Your mistakes ({s.mistakes.length})</h2>
-          <ul className="mt-4 flex flex-col gap-3">
-            {s.mistakes.map((m) => (
-              <li key={m.itemId} className="rounded-lg border p-4">
-                <div className="flex flex-col-reverse items-start gap-2 sm:flex-row sm:justify-between sm:gap-3">
-                  <p className="font-medium">{m.stem}</p>
-                  {m.wasSure && <Badge className="bg-wrong-soft text-wrong">you were sure</Badge>}
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">{m.correctAnswer}</p>
-                <ModelLabel model={m.generatedBy} />
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-      <p className="mt-10 rounded-lg bg-learning-soft p-4">
-        <span className="font-semibold">Coach:</span> {s.nextLine}
-      </p>
-      <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center">
-        {s.optIn ? (
-          <Button asChild className="w-full px-6 sm:w-auto">
-            <Link to="/opt-in">Continue</Link>
-          </Button>
-        ) : placed ? (
-          <Button asChild className="w-full px-6 sm:w-auto">
-            <Link to="/t/$topicId/path" params={{ topicId: s.topicId }}>
-              See your path
-            </Link>
-          </Button>
-        ) : (
-          <>
-            <StartButton topicId={s.topicId}>Start another session</StartButton>
-            <Button asChild variant="secondary" className="w-full px-6 sm:w-auto">
-              <Link to="/t/$topicId/path" params={{ topicId: s.topicId }}>
-                Open your path
-              </Link>
-            </Button>
-          </>
-        )}
+        {s.kind !== 'placement' && <RewardChips xp={s.xp} streak={s.streak} />}
+        {s.nextLine && <CoachLine>{s.nextLine}</CoachLine>}
+      </div>
+      <MasteryMoved rows={s.masteryMoved} benchmark={s.benchmark} />
+      <MistakesDisclosure mistakes={s.mistakes} />
+      <ModelTrace key={s.sessionId} scope={{ scope: 'session', sessionId: s.sessionId }} variant="link" />
+      <div className="sticky bottom-0 -mx-4 mt-auto flex flex-col gap-1 border-t border-border bg-surface-page px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <Button asChild size="lg" className="w-full">
+          <Link to={s.optIn ? '/opt-in' : '/today'}>Continue</Link>
+        </Button>
+        <StartButton topicId={s.topicId} variant="link" className="self-center">
+          Another session
+        </StartButton>
       </div>
     </main>
   )
