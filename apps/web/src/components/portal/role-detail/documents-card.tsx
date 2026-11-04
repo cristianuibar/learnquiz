@@ -204,11 +204,9 @@ export function DocumentsCard({ detail, readOnly, pasteOpen, pasteFor, onToggleP
                     <Upload aria-hidden />
                     Replace file
                   </Button>
-                  {canUpload && (
-                    <Button type="button" variant="ghost" aria-expanded={pasteOpen && pasteFor === doc.id} aria-controls="rd-paste" onClick={(e) => onTogglePaste(e.currentTarget, doc.id)}>
-                      Paste text instead
-                    </Button>
-                  )}
+                  <Button type="button" variant="ghost" aria-expanded={pasteOpen && pasteFor === doc.id} aria-controls="rd-paste" onClick={(e) => onTogglePaste(e.currentTarget, doc.id)}>
+                    Paste text instead
+                  </Button>
                   <RowMenu label={doc.title} items={[{ label: 'Remove', icon: X, onSelect: () => void removeDoc(doc.id) }]} />
                 </>
               ) : (

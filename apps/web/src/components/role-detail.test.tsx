@@ -209,10 +209,11 @@ it('keeps the old row live while a replacement uploads', async () => {
 
 const failed: Doc = { ...pdf, id: 'd3', title: 'Scanned SOP', version: 1, status: 'failed', error: 'No selectable text found. This looks like a scan.', pageCount: null, sizeBytes: 3.1 * 1048576, chars: 0 }
 
-it('shows an extraction failure with its recovery actions', async () => {
+// A scan uploaded before the build stays listed once the curriculum is ready.
+it.each(['draft', 'ready'])('shows an extraction failure with its recovery actions (%s curriculum)', async (status) => {
   vi.mocked(removeRoleDocument).mockResolvedValue({ ok: true })
   vi.mocked(uploadRoleDocument).mockResolvedValue({ sourceId: '0-0-0-0-4', topicId: 't1', r2Key: null, chars: 24, version: 1, status: 'ready' })
-  const { container, button } = await mount(makeDetail({ documents: [failed] }))
+  const { container, button } = await mount(makeDetail({ status, documents: [failed] }))
   expect(container.textContent).toContain('Extraction failed')
   expect(container.textContent).toContain('No selectable text found. This looks like a scan.')
   expect(container.textContent).toContain('PDF · 3.1 MB · Oct 28, 2026 · Dana Whitaker')
