@@ -1,0 +1,1207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Questions · Northwind Logistics</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" style="position: relative;">
+  <sc-if value="{{readonly}}" hint-placeholder-val="{{ false }}">
+    <div class="ro-band" role="region" aria-label="Read-only view">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+      <span class="ro-text">Read only · You are viewing Northwind Logistics as Learn Quiz staff. Nothing here can be changed.</span>
+      <a href="Flags.dc.html">Exit to staff admin</a>
+    </div>
+  </sc-if>
+  <div class="{{appClass}}">
+    <dc-import name="PortalNav" active="questions" readonly="{{readonly}}" hint-size="248px,900px"></dc-import>
+    <main class="main">
+      <div class="page page-capped">
+        <div class="page-head">
+          <div class="page-head-text">
+            <h1 class="t-title1" tabindex="-1">Questions</h1>
+          </div>
+          <div class="page-actions">
+            <label class="field-label" for="qs-role">Role</label>
+            <span class="select-wrap" style="width: 240px;">
+              <select class="select" id="qs-role" name="role">
+                <option value="warehouse-picker">Warehouse picker</option>
+                <option value="forklift-operator">Forklift operator</option>
+              </select>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+            </span>
+          </div>
+        </div>
+
+        <!-- ============ Toolbar: search, filters (combinable), status, results ============ -->
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <div class="dt-toolbar">
+            <span class="input-icon grow">
+              <label class="sr-only" for="qs-search">Search questions</label>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+              <input class="input" id="qs-search" name="q" type="search" placeholder="Search questions" autocomplete="off">
+            </span>
+            <div role="group" aria-label="Filters" style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button class="filter-chip" type="button" aria-pressed="{{unrevPressed}}" onClick="{{toggleUnrev}}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-dasharray="2 3.2"></circle><path d="M12 8v4"></path><path d="M12 16h.01"></path></svg>Unreviewed <span class="count">38</span></button>
+              <button class="filter-chip" type="button" aria-pressed="{{flagPressed}}" onClick="{{toggleFlag}}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>Flagged by learners <span class="count">2</span></button>
+              <button class="filter-chip" type="button" aria-pressed="{{critPressed}}" onClick="{{toggleCrit}}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>Critical <span class="count">96</span></button>
+            </div>
+            <label class="sr-only" for="qs-status">Status</label>
+            <span class="select-wrap" style="width: 176px; margin-left: auto;">
+              <select class="select" id="qs-status" name="status">
+                <option value="all">All statuses</option>
+                <option value="live">Live</option>
+                <option value="retired">Retired</option>
+                <option value="rejected">Rejected</option>
+              </select>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+            </span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <p class="t-label num" role="status">{{resultsText}}</p>
+            <sc-if value="{{anyFilter}}" hint-placeholder-val="{{ false }}">
+              <button class="link-btn" type="button" onClick="{{clearFilters}}">Clear filters</button>
+            </sc-if>
+          </div>
+        </div>
+
+        <!-- ============ Body: outline (>= 1280) + grouped questions.
+             Each concept: compact rows (56px), one row expanded in place, then "Show N more". ============ -->
+        <div class="review-layout">
+
+          <!-- ===== Outline: all units, current unit open ===== -->
+          <sc-if value="{{outlineMain}}" hint-placeholder-val="{{ true }}">
+            <nav class="review-outline" aria-label="Units and concepts">
+              <ul style="display: flex; flex-direction: column; gap: 2px;">
+                <li>
+                  <a class="outline-link" href="#qs-u-rec" style="font-weight: 600;"><span>Receiving</span><span class="t-caption muted num">105</span></a>
+                  <ul style="display: flex; flex-direction: column; gap: 2px; padding: 2px 0 8px;">
+                    <li><a class="outline-link" href="#qs-u-rec" style="padding: 6px 12px 6px 24px;"><span>Check the delivery against the ASN</span><span class="t-caption muted num">16</span></a></li>
+                    <li><a class="outline-link" href="#qs-u-rec" style="padding: 6px 12px 6px 24px;"><span>Inspect pallets at the dock door</span><span class="t-caption muted num">15</span></a></li>
+                    <li><a class="outline-link" href="#qs-c-rec3" aria-current="location" style="padding: 6px 12px 6px 24px;"><span>Report damaged pallets before put-away</span><span class="t-caption muted num">15</span></a></li>
+                    <li><a class="outline-link" href="#qs-u-rec" style="padding: 6px 12px 6px 24px;"><span>Move chilled goods within 20 minutes</span><span class="t-caption muted num">13</span></a></li>
+                    <li><a class="outline-link" href="#qs-u-rec" style="padding: 6px 12px 6px 24px;"><span>Label each pallet with its LPN</span><span class="t-caption muted num">14</span></a></li>
+                    <li><a class="outline-link" href="#qs-u-rec" style="padding: 6px 12px 6px 24px;"><span>Count over and short deliveries</span><span class="t-caption muted num">17</span></a></li>
+                    <li><a class="outline-link" href="#qs-u-rec" style="padding: 6px 12px 6px 24px;"><span>Put away to the directed location</span><span class="t-caption muted num">15</span></a></li>
+                  </ul>
+                </li>
+                <li><a class="outline-link" href="#qs-u-pic" style="font-weight: 600;"><span>Picking</span><span class="t-caption muted num">122</span></a></li>
+                <li><a class="outline-link" href="#qs-u-scn" style="padding: 6px 12px;"><span style="display: flex; flex-direction: column;"><span style="font-weight: 600;">Scanning</span><span class="t-caption muted num">2 flagged</span></span><span class="t-caption muted num">88</span></a></li>
+                <li><a class="outline-link" href="#qs-u-saf" style="font-weight: 600;"><span>Safety</span><span class="t-caption muted num">84</span></a></li>
+                <li><a class="outline-link" href="#qs-u-ret" style="padding: 6px 12px;"><span style="display: flex; flex-direction: column;"><span style="font-weight: 600;">Returns</span><span class="t-caption muted num">38 unreviewed</span></span><span class="t-caption muted num">38</span></a></li>
+              </ul>
+            </nav>
+          </sc-if>
+
+          <!-- ===== Outline: Unreviewed filter ===== -->
+          <sc-if value="{{outlineRet}}" hint-placeholder-val="{{ false }}">
+            <nav class="review-outline" aria-label="Units and concepts">
+              <ul style="display: flex; flex-direction: column; gap: 2px;">
+                <li>
+                  <a class="outline-link" href="#qs-u-ret" style="padding: 6px 12px;"><span style="display: flex; flex-direction: column;"><span style="font-weight: 600;">Returns</span><span class="t-caption muted num">{{retOutlineText}}</span></span><span class="t-caption muted num">{{retOutlineCount}}</span></a>
+                  <ul style="display: flex; flex-direction: column; gap: 2px; padding: 2px 0 8px;">
+                    <sc-if value="{{notCrit}}" hint-placeholder-val="{{ true }}">
+                      <li><a class="outline-link" href="#qs-u-ret" style="padding: 6px 12px 6px 24px;"><span>Check the return authorization</span><span class="t-caption muted num">9</span></a></li>
+                      <li><a class="outline-link" href="#qs-u-ret" style="padding: 6px 12px 6px 24px;"><span>Inspect and grade each item</span><span class="t-caption muted num">10</span></a></li>
+                    </sc-if>
+                    <li><a class="outline-link" href="#qs-c-ret3" aria-current="location" style="padding: 6px 12px 6px 24px;"><span>Refund only after inspection</span><span class="t-caption muted num">11</span></a></li>
+                    <sc-if value="{{notCrit}}" hint-placeholder-val="{{ true }}">
+                      <li><a class="outline-link" href="#qs-u-ret" style="padding: 6px 12px 6px 24px;"><span>Restock or quarantine</span><span class="t-caption muted num">8</span></a></li>
+                    </sc-if>
+                  </ul>
+                </li>
+              </ul>
+            </nav>
+          </sc-if>
+
+          <!-- ===== Outline: Flagged filter ===== -->
+          <sc-if value="{{flagBlock}}" hint-placeholder-val="{{ false }}">
+            <nav class="review-outline" aria-label="Units and concepts">
+              <ul style="display: flex; flex-direction: column; gap: 2px;">
+                <li>
+                  <a class="outline-link" href="#qs-f-u-scn" style="padding: 6px 12px;"><span style="display: flex; flex-direction: column;"><span style="font-weight: 600;">Scanning</span><span class="t-caption muted num">{{flagOutlineText}}</span></span><span class="t-caption muted num">{{flagCount}}</span></a>
+                  <ul style="display: flex; flex-direction: column; gap: 2px; padding: 2px 0 8px;">
+                    <li><a class="outline-link" href="#qs-f-c-scn2" aria-current="location" style="padding: 6px 12px 6px 24px;"><span>Double beep: put the item back and re-scan</span><span class="t-caption muted num">1</span></a></li>
+                    <sc-if value="{{showAmara}}" hint-placeholder-val="{{ true }}">
+                      <li><a class="outline-link" href="#qs-f-c-scn4" style="padding: 6px 12px 6px 24px;"><span>Key in a barcode only as a last resort</span><span class="t-caption muted num">1</span></a></li>
+                    </sc-if>
+                  </ul>
+                </li>
+              </ul>
+            </nav>
+          </sc-if>
+
+          <!-- ===== Outline: no results ===== -->
+          <sc-if value="{{isEmpty}}" hint-placeholder-val="{{ false }}">
+            <div class="review-outline" aria-hidden="true"></div>
+          </sc-if>
+
+          <div style="display: flex; flex-direction: column; gap: 40px; min-width: 0;">
+
+            <!-- ======================= UNIT: Receiving ======================= -->
+            <sc-if value="{{showOthers}}" hint-placeholder-val="{{ true }}">
+              <section id="qs-u-rec" aria-labelledby="qs-u-rec-h" style="display: flex; flex-direction: column; gap: 16px; scroll-margin-top: 24px;">
+                <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-bottom: 8px; border-bottom: 1px solid var(--border);">
+                  <h2 id="qs-u-rec-h" class="t-title2">Receiving</h2>
+                  <p class="t-caption muted num">7 concepts · 105 questions</p>
+                </div>
+                <div id="qs-c-rec3" style="display: flex; flex-direction: column; gap: 12px; scroll-margin-top: 24px;">
+                  <div style="display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; min-height: 28px;">
+                    <h3 id="qs-c-rec3-h" class="t-label">Report damaged pallets before put-away</h3>
+                    <span class="chip chip-critical"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>Critical</span>
+                    <span class="t-caption muted num">15 questions · 1 rejected</span>
+                  </div>
+                  <div class="card">
+                    <ul aria-labelledby="qs-c-rec3-h">
+                      <!-- Rejected, expanded (or its edit form) -->
+                      <li>
+                        <sc-if value="{{notEditMC}}" hint-placeholder-val="{{ true }}">
+                          <div style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 8px 4px 16px;">
+                            <div style="display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0;">
+                              <h4 id="qs-r-rec3a" class="t-body-lg" style="font-weight: 600;">A pallet arrives with a crushed corner and torn wrap. What do you do first?</h4>
+                              <div style="display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+                                <span class="chip chip-muted"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m5.6 5.6 12.8 12.8"></path></svg>Rejected</span>
+                                <span class="chip chip-critical"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>Critical</span>
+                                <span class="tag num">Difficulty 2</span>
+                              </div>
+                            </div>
+                            <button class="icon-btn" type="button" aria-expanded="true" aria-controls="qs-b-rec3a" aria-label="Hide details" aria-describedby="qs-r-rec3a"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 15 6-6 6 6"></path></svg></button>
+                          </div>
+                          <div id="qs-b-rec3a" style="display: flex; flex-direction: column; gap: 16px; padding: 4px 16px 16px;">
+                            <p class="t-caption">Multiple choice · Unreviewed · Checked automatically Oct 28 · The correct answer isn't in the source quote</p>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 16px 32px; align-items: start;">
+                              <ol aria-label="Answer options" style="display: flex; flex-direction: column;">
+                                <li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; padding: 0 0 8px; border-bottom: 1px solid var(--border);">
+                                  <span class="t-label">A</span>
+                                  <div style="display: flex; flex-direction: column; gap: 2px;">
+                                    <span class="t-body" style="font-weight: 600;">Put it away and note the damage on the record</span>
+                                    <span class="t-caption" style="display: inline-flex; align-items: center; gap: 4px; font-weight: 600;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Correct answer</span>
+                                  </div>
+                                </li>
+                                <li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                                  <span class="t-label muted">B</span>
+                                  <div style="display: flex; flex-direction: column; gap: 2px;">
+                                    <span class="t-body">Re-wrap the pallet before put-away</span>
+                                    <span class="t-caption muted">Feedback: Re-wrapping hides the damage.</span>
+                                  </div>
+                                </li>
+                                <li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                                  <span class="t-label muted">C</span>
+                                  <div style="display: flex; flex-direction: column; gap: 2px;">
+                                    <span class="t-body">Refuse the whole delivery</span>
+                                    <span class="t-caption muted">Feedback: Only the receiving lead refuses a delivery.</span>
+                                  </div>
+                                </li>
+                                <li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; padding: 8px 0 0;">
+                                  <span class="t-label muted">D</span>
+                                  <div style="display: flex; flex-direction: column; gap: 2px;">
+                                    <span class="t-body">Move it to the returns area</span>
+                                    <span class="t-caption null">No feedback</span>
+                                  </div>
+                                </li>
+                              </ol>
+                              <div style="display: flex; flex-direction: column; gap: 16px; min-width: 0;">
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                  <p class="t-label">Explanation</p>
+                                  <p class="t-body">Recording the damage keeps the stock count accurate while the pallet is in storage.</p>
+                                </div>
+                                <figure class="quote">
+                                  <blockquote class="quote-text">“Photograph the damage, tag the pallet and log it in the WMS before put-away. A damaged pallet stays at the dock until it is logged.”</blockquote>
+                                  <figcaption class="quote-src">Picking SOP v3 · §2.3</figcaption>
+                                </figure>
+                              </div>
+                            </div>
+                          </div>
+                          <sc-if value="{{notReadonly}}" hint-placeholder-val="{{ true }}">
+                            <div style="display: flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-top: 1px solid var(--border);">
+                              <button class="btn btn-secondary" type="button" onClick="{{startEdit}}" aria-describedby="qs-r-rec3a"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"></path><path d="m13.5 6.5 4 4"></path></svg>Edit</button>
+                            </div>
+                          </sc-if>
+                        </sc-if>
+
+                        <!-- EDIT (multiple choice), in place -->
+                        <sc-if value="{{isEditMC}}" hint-placeholder-val="{{ false }}">
+                          <form aria-labelledby="qs-e-h" onSubmit="{{saveEdit}}">
+                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 64px; padding: 12px 16px; border-bottom: 1px solid var(--border);">
+                              <h4 id="qs-e-h" class="t-title2">Edit question</h4>
+                              <span class="chip chip-muted"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m5.6 5.6 12.8 12.8"></path></svg>Rejected</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 24px; padding: 16px;">
+                              <div class="field-row">
+                                <div class="field">
+                                  <label class="field-label" for="qs-e-type">Type</label>
+                                  <span class="select-wrap">
+                                    <select class="select" id="qs-e-type" name="type" value="multiple-choice">
+                                      <option value="multiple-choice">Multiple choice</option>
+                                      <option value="short-answer">Short answer</option>
+                                    </select>
+                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+                                  </span>
+                                </div>
+                                <div class="field">
+                                  <span class="field-label" id="qs-e-diff-l">Difficulty</span>
+                                  <div class="seg" role="radiogroup" aria-labelledby="qs-e-diff-l" style="align-self: flex-start;">
+                                    <button class="seg-btn num" type="button" role="radio" aria-checked="false" tabindex="-1" style="min-width: 44px; justify-content: center;">1</button>
+                                    <button class="seg-btn num" type="button" role="radio" aria-checked="true" tabindex="0" style="min-width: 44px; justify-content: center;">2</button>
+                                    <button class="seg-btn num" type="button" role="radio" aria-checked="false" tabindex="-1" style="min-width: 44px; justify-content: center;">3</button>
+                                    <button class="seg-btn num" type="button" role="radio" aria-checked="false" tabindex="-1" style="min-width: 44px; justify-content: center;">4</button>
+                                    <button class="seg-btn num" type="button" role="radio" aria-checked="false" tabindex="-1" style="min-width: 44px; justify-content: center;">5</button>
+                                  </div>
+                                </div>
+                              </div>
+                              <div class="field">
+                                <label class="field-label" for="qs-e-stem">Stem</label>
+                                <textarea class="textarea" id="qs-e-stem" name="stem" rows="2" style="min-height: 72px;">A pallet arrives with a crushed corner and torn wrap. What do you do first?</textarea>
+                              </div>
+                              <fieldset style="display: flex; flex-direction: column; gap: 12px;">
+                                <legend class="field-label" style="margin-bottom: 12px;">Options</legend>
+                                <div style="display: grid; grid-template-columns: 112px minmax(0, 1fr) 44px; gap: 8px 12px; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--border);">
+                                  <label class="check t-label"><input type="radio" name="qs-e-correct" value="1" checked>Correct<span class="sr-only"> answer: option 1</span></label>
+                                  <input class="input" type="text" name="option-1" aria-label="Option 1" value="Photograph it, tag it and log it in the WMS">
+                                  <button class="icon-btn" type="button" aria-label="Remove option 1"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+                                  <label class="t-caption muted" for="qs-e-fb1" style="padding-left: 32px;">Feedback<span class="sr-only"> for option 1</span></label>
+                                  <input class="input" id="qs-e-fb1" type="text" name="feedback-1" value="">
+                                  <span aria-hidden="true"></span>
+                                </div>
+                                <div style="display: grid; grid-template-columns: 112px minmax(0, 1fr) 44px; gap: 8px 12px; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--border);">
+                                  <label class="check t-label"><input type="radio" name="qs-e-correct" value="2">Correct<span class="sr-only"> answer: option 2</span></label>
+                                  <input class="input" type="text" name="option-2" aria-label="Option 2" value="Put it away and note the damage on the record">
+                                  <button class="icon-btn" type="button" aria-label="Remove option 2"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+                                  <label class="t-caption muted" for="qs-e-fb2" style="padding-left: 32px;">Feedback<span class="sr-only"> for option 2</span></label>
+                                  <input class="input" id="qs-e-fb2" type="text" name="feedback-2" value="A damaged pallet stays at the dock until it is logged.">
+                                  <span aria-hidden="true"></span>
+                                </div>
+                                <div style="display: grid; grid-template-columns: 112px minmax(0, 1fr) 44px; gap: 8px 12px; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--border);">
+                                  <label class="check t-label"><input type="radio" name="qs-e-correct" value="3">Correct<span class="sr-only"> answer: option 3</span></label>
+                                  <input class="input" type="text" name="option-3" aria-label="Option 3" value="Re-wrap the pallet before put-away">
+                                  <button class="icon-btn" type="button" aria-label="Remove option 3"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+                                  <label class="t-caption muted" for="qs-e-fb3" style="padding-left: 32px;">Feedback<span class="sr-only"> for option 3</span></label>
+                                  <input class="input" id="qs-e-fb3" type="text" name="feedback-3" value="Re-wrapping hides the damage.">
+                                  <span aria-hidden="true"></span>
+                                </div>
+                                <div style="display: grid; grid-template-columns: 112px minmax(0, 1fr) 44px; gap: 8px 12px; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--border);">
+                                  <label class="check t-label"><input type="radio" name="qs-e-correct" value="4">Correct<span class="sr-only"> answer: option 4</span></label>
+                                  <input class="input" type="text" name="option-4" aria-label="Option 4" value="Refuse the whole delivery">
+                                  <button class="icon-btn" type="button" aria-label="Remove option 4"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+                                  <label class="t-caption muted" for="qs-e-fb4" style="padding-left: 32px;">Feedback<span class="sr-only"> for option 4</span></label>
+                                  <input class="input" id="qs-e-fb4" type="text" name="feedback-4" value="Only the receiving lead refuses a delivery.">
+                                  <span aria-hidden="true"></span>
+                                </div>
+                                <div>
+                                  <button class="btn btn-ghost" type="button"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Add option</button>
+                                </div>
+                              </fieldset>
+                              <div class="field">
+                                <label class="field-label" for="qs-e-expl">Explanation</label>
+                                <textarea class="textarea" id="qs-e-expl" name="explanation" rows="2" style="min-height: 72px;">A damaged pallet is photographed, tagged and logged before put-away, so damaged stock never reaches a pick location.</textarea>
+                              </div>
+                              <div class="field-row">
+                                <div class="field">
+                                  <label class="field-label" for="qs-e-doc">Source document</label>
+                                  <span class="select-wrap">
+                                    <select class="select" id="qs-e-doc" name="source" value="picking-sop">
+                                      <option value="picking-sop">Picking SOP v3</option>
+                                      <option value="returns-procedure">Returns procedure</option>
+                                    </select>
+                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+                                  </span>
+                                </div>
+                                <div class="field">
+                                  <label class="field-label" for="qs-e-sec">Section</label>
+                                  <input class="input num" id="qs-e-sec" type="text" name="section" value="§2.3" autocomplete="off">
+                                </div>
+                              </div>
+                              <div class="field is-invalid">
+                                <label class="field-label" for="qs-e-quote">Source quote</label>
+                                <textarea class="textarea" id="qs-e-quote" name="quote" rows="3" aria-invalid="true" aria-describedby="qs-e-quote-err">Take a photo, tag it and log it in the WMS before you put it away.</textarea>
+                                <p class="field-error" id="qs-e-quote-err" role="alert"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5h.01"></path></svg>This quote isn't in Picking SOP v3. Copy it exactly from the document.</p>
+                              </div>
+                            </div>
+                            <div style="display: flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-top: 1px solid var(--border);">
+                              <button class="btn btn-ghost" type="button" onClick="{{cancelEdit}}">Cancel</button>
+                              <button class="btn btn-primary" type="submit">Save question</button>
+                            </div>
+                          </form>
+                        </sc-if>
+                      </li>
+                      <li style="border-top: 1px solid var(--border);">
+                        <div style="display: grid; grid-template-columns: 168px 150px minmax(0, 1fr) 80px 44px; gap: 12px; align-items: center; min-height: 56px; padding: 6px 8px 6px 16px;">
+                          <span class="chip" style="justify-self: start;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor"></circle><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"></path></svg>Live</span>
+                          <span class="t-caption muted" style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>Approved Oct 30</span>
+                          <h4 id="qs-r-rec3b" class="t-body" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Where do you log a damaged pallet?</h4>
+                          <span class="t-caption muted num">Difficulty 1</span>
+                          <button class="icon-btn" type="button" aria-expanded="false" aria-label="Show details" aria-describedby="qs-r-rec3b"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+                        </div>
+                      </li>
+                      <li style="border-top: 1px solid var(--border);">
+                        <div style="display: grid; grid-template-columns: 168px 150px minmax(0, 1fr) 80px 44px; gap: 12px; align-items: center; min-height: 56px; padding: 6px 8px 6px 16px;">
+                          <span class="chip" style="justify-self: start;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor"></circle><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"></path></svg>Live</span>
+                          <span class="t-caption muted" style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>Approved Oct 30</span>
+                          <h4 id="qs-r-rec3c" class="t-body" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">What do you photograph before a damaged pallet is tagged?</h4>
+                          <span class="t-caption muted num">Difficulty 2</span>
+                          <button class="icon-btn" type="button" aria-expanded="false" aria-label="Show details" aria-describedby="qs-r-rec3c"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+                        </div>
+                      </li>
+                      <li style="border-top: 1px solid var(--border);">
+                        <div style="display: grid; grid-template-columns: 168px 150px minmax(0, 1fr) 80px 44px; gap: 12px; align-items: center; min-height: 56px; padding: 6px 8px 6px 16px;">
+                          <span class="chip" style="justify-self: start;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor"></circle><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"></path></svg>Live</span>
+                          <span class="t-caption muted" style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>Approved Oct 30</span>
+                          <h4 id="qs-r-rec3d" class="t-body" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">A damaged pallet is tagged but not logged yet. Where does it stay?</h4>
+                          <span class="t-caption muted num">Difficulty 3</span>
+                          <button class="icon-btn" type="button" aria-expanded="false" aria-label="Show details" aria-describedby="qs-r-rec3d"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+                        </div>
+                      </li>
+                    </ul>
+                    <div style="padding: 0 8px; border-top: 1px solid var(--border);">
+                      <button class="link-btn" type="button" aria-describedby="qs-c-rec3-h" style="padding: 0 8px;">Show 11 more</button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </sc-if>
+
+            <!-- ======================= UNIT: Picking ======================= -->
+            <sc-if value="{{showOthers}}" hint-placeholder-val="{{ true }}">
+              <section id="qs-u-pic" aria-labelledby="qs-u-pic-h" style="display: flex; flex-direction: column; gap: 16px; scroll-margin-top: 24px;">
+                <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-bottom: 8px; border-bottom: 1px solid var(--border);">
+                  <h2 id="qs-u-pic-h" class="t-title2">Picking</h2>
+                  <p class="t-caption muted num">8 concepts · 122 questions</p>
+                </div>
+                <div id="qs-c-pic3" style="display: flex; flex-direction: column; gap: 12px; scroll-margin-top: 24px;">
+                  <div style="display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; min-height: 28px;">
+                    <h3 id="qs-c-pic3-h" class="t-label">Confirm the location label before picking</h3>
+                    <span class="chip chip-critical"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>Critical</span>
+                    <span class="t-caption muted num">16 questions · 1 retired</span>
+                  </div>
+                  <div class="card">
+                    <ul aria-labelledby="qs-c-pic3-h">
+                      <!-- Nothing to review in this concept: all rows collapsed -->
+                      <li>
+                        <div style="display: grid; grid-template-columns: 168px 150px minmax(0, 1fr) 80px 44px; gap: 12px; align-items: center; min-height: 56px; padding: 6px 8px 6px 16px;">
+                          <span class="chip" style="justify-self: start;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor"></circle><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"></path></svg>Live</span>
+                          <span class="t-caption muted" style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>Approved Oct 30</span>
+                          <h4 id="qs-r-pic3a" class="t-body" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">You reach the bin on your pick list. What do you check before taking the item?</h4>
+                          <span class="t-caption muted num">Difficulty 1</span>
+                          <button class="icon-btn" type="button" aria-expanded="false" aria-label="Show details" aria-describedby="qs-r-pic3a"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+                        </div>
+                      </li>
+                      <li style="border-top: 1px solid var(--border);">
+                        <div style="display: grid; grid-template-columns: 168px 150px minmax(0, 1fr) 80px 44px; gap: 12px; align-items: center; min-height: 56px; padding: 6px 8px 6px 16px;">
+                          <span class="chip" style="justify-self: start;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor"></circle><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"></path></svg>Live</span>
+                          <span class="t-caption muted" style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>Approved Oct 30</span>
+                          <h4 id="qs-r-pic3b" class="t-body" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Two neighboring bins hold the same item. Which one do you pick from?</h4>
+                          <span class="t-caption muted num">Difficulty 3</span>
+                          <button class="icon-btn" type="button" aria-expanded="false" aria-label="Show details" aria-describedby="qs-r-pic3b"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+                        </div>
+                      </li>
+                      <!-- Retired: out of play, muted row; "Show details" expands in place -->
+                      <li style="border-top: 1px solid var(--border); background: var(--surface-page);">
+                        <div style="display: grid; grid-template-columns: 168px 150px minmax(0, 1fr) 80px 44px; gap: 12px; align-items: center; min-height: 56px; padding: 6px 8px 6px 16px;">
+                          <span class="chip chip-muted" style="justify-self: start;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"></rect><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"></path></svg>Retired</span>
+                          <span class="t-caption muted" style="white-space: nowrap;">Oct 28 · v2 replaced</span>
+                          <h4 id="qs-r-pic3c" class="t-body muted" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Where do you find the location of your next pick?</h4>
+                          <span class="t-caption muted num">Difficulty 1</span>
+                          <button class="icon-btn" type="button" aria-expanded="false" aria-label="Show details" aria-describedby="qs-r-pic3c"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+                        </div>
+                      </li>
+                      <li style="border-top: 1px solid var(--border);">
+                        <div style="display: grid; grid-template-columns: 168px 150px minmax(0, 1fr) 80px 44px; gap: 12px; align-items: center; min-height: 56px; padding: 6px 8px 6px 16px;">
+                          <span class="chip" style="justify-self: start;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor"></circle><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"></path></svg>Live</span>
+                          <span class="t-caption muted" style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>Approved Oct 30</span>
+                          <h4 id="qs-r-pic3d" class="t-body" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">The location label is torn and you can't read it. What do you do?</h4>
+                          <span class="t-caption muted num">Difficulty 2</span>
+                          <button class="icon-btn" type="button" aria-expanded="false" aria-label="Show details" aria-describedby="qs-r-pic3d"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+                        </div>
+                      </li>
+                    </ul>
+                    <div style="padding: 0 8px; border-top: 1px solid var(--border);">
+                      <button class="link-btn" type="button" aria-describedby="qs-c-pic3-h" style="padding: 0 8px;">Show 12 more</button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </sc-if>
+
+            <!-- ======================= UNIT: Scanning ======================= -->
+            <sc-if value="{{showOthers}}" hint-placeholder-val="{{ true }}">
+              <section id="qs-u-scn" aria-labelledby="qs-u-scn-h" style="display: flex; flex-direction: column; gap: 16px; scroll-margin-top: 24px;">
+                <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-bottom: 8px; border-bottom: 1px solid var(--border);">
+                  <h2 id="qs-u-scn-h" class="t-title2">Scanning</h2>
+                  <p class="t-caption muted num">6 concepts · 88 questions · 2 flagged</p>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 24px;">
+                  <div id="qs-c-scn2" style="display: flex; flex-direction: column; gap: 12px; scroll-margin-top: 24px;">
+                    <div style="display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; min-height: 28px;">
+                      <h3 id="qs-c-scn2-h" class="t-label">Double beep: put the item back and re-scan</h3>
+                      <span class="chip chip-critical"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>Critical</span>
+                      <span class="t-caption muted num">14 questions · 1 flagged</span>
+                    </div>
+                    <div class="card">
+                      <ul aria-labelledby="qs-c-scn2-h">
+                        <!-- Flagged by Jordan Reyes, expanded -->
+                        <li>
+                          <div style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 8px 4px 16px;">
+                            <div style="display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0;">
+                              <h4 id="qs-r-scn2a" class="t-body-lg" style="font-weight: 600;">Your handheld beeps twice after you scan an item. What do you do?</h4>
+                              <div style="display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+                                <span class="chip chip-strong"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>Flagged by learner</span>
+                                <span class="chip chip-critical"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>Critical</span>
+                                <span class="tag num">Difficulty 2</span>
+                              </div>
+                            </div>
+                            <button class="icon-btn" type="button" aria-expanded="true" aria-controls="qs-b-scn2a" aria-label="Hide details" aria-describedby="qs-r-scn2a"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 15 6-6 6 6"></path></svg></button>
+                          </div>
+                          <div id="qs-b-scn2a" style="display: flex; flex-direction: column; gap: 16px; padding: 4px 16px 16px;">
+                            <p class="t-caption muted">Multiple choice · Approved Oct 30 · Dana Whitaker</p>
+                            <div class="sunken" role="group" aria-labelledby="qs-fl-scn2a" style="padding: 12px 16px; display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 12px; align-items: start;">
+                              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>
+                              <div style="display: flex; flex-direction: column; gap: 8px; min-width: 0;">
+                                <p id="qs-fl-scn2a" class="t-label">Reported by <a href="Person.dc.html">Jordan Reyes</a> · Nov 2, 10:14</p>
+                                <dl class="kv" style="font-size: 14px; line-height: 20px; gap: 4px 16px;">
+                                  <dt>Reason</dt><dd>The answer looks incorrect</dd>
+                                  <dt>Note</dt><dd>“I re-scanned it and the beep stopped. That's how my lead showed me on day 2.”</dd>
+                                  <dt>Attempt</dt><dd>Chose “Re-scan the item barcode” · Sure</dd>
+                                </dl>
+                              </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 16px 32px; align-items: start;">
+                              <ol aria-label="Answer options" style="display: flex; flex-direction: column;">
+                                <li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; padding: 0 0 8px; border-bottom: 1px solid var(--border);">
+                                  <span class="t-label">A</span>
+                                  <div style="display: flex; flex-direction: column; gap: 2px;">
+                                    <span class="t-body" style="font-weight: 600;">Put it back, then scan the bin and the item</span>
+                                    <span class="t-caption" style="display: inline-flex; align-items: center; gap: 4px; font-weight: 600;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Correct answer</span>
+                                  </div>
+                                </li>
+                                <li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                                  <span class="t-label muted">B</span>
+                                  <div style="display: flex; flex-direction: column; gap: 2px;">
+                                    <span class="t-body">Re-scan the item barcode</span>
+                                    <span class="t-caption muted">Feedback: Scanning it again repeats the mismatch.</span>
+                                  </div>
+                                </li>
+                                <li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                                  <span class="t-label muted">C</span>
+                                  <div style="display: flex; flex-direction: column; gap: 2px;">
+                                    <span class="t-body">Put it in the tote and report it at drop-off</span>
+                                    <span class="t-caption muted">Feedback: The wrong item ships to the customer.</span>
+                                  </div>
+                                </li>
+                                <li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; padding: 8px 0 0;">
+                                  <span class="t-label muted">D</span>
+                                  <div style="display: flex; flex-direction: column; gap: 2px;">
+                                    <span class="t-body">Restart the handheld</span>
+                                    <span class="t-caption null">No feedback</span>
+                                  </div>
+                                </li>
+                              </ol>
+                              <div style="display: flex; flex-direction: column; gap: 16px; min-width: 0;">
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                  <p class="t-label">Explanation</p>
+                                  <p class="t-body">Two beeps mean the item doesn't match the pick. Putting it back first keeps the wrong item out of the tote.</p>
+                                </div>
+                                <figure class="quote">
+                                  <blockquote class="quote-text">“A double beep means the item does not match the pick. Put the item back in its bin, scan the bin label, then scan the item.”</blockquote>
+                                  <figcaption class="quote-src">Picking SOP v3 · §4.3</figcaption>
+                                </figure>
+                              </div>
+                            </div>
+                          </div>
+                          <sc-if value="{{notReadonly}}" hint-placeholder-val="{{ true }}">
+                            <div style="display: flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-top: 1px solid var(--border);">
+                              <button class="btn btn-ghost" type="button" aria-describedby="qs-r-scn2a">Retire</button>
+                              <button class="btn btn-secondary" type="button" aria-describedby="qs-r-scn2a"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"></path><path d="m13.5 6.5 4 4"></path></svg>Edit</button>
+                              <button class="btn btn-primary" type="button" aria-describedby="qs-r-scn2a">Approve, resolve flag and next</button>
+                            </div>
+                          </sc-if>
+                        </li>
+                        <li style="border-top: 1px solid var(--border);">
+                          <div style="display: grid; grid-template-columns: 168px 150px minmax(0, 1fr) 80px 44px; gap: 12px; align-items: center; min-height: 56px; padding: 6px 8px 6px 16px;">
+                            <span class="chip" style="justify-self: start;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor"></circle><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"></path></svg>Live</span>
+                            <span class="t-caption muted" style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>Approved Oct 30</span>
+                            <h4 id="qs-r-scn2b" class="t-body" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">What does a double beep tell you?</h4>
+                            <span class="t-caption muted num">Difficulty 1</span>
+                            <button class="icon-btn" type="button" aria-expanded="false" aria-label="Show details" aria-describedby="qs-r-scn2b"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+                          </div>
+                        </li>
+                        <li style="border-top: 1px solid var(--border);">
+                          <div style="display: grid; grid-template-columns: 168px 150px minmax(0, 1fr) 80px 44px; gap: 12px; align-items: center; min-height: 56px; padding: 6px 8px 6px 16px;">
+                            <span class="chip" style="justify-self: start;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor"></circle><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"></path></svg>Live</span>
+                            <span class="t-caption muted" style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>Approved Oct 30</span>
+                            <h4 id="qs-r-scn2c" class="t-body" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">You hear a double beep with the item already in the tote. What now?</h4>
+                            <span class="t-caption muted num">Difficulty 3</span>
+                            <button class="icon-btn" type="button" aria-expanded="false" aria-label="Show details" aria-describedby="qs-r-scn2c"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+                          </div>
+                        </li>
+                      </ul>
+                      <div style="padding: 0 8px; border-top: 1px solid var(--border);">
+                        <button class="link-btn" type="button" aria-describedby="qs-c-scn2-h" style="padding: 0 8px;">Show 11 more</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <sc-if value="{{showScn4}}" hint-placeholder-val="{{ true }}">
+                    <div id="qs-c-scn4" style="display: flex; flex-direction: column; gap: 12px; scroll-margin-top: 24px;">
+                      <div style="display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; min-height: 28px;">
+                        <h3 id="qs-c-scn4-h" class="t-label">Key in a barcode only as a last resort</h3>
+                        <span class="t-caption muted num">12 questions · 1 flagged</span>
+                      </div>
+                      <div class="card">
+                        <ul aria-labelledby="qs-c-scn4-h">
+                          <!-- Flagged by Amara Okafor, no source quote, expanded -->
+                          <li>
+                            <div style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 8px 4px 16px;">
+                              <div style="display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0;">
+                                <h4 id="qs-r-scn4a" class="t-body-lg" style="font-weight: 600;">The item barcode won't scan. When can you key in the number by hand?</h4>
+                                <div style="display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+                                  <span class="chip chip-strong"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>Flagged by learner</span>
+                                  <span class="tag num">Difficulty 2</span>
+                                </div>
+                              </div>
+                              <button class="icon-btn" type="button" aria-expanded="true" aria-controls="qs-b-scn4a" aria-label="Hide details" aria-describedby="qs-r-scn4a"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 15 6-6 6 6"></path></svg></button>
+                            </div>
+                            <div id="qs-b-scn4a" style="display: flex; flex-direction: column; gap: 16px; padding: 4px 16px 16px;">
+                              <p class="t-caption muted">Multiple choice · Approved Oct 30 · Dana Whitaker</p>
+                              <div class="sunken" role="group" aria-labelledby="qs-fl-scn4a" style="padding: 12px 16px; display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 12px; align-items: start;">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>
+                                <div style="display: flex; flex-direction: column; gap: 8px; min-width: 0;">
+                                  <p id="qs-fl-scn4a" class="t-label">Reported by <a href="Person-Proficient.dc.html">Amara Okafor</a> · Nov 2, 16:05</p>
+                                  <dl class="kv" style="font-size: 14px; line-height: 20px; gap: 4px 16px;">
+                                    <dt>Reason</dt><dd>It doesn't match how we do it here</dd>
+                                    <dt>Note</dt><dd>“On our floor only the team lead keys in a barcode. We send the label to the help desk.”</dd>
+                                    <dt>Attempt</dt><dd>Chose “Never: send it to the help desk” · Sure</dd>
+                                  </dl>
+                                </div>
+                              </div>
+                              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 16px 32px; align-items: start;">
+                                <ol aria-label="Answer options" style="display: flex; flex-direction: column;">
+                                  <li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; padding: 0 0 8px; border-bottom: 1px solid var(--border);">
+                                    <span class="t-label">A</span>
+                                    <div style="display: flex; flex-direction: column; gap: 2px;">
+                                      <span class="t-body" style="font-weight: 600;">After three failed scans at 10 to 30 cm</span>
+                                      <span class="t-caption" style="display: inline-flex; align-items: center; gap: 4px; font-weight: 600;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Correct answer</span>
+                                    </div>
+                                  </li>
+                                  <li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                                    <span class="t-label muted">B</span>
+                                    <div style="display: flex; flex-direction: column; gap: 2px;">
+                                      <span class="t-body">Whenever it's faster than scanning</span>
+                                      <span class="t-caption muted">Feedback: A keyed number skips the scanner's check.</span>
+                                    </div>
+                                  </li>
+                                  <li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                                    <span class="t-label muted">C</span>
+                                    <div style="display: flex; flex-direction: column; gap: 2px;">
+                                      <span class="t-body">Before scanning, if the label looks worn</span>
+                                      <span class="t-caption muted">Feedback: Worn labels often still scan. Try first.</span>
+                                    </div>
+                                  </li>
+                                  <li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; padding: 8px 0 0;">
+                                    <span class="t-label muted">D</span>
+                                    <div style="display: flex; flex-direction: column; gap: 2px;">
+                                      <span class="t-body">Never: send it to the help desk</span>
+                                      <span class="t-caption null">No feedback</span>
+                                    </div>
+                                  </li>
+                                </ol>
+                                <div style="display: flex; flex-direction: column; gap: 16px; min-width: 0;">
+                                  <div style="display: flex; flex-direction: column; gap: 4px;">
+                                    <p class="t-label">Explanation</p>
+                                    <p class="t-body">Keying in is the fallback when the scanner can't read the label. Three tries at the right distance come first.</p>
+                                  </div>
+                                  <p class="quote-none"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" stroke-dasharray="3 3"></path></svg>No source quote</p>
+                                </div>
+                              </div>
+                            </div>
+                            <sc-if value="{{notReadonly}}" hint-placeholder-val="{{ true }}">
+                              <div style="display: flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-top: 1px solid var(--border);">
+                                <button class="btn btn-ghost" type="button" aria-describedby="qs-r-scn4a">Retire</button>
+                                <button class="btn btn-secondary" type="button" aria-describedby="qs-r-scn4a"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"></path><path d="m13.5 6.5 4 4"></path></svg>Edit</button>
+                                <button class="btn btn-primary" type="button" aria-describedby="qs-r-scn4a">Approve, resolve flag and next</button>
+                              </div>
+                            </sc-if>
+                          </li>
+                          <li style="border-top: 1px solid var(--border);">
+                            <div style="display: grid; grid-template-columns: 168px 150px minmax(0, 1fr) 80px 44px; gap: 12px; align-items: center; min-height: 56px; padding: 6px 8px 6px 16px;">
+                              <span class="chip" style="justify-self: start;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor"></circle><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"></path></svg>Live</span>
+                              <span class="t-caption muted" style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>Approved Oct 30</span>
+                              <h4 id="qs-r-scn4b" class="t-body" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">How many scan attempts come before keying in a barcode?</h4>
+                              <span class="t-caption muted num">Difficulty 1</span>
+                              <button class="icon-btn" type="button" aria-expanded="false" aria-label="Show details" aria-describedby="qs-r-scn4b"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+                            </div>
+                          </li>
+                          <li style="border-top: 1px solid var(--border);">
+                            <div style="display: grid; grid-template-columns: 168px 150px minmax(0, 1fr) 80px 44px; gap: 12px; align-items: center; min-height: 56px; padding: 6px 8px 6px 16px;">
+                              <span class="chip" style="justify-self: start;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor"></circle><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"></path></svg>Live</span>
+                              <span class="t-caption muted" style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>Approved Oct 30</span>
+                              <h4 id="qs-r-scn4c" class="t-body" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">What do you check on screen after keying in a barcode?</h4>
+                              <span class="t-caption muted num">Difficulty 2</span>
+                              <button class="icon-btn" type="button" aria-expanded="false" aria-label="Show details" aria-describedby="qs-r-scn4c"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+                            </div>
+                          </li>
+                        </ul>
+                        <div style="padding: 0 8px; border-top: 1px solid var(--border);">
+                          <button class="link-btn" type="button" aria-describedby="qs-c-scn4-h" style="padding: 0 8px;">Show 9 more</button>
+                        </div>
+                      </div>
+                    </div>
+                  </sc-if>
+                </div>
+              </section>
+            </sc-if>
+
+            <!-- ======================= UNIT: Safety ======================= -->
+            <sc-if value="{{showOthers}}" hint-placeholder-val="{{ true }}">
+              <section id="qs-u-saf" aria-labelledby="qs-u-saf-h" style="display: flex; flex-direction: column; gap: 16px; scroll-margin-top: 24px;">
+                <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-bottom: 8px; border-bottom: 1px solid var(--border);">
+                  <h2 id="qs-u-saf-h" class="t-title2">Safety</h2>
+                  <p class="t-caption muted num">6 concepts · 84 questions</p>
+                </div>
+                <div id="qs-c-saf4" style="display: flex; flex-direction: column; gap: 12px; scroll-margin-top: 24px;">
+                  <div style="display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; min-height: 28px;">
+                    <h3 id="qs-c-saf4-h" class="t-label">Two-person lift above 23 kg</h3>
+                    <span class="chip chip-critical"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>Critical</span>
+                    <span class="t-caption muted num">14 questions</span>
+                  </div>
+                  <div class="card">
+                    <ul aria-labelledby="qs-c-saf4-h">
+                      <!-- Short answer, live, expanded (or its edit form) -->
+                      <li>
+                        <sc-if value="{{notEditShort}}" hint-placeholder-val="{{ true }}">
+                          <div style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 8px 4px 16px;">
+                            <div style="display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0;">
+                              <h4 id="qs-r-saf4a" class="t-body-lg" style="font-weight: 600;">Above what weight must two people lift a carton together?</h4>
+                              <div style="display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+                                <span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor"></circle><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"></path></svg>Live</span>
+                                <span class="chip chip-critical"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>Critical</span>
+                                <span class="tag num">Difficulty 2</span>
+                              </div>
+                            </div>
+                            <button class="icon-btn" type="button" aria-expanded="true" aria-controls="qs-b-saf4a" aria-label="Hide details" aria-describedby="qs-r-saf4a"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 15 6-6 6 6"></path></svg></button>
+                          </div>
+                          <div id="qs-b-saf4a" style="display: flex; flex-direction: column; gap: 16px; padding: 4px 16px 16px;">
+                            <p class="t-caption muted">Short answer · Approved Oct 30 · Dana Whitaker</p>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 16px 32px; align-items: start;">
+                              <div style="display: flex; flex-direction: column; gap: 8px;">
+                                <p class="t-label" id="qs-acc-saf4a">Accepted answers</p>
+                                <ul aria-labelledby="qs-acc-saf4a" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                  <li class="tag num">23 kg</li>
+                                  <li class="tag num">23 kilograms</li>
+                                  <li class="tag num">23kg</li>
+                                </ul>
+                              </div>
+                              <div style="display: flex; flex-direction: column; gap: 16px; min-width: 0;">
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                  <p class="t-label">Explanation</p>
+                                  <p class="t-body">Any carton over 23 kg needs a second person, even for a short carry. The weight is on the carton label.</p>
+                                </div>
+                                <figure class="quote">
+                                  <blockquote class="quote-text">“Any carton over 23 kg is a two-person lift, whatever the distance. Check the weight on the carton label before you lift.”</blockquote>
+                                  <figcaption class="quote-src">Picking SOP v3 · §5.4</figcaption>
+                                </figure>
+                              </div>
+                            </div>
+                          </div>
+                          <sc-if value="{{notReadonly}}" hint-placeholder-val="{{ true }}">
+                            <div style="display: flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-top: 1px solid var(--border);">
+                              <button class="btn btn-ghost" type="button" aria-describedby="qs-r-saf4a">Retire</button>
+                              <button class="btn btn-secondary" type="button" onClick="{{startEditShort}}" aria-describedby="qs-r-saf4a"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"></path><path d="m13.5 6.5 4 4"></path></svg>Edit</button>
+                            </div>
+                          </sc-if>
+                        </sc-if>
+
+                        <!-- EDIT (short answer), in place: Accepted answers replaces Options -->
+                        <sc-if value="{{isEditShort}}" hint-placeholder-val="{{ false }}">
+                          <form aria-labelledby="qs-es-h" onSubmit="{{saveEdit}}">
+                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 64px; padding: 12px 16px; border-bottom: 1px solid var(--border);">
+                              <h4 id="qs-es-h" class="t-title2">Edit question</h4>
+                              <span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor"></circle><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"></path></svg>Live</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 24px; padding: 16px;">
+                              <div class="field-row">
+                                <div class="field">
+                                  <label class="field-label" for="qs-es-type">Type</label>
+                                  <span class="select-wrap">
+                                    <select class="select" id="qs-es-type" name="type" value="short-answer">
+                                      <option value="multiple-choice">Multiple choice</option>
+                                      <option value="short-answer">Short answer</option>
+                                    </select>
+                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+                                  </span>
+                                </div>
+                                <div class="field">
+                                  <span class="field-label" id="qs-es-diff-l">Difficulty</span>
+                                  <div class="seg" role="radiogroup" aria-labelledby="qs-es-diff-l" style="align-self: flex-start;">
+                                    <button class="seg-btn num" type="button" role="radio" aria-checked="false" tabindex="-1" style="min-width: 44px; justify-content: center;">1</button>
+                                    <button class="seg-btn num" type="button" role="radio" aria-checked="true" tabindex="0" style="min-width: 44px; justify-content: center;">2</button>
+                                    <button class="seg-btn num" type="button" role="radio" aria-checked="false" tabindex="-1" style="min-width: 44px; justify-content: center;">3</button>
+                                    <button class="seg-btn num" type="button" role="radio" aria-checked="false" tabindex="-1" style="min-width: 44px; justify-content: center;">4</button>
+                                    <button class="seg-btn num" type="button" role="radio" aria-checked="false" tabindex="-1" style="min-width: 44px; justify-content: center;">5</button>
+                                  </div>
+                                </div>
+                              </div>
+                              <div class="field">
+                                <label class="field-label" for="qs-es-stem">Stem</label>
+                                <textarea class="textarea" id="qs-es-stem" name="stem" rows="2" style="min-height: 72px;">Above what weight must two people lift a carton together?</textarea>
+                              </div>
+                              <fieldset style="display: flex; flex-direction: column; gap: 12px;">
+                                <legend class="field-label" style="margin-bottom: 12px;">Accepted answers</legend>
+                                <ul aria-label="Accepted answers" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                  <li class="chip num" style="height: 44px; padding: 0 0 0 14px; font-size: 14px;">23 kg<button class="icon-btn" type="button" aria-label="Remove 23 kg" style="margin: -1px;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></li>
+                                  <li class="chip num" style="height: 44px; padding: 0 0 0 14px; font-size: 14px;">23 kilograms<button class="icon-btn" type="button" aria-label="Remove 23 kilograms" style="margin: -1px;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></li>
+                                  <li class="chip num" style="height: 44px; padding: 0 0 0 14px; font-size: 14px;">23kg<button class="icon-btn" type="button" aria-label="Remove 23kg" style="margin: -1px;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></li>
+                                </ul>
+                                <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                                  <input class="input" id="qs-es-add" type="text" name="accepted-new" aria-label="New accepted answer" autocomplete="off" style="flex: 1 1 240px; max-width: 360px;">
+                                  <button class="btn btn-secondary" type="button"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Add answer</button>
+                                </div>
+                              </fieldset>
+                              <div class="field">
+                                <label class="field-label" for="qs-es-expl">Explanation</label>
+                                <textarea class="textarea" id="qs-es-expl" name="explanation" rows="2" style="min-height: 72px;">Any carton over 23 kg needs a second person, even for a short carry. The weight is on the carton label.</textarea>
+                              </div>
+                              <div class="field-row">
+                                <div class="field">
+                                  <label class="field-label" for="qs-es-doc">Source document</label>
+                                  <span class="select-wrap">
+                                    <select class="select" id="qs-es-doc" name="source" value="picking-sop">
+                                      <option value="picking-sop">Picking SOP v3</option>
+                                      <option value="returns-procedure">Returns procedure</option>
+                                    </select>
+                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+                                  </span>
+                                </div>
+                                <div class="field">
+                                  <label class="field-label" for="qs-es-sec">Section</label>
+                                  <input class="input num" id="qs-es-sec" type="text" name="section" value="§5.4" autocomplete="off">
+                                </div>
+                              </div>
+                              <div class="field">
+                                <label class="field-label" for="qs-es-quote">Source quote</label>
+                                <textarea class="textarea" id="qs-es-quote" name="quote" rows="3">Any carton over 23 kg is a two-person lift, whatever the distance. Check the weight on the carton label before you lift.</textarea>
+                              </div>
+                            </div>
+                            <div style="display: flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-top: 1px solid var(--border);">
+                              <button class="btn btn-ghost" type="button" onClick="{{cancelEdit}}">Cancel</button>
+                              <button class="btn btn-primary" type="submit">Save question</button>
+                            </div>
+                          </form>
+                        </sc-if>
+                      </li>
+                      <li style="border-top: 1px solid var(--border);">
+                        <div style="display: grid; grid-template-columns: 168px 150px minmax(0, 1fr) 80px 44px; gap: 12px; align-items: center; min-height: 56px; padding: 6px 8px 6px 16px;">
+                          <span class="chip" style="justify-self: start;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor"></circle><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"></path></svg>Live</span>
+                          <span class="t-caption muted" style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>Approved Oct 30</span>
+                          <h4 id="qs-r-saf4b" class="t-body" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Where do you find a carton's weight?</h4>
+                          <span class="t-caption muted num">Difficulty 1</span>
+                          <button class="icon-btn" type="button" aria-expanded="false" aria-label="Show details" aria-describedby="qs-r-saf4b"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+                        </div>
+                      </li>
+                      <li style="border-top: 1px solid var(--border);">
+                        <div style="display: grid; grid-template-columns: 168px 150px minmax(0, 1fr) 80px 44px; gap: 12px; align-items: center; min-height: 56px; padding: 6px 8px 6px 16px;">
+                          <span class="chip" style="justify-self: start;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor"></circle><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"></path></svg>Live</span>
+                          <span class="t-caption muted" style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>Approved Oct 30</span>
+                          <h4 id="qs-r-saf4c" class="t-body" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">A carton weighs 25 kg and no one is free to help. What do you do?</h4>
+                          <span class="t-caption muted num">Difficulty 3</span>
+                          <button class="icon-btn" type="button" aria-expanded="false" aria-label="Show details" aria-describedby="qs-r-saf4c"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+                        </div>
+                      </li>
+                    </ul>
+                    <div style="padding: 0 8px; border-top: 1px solid var(--border);">
+                      <button class="link-btn" type="button" aria-describedby="qs-c-saf4-h" style="padding: 0 8px;">Show 11 more</button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </sc-if>
+
+            <!-- ======================= UNIT: Returns (all unreviewed) ======================= -->
+            <sc-if value="{{showRet}}" hint-placeholder-val="{{ true }}">
+              <section id="qs-u-ret" aria-labelledby="qs-u-ret-h" style="display: flex; flex-direction: column; gap: 16px; scroll-margin-top: 24px;">
+                <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-bottom: 8px; border-bottom: 1px solid var(--border);">
+                  <h2 id="qs-u-ret-h" class="t-title2">Returns</h2>
+                  <p class="t-caption muted num">4 concepts · 38 questions · 38 unreviewed</p>
+                </div>
+                <div id="qs-c-ret3" style="display: flex; flex-direction: column; gap: 12px; scroll-margin-top: 24px;">
+                  <div style="display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; min-height: 28px;">
+                    <h3 id="qs-c-ret3-h" class="t-label">Refund only after inspection</h3>
+                    <span class="chip chip-critical"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>Critical</span>
+                    <span class="t-caption muted num">11 questions · 11 unreviewed</span>
+                  </div>
+                  <div class="card">
+                    <ul aria-labelledby="qs-c-ret3-h">
+                      <!-- Unreviewed (live by default), expanded -->
+                      <li>
+                        <div style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 8px 4px 16px;">
+                          <div style="display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0;">
+                            <h4 id="qs-r-ret3a" class="t-body-lg" style="font-weight: 600;">A return arrives with the outer box still sealed. When can the refund go out?</h4>
+                            <div style="display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+                              <span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor"></circle><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"></path></svg>Live</span>
+                              <span class="chip chip-critical"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>Critical</span>
+                              <span class="tag num">Difficulty 3</span>
+                            </div>
+                          </div>
+                          <button class="icon-btn" type="button" aria-expanded="true" aria-controls="qs-b-ret3a" aria-label="Hide details" aria-describedby="qs-r-ret3a"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 15 6-6 6 6"></path></svg></button>
+                        </div>
+                        <div id="qs-b-ret3a" style="display: flex; flex-direction: column; gap: 16px; padding: 4px 16px 16px;">
+                          <p class="t-caption muted">Multiple choice · Unreviewed · Generated Nov 2 from Returns procedure</p>
+                          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 16px 32px; align-items: start;">
+                            <ol aria-label="Answer options" style="display: flex; flex-direction: column;">
+                              <li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; padding: 0 0 8px; border-bottom: 1px solid var(--border);">
+                                <span class="t-label">A</span>
+                                <div style="display: flex; flex-direction: column; gap: 2px;">
+                                  <span class="t-body" style="font-weight: 600;">After someone inspects the item</span>
+                                  <span class="t-caption" style="display: inline-flex; align-items: center; gap: 4px; font-weight: 600;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Correct answer</span>
+                                </div>
+                              </li>
+                              <li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                                <span class="t-label muted">B</span>
+                                <div style="display: flex; flex-direction: column; gap: 2px;">
+                                  <span class="t-body">As soon as the return label scans</span>
+                                  <span class="t-caption muted">Feedback: A label scan doesn't show what's inside.</span>
+                                </div>
+                              </li>
+                              <li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                                <span class="t-label muted">C</span>
+                                <div style="display: flex; flex-direction: column; gap: 2px;">
+                                  <span class="t-body">When the box weight matches the shipment</span>
+                                  <span class="t-caption muted">Feedback: A damaged item can weigh the same.</span>
+                                </div>
+                              </li>
+                              <li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; padding: 8px 0 0;">
+                                <span class="t-label muted">D</span>
+                                <div style="display: flex; flex-direction: column; gap: 2px;">
+                                  <span class="t-body">After the customer confirms by phone</span>
+                                  <span class="t-caption null">No feedback</span>
+                                </div>
+                              </li>
+                            </ol>
+                            <div style="display: flex; flex-direction: column; gap: 16px; min-width: 0;">
+                              <div style="display: flex; flex-direction: column; gap: 4px;">
+                                <p class="t-label">Explanation</p>
+                                <p class="t-body">A refund goes out only after someone has seen the item. A sealed box can still hold a damaged item.</p>
+                              </div>
+                              <figure class="quote">
+                                <blockquote class="quote-text">“Never release a refund before the item has been inspected, even if the packaging is sealed.”</blockquote>
+                                <figcaption class="quote-src">Returns procedure · Inspection</figcaption>
+                              </figure>
+                            </div>
+                          </div>
+                        </div>
+                        <sc-if value="{{notReadonly}}" hint-placeholder-val="{{ true }}">
+                          <div style="display: flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-top: 1px solid var(--border);">
+                            <button class="btn btn-ghost" type="button" aria-describedby="qs-r-ret3a">Retire</button>
+                            <button class="btn btn-secondary" type="button" aria-describedby="qs-r-ret3a"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"></path><path d="m13.5 6.5 4 4"></path></svg>Edit</button>
+                            <button class="btn btn-primary" type="button" aria-describedby="qs-r-ret3a">Approve and next</button>
+                          </div>
+                        </sc-if>
+                      </li>
+                      <li style="border-top: 1px solid var(--border);">
+                        <div style="display: grid; grid-template-columns: 168px 150px minmax(0, 1fr) 80px 44px; gap: 12px; align-items: center; min-height: 56px; padding: 6px 8px 6px 16px;">
+                          <span class="chip" style="justify-self: start;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor"></circle><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"></path></svg>Live</span>
+                          <span class="chip chip-dashed" style="justify-self: start;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-dasharray="2 3.2"></circle><path d="M12 8v4"></path><path d="M12 16h.01"></path></svg>Unreviewed</span>
+                          <h4 id="qs-r-ret3b" class="t-body" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Who can release a refund for a returned item?</h4>
+                          <span class="t-caption muted num">Difficulty 2</span>
+                          <button class="icon-btn" type="button" aria-expanded="false" aria-label="Show details" aria-describedby="qs-r-ret3b"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+                        </div>
+                      </li>
+                      <li style="border-top: 1px solid var(--border);">
+                        <div style="display: grid; grid-template-columns: 168px 150px minmax(0, 1fr) 80px 44px; gap: 12px; align-items: center; min-height: 56px; padding: 6px 8px 6px 16px;">
+                          <span class="chip" style="justify-self: start;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor"></circle><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"></path></svg>Live</span>
+                          <span class="chip chip-dashed" style="justify-self: start;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-dasharray="2 3.2"></circle><path d="M12 8v4"></path><path d="M12 16h.01"></path></svg>Unreviewed</span>
+                          <h4 id="qs-r-ret3c" class="t-body" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">The item is damaged on inspection. What happens to the refund?</h4>
+                          <span class="t-caption muted num">Difficulty 3</span>
+                          <button class="icon-btn" type="button" aria-expanded="false" aria-label="Show details" aria-describedby="qs-r-ret3c"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+                        </div>
+                      </li>
+                      <li style="border-top: 1px solid var(--border);">
+                        <div style="display: grid; grid-template-columns: 168px 150px minmax(0, 1fr) 80px 44px; gap: 12px; align-items: center; min-height: 56px; padding: 6px 8px 6px 16px;">
+                          <span class="chip" style="justify-self: start;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor"></circle><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"></path></svg>Live</span>
+                          <span class="chip chip-dashed" style="justify-self: start;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-dasharray="2 3.2"></circle><path d="M12 8v4"></path><path d="M12 16h.01"></path></svg>Unreviewed</span>
+                          <h4 id="qs-r-ret3d" class="t-body" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">The inspection finds the wrong item in the box. Who do you tell?</h4>
+                          <span class="t-caption muted num">Difficulty 2</span>
+                          <button class="icon-btn" type="button" aria-expanded="false" aria-label="Show details" aria-describedby="qs-r-ret3d"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+                        </div>
+                      </li>
+                    </ul>
+                    <div style="padding: 0 8px; border-top: 1px solid var(--border);">
+                      <button class="link-btn" type="button" aria-describedby="qs-c-ret3-h" style="padding: 0 8px;">Show 7 more</button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </sc-if>
+
+            <!-- ======================= FLAGGED filter: only the flagged questions ======================= -->
+            <sc-if value="{{flagBlock}}" hint-placeholder-val="{{ false }}">
+              <section id="qs-f-u-scn" aria-labelledby="qs-f-u-scn-h" style="display: flex; flex-direction: column; gap: 16px; scroll-margin-top: 24px;">
+                <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-bottom: 8px; border-bottom: 1px solid var(--border);">
+                  <h2 id="qs-f-u-scn-h" class="t-title2">Scanning</h2>
+                  <p class="t-caption muted num">{{flagUnitText}}</p>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 24px;">
+                  <div id="qs-f-c-scn2" style="display: flex; flex-direction: column; gap: 12px; scroll-margin-top: 24px;">
+                    <div style="display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; min-height: 28px;">
+                      <h3 id="qs-f-c-scn2-h" class="t-label">Double beep: put the item back and re-scan</h3>
+                      <span class="chip chip-critical"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>Critical</span>
+                      <span class="t-caption muted num">1 of 14 questions</span>
+                    </div>
+                    <div class="card">
+                      <ul aria-labelledby="qs-f-c-scn2-h">
+                        <li>
+                          <div style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 8px 4px 16px;">
+                            <div style="display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0;">
+                              <h4 id="qs-f-r-scn2a" class="t-body-lg" style="font-weight: 600;">Your handheld beeps twice after you scan an item. What do you do?</h4>
+                              <div style="display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+                                <span class="chip chip-strong"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>Flagged by learner</span>
+                                <span class="chip chip-critical"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>Critical</span>
+                                <span class="tag num">Difficulty 2</span>
+                              </div>
+                            </div>
+                            <button class="icon-btn" type="button" aria-expanded="true" aria-controls="qs-f-b-scn2a" aria-label="Hide details" aria-describedby="qs-f-r-scn2a"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 15 6-6 6 6"></path></svg></button>
+                          </div>
+                          <div id="qs-f-b-scn2a" style="display: flex; flex-direction: column; gap: 16px; padding: 4px 16px 16px;">
+                            <p class="t-caption muted">Multiple choice · Approved Oct 30 · Dana Whitaker</p>
+                            <div class="sunken" role="group" aria-labelledby="qs-f-fl-scn2a" style="padding: 12px 16px; display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 12px; align-items: start;">
+                              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>
+                              <div style="display: flex; flex-direction: column; gap: 8px; min-width: 0;">
+                                <p id="qs-f-fl-scn2a" class="t-label">Reported by <a href="Person.dc.html">Jordan Reyes</a> · Nov 2, 10:14</p>
+                                <dl class="kv" style="font-size: 14px; line-height: 20px; gap: 4px 16px;">
+                                  <dt>Reason</dt><dd>The answer looks incorrect</dd>
+                                  <dt>Note</dt><dd>“I re-scanned it and the beep stopped. That's how my lead showed me on day 2.”</dd>
+                                  <dt>Attempt</dt><dd>Chose “Re-scan the item barcode” · Sure</dd>
+                                </dl>
+                              </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 16px 32px; align-items: start;">
+                              <ol aria-label="Answer options" style="display: flex; flex-direction: column;">
+                                <li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; padding: 0 0 8px; border-bottom: 1px solid var(--border);">
+                                  <span class="t-label">A</span>
+                                  <div style="display: flex; flex-direction: column; gap: 2px;">
+                                    <span class="t-body" style="font-weight: 600;">Put it back, then scan the bin and the item</span>
+                                    <span class="t-caption" style="display: inline-flex; align-items: center; gap: 4px; font-weight: 600;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Correct answer</span>
+                                  </div>
+                                </li>
+                                <li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                                  <span class="t-label muted">B</span>
+                                  <div style="display: flex; flex-direction: column; gap: 2px;">
+                                    <span class="t-body">Re-scan the item barcode</span>
+                                    <span class="t-caption muted">Feedback: Scanning it again repeats the mismatch.</span>
+                                  </div>
+                                </li>
+                                <li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                                  <span class="t-label muted">C</span>
+                                  <div style="display: flex; flex-direction: column; gap: 2px;">
+                                    <span class="t-body">Put it in the tote and report it at drop-off</span>
+                                    <span class="t-caption muted">Feedback: The wrong item ships to the customer.</span>
+                                  </div>
+                                </li>
+                                <li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; padding: 8px 0 0;">
+                                  <span class="t-label muted">D</span>
+                                  <div style="display: flex; flex-direction: column; gap: 2px;">
+                                    <span class="t-body">Restart the handheld</span>
+                                    <span class="t-caption null">No feedback</span>
+                                  </div>
+                                </li>
+                              </ol>
+                              <div style="display: flex; flex-direction: column; gap: 16px; min-width: 0;">
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                  <p class="t-label">Explanation</p>
+                                  <p class="t-body">Two beeps mean the item doesn't match the pick. Putting it back first keeps the wrong item out of the tote.</p>
+                                </div>
+                                <figure class="quote">
+                                  <blockquote class="quote-text">“A double beep means the item does not match the pick. Put the item back in its bin, scan the bin label, then scan the item.”</blockquote>
+                                  <figcaption class="quote-src">Picking SOP v3 · §4.3</figcaption>
+                                </figure>
+                              </div>
+                            </div>
+                          </div>
+                          <sc-if value="{{notReadonly}}" hint-placeholder-val="{{ true }}">
+                            <div style="display: flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-top: 1px solid var(--border);">
+                              <button class="btn btn-ghost" type="button" aria-describedby="qs-f-r-scn2a">Retire</button>
+                              <button class="btn btn-secondary" type="button" aria-describedby="qs-f-r-scn2a"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"></path><path d="m13.5 6.5 4 4"></path></svg>Edit</button>
+                              <button class="btn btn-primary" type="button" aria-describedby="qs-f-r-scn2a">Approve, resolve flag and next</button>
+                            </div>
+                          </sc-if>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <sc-if value="{{showAmara}}" hint-placeholder-val="{{ true }}">
+                    <div id="qs-f-c-scn4" style="display: flex; flex-direction: column; gap: 12px; scroll-margin-top: 24px;">
+                      <div style="display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; min-height: 28px;">
+                        <h3 id="qs-f-c-scn4-h" class="t-label">Key in a barcode only as a last resort</h3>
+                        <span class="t-caption muted num">1 of 12 questions</span>
+                      </div>
+                      <div class="card">
+                        <ul aria-labelledby="qs-f-c-scn4-h">
+                          <li>
+                            <div style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 8px 4px 16px;">
+                              <div style="display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0;">
+                                <h4 id="qs-f-r-scn4a" class="t-body-lg" style="font-weight: 600;">The item barcode won't scan. When can you key in the number by hand?</h4>
+                                <div style="display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+                                  <span class="chip chip-strong"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>Flagged by learner</span>
+                                  <span class="tag num">Difficulty 2</span>
+                                </div>
+                              </div>
+                              <button class="icon-btn" type="button" aria-expanded="true" aria-controls="qs-f-b-scn4a" aria-label="Hide details" aria-describedby="qs-f-r-scn4a"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 15 6-6 6 6"></path></svg></button>
+                            </div>
+                            <div id="qs-f-b-scn4a" style="display: flex; flex-direction: column; gap: 16px; padding: 4px 16px 16px;">
+                              <p class="t-caption muted">Multiple choice · Approved Oct 30 · Dana Whitaker</p>
+                              <div class="sunken" role="group" aria-labelledby="qs-f-fl-scn4a" style="padding: 12px 16px; display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 12px; align-items: start;">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>
+                                <div style="display: flex; flex-direction: column; gap: 8px; min-width: 0;">
+                                  <p id="qs-f-fl-scn4a" class="t-label">Reported by <a href="Person-Proficient.dc.html">Amara Okafor</a> · Nov 2, 16:05</p>
+                                  <dl class="kv" style="font-size: 14px; line-height: 20px; gap: 4px 16px;">
+                                    <dt>Reason</dt><dd>It doesn't match how we do it here</dd>
+                                    <dt>Note</dt><dd>“On our floor only the team lead keys in a barcode. We send the label to the help desk.”</dd>
+                                    <dt>Attempt</dt><dd>Chose “Never: send it to the help desk” · Sure</dd>
+                                  </dl>
+                                </div>
+                              </div>
+                              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 16px 32px; align-items: start;">
+                                <ol aria-label="Answer options" style="display: flex; flex-direction: column;">
+                                  <li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; padding: 0 0 8px; border-bottom: 1px solid var(--border);">
+                                    <span class="t-label">A</span>
+                                    <div style="display: flex; flex-direction: column; gap: 2px;">
+                                      <span class="t-body" style="font-weight: 600;">After three failed scans at 10 to 30 cm</span>
+                                      <span class="t-caption" style="display: inline-flex; align-items: center; gap: 4px; font-weight: 600;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Correct answer</span>
+                                    </div>
+                                  </li>
+                                  <li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                                    <span class="t-label muted">B</span>
+                                    <div style="display: flex; flex-direction: column; gap: 2px;">
+                                      <span class="t-body">Whenever it's faster than scanning</span>
+                                      <span class="t-caption muted">Feedback: A keyed number skips the scanner's check.</span>
+                                    </div>
+                                  </li>
+                                  <li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                                    <span class="t-label muted">C</span>
+                                    <div style="display: flex; flex-direction: column; gap: 2px;">
+                                      <span class="t-body">Before scanning, if the label looks worn</span>
+                                      <span class="t-caption muted">Feedback: Worn labels often still scan. Try first.</span>
+                                    </div>
+                                  </li>
+                                  <li style="display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; padding: 8px 0 0;">
+                                    <span class="t-label muted">D</span>
+                                    <div style="display: flex; flex-direction: column; gap: 2px;">
+                                      <span class="t-body">Never: send it to the help desk</span>
+                                      <span class="t-caption null">No feedback</span>
+                                    </div>
+                                  </li>
+                                </ol>
+                                <div style="display: flex; flex-direction: column; gap: 16px; min-width: 0;">
+                                  <div style="display: flex; flex-direction: column; gap: 4px;">
+                                    <p class="t-label">Explanation</p>
+                                    <p class="t-body">Keying in is the fallback when the scanner can't read the label. Three tries at the right distance come first.</p>
+                                  </div>
+                                  <p class="quote-none"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" stroke-dasharray="3 3"></path></svg>No source quote</p>
+                                </div>
+                              </div>
+                            </div>
+                            <sc-if value="{{notReadonly}}" hint-placeholder-val="{{ true }}">
+                              <div style="display: flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-top: 1px solid var(--border);">
+                                <button class="btn btn-ghost" type="button" aria-describedby="qs-f-r-scn4a">Retire</button>
+                                <button class="btn btn-secondary" type="button" aria-describedby="qs-f-r-scn4a"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"></path><path d="m13.5 6.5 4 4"></path></svg>Edit</button>
+                                <button class="btn btn-primary" type="button" aria-describedby="qs-f-r-scn4a">Approve, resolve flag and next</button>
+                              </div>
+                            </sc-if>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  </sc-if>
+                </div>
+              </section>
+            </sc-if>
+
+            <!-- ======================= No results for these filters ======================= -->
+            <sc-if value="{{isEmpty}}" hint-placeholder-val="{{ false }}">
+              <div class="card card-pad" style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+                <p class="t-body">No questions match these filters. Flagged questions have already been reviewed.</p>
+                <button class="btn btn-secondary" type="button" onClick="{{clearFilters}}">Clear filters</button>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light"},"state":{"editor":"enum","options":["list","edit","editshort","flagged"],"default":"list"},"readonly":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":4470}}'>
+class Component extends DCLogic {
+  componentDidUpdate(prevProps) {
+    if (prevProps && (prevProps.state !== this.props.state || prevProps.readonly !== this.props.readonly) && this.state) {
+      if (this.state.view !== undefined || this.state.flag !== undefined || this.state.unrev !== undefined || this.state.crit !== undefined) {
+        this.setState({ view: undefined, flag: undefined, unrev: undefined, crit: undefined });
+      }
+    }
+  }
+  renderVals() {
+    const st = this.state || {};
+    const ps = this.props.state ?? 'list';
+    const ro = this.props.readonly === true || this.props.readonly === 'true';
+    const view = st.view ?? (ps === 'flagged' ? 'list' : ps);
+    const flag = st.flag ?? (ps === 'flagged');
+    const unrev = st.unrev ?? false;
+    const crit = st.crit ?? false;
+    const any = flag || unrev || crit;
+    const listMode = !flag;
+    const showOthers = listMode && !unrev;
+    const flagBlock = flag && !unrev;
+    let n = null;
+    if (flag && unrev) n = 0;
+    else if (flag) n = crit ? 1 : 2;
+    else if (unrev) n = crit ? 11 : 38;
+    else if (crit) n = 96;
+    const flagCount = crit ? 1 : 2;
+    return {
+      theme: this.props.theme ?? 'light',
+      readonly: ro, notReadonly: !ro,
+      appClass: ro ? 'app has-band' : 'app',
+      unrevPressed: unrev ? 'true' : 'false',
+      flagPressed: flag ? 'true' : 'false',
+      critPressed: crit ? 'true' : 'false',
+      anyFilter: any,
+      notCrit: !crit,
+      resultsText: n === null ? '' : (n === 1 ? '1 question' : n + ' questions'),
+      outlineMain: showOthers,
+      outlineRet: listMode && unrev,
+      retOutlineText: crit ? '11 unreviewed' : '38 unreviewed',
+      retOutlineCount: crit ? '11' : '38',
+      flagBlock: flagBlock,
+      showAmara: flagBlock && !crit,
+      flagCount: String(flagCount),
+      flagOutlineText: flagCount + ' flagged',
+      flagUnitText: flagCount + ' of 88 questions',
+      isEmpty: flag && unrev,
+      showOthers: showOthers,
+      showScn4: showOthers && !crit,
+      showRet: listMode,
+      isEditMC: showOthers && !ro && view === 'edit',
+      notEditMC: !(showOthers && !ro && view === 'edit'),
+      isEditShort: showOthers && !ro && view === 'editshort',
+      notEditShort: !(showOthers && !ro && view === 'editshort'),
+      toggleUnrev: () => this.setState({ unrev: !unrev, flag, crit }),
+      toggleFlag: () => this.setState({ flag: !flag, unrev, crit }),
+      toggleCrit: () => this.setState({ crit: !crit, flag, unrev }),
+      clearFilters: () => this.setState({ flag: false, unrev: false, crit: false }),
+      startEdit: () => this.setState({ view: 'edit' }),
+      startEditShort: () => this.setState({ view: 'editshort' }),
+      cancelEdit: () => this.setState({ view: 'list' }),
+      saveEdit: (e) => { if (e && e.preventDefault) e.preventDefault(); },
+    };
+  }
+}
+</script>
+</body>
+</html>

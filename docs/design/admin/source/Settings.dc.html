@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings · Northwind Logistics</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" style="position: relative;">
+  <div class="app">
+    <dc-import name="PortalNav" active="settings" readonly="false" hint-size="248px,900px"></dc-import>
+    <main class="main">
+      <div class="page page-capped">
+        <div class="page-head">
+          <div class="page-head-text">
+            <h1 class="t-title1" tabindex="-1">Settings</h1>
+          </div>
+        </div>
+
+        <!-- ============ SAVEFAIL: failed save keeps the input ============ -->
+        <sc-if value="{{isSaveFail}}" hint-placeholder-val="{{ false }}">
+          <div class="banner banner-alert" role="alert">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5h.01"></path></svg>
+            <p class="banner-text"><strong>Couldn't save your changes.</strong> The server didn't respond. Your edits are still in the form.</p>
+            <button class="btn btn-secondary" type="button"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"></path></svg>Try again</button>
+          </div>
+        </sc-if>
+
+        <form class="card" aria-label="Company settings">
+
+          <!-- ============ Company ============ -->
+          <section aria-labelledby="st-h-company" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 24px;">
+            <h2 id="st-h-company" class="t-title2" style="flex: 0 0 200px;">Company</h2>
+            <div style="flex: 1 1 400px; max-width: 560px; display: flex; flex-direction: column; gap: 24px;">
+              <div class="field">
+                <label class="field-label" for="st-name">Company name</label>
+                <input class="input" id="st-name" name="company" type="text" value="{{companyName}}" autocomplete="organization">
+              </div>
+              <div class="field" role="group" aria-labelledby="st-logo-l" aria-describedby="st-logo-meta">
+                <span class="field-label" id="st-logo-l">Logo</span>
+                <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                  <svg viewBox="0 0 32 32" width="64" height="64" role="img" aria-label="Current logo"><rect width="32" height="32" rx="8" fill="#5B2A6E"></rect><path d="M9 23V9l14 14V9" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <input class="sr-only" id="st-logo-file" name="logo" type="file" accept="image/png,image/jpeg,image/webp" tabindex="-1" aria-hidden="true">
+                    <button class="btn btn-secondary" type="button" aria-controls="st-logo-file"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"></path></svg>Replace logo</button>
+                    <button class="btn btn-ghost" type="button">Remove</button>
+                  </div>
+                </div>
+                <p class="field-meta" id="st-logo-meta">PNG, JPEG or WebP · up to 2 MB</p>
+              </div>
+            </div>
+          </section>
+
+          <hr class="divider">
+
+          <!-- ============ Learner app color ============ -->
+          <section aria-labelledby="st-h-color" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 24px;">
+            <h2 id="st-h-color" class="t-title2" style="flex: 0 0 200px;">Learner app</h2>
+            <div style="flex: 1 1 400px; max-width: 560px; display: flex; flex-direction: column; gap: 24px;">
+
+              <sc-if value="{{accentOk}}" hint-placeholder-val="{{ true }}">
+                <div class="field">
+                  <label class="field-label" for="st-accent">Accent color</label>
+                  <div style="display: flex; align-items: center; gap: 24px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <input class="input num" id="st-accent" name="accent" type="text" value="#5B2A6E" maxlength="7" spellcheck="false" autocomplete="off" style="width: 160px;">
+                      <button type="button" aria-label="Choose accent color" style="width: 44px; height: 44px; flex: none; border-radius: var(--radius-md); border: 1px solid var(--border-strong); background: #5B2A6E; cursor: pointer; padding: 0;"></button>
+                    </div>
+                    <figure style="display: flex; align-items: center; gap: 12px; margin: 0;">
+                      <span aria-hidden="true" style="display: inline-flex; align-items: center; min-height: var(--target); padding: 0 16px; border-radius: var(--radius-md); background: #5B2A6E; color: #FFFFFF; font-size: 14px; line-height: 20px; font-weight: 600;">Start quiz</span>
+                      <figcaption class="t-caption muted num"><span class="sr-only">Learner app button preview: </span>10.5:1 on white · passes AA</figcaption>
+                    </figure>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{isAccentFail}}" hint-placeholder-val="{{ false }}">
+                <div class="field is-invalid">
+                  <label class="field-label" for="st-accent-x">Accent color</label>
+                  <div style="display: flex; align-items: center; gap: 24px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <input class="input num" id="st-accent-x" name="accent" type="text" value="#F4C430" maxlength="7" spellcheck="false" autocomplete="off" aria-invalid="true" aria-describedby="st-accent-err" style="width: 160px;">
+                      <button type="button" aria-label="Choose accent color" style="width: 44px; height: 44px; flex: none; border-radius: var(--radius-md); border: 1px solid var(--border-strong); background: #F4C430; cursor: pointer; padding: 0;"></button>
+                    </div>
+                    <figure style="display: flex; align-items: center; gap: 12px; margin: 0;">
+                      <span aria-hidden="true" style="display: inline-flex; align-items: center; min-height: var(--target); padding: 0 16px; border-radius: var(--radius-md); background: #F4C430; color: #FFFFFF; font-size: 14px; line-height: 20px; font-weight: 600;">Start quiz</span>
+                      <figcaption class="sr-only">Learner app button preview</figcaption>
+                    </figure>
+                  </div>
+                  <p class="field-error" id="st-accent-err" role="alert"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5h.01"></path></svg><span class="num">1.6:1 on white. Pick a darker color that reaches 4.5:1.</span></p>
+                </div>
+              </sc-if>
+
+            </div>
+          </section>
+
+          <hr class="divider">
+
+          <!-- ============ Learning pushes ============ -->
+          <section aria-labelledby="st-h-push" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 24px;">
+            <h2 id="st-h-push" class="t-title2" style="flex: 0 0 200px;">Learning pushes</h2>
+            <div style="flex: 1 1 400px; max-width: 560px; display: flex; flex-direction: column; gap: 24px;">
+              <div class="field">
+                <label class="field-label" for="st-tz">Timezone</label>
+                <span class="select-wrap">
+                  <select class="select" id="st-tz" name="timezone">
+                    <option value="America/Chicago" selected="selected">America/Chicago (CT)</option>
+                    <option value="America/New_York">America/New_York (ET)</option>
+                    <option value="America/Denver">America/Denver (MT)</option>
+                    <option value="America/Los_Angeles">America/Los_Angeles (PT)</option>
+                  </select>
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+                </span>
+              </div>
+
+              <div class="field" role="group" aria-labelledby="st-days-l">
+                <span class="field-label" id="st-days-l">Working days</span>
+                <div class="seg" style="align-self: flex-start; flex-wrap: wrap;">
+                  <!-- Pressed day: brand-tint fill + 2px brand border + check + ink text; unpressed: card ground, 1px border-strong, ink-muted. -->
+                  <button class="seg-btn" type="button" aria-pressed="true" aria-label="Monday" style="background: var(--brand-tint); color: var(--ink); border: 2px solid var(--brand);"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--brand);"><path d="M20 6 9 17l-5-5"></path></svg>Mon</button>
+                  <button class="seg-btn" type="button" aria-pressed="true" aria-label="Tuesday" style="background: var(--brand-tint); color: var(--ink); border: 2px solid var(--brand);"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--brand);"><path d="M20 6 9 17l-5-5"></path></svg>Tue</button>
+                  <button class="seg-btn" type="button" aria-pressed="true" aria-label="Wednesday" style="background: var(--brand-tint); color: var(--ink); border: 2px solid var(--brand);"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--brand);"><path d="M20 6 9 17l-5-5"></path></svg>Wed</button>
+                  <button class="seg-btn" type="button" aria-pressed="true" aria-label="Thursday" style="background: var(--brand-tint); color: var(--ink); border: 2px solid var(--brand);"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--brand);"><path d="M20 6 9 17l-5-5"></path></svg>Thu</button>
+                  <button class="seg-btn" type="button" aria-pressed="true" aria-label="Friday" style="background: var(--brand-tint); color: var(--ink); border: 2px solid var(--brand);"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--brand);"><path d="M20 6 9 17l-5-5"></path></svg>Fri</button>
+                  <sc-if value="{{satPressed}}" hint-placeholder-val="{{ false }}">
+                    <button class="seg-btn" type="button" aria-pressed="true" aria-label="Saturday" style="background: var(--brand-tint); color: var(--ink); border: 2px solid var(--brand);"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--brand);"><path d="M20 6 9 17l-5-5"></path></svg>Sat</button>
+                  </sc-if>
+                  <sc-if value="{{satOff}}" hint-placeholder-val="{{ true }}">
+                    <button class="seg-btn" type="button" aria-pressed="false" aria-label="Saturday" style="background: var(--surface-card); color: var(--ink-muted); border: 1px solid var(--border-strong);">Sat</button>
+                  </sc-if>
+                  <button class="seg-btn" type="button" aria-pressed="false" aria-label="Sunday" style="background: var(--surface-card); color: var(--ink-muted); border: 1px solid var(--border-strong);">Sun</button>
+                </div>
+              </div>
+
+              <fieldset class="field">
+                <legend class="field-label" style="margin-bottom: 8px;">Working hours</legend>
+                <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; max-width: 420px;">
+                  <div class="field">
+                    <label class="t-caption muted" for="st-from">From</label>
+                    <span class="select-wrap">
+                      <select class="select num" id="st-from" name="work_start">
+                        <option value="05:00">5:00 AM</option>
+                        <option value="06:00" selected="selected">6:00 AM</option>
+                        <option value="07:00">7:00 AM</option>
+                        <option value="08:00">8:00 AM</option>
+                        <option value="09:00">9:00 AM</option>
+                      </select>
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+                    </span>
+                  </div>
+                  <div class="field">
+                    <label class="t-caption muted" for="st-to">To</label>
+                    <span class="select-wrap">
+                      <select class="select num" id="st-to" name="work_end">
+                        <option value="16:00">4:00 PM</option>
+                        <option value="17:00">5:00 PM</option>
+                        <option value="18:00" selected="selected">6:00 PM</option>
+                        <option value="19:00">7:00 PM</option>
+                        <option value="20:00">8:00 PM</option>
+                      </select>
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+                    </span>
+                  </div>
+                </div>              </fieldset>
+            </div>
+          </section>
+
+          <div class="card-foot">
+            <button class="btn btn-ghost" type="button">Discard</button>
+            <!-- Stays enabled with an invalid field: on click, nothing is sent and focus moves to the accent field and its error. -->
+            <button class="btn btn-primary" type="submit">Save changes</button>
+          </div>
+        </form>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light"},"state":{"editor":"enum","options":["normal","accentfail","savefail"],"default":"normal"},"$preview":{"width":1440,"height":990}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.props.state ?? 'normal';
+    const accentFail = s === 'accentfail';
+    const saveFail = s === 'savefail';
+    return {
+      theme: this.props.theme ?? 'light',
+      isAccentFail: accentFail,
+      accentOk: !accentFail,
+      isSaveFail: saveFail,
+      companyName: saveFail ? 'Northwind Logistics Ltd' : 'Northwind Logistics',
+      satPressed: saveFail,
+      satOff: !saveFail,
+    };
+  }
+}
+</script>
+</body>
+</html>

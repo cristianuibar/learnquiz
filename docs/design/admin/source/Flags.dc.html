@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Content flags · Staff admin</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" style="position: relative;">
+  <div class="app">
+    <dc-import name="StaffNav" active="flags" hint-size="248px,900px"></dc-import>
+    <main class="main">
+      <div class="page">
+        <div class="page-head">
+          <div class="page-head-text">
+            <h1 class="t-title1" tabindex="-1">Content flags</h1>
+          </div>
+        </div>
+
+        <section class="section" aria-label="Flag list">
+          <div class="dt-toolbar">
+            <div role="group" aria-label="Flag type" style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button class="filter-chip" type="button" aria-pressed="{{pAll}}" onClick="{{showAll}}">All <span class="count">9</span></button>
+              <button class="filter-chip" type="button" aria-pressed="{{pLearner}}" onClick="{{showLearner}}">Reported by learners <span class="count">5</span></button>
+              <button class="filter-chip" type="button" aria-pressed="{{pPartner}}" onClick="{{showPartner}}">Retired by partners <span class="count">4</span></button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 16px; margin-left: auto; flex-wrap: wrap;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <label for="fl-company" class="t-label">Company</label>
+                <span class="select-wrap" style="width: 220px;">
+                  <select id="fl-company" class="select"><option>All companies</option><option>Bluefield Foods</option><option>Brightwater Packaging</option><option>Corvid Freight</option><option>Kestrel Couriers</option><option>Lumen Retail Group</option><option>Northwind Logistics</option><option>Orchard Lane Bakeries</option><option>Tallis Hotels</option></select>
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+                </span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <label for="fl-status" class="t-label">Status</label>
+                <span class="select-wrap" style="width: 136px;">
+                  <select id="fl-status" class="select"><option>All</option><option>Open</option><option>Resolved</option></select>
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+                </span>
+              </div>
+            </div>
+          </div>
+          <p class="sr-only" role="status">{{shownText}}</p>
+
+          <!-- Northwind questions open the read-only Questions artboard; other companies have no prototype data (href="#"). -->
+          <div class="dt-wrap">
+            <table class="dt">
+              <caption class="sr-only">Flagged and retired questions across all companies, newest first</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Question</th>
+                  <th scope="col">Company</th>
+                  <th scope="col">Reason and note</th>
+                  <th scope="col" aria-sort="descending"><button class="th-sort" type="button">When<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 10 5 5 5-5"></path></svg></button></th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr hidden="{{hideLearner}}">
+                  <td><a class="cell-main" href="RO-Questions.dc.html" style="max-width: 320px;"><span style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">The item barcode won't scan. When can you key in the number by hand?</span></a><div class="cell-sub">Learner report · Scanning</div></td>
+                  <td>Northwind Logistics</td>
+                  <td><div class="t-label">It doesn't match how we do it here</div><p class="cell-sub" style="max-width: 280px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">On our floor only the team lead keys in a barcode. We send the label to the help desk.</p></td>
+                  <td style="white-space: nowrap;"><div>Nov 2</div><div class="cell-sub">Amara Okafor</div></td>
+                  <td style="white-space: nowrap;"><span class="chip chip-strong"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>Flagged by learner</span></td>
+                </tr>
+                <tr hidden="{{hideLearner}}">
+                  <td><a class="cell-main" href="RO-Questions.dc.html" style="max-width: 320px;"><span style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">Your handheld beeps twice after you scan an item. What do you do?</span></a><div class="cell-sub">Learner report · Scanning</div></td>
+                  <td>Northwind Logistics</td>
+                  <td><div class="t-label">The answer looks incorrect</div><p class="cell-sub" style="max-width: 280px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">I re-scanned it and the beep stopped. That's how my lead showed me on day 2.</p></td>
+                  <td style="white-space: nowrap;"><div>Nov 2</div><div class="cell-sub">Jordan Reyes</div></td>
+                  <td style="white-space: nowrap;"><span class="chip chip-strong"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>Flagged by learner</span></td>
+                </tr>
+                <tr hidden="{{hideLearner}}">
+                  <td><a class="cell-main" href="#" style="max-width: 320px;"><span style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">How long must the line stay clear after an allergen changeover?</span></a><div class="cell-sub">Learner report · Allergen control</div></td>
+                  <td>Bluefield Foods</td>
+                  <td><div class="t-label">It doesn't match how we do it here</div><p class="cell-sub" style="max-width: 280px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">Our changeover sheet says 15 minutes. The question says 10, which was the old rule before the March audit.</p></td>
+                  <td style="white-space: nowrap;"><div>Nov 2</div><div class="cell-sub">Tomás Rivera</div></td>
+                  <td style="white-space: nowrap;"><span class="chip chip-strong"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>Flagged by learner</span></td>
+                </tr>
+                <tr hidden="{{hidePartner}}">
+                  <td><a class="cell-main" href="#" style="max-width: 320px;"><span style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">Which cart holds soiled linen during a room turn?</span></a><div class="cell-sub">Retired by partner · Linen</div></td>
+                  <td>Tallis Hotels</td>
+                  <td><div class="t-label">Out of date</div><p class="cell-sub" style="max-width: 280px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">We replaced the two-cart system in October.</p></td>
+                  <td style="white-space: nowrap;"><div>Nov 1</div><div class="cell-sub">Grace Holloway</div></td>
+                  <td style="white-space: nowrap;"><span class="chip chip-muted"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"></rect><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"></path></svg>Retired</span></td>
+                </tr>
+                <tr hidden="{{hideLearner}}">
+                  <td><a class="cell-main" href="#" style="max-width: 320px;"><span style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">A customer returns an opened item without a receipt. What do you offer?</span></a><div class="cell-sub">Learner report · Returns</div></td>
+                  <td>Lumen Retail Group</td>
+                  <td><div class="t-label">The question is unclear</div><p class="cell-sub" style="max-width: 280px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">Two options both look right. It depends on whether the item is damaged, and the question doesn't say.</p></td>
+                  <td style="white-space: nowrap;"><div>Oct 31</div><div class="cell-sub">Mei Tanaka</div></td>
+                  <td style="white-space: nowrap;"><span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>Resolved Nov 1</span></td>
+                </tr>
+                <tr hidden="{{hidePartner}}">
+                  <td><a class="cell-main" href="#" style="max-width: 320px;"><span style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">When do you call a supervisor to the till?</span></a><div class="cell-sub">Retired by partner · Cash handling</div></td>
+                  <td>Lumen Retail Group</td>
+                  <td><div class="t-label">Duplicate</div><p class="cell-sub" style="max-width: 280px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">Same as the question about void approvals.</p></td>
+                  <td style="white-space: nowrap;"><div>Oct 31</div><div class="cell-sub">Rhys Calder</div></td>
+                  <td style="white-space: nowrap;"><span class="chip chip-muted"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"></rect><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"></path></svg>Retired</span></td>
+                </tr>
+                <tr hidden="{{hideLearner}}">
+                  <td><a class="cell-main" href="#" style="max-width: 320px;"><span style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">What do you check before handing over a room key?</span></a><div class="cell-sub">Learner report · Check-in</div></td>
+                  <td>Tallis Hotels</td>
+                  <td><div class="t-label">The answer looks incorrect</div><p class="cell-sub" style="max-width: 280px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">The SOP asks for ID and the booking name. The quiz only accepts one of them as correct.</p></td>
+                  <td style="white-space: nowrap;"><div>Oct 29</div><div class="cell-sub">Owen Pryce</div></td>
+                  <td style="white-space: nowrap;"><span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>Resolved Oct 30</span></td>
+                </tr>
+                <tr hidden="{{hidePartner}}">
+                  <td><a class="cell-main" href="#" style="max-width: 320px;"><span style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">How often are hairnets replaced during a shift?</span></a><div class="cell-sub">Retired by partner · Hygiene</div></td>
+                  <td>Bluefield Foods</td>
+                  <td><div class="t-label">Not our procedure</div><p class="cell-sub" style="max-width: 280px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">This came from the supplier manual, not our SOP.</p></td>
+                  <td style="white-space: nowrap;"><div>Oct 29</div><div class="cell-sub">Priya Nair</div></td>
+                  <td style="white-space: nowrap;"><span class="chip chip-muted"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"></rect><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"></path></svg>Retired</span></td>
+                </tr>
+                <tr hidden="{{hidePartner}}">
+                  <td><a class="cell-main" href="RO-Questions.dc.html" style="max-width: 320px;"><span style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">Where do you find the location of your next pick?</span></a><div class="cell-sub">Retired by partner · Picking</div></td>
+                  <td>Northwind Logistics</td>
+                  <td><div class="t-label">Document replaced</div><p class="cell-sub" style="max-width: 280px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">Picking SOP v2 replaced by v3.</p></td>
+                  <td style="white-space: nowrap;"><div>Oct 28</div><div class="cell-sub">Dana Whitaker</div></td>
+                  <td style="white-space: nowrap;"><span class="chip chip-muted"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"></rect><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"></path></svg>Retired</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const f = (this.state && this.state.filter) || 'all';
+    const shown = f === 'learner' ? 5 : f === 'partner' ? 4 : 9;
+    return {
+      theme: this.props.theme ?? 'light',
+      pAll: f === 'all' ? 'true' : 'false',
+      pLearner: f === 'learner' ? 'true' : 'false',
+      pPartner: f === 'partner' ? 'true' : 'false',
+      hideLearner: f === 'partner',
+      hidePartner: f === 'learner',
+      shownText: 'Showing ' + shown + ' flags',
+      showAll: () => this.setState({ filter: 'all' }),
+      showLearner: () => this.setState({ filter: 'learner' }),
+      showPartner: () => this.setState({ filter: 'partner' }),
+    };
+  }
+}
+</script>
+</body>
+</html>

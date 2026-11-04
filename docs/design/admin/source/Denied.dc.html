@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>No access · Learn Quiz</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" style="position: relative; display: flex; flex-direction: column;">
+  <header style="display: flex; align-items: center; gap: 8px; min-height: 72px; padding: 0 32px;">
+    <svg viewBox="0 0 64 64" width="24" height="24" aria-hidden="true"><mask id="lqm-dn" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="#fff"></rect><circle cx="48" cy="48" r="13"></circle></mask><circle cx="32" cy="32" r="19" fill="none" stroke="var(--brand)" stroke-width="14" mask="url(#lqm-dn)"></circle><circle cx="48" cy="48" r="9" fill="#F2A900"></circle></svg>
+    <span class="t-label">Learn Quiz</span>
+  </header>
+
+  <main style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 16px 96px;">
+    <section class="card" aria-labelledby="{{titleId}}" style="width: 100%; max-width: 480px;">
+      <div style="display: flex; flex-direction: column; gap: 24px; padding: 32px;">
+        <!-- ============ PORTAL: a learner opens the partner portal ============ -->
+        <sc-if value="{{isPortal}}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <h1 id="dn-title" class="t-title1" tabindex="-1">No access to this portal</h1>
+            <p class="t-body">You're signed in as <strong>jordan.reyes@northwind.example</strong>. Only owners and admins can open Northwind's portal. Ask Dana Whitaker to make you an admin.</p>
+          </div>
+          <a class="btn btn-primary btn-block" href="#">Sign in with another account</a>
+        </sc-if>
+
+        <!-- ============ STAFF: a partner opens the staff admin ============ -->
+        <sc-if value="{{isStaff}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <h1 id="dn-title-s" class="t-title1" tabindex="-1">No access to the staff admin</h1>
+            <p class="t-body">Only Learn Quiz staff can open it. You're signed in as <strong>dana.whitaker@northwind.example</strong>.</p>
+          </div>
+          <a class="btn btn-primary btn-block" href="Overview.dc.html">Go to your portal</a>
+        </sc-if>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light"},"state":{"editor":"enum","options":["default","staff"],"default":"default"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.props.state ?? 'default';
+    return {
+      theme: this.props.theme ?? 'light',
+      isPortal: s !== 'staff',
+      isStaff: s === 'staff',
+      titleId: s === 'staff' ? 'dn-title-s' : 'dn-title',
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Warehouse picker · Role detail</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" style="position: relative;">
+  <!-- One persistent live region for this screen (upload finished, build progress throttled to steps of 5, build finished). Never inside an sc-if. -->
+  <p class="sr-only" role="status" aria-live="polite">{{liveText}}</p>
+
+  <sc-if value="{{readonly}}" hint-placeholder-val="{{ false }}">
+    <div class="ro-band" role="region" aria-label="Read-only view">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+      <span class="ro-text">Read only · You are viewing Northwind Logistics as Learn Quiz staff. Nothing here can be changed.</span>
+      <a href="CompanyDetail.dc.html">Exit to staff admin</a>
+    </div>
+  </sc-if>
+  <div class="{{appClass}}">
+    <dc-import name="PortalNav" active="roles" readonly="{{readonly}}" hint-size="248px,900px"></dc-import>
+    <main class="main">
+      <div class="page page-capped">
+
+        <!-- ============ Page head ============ -->
+        <div class="page-head">
+          <div class="page-head-text">
+            <nav aria-label="Breadcrumb">
+              <ol class="crumbs">
+                <li style="display: inline-flex; align-items: center; gap: 4px;"><a href="{{crumbHref}}">{{crumbLabel}}</a><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></li>
+                <li><span aria-current="page">Warehouse picker</span></li>
+              </ol>
+            </nav>
+            <h1 class="t-title1" tabindex="-1">Warehouse picker</h1>
+            <p class="t-body muted num">Benchmark 85% · Onboarding 30 days · {{peopleText}}</p>
+          </div>
+          <sc-if value="{{notReadonly}}" hint-placeholder-val="{{ true }}">
+            <div class="page-actions">
+              <button type="button" class="btn btn-secondary">Edit role</button>
+              <sc-if value="{{showReviewAccent}}" hint-placeholder-val="{{ false }}">
+                <a class="btn btn-accent" href="Questions.dc.html">Review questions</a>
+              </sc-if>
+              <sc-if value="{{showReviewSecondary}}" hint-placeholder-val="{{ false }}">
+                <a class="btn btn-secondary" href="Questions.dc.html">Review questions</a>
+              </sc-if>
+            </div>
+          </sc-if>
+        </div>
+
+        <!-- ============ Documents ============ -->
+        <section class="section" aria-labelledby="rd-docs-h">
+          <div class="section-head">
+            <h2 id="rd-docs-h" class="t-title2">Documents</h2>
+            <sc-if value="{{showDocsActions}}" hint-placeholder-val="{{ true }}">
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button type="button" class="btn btn-ghost" aria-expanded="{{pasteExp}}" aria-controls="rd-paste" onClick="{{togglePaste}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 10h16M4 14h10M4 18h7"></path></svg>Paste text</button>
+                <button type="button" class="btn btn-secondary"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"></path></svg>Add document</button>
+              </div>
+            </sc-if>
+          </div>
+
+          <!-- Rejected upload: role=alert, focus stays where it was -->
+          <sc-if value="{{showReject}}" hint-placeholder-val="{{ false }}">
+            <div class="banner banner-alert" role="alert">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5h.01"></path></svg>
+              <p class="banner-text">Forklift manual.pdf wasn't uploaded. It's 14.2 MB; the limit is 10 MB. Split it or export a smaller PDF.</p>
+              <button type="button" class="icon-btn" aria-label="Dismiss" onClick="{{dismissReject}}" style="margin: -8px -8px -8px 0;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+            </div>
+          </sc-if>
+
+          <!-- Once a document exists there is no drop zone on the page: the whole Documents card below is the drop target.
+               While a file is dragged over the window, the card takes .dropzone.is-over styling (2px dashed brand border, brand-tint ground). -->
+          <sc-if value="{{hasDocs}}" hint-placeholder-val="{{ true }}">
+            <ul class="card" aria-label="Documents for Warehouse picker">
+
+              <!-- Failed extraction (problems) -->
+              <sc-if value="{{showDocProblem}}" hint-placeholder-val="{{ false }}">
+                <li class="file-row is-problem">
+                  <span class="file-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5M9 13h6M9 17h6"></path></svg></span>
+                  <div class="file-main">
+                    <div class="file-title">
+                      <span>Receiving checklist.pdf</span>
+                      <span class="chip chip-strong"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l5 5v8l-5 5H8l-5-5V8z"></path><path d="M12 8v5M12 16h.01"></path></svg>Extraction failed</span>
+                    </div>
+                    <p class="file-meta num">PDF · 3.1 MB · Nov 3, 2026 · Dana Whitaker</p>
+                    <p class="field-error" style="margin-top: 4px;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5h.01"></path></svg><span>No selectable text found. This looks like a scan.</span></p>
+                  </div>
+                  <sc-if value="{{notReadonly}}" hint-placeholder-val="{{ true }}">
+                    <div class="file-actions">
+                      <a class="btn btn-ghost" href="RoleDetail-Replace.dc.html" aria-label="Replace file Receiving checklist.pdf"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"></path></svg>Replace file</a>
+                      <button type="button" class="btn btn-ghost" aria-expanded="{{pasteExp}}" aria-controls="rd-paste" onClick="{{togglePaste}}">Paste text instead</button>
+                      <div class="menu-anchor">
+                        <button type="button" class="icon-btn" aria-label="More actions for Receiving checklist.pdf" aria-haspopup="menu" aria-expanded="{{menuRecExp}}" onClick="{{toggleMenuRec}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg></button>
+                        <sc-if value="{{menuRecOpen}}" hint-placeholder-val="{{ false }}">
+                          <div class="menu" role="menu" aria-label="Receiving checklist.pdf">
+                            <button type="button" class="menu-item" role="menuitem" onClick="{{closeMenu}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>Remove</button>
+                          </div>
+                        </sc-if>
+                      </div>
+                    </div>
+                  </sc-if>
+                </li>
+              </sc-if>
+
+              <!-- New upload (uploading). In live mode the row turns ready in place; if focus was on
+                   "Cancel upload" it moves to this row's Replace link, otherwise focus does not move. -->
+              <sc-if value="{{showUpSlot}}" hint-placeholder-val="{{ false }}">
+                <li class="file-row">
+                  <span class="file-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5M9 13h6M9 17h6"></path></svg></span>
+                  <div class="file-main">
+                    <sc-if value="{{upBusy}}" hint-placeholder-val="{{ true }}">
+                      <div class="file-title">
+                        <span>Picking SOP v3.pdf</span>
+                        <span class="chip chip-tint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12M6 21h12M7 3v3a5 5 0 0 0 10 0V3M7 21v-3a5 5 0 0 1 10 0v3"></path></svg>Uploading</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 12px;">
+                        <div class="meter" role="progressbar" aria-label="Uploading Picking SOP v3.pdf" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{upPct}}" aria-valuetext="{{upText}}" style="width: 240px;"><i style="width: {{upPct}}%;"></i></div>
+                        <span class="file-meta num">{{upText}}</span>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{upDone}}" hint-placeholder-val="{{ false }}">
+                      <div class="file-title"><span>Picking SOP</span><span class="tag">v3</span></div>
+                      <p class="file-meta num">PDF · 18 pages · Nov 3, 2026 · Dana Whitaker</p>
+                    </sc-if>
+                  </div>
+                  <div class="file-actions">
+                    <sc-if value="{{upBusy}}" hint-placeholder-val="{{ true }}">
+                      <button type="button" class="btn btn-ghost">Cancel upload</button>
+                    </sc-if>
+                    <sc-if value="{{upDone}}" hint-placeholder-val="{{ false }}">
+                      <a class="btn btn-ghost" href="RoleDetail-Replace.dc.html" aria-label="Replace Picking SOP"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"></path></svg>Replace</a>
+                      <div class="menu-anchor">
+                        <button type="button" class="icon-btn" aria-label="More actions for Picking SOP" aria-haspopup="menu" aria-expanded="{{menuPickExp}}" onClick="{{toggleMenuPick}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg></button>
+                        <sc-if value="{{menuPickOpen}}" hint-placeholder-val="{{ false }}">
+                          <div class="menu" role="menu" aria-label="Picking SOP">
+                            <button type="button" class="menu-item" role="menuitem" onClick="{{closeMenu}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M4 19h16"></path></svg>Download</button>
+                            <div class="menu-sep" role="separator"></div>
+                            <a class="menu-item" role="menuitem" href="RoleDetail-Retire.dc.html"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"></rect><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"></path></svg>Retire document</a>
+                          </div>
+                        </sc-if>
+                      </div>
+                    </sc-if>
+                  </div>
+                </li>
+              </sc-if>
+
+              <!-- Returns procedure (pasted Nov 2, after Picking SOP; not present while the first upload runs) -->
+              <sc-if value="{{showDocReturns}}" hint-placeholder-val="{{ true }}">
+              <li class="file-row">
+                <span class="file-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 10h16M4 14h10M4 18h7"></path></svg></span>
+                <div class="file-main">
+                  <div class="file-title"><span>Returns procedure</span><span class="tag">v1</span></div>
+                  <p class="file-meta num">Pasted text · 6,240 characters · Nov 2, 2026 · Dana Whitaker</p>
+                </div>
+                <sc-if value="{{notReadonly}}" hint-placeholder-val="{{ true }}">
+                  <div class="file-actions">
+                    <a class="btn btn-ghost" href="RoleDetail-Replace.dc.html" aria-label="Replace Returns procedure"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"></path></svg>Replace</a>
+                    <div class="menu-anchor">
+                      <button type="button" class="icon-btn" aria-label="More actions for Returns procedure" aria-haspopup="menu" aria-expanded="{{menuRetExp}}" onClick="{{toggleMenuRet}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg></button>
+                      <sc-if value="{{menuRetOpen}}" hint-placeholder-val="{{ false }}">
+                        <div class="menu" role="menu" aria-label="Returns procedure">
+                          <button type="button" class="menu-item" role="menuitem" onClick="{{closeMenu}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M4 19h16"></path></svg>Download</button>
+                          <div class="menu-sep" role="separator"></div>
+                          <a class="menu-item" role="menuitem" href="RoleDetail-Retire.dc.html"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"></rect><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"></path></svg>Retire document</a>
+                        </div>
+                      </sc-if>
+                    </div>
+                  </div>
+                </sc-if>
+              </li>
+              </sc-if>
+
+              <!-- Picking SOP v3 (PDF, ready) -->
+              <sc-if value="{{showDocPicking}}" hint-placeholder-val="{{ true }}">
+                <li class="file-row">
+                  <span class="file-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5M9 13h6M9 17h6"></path></svg></span>
+                  <div class="file-main">
+                    <div class="file-title"><span>Picking SOP</span><span class="tag">v3</span></div>
+                    <p class="file-meta num">PDF · 18 pages · Oct 28, 2026 · Dana Whitaker</p>
+                  </div>
+                  <sc-if value="{{notReadonly}}" hint-placeholder-val="{{ true }}">
+                    <div class="file-actions">
+                      <a class="btn btn-ghost" href="RoleDetail-Replace.dc.html" aria-label="Replace Picking SOP"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"></path></svg>Replace</a>
+                      <div class="menu-anchor">
+                        <button type="button" class="icon-btn" aria-label="More actions for Picking SOP" aria-haspopup="menu" aria-expanded="{{menuPickExp}}" onClick="{{toggleMenuPick}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg></button>
+                        <sc-if value="{{menuPickOpen}}" hint-placeholder-val="{{ false }}">
+                          <div class="menu" role="menu" aria-label="Picking SOP">
+                            <button type="button" class="menu-item" role="menuitem" onClick="{{closeMenu}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M4 19h16"></path></svg>Download</button>
+                            <div class="menu-sep" role="separator"></div>
+                            <a class="menu-item" role="menuitem" href="RoleDetail-Retire.dc.html"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"></rect><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"></path></svg>Retire document</a>
+                          </div>
+                        </sc-if>
+                      </div>
+                    </div>
+                  </sc-if>
+                </li>
+              </sc-if>
+
+              <!-- Picking SOP: new version uploading (replacing) -->
+              <sc-if value="{{showDocReplacing}}" hint-placeholder-val="{{ false }}">
+                <li class="file-row">
+                  <span class="file-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5M9 13h6M9 17h6"></path></svg></span>
+                  <div class="file-main">
+                    <div class="file-title">
+                      <span>Picking SOP</span><span class="tag">v4</span>
+                      <span class="chip chip-tint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12M6 21h12M7 3v3a5 5 0 0 0 10 0V3M7 21v-3a5 5 0 0 1 10 0v3"></path></svg>Uploading</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                      <div class="meter" role="progressbar" aria-label="Uploading Picking SOP v4" aria-valuemin="0" aria-valuemax="100" aria-valuenow="64" aria-valuetext="1.6 of 2.5 MB" style="width: 240px;"><i style="width: 64%;"></i></div>
+                      <span class="file-meta num">1.6 of 2.5 MB</span>
+                    </div>
+                    <p class="file-meta">v3 stays live until v4 is ready.</p>
+                  </div>
+                  <div class="file-actions">
+                    <button type="button" class="btn btn-ghost">Cancel upload</button>
+                  </div>
+                </li>
+              </sc-if>
+            </ul>
+          </sc-if>
+
+          <!-- Empty role: the drop zone is the lead -->
+          <sc-if value="{{showDropLead}}" hint-placeholder-val="{{ false }}">
+            <div class="dropzone" style="flex-direction: column; justify-content: center; text-align: center; padding: 48px 24px; gap: 16px;">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--ink-muted);"><path d="M12 15V4M7 9l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"></path></svg>
+              <div style="display: flex; flex-direction: column; gap: 4px;">
+                <p class="t-body-lg" style="font-weight: 600;">Drop a PDF here</p>
+                <p class="file-meta">PDF with selectable text · up to 10 MB</p>
+              </div>
+              <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
+                <a class="btn btn-accent" href="RoleDetail-UploadingLive.dc.html"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"></path></svg>Upload PDF</a>
+                <button type="button" class="btn btn-secondary" aria-expanded="{{pasteExp}}" aria-controls="rd-paste" onClick="{{togglePaste}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 10h16M4 14h10M4 18h7"></path></svg>Paste text</button>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- Paste text panel. Focus moves to Title on open. Over the limit nothing is cut: the field shows the error and Add text stays disabled. -->
+          <sc-if value="{{pasteOpen}}" hint-placeholder-val="{{ false }}">
+            <section class="card" id="rd-paste" aria-labelledby="rd-paste-h">
+              <div class="card-body">
+                <h3 id="rd-paste-h" class="t-label">Paste text</h3>
+                <div class="field">
+                  <label class="field-label" for="rd-paste-title">Title</label>
+                  <input class="input" id="rd-paste-title" type="text" autocomplete="off" value="{{pasteTitle}}" onChange="{{onPasteTitle}}">
+                </div>
+                <div class="{{pasteFieldClass}}">
+                  <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px;">
+                    <label class="field-label" for="rd-paste-text">Text</label>
+                    <sc-if value="{{pasteOk}}" hint-placeholder-val="{{ true }}">
+                      <span class="field-meta num" id="rd-paste-count">{{pasteCount}}</span>
+                    </sc-if>
+                  </div>
+                  <textarea class="textarea" id="rd-paste-text" rows="8" aria-describedby="{{pasteDescId}}" aria-invalid="{{pasteInvalidStr}}" value="{{pasteText}}" onChange="{{onPasteText}}"></textarea>
+                  <sc-if value="{{pasteOver}}" hint-placeholder-val="{{ false }}">
+                    <p class="field-error num" id="rd-paste-err" role="alert"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5h.01"></path></svg><span>{{pasteError}}</span></p>
+                  </sc-if>
+                </div>
+              </div>
+              <div class="card-foot">
+                <button type="button" class="btn btn-ghost" onClick="{{closePaste}}">Cancel</button>
+                <button type="button" class="btn btn-primary" disabled="{{pasteAddDisabled}}">Add text</button>
+              </div>
+            </section>
+          </sc-if>
+        </section>
+
+        <!-- ============ Curriculum ============ -->
+        <section class="section" aria-labelledby="rd-cur-h">
+          <div class="section-head">
+            <h2 id="rd-cur-h" class="t-title2">Curriculum</h2>
+
+            <sc-if value="{{isUploading}}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                <sc-if value="{{upBusy}}" hint-placeholder-val="{{ true }}">
+                  <button type="button" class="btn" disabled>Build curriculum</button>
+                </sc-if>
+                <sc-if value="{{upDone}}" hint-placeholder-val="{{ false }}">
+                  <span class="t-body muted num">1 document</span>
+                  <a class="btn btn-accent" href="RoleDetail-BuildingLive.dc.html">Build curriculum</a>
+                </sc-if>
+              </div>
+            </sc-if>
+
+            <!-- Building: determinate progress, never a spinner. Announced through the persistent live region (throttled). -->
+            <sc-if value="{{showBuildProgress}}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <span class="t-label num" aria-hidden="true">{{readyText}}</span>
+                <div class="meter" role="progressbar" aria-label="Concepts ready" aria-valuemin="0" aria-valuemax="31" aria-valuenow="{{readyCount}}" aria-valuetext="{{readyText}}" style="width: 200px;"><i style="width: {{meterPct}}%;"></i></div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{readyLike}}" hint-placeholder-val="{{ true }}">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <p class="t-body muted num">{{statsText}}</p>
+                <sc-if value="{{notReadonly}}" hint-placeholder-val="{{ true }}">
+                  <div class="menu-anchor">
+                    <button type="button" class="icon-btn" aria-label="More actions for Curriculum" aria-haspopup="menu" aria-expanded="{{menuCurExp}}" onClick="{{toggleMenuCur}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg></button>
+                    <sc-if value="{{menuCurOpen}}" hint-placeholder-val="{{ false }}">
+                      <div class="menu" role="menu" aria-label="Curriculum">
+                        <button type="button" class="menu-item" role="menuitem" onClick="{{closeMenu}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"></path></svg>Rebuild curriculum</button>
+                      </div>
+                    </sc-if>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-if>
+          </div>
+
+          <sc-if value="{{isEmpty}}" hint-placeholder-val="{{ false }}">
+            <p class="sunken t-body muted" style="padding: 16px 24px;">Add a document to build the curriculum.</p>
+          </sc-if>
+
+          <!-- Live build finished (announced via the live region; focus does not move) -->
+          <sc-if value="{{buildDone}}" hint-placeholder-val="{{ false }}">
+            <div class="banner">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>
+              <p class="banner-text num"><strong>Curriculum ready</strong> · 31 concepts</p>
+              <a class="btn btn-primary" href="Questions.dc.html">Review questions</a>
+            </div>
+          </sc-if>
+
+          <!-- Units, in procedure order. Each unit header is a disclosure button (aria-expanded). -->
+          <sc-if value="{{showUnits}}" hint-placeholder-val="{{ true }}">
+            <ol aria-label="Units of Warehouse picker" style="display: flex; flex-direction: column; gap: 12px;">
+              <sc-for list="{{units}}" as="u" hint-placeholder-count="5">
+                <li class="card">
+
+                  <sc-if value="{{u.isFound}}" hint-placeholder-val="{{ true }}">
+                    <h3 style="font: inherit;">
+                      <button type="button" id="{{u.btnId}}" aria-expanded="{{u.expStr}}" aria-controls="{{u.listId}}" onClick="{{u.toggle}}" style="width: 100%; min-height: 64px; display: flex; align-items: center; gap: 12px; padding: 10px 16px 10px 24px; border: 0; background: transparent; text-align: left; cursor: pointer; color: var(--ink); border-radius: var(--radius-md);">
+                        <span class="t-label num muted" style="width: 16px; flex: none;">{{u.num}}</span>
+                        <span class="t-body-lg" style="font-weight: 600;">{{u.name}}</span>
+                        <span class="t-caption muted num">{{u.meta}}</span>
+                        <span style="margin-left: auto; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; flex: none; color: var(--ink-muted);">
+                          <sc-if value="{{u.expanded}}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 15 6-6 6 6"></path></svg></sc-if>
+                          <sc-if value="{{u.collapsed}}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></sc-if>
+                        </span>
+                      </button>
+                    </h3>
+
+                    <div class="concept-list" id="{{u.listId}}" hidden="{{u.collapsed}}">
+                      <!-- Column headers; each switch is labelled by "Critical" + the concept name -->
+                      <div class="concept-row" style="padding-top: 8px; padding-bottom: 8px;">
+                        <span></span>
+                        <sc-if value="{{u.showControls}}" hint-placeholder-val="{{ true }}">
+                          <div class="concept-controls">
+                            <span class="t-caption muted">Questions</span>
+                            <span class="t-caption muted" id="{{u.critHdrId}}" style="width: 52px; text-align: center;">Critical</span>
+                            <span style="width: 44px;"></span>
+                          </div>
+                        </sc-if>
+                        <sc-if value="{{u.showRo}}" hint-placeholder-val="{{ false }}">
+                          <div class="concept-controls">
+                            <span class="t-caption muted">Questions</span>
+                            <span style="width: 92px;"></span>
+                          </div>
+                        </sc-if>
+                      </div>
+
+                      <ol aria-labelledby="{{u.btnId}}">
+                        <sc-for list="{{u.concepts}}" as="c" hint-placeholder-count="7">
+                          <li class="concept-row">
+
+                            <sc-if value="{{c.isView}}" hint-placeholder-val="{{ true }}">
+                              <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+                                <span class="t-label" id="{{c.nameId}}">{{c.name}}</span>
+                                <span class="t-body muted">{{c.summary}}</span>
+                                <sc-if value="{{c.isFailed}}" hint-placeholder-val="{{ false }}">
+                                  <span class="field-error" style="margin-top: 4px;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5h.01"></path></svg><span>Couldn't generate questions. No draft passed the source check.</span></span>
+                                </sc-if>
+                              </div>
+                              <div class="concept-controls">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                  <sc-if value="{{c.isDone}}" hint-placeholder-val="{{ true }}">
+                                    <span class="t-body muted num">{{c.qText}}</span>
+                                  </sc-if>
+                                  <sc-if value="{{c.isQueued}}" hint-placeholder-val="{{ false }}">
+                                    <span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Queued</span>
+                                  </sc-if>
+                                  <sc-if value="{{c.isGen}}" hint-placeholder-val="{{ false }}">
+                                    <span class="chip chip-tint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12M6 21h12M7 3v3a5 5 0 0 0 10 0V3M7 21v-3a5 5 0 0 1 10 0v3"></path></svg>Generating questions</span>
+                                  </sc-if>
+                                  <sc-if value="{{c.isFailed}}" hint-placeholder-val="{{ false }}">
+                                    <span class="chip chip-strong"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l5 5v8l-5 5H8l-5-5V8z"></path><path d="M12 8v5M12 16h.01"></path></svg>Failed</span>
+                                    <sc-if value="{{c.canRetry}}" hint-placeholder-val="{{ false }}">
+                                      <button type="button" class="btn btn-ghost" aria-label="{{c.retryLabel}}" onClick="{{c.retry}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"></path></svg>Retry</button>
+                                    </sc-if>
+                                  </sc-if>
+                                </div>
+                                <sc-if value="{{c.showControls}}" hint-placeholder-val="{{ true }}">
+                                  <span style="width: 52px; display: inline-flex; justify-content: center;"><button type="button" class="switch" role="switch" aria-checked="{{c.critStr}}" aria-labelledby="{{c.critHdrId}} {{c.nameId}}" onClick="{{c.toggleCrit}}"></button></span>
+                                  <button type="button" class="icon-btn" aria-label="{{c.editLabel}}" disabled="{{c.editDisabled}}" onClick="{{c.edit}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"></path><path d="m13.5 6.5 4 4"></path></svg></button>
+                                </sc-if>
+                                <sc-if value="{{c.showRoCrit}}" hint-placeholder-val="{{ false }}">
+                                  <span style="width: 92px; display: inline-flex;">
+                                    <sc-if value="{{c.critOn}}" hint-placeholder-val="{{ false }}">
+                                      <span class="chip chip-critical"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V6z"></path><circle cx="12" cy="11.5" r="1.5" fill="currentColor" stroke="none"></circle></svg>Critical</span>
+                                    </sc-if>
+                                  </span>
+                                </sc-if>
+                              </div>
+                            </sc-if>
+
+                            <!-- Inline edit. Focus moves to Name on open; Cancel or Save returns focus to the row's Edit button. -->
+                            <sc-if value="{{c.isEditing}}" hint-placeholder-val="{{ false }}">
+                              <form aria-label="{{c.editLabel}}" style="grid-column: 1 / -1; margin: -12px -24px; padding: 20px 24px 24px; background: var(--surface-page); display: flex; flex-direction: column; gap: 16px;">
+                                <div class="field">
+                                  <label class="field-label" for="rd-edit-name">Name</label>
+                                  <input class="input" id="rd-edit-name" type="text" autocomplete="off" value="{{c.draftName}}" onChange="{{c.onName}}">
+                                </div>
+                                <div class="field">
+                                  <label class="field-label" for="rd-edit-sum">Summary</label>
+                                  <textarea class="textarea" id="rd-edit-sum" rows="2" value="{{c.draftSummary}}" onChange="{{c.onSummary}}"></textarea>
+                                </div>
+                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+                                  <div style="display: flex; align-items: center; gap: 8px;">
+                                    <button type="button" class="switch" role="switch" id="rd-edit-crit" aria-checked="{{c.critStr}}" aria-labelledby="rd-edit-critl" onClick="{{c.toggleCrit}}"></button>
+                                    <label class="t-label" id="rd-edit-critl" for="rd-edit-crit" style="cursor: pointer;">Critical</label>
+                                  </div>
+                                  <div style="display: flex; gap: 12px;">
+                                    <button type="button" class="btn btn-ghost" onClick="{{c.cancel}}">Cancel</button>
+                                    <button type="button" class="btn btn-primary" onClick="{{c.save}}">Save concept</button>
+                                  </div>
+                                </div>
+                              </form>
+                            </sc-if>
+                          </li>
+                        </sc-for>
+                      </ol>
+                    </div>
+                  </sc-if>
+
+                  <!-- Unit found, concepts still being read from the documents -->
+                  <sc-if value="{{u.isFinding}}" hint-placeholder-val="{{ false }}">
+                    <div style="display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 24px;">
+                      <span class="t-label num muted" style="width: 16px; flex: none;">{{u.num}}</span>
+                      <h3 class="t-body-lg" style="font-weight: 600;">{{u.name}}</h3>
+                      <span class="t-caption muted">Finding concepts…</span>
+                    </div>
+                    <div aria-hidden="true" style="display: flex; flex-direction: column; gap: 12px; padding: 0 24px 20px 52px;">
+                      <span class="skel-line" style="width: 46%;"></span>
+                      <span class="skel-line" style="width: 38%;"></span>
+                      <span class="skel-line" style="width: 42%;"></span>
+                    </div>
+                  </sc-if>
+                </li>
+              </sc-for>
+
+              <!-- Units not found yet: one skeleton block -->
+              <sc-if value="{{showPending}}" hint-placeholder-val="{{ false }}">
+                <li class="card" aria-hidden="true" style="display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 0 24px;">
+                  <span class="skel-line" style="width: 16px;"></span>
+                  <span class="skel-line" style="width: 140px; height: 16px;"></span>
+                  <span class="skel-line" style="width: 120px;"></span>
+                </li>
+              </sc-if>
+            </ol>
+          </sc-if>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- ============ Retire confirmation ============ -->
+  <sc-if value="{{showRetire}}" hint-placeholder-val="{{ false }}">
+    <div class="overlay" style="align-items: flex-start; padding-top: 160px;">
+      <!-- Focus starts on Cancel (the safe choice). Focus is trapped in the dialog; Escape = Cancel;
+           on close, focus returns to "More actions for Returns procedure". -->
+      <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="rd-ret-h" aria-describedby="rd-ret-list">
+        <div class="dialog-head">
+          <h2 id="rd-ret-h" class="t-title2">Retire Returns procedure?</h2>
+          <a class="icon-btn" href="RoleDetail-Ready.dc.html" aria-label="Close"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></a>
+        </div>
+        <div class="dialog-body">
+          <ul class="consequences" id="rd-ret-list">
+            <li><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"></rect><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"></path></svg><span class="num">Its 38 questions leave play for everyone in Warehouse picker.</span></li>
+            <li><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-dasharray="2 3.2"></circle><path d="M12 8v4"></path><path d="M12 16h.01"></path></svg><span>Refund only after inspection is also in Picking SOP v3. New questions are generated from it and arrive as Unreviewed.</span></li>
+            <li><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" stroke-dasharray="3 3"></path></svg><span>The other 3 Returns concepts have no other source. They leave training until you add a document.</span></li>
+            <li><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"></path></svg><span>People keep their progress. Nothing is deleted.</span></li>
+          </ul>
+        </div>
+        <div class="dialog-foot">
+          <a class="btn btn-secondary" href="RoleDetail-Ready.dc.html">Cancel</a>
+          <button type="button" class="btn btn-danger">Retire document</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light"},"state":{"editor":"enum","options":["empty","uploading","building","ready","replacing","paste","problems","retire","edit"],"default":"empty"},"readonly":{"editor":"boolean","default":false},"live":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":900}}'>
+const RD_UNITS = [
+  { id: 'rec', name: 'Receiving', c: [
+    ['rec1', 'Check the delivery against the ASN', 'Match carrier, PO number and pallet count before signing.', false, 16],
+    ['rec2', 'Inspect pallets at the dock door', 'Look for crushed corners, torn wrap and wet cartons.', false, 15],
+    ['rec3', 'Report damaged pallets before put-away', 'Photograph the damage, tag the pallet and log it in the WMS.', true, 15],
+    ['rec4', 'Move chilled goods within 20 minutes', 'Chilled pallets go to the cold bay before anything else.', true, 13],
+    ['rec5', 'Label each pallet with its LPN', 'Apply the license plate label on two adjacent sides.', false, 14],
+    ['rec6', 'Count over and short deliveries', 'Record the variance on the receiving screen; leave the PO as is.', false, 17],
+    ['rec7', 'Put away to the directed location', 'Scan the location barcode; never choose a slot by eye.', false, 15],
+  ] },
+  { id: 'pic', name: 'Picking', c: [
+    ['pic1', 'Start a pick wave on the handheld', 'Accept the next wave; tasks arrive sorted by walking route.', false, 15],
+    ['pic2', 'Use one tote per order', 'Scan the tote label before the first item goes in.', false, 14],
+    ['pic3', 'Confirm the location label before picking', 'Scan the slot label and check the last two digits on screen.', true, 16],
+    ['pic4', 'Pick first-expiry, first-out', 'Take the earliest expiry date in the slot, not the front carton.', false, 17],
+    ['pic5', 'Pick the exact quantity', 'Count loose units into the tote, one scan per unit.', false, 16],
+    ['pic6', 'Report a short pick', 'Mark the slot short on the handheld; never substitute an item.', false, 12],
+    ['pic7', 'Build stable pallets', 'Heaviest cartons at the bottom, labels out, no overhang.', false, 13],
+    ['pic8', 'Drop completed orders at staging', 'Scan the lane barcode so dispatch sees the order is ready.', false, 16],
+  ] },
+  { id: 'scn', name: 'Scanning', c: [
+    ['scn1', 'Scan from 10 to 30 cm away', 'Hold the scanner square to the label, not at an angle.', false, 14],
+    ['scn2', 'Double beep: put the item back and re-scan', 'Two beeps mean a mismatch; the item stays out of the tote.', true, 14],
+    ['scn3', 'Read the screen before you confirm', 'Check item, quantity and slot on screen every time.', false, 16],
+    ['scn4', 'Key in a barcode only as a last resort', 'Type the code after two failed scans, then tell the shift lead.', false, 12],
+    ['scn5', 'Send unreadable labels to the help desk', 'Put the item in the yellow tray; never guess the code.', false, 15],
+    ['scn6', 'Return handhelds to the charger', 'Dock it at shift end so the next picker starts fully charged.', false, 17],
+  ] },
+  { id: 'saf', name: 'Safety', c: [
+    ['saf1', 'Wear hi-vis and safety shoes on the floor', 'Both, every shift, including short visits from the office.', false, 15],
+    ['saf2', 'Keep pedestrian lanes clear', 'Nothing parked or stacked on the walkways, even for a minute.', true, 13],
+    ['saf3', 'Give way to forklifts at crossings', 'Stop at the line and make eye contact with the driver first.', false, 16],
+    ['saf4', 'Two-person lift above 23 kg', 'Call a second person before lifting anything heavier.', true, 14],
+    ['saf5', 'Report spills straight away', 'Cone it off, cover it with absorbent, tell the shift lead.', false, 14],
+    ['saf6', 'Use the step ladder for top shelves', 'Never climb racking; use a ladder with a handrail.', false, 15],
+  ] },
+  { id: 'ret', name: 'Returns', c: [
+    ['ret1', 'Check the return authorization', 'No RMA number, no return; set the parcel aside for customer service.', false, 9],
+    ['ret2', 'Inspect and grade each item', 'Grade A resells, B goes to outlet, C is scrapped.', false, 10],
+    ['ret3', 'Refund only after inspection', 'Approve the refund in the WMS once the grade is recorded.', true, 11],
+    ['ret4', 'Restock or quarantine', 'Grade A goes back to its pick face; damaged items to the quarantine cage.', false, 8],
+  ] },
+];
+const RD_TOTAL = 31;
+const RD_PASTE_LIMIT = 60000;
+const RD_PASTE_SAMPLE = 'Returns procedure\n\n1. Check the return authorization\nEvery return arrives with an RMA number on the shipping label. No RMA number, no return: set the parcel aside for customer service and log it on the returns sheet.\n\n2. Inspect and grade each item\nOpen the parcel at the returns bench. Grade A: unopened or as new, resells. Grade B: opened, complete, goes to outlet. Grade C: damaged or incomplete, scrapped.\n\n3. Refund only after inspection\nApprove the refund in the WMS only once the grade is recorded. Never refund from the label alone.\n\n4. Restock or quarantine\n…';
+
+class Component extends DCLogic {
+  liveMode() {
+    const l = this.props.live;
+    if (!(l === true || l === 'true')) return null;
+    const s = this.props.state ?? 'empty';
+    if (s === 'building') return 'build';
+    if (s === 'uploading') return 'upload';
+    return null;
+  }
+  componentDidMount() { this.syncTimer(); }
+  componentDidUpdate() { this.syncTimer(); }
+  componentWillUnmount() { this.stopTimer(); }
+  stopTimer() {
+    if (this.timer) { clearInterval(this.timer); this.timer = null; this.timerMode = null; }
+  }
+  syncTimer() {
+    const mode = this.liveMode();
+    if (mode !== this.timerMode) this.stopTimer();
+    if (!mode || this.timer) return;
+    const st = this.state || {};
+    if (mode === 'build') {
+      if ((st.readyCount ?? 12) >= RD_TOTAL) return;
+      // Simulated poll: one more concept ready every 700 ms, 12 -> 31, then stop.
+      this.timerMode = mode;
+      this.timer = setInterval(() => {
+        const next = Math.min(((this.state && this.state.readyCount) ?? 12) + 1, RD_TOTAL);
+        if (next >= RD_TOTAL) this.stopTimer();
+        this.setState({ readyCount: next });
+      }, 700);
+    } else {
+      if ((st.upPct ?? 64) >= 100) return;
+      // Simulated upload: 64% -> 100% in 12 steps of 250 ms (3 s), then the row turns ready.
+      this.timerMode = mode;
+      this.timer = setInterval(() => {
+        const next = Math.min(((this.state && this.state.upPct) ?? 64) + 3, 100);
+        if (next >= 100) this.stopTimer();
+        this.setState({ upPct: next });
+      }, 250);
+    }
+  }
+
+  renderVals() {
+    const s = this.props.state ?? 'empty';
+    const ro = this.props.readonly === true || this.props.readonly === 'true';
+    const st = this.state || {};
+    const mode = this.liveMode();
+
+    const isEmpty = s === 'empty';
+    const isUploading = s === 'uploading';
+    const isBuilding = s === 'building';
+    const isProblems = s === 'problems';
+    const isRetire = s === 'retire';
+    const isEdit = s === 'edit';
+    const isReplacing = s === 'replacing';
+    const isPaste = s === 'paste';
+    const readyLike = s === 'ready' || isReplacing || isPaste || isProblems || isRetire || isEdit;
+
+    // Upload (uploading state)
+    const upPct = isUploading ? Math.min(mode === 'upload' ? (st.upPct ?? 64) : 64, 100) : 64;
+    const upDone = isUploading && upPct >= 100;
+
+    // Build progress (building state)
+    const rc = isBuilding ? Math.min(mode === 'build' ? (st.readyCount ?? 12) : 12, RD_TOTAL) : RD_TOTAL;
+    const buildDone = isBuilding && rc >= RD_TOTAL;
+    const announced = rc >= RD_TOTAL ? RD_TOTAL : Math.max(12, rc - (rc % 5));
+
+    let liveText = '';
+    if (isBuilding) liveText = buildDone ? '31 of 31 concepts ready. Curriculum ready.' : announced + ' of ' + RD_TOTAL + ' concepts ready';
+    if (upDone) liveText = 'Picking SOP v3.pdf uploaded. 1 document ready.';
+
+    const crit = st.crit || {};
+    const expd = st.exp || {};
+    const retried = st.retried || {};
+    const edits = st.edits || {};
+    const canEdit = !ro && (readyLike || isBuilding);
+    const editingId = !canEdit ? null : (st.editingId !== undefined ? st.editingId : (isEdit ? 'rec3' : null));
+
+    const menu = st.menu ?? null;
+    const toggleMenu = (k) => () => this.setState({ menu: menu === k ? null : k });
+
+    const defOpen = ['rec', 'pic'];
+    let gi = 0;
+    let findingSeen = false;
+    let pending = 0;
+    let totalQ = 0;
+    let critQ = 0;
+    const units = [];
+
+    RD_UNITS.forEach((u, ui) => {
+      const start = gi;
+      gi += u.c.length;
+      const found = !isBuilding || start <= rc + 2;
+      let phase = 'found';
+      if (!found) { phase = findingSeen ? 'pending' : 'finding'; findingSeen = true; }
+      if (phase === 'pending') { pending += 1; return; }
+
+      const expanded = expd[u.id] ?? defOpen.includes(u.id);
+      const critHdrId = 'rd-ch-' + u.id;
+      let critN = 0; let doneN = 0; let genN = 0; let failN = 0;
+
+      const concepts = u.c.map(([id, name, summary, critDef, q], ci) => {
+        const g = start + ci;
+        let status = 'done';
+        if (isBuilding) status = g < rc ? 'done' : (g < rc + 2 ? 'gen' : 'queued');
+        else if (id === 'pic6') status = 'gen';
+        else if (id === 'pic7') status = retried[id] ? 'gen' : 'failed';
+        const isCrit = crit[id] ?? critDef;
+        if (isCrit) critN += 1;
+        if (status === 'done') { doneN += 1; totalQ += q; if (isCrit) critQ += q; }
+        if (status === 'gen') genN += 1;
+        if (status === 'failed') failN += 1;
+
+        const e = edits[id] || {};
+        const nm = e.name ?? name;
+        const sm = e.summary ?? summary;
+        const editing = editingId === id;
+        const draftName = st.draftName ?? nm;
+        const draftSummary = st.draftSummary ?? sm;
+        return {
+          id, name: nm, summary: sm,
+          nameId: 'rd-c-' + id, critHdrId,
+          isView: !editing, isEditing: editing,
+          critOn: isCrit, critStr: isCrit ? 'true' : 'false',
+          showControls: !ro, showRoCrit: ro,
+          editDisabled: isBuilding && status !== 'done',
+          isDone: status === 'done', isQueued: status === 'queued', isGen: status === 'gen', isFailed: status === 'failed',
+          canRetry: status === 'failed' && !ro,
+          qText: String(q),
+          editLabel: 'Edit concept: ' + nm,
+          retryLabel: 'Retry questions for ' + nm,
+          draftName, draftSummary,
+          toggleCrit: () => this.setState({ crit: { ...crit, [id]: !isCrit } }),
+          edit: () => this.setState({ editingId: id, draftName: nm, draftSummary: sm, menu: null }),
+          retry: () => this.setState({ retried: { ...retried, [id]: true } }),
+          onName: (ev) => this.setState({ draftName: ev.target.value }),
+          onSummary: (ev) => this.setState({ draftSummary: ev.target.value }),
+          save: () => this.setState({
+            edits: { ...edits, [id]: { name: draftName.trim() || nm, summary: draftSummary.trim() || sm } },
+            editingId: null, draftName: undefined, draftSummary: undefined,
+          }),
+          cancel: () => this.setState({ editingId: null, draftName: undefined, draftSummary: undefined }),
+        };
+      });
+
+      let meta = u.c.length + ' concepts · ' + critN + ' critical';
+      if (isBuilding && doneN < u.c.length) meta += ' · ' + doneN + ' of ' + u.c.length + ' ready';
+      if (readyLike && genN) meta += ' · ' + genN + ' generating';
+      if (readyLike && failN) meta += ' · ' + failN + ' failed';
+
+      units.push({
+        id: u.id, num: ui + 1, name: u.name, meta,
+        isFound: phase === 'found', isFinding: phase === 'finding',
+        expanded, collapsed: !expanded, expStr: expanded ? 'true' : 'false',
+        listId: 'rd-u-' + u.id, btnId: 'rd-ub-' + u.id, critHdrId,
+        showControls: !ro, showRo: ro,
+        concepts,
+        toggle: () => this.setState({ exp: { ...expd, [u.id]: !expanded } }),
+      });
+    });
+
+    // Paste panel: never truncates; over the limit shows the error and disables Add text
+    const pasteOpen = !ro && (st.pasteOpen ?? isPaste);
+    const pasteText = st.pasteText ?? (isPaste ? RD_PASTE_SAMPLE : '');
+    const pasteLen = st.pasteText !== undefined ? st.pasteText.length : (isPaste ? 62410 : 0);
+    const pasteOver = pasteLen > RD_PASTE_LIMIT;
+    const fmt = (n) => n.toLocaleString('en-US');
+
+    return {
+      theme: this.props.theme ?? 'light',
+      readonly: ro, notReadonly: !ro,
+      appClass: ro ? 'app has-band' : 'app',
+      crumbLabel: ro ? 'Overview' : 'Roles',
+      crumbHref: ro ? 'RO-Overview.dc.html' : 'Roles.dc.html',
+      peopleText: (isEmpty || isUploading || isBuilding) ? '0 people' : '3 people',
+      liveText,
+
+      showReviewAccent: !ro && (s === 'ready' || isRetire || isEdit || isReplacing),
+      showReviewSecondary: !ro && (isProblems || isPaste),
+
+      hasDocs: !isEmpty,
+      showDocsActions: !isEmpty && !ro,
+      showDocProblem: isProblems,
+      showUpSlot: isUploading,
+      upBusy: isUploading && !upDone,
+      upDone,
+      upPct,
+      upText: (Math.round(upPct * 2.4) / 100).toFixed(1) + ' of 2.4 MB',
+      showDocPicking: isBuilding || (readyLike && !isReplacing),
+      showDocReplacing: isReplacing,
+      showReject: isProblems && !ro && !st.dismissed,
+      dismissReject: () => this.setState({ dismissed: true }),
+      showDropLead: isEmpty && !ro,
+      showDocReturns: !isEmpty && !isUploading,
+
+      pasteOpen, pasteExp: pasteOpen ? 'true' : 'false',
+      togglePaste: () => this.setState({ pasteOpen: !pasteOpen }),
+      closePaste: () => this.setState({ pasteOpen: false }),
+      pasteTitle: st.pasteTitle ?? (isPaste ? 'Returns procedure' : ''),
+      pasteText,
+      pasteOk: !pasteOver, pasteOver,
+      pasteFieldClass: pasteOver ? 'field is-invalid' : 'field',
+      pasteInvalidStr: pasteOver ? 'true' : 'false',
+      pasteDescId: pasteOver ? 'rd-paste-err' : 'rd-paste-count',
+      pasteCount: fmt(pasteLen) + ' / 60,000',
+      pasteError: fmt(pasteLen) + ' / 60,000 characters. Remove ' + fmt(pasteLen - RD_PASTE_LIMIT) + ' or upload a PDF instead.',
+      pasteAddDisabled: pasteOver || pasteLen === 0,
+      onPasteTitle: (ev) => this.setState({ pasteTitle: ev.target.value }),
+      onPasteText: (ev) => this.setState({ pasteText: ev.target.value }),
+
+      menuRecOpen: menu === 'rec', menuRecExp: menu === 'rec' ? 'true' : 'false', toggleMenuRec: toggleMenu('rec'),
+      menuRetOpen: menu === 'ret', menuRetExp: menu === 'ret' ? 'true' : 'false', toggleMenuRet: toggleMenu('ret'),
+      menuPickOpen: menu === 'pick', menuPickExp: menu === 'pick' ? 'true' : 'false', toggleMenuPick: toggleMenu('pick'),
+      menuCurOpen: menu === 'cur', menuCurExp: menu === 'cur' ? 'true' : 'false', toggleMenuCur: toggleMenu('cur'),
+      closeMenu: () => this.setState({ menu: null }),
+
+      isEmpty, isUploading, readyLike,
+      showBuildProgress: isBuilding && !buildDone,
+      buildDone,
+      readyCount: rc,
+      readyText: rc + ' of ' + RD_TOTAL + ' concepts ready',
+      meterPct: Math.round((rc / RD_TOTAL) * 1000) / 10,
+      statsText: RD_TOTAL + ' concepts · ' + totalQ + ' live questions · ' + critQ + ' critical questions',
+
+      showUnits: isBuilding || readyLike,
+      units,
+      showPending: pending > 0,
+
+      showRetire: isRetire && !ro,
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Overview · Northwind Logistics</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" style="position: relative;">
+  <sc-if value="{{readonly}}" hint-placeholder-val="{{ false }}">
+    <div class="ro-band" role="region" aria-label="Read-only view">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+      <span class="ro-text">Read only · You are viewing Northwind Logistics as Learn Quiz staff. Nothing here can be changed.</span>
+      <a href="CompanyDetail.dc.html">Exit to staff admin</a>
+    </div>
+  </sc-if>
+  <div class="{{appClass}}">
+    <dc-import name="PortalNav" active="overview" readonly="{{readonly}}" hint-size="248px,900px"></dc-import>
+    <main class="main">
+      <div class="page">
+        <div class="page-head">
+          <div class="page-head-text">
+            <h1 class="t-title1" tabindex="-1">Overview</h1>
+          </div>
+        </div>
+
+        <!-- ============ EMPTY: new company ============ -->
+        <sc-if value="{{isEmpty}}" hint-placeholder-val="{{ false }}">
+          <section class="card" aria-labelledby="ov-next" style="max-width: 720px;">
+            <div class="card-pad" style="display: flex; flex-direction: column; gap: 24px;">
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <h2 id="ov-next" class="t-title2">Add your first SOP</h2>
+                <p class="t-body muted">Warehouse picker has no documents yet. Upload one, and Learn Quiz builds the training from it.</p>
+              </div>
+              <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                <a class="btn btn-accent" href="RoleDetail.dc.html"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"></path></svg>Upload SOP</a>
+              </div>
+            </div>
+          </section>
+          <section class="section" aria-labelledby="ov-roles-e">
+            <div class="section-head">
+              <h2 id="ov-roles-e" class="t-title2">Roles</h2>
+              <a class="btn btn-ghost" href="Roles-New.dc.html">All roles</a>
+            </div>
+            <div class="dt-wrap">
+              <table class="dt dt-stack" role="table">
+                <caption class="sr-only">Job roles and their training status</caption>
+                <thead role="rowgroup"><tr role="row"><th scope="col" role="columnheader">Role</th><th scope="col" role="columnheader">Training</th><th scope="col" class="r" role="columnheader">Benchmark</th><th scope="col" class="r" role="columnheader">Onboarding</th><th scope="col" class="r" role="columnheader">People</th></tr></thead>
+                <tbody role="rowgroup">
+                  <tr role="row">
+                    <td role="cell" class="stack-full"><a class="cell-main" href="RoleDetail.dc.html">Warehouse picker</a></td>
+                    <td role="cell" class="stack-full" data-label="Training"><span class="chip chip-dashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" stroke-dasharray="3 3"></path></svg>No documents yet</span></td>
+                    <td role="cell" class="r num" data-label="Benchmark">85%</td>
+                    <td role="cell" class="r num" data-label="Onboarding">30 days</td>
+                    <td role="cell" class="r num" data-label="People">0</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </sc-if>
+
+        <!-- ============ PREPARING: first role is being built ============ -->
+        <sc-if value="{{isPreparing}}" hint-placeholder-val="{{ false }}">
+          <section class="card" aria-labelledby="ov-prep" style="max-width: 720px;">
+            <div class="card-pad" style="display: flex; flex-direction: column; gap: 20px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+                <h2 id="ov-prep" class="t-title2">Preparing Warehouse picker training</h2>
+                <span class="chip chip-tint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12M6 21h12M7 3v3a5 5 0 0 0 10 0V3M7 21v-3a5 5 0 0 1 10 0v3"></path></svg>Preparing training</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 8px;" role="status" aria-live="polite">
+                <div class="meter" role="progressbar" aria-label="Concepts ready" aria-valuemin="0" aria-valuemax="31" aria-valuenow="12" aria-valuetext="12 of 31 concepts ready"><i style="width: 39%;"></i></div>
+                <p class="t-label num">12 of 31 concepts ready</p>
+              </div>
+              <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+                <a class="btn btn-accent" href="People-Invite.dc.html"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Invite people</a>
+                <a class="btn btn-ghost" href="RoleDetail-Building.dc.html">Watch the build</a>
+              </div>
+            </div>
+          </section>
+          <section class="section" aria-labelledby="ov-roles-p">
+            <div class="section-head">
+              <h2 id="ov-roles-p" class="t-title2">Roles</h2>
+              <a class="btn btn-ghost" href="Roles.dc.html">All roles</a>
+            </div>
+            <div class="dt-wrap">
+              <table class="dt dt-stack" role="table">
+                <caption class="sr-only">Job roles and their training status</caption>
+                <thead role="rowgroup"><tr role="row"><th scope="col" role="columnheader">Role</th><th scope="col" role="columnheader">Training</th><th scope="col" class="r" role="columnheader">Benchmark</th><th scope="col" class="r" role="columnheader">Onboarding</th><th scope="col" class="r" role="columnheader">People</th></tr></thead>
+                <tbody role="rowgroup">
+                  <tr role="row">
+                    <td role="cell" class="stack-full"><a class="cell-main" href="RoleDetail-Building.dc.html">Warehouse picker</a></td>
+                    <td role="cell" class="stack-full" data-label="Training"><div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;"><span class="chip chip-tint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12M6 21h12M7 3v3a5 5 0 0 0 10 0V3M7 21v-3a5 5 0 0 1 10 0v3"></path></svg>Preparing training</span><span class="t-caption muted num">12 of 31 concepts</span></div></td>
+                    <td role="cell" class="r num" data-label="Benchmark">85%</td>
+                    <td role="cell" class="r num" data-label="Onboarding">30 days</td>
+                    <td role="cell" class="r num" data-label="People">0</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </sc-if>
+
+        <!-- ============ NORMAL ============ -->
+        <sc-if value="{{isNormal}}" hint-placeholder-val="{{ true }}">
+          <section aria-labelledby="ov-figs">
+            <h2 id="ov-figs" class="sr-only">Figures</h2>
+            <div class="stats card">
+              <a class="stat" href="People.dc.html"><span class="stat-label">Employees</span><span class="stat-value">3</span></a>
+              <a class="stat" href="People.dc.html"><span class="stat-label">Proficient</span><span class="stat-value">1</span></a>
+              <a class="stat" href="Person-Proficient.dc.html"><span class="stat-label">Avg. days to proficiency</span><span class="stat-value">21<span class="stat-unit">days</span></span></a>
+              <a class="stat" href="Person.dc.html"><span class="stat-label">Critical-step errors this week</span><span class="stat-value">1</span></a>
+              <a class="stat" href="Questions.dc.html"><span class="stat-label">Documents awaiting review</span><span class="stat-value">1</span></a>
+            </div>
+          </section>
+
+          <sc-if value="{{notReadonly}}" hint-placeholder-val="{{ true }}">
+            <section class="banner" aria-labelledby="ov-next-n">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5M9 13h6M9 17h6"></path></svg>
+              <p class="banner-text"><strong id="ov-next-n">Next step:</strong> review 38 new questions from Returns procedure.</p>
+              <a class="btn btn-accent" href="Questions.dc.html">Review questions</a>
+            </section>
+          </sc-if>
+
+          <section class="section" aria-labelledby="ov-roles-n">
+            <div class="section-head">
+              <h2 id="ov-roles-n" class="t-title2">Roles</h2>
+              <a class="btn btn-ghost" href="{{rolesHref}}">All roles</a>
+            </div>
+            <div class="dt-wrap">
+              <table class="dt dt-stack" role="table">
+                <caption class="sr-only">Job roles and their training status</caption>
+                <thead role="rowgroup"><tr role="row"><th scope="col" role="columnheader">Role</th><th scope="col" role="columnheader">Training</th><th scope="col" class="r" role="columnheader">Benchmark</th><th scope="col" class="r" role="columnheader">Onboarding</th><th scope="col" class="r" role="columnheader">People</th></tr></thead>
+                <tbody role="rowgroup">
+                  <tr role="row">
+                    <td role="cell" class="stack-full"><a class="cell-main" href="{{pickerHref}}">Warehouse picker</a></td>
+                    <td role="cell" class="stack-full" data-label="Training"><span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12.5 2.7 2.7L16 9.5"></path></svg>Ready</span></td>
+                    <td role="cell" class="r num" data-label="Benchmark">85%</td>
+                    <td role="cell" class="r num" data-label="Onboarding">30 days</td>
+                    <td role="cell" class="r num" data-label="People">3</td>
+                  </tr>
+                  <tr role="row">
+                    <td role="cell" class="stack-full"><a class="cell-main" href="{{forkliftHref}}">Forklift operator</a></td>
+                    <td role="cell" class="stack-full" data-label="Training">
+                      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                        <span class="chip chip-tint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12M6 21h12M7 3v3a5 5 0 0 0 10 0V3M7 21v-3a5 5 0 0 1 10 0v3"></path></svg>Preparing training</span>
+                        <span class="t-caption muted num">9 of 24 concepts</span>
+                      </div>
+                    </td>
+                    <td role="cell" class="r num" data-label="Benchmark">90%</td>
+                    <td role="cell" class="r num" data-label="Onboarding">21 days</td>
+                    <td role="cell" class="r num" data-label="People">0</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </sc-if>
+
+        <!-- ============ LOADING ============ -->
+        <sc-if value="{{isLoading}}" hint-placeholder-val="{{ false }}">
+          <div role="status" aria-live="polite" class="sr-only">Loading overview</div>
+          <div class="stats card" aria-hidden="true">
+            <div class="stat"><span class="skel" style="width: 80px; height: 14px; margin: 3px 0;"></span><span class="skel" style="width: 48px; height: 28px; margin: 6px 0;"></span></div>
+            <div class="stat"><span class="skel" style="width: 72px; height: 14px; margin: 3px 0;"></span><span class="skel" style="width: 32px; height: 28px; margin: 6px 0;"></span></div>
+            <div class="stat"><span class="skel" style="width: 140px; height: 14px; margin: 3px 0;"></span><span class="skel" style="width: 64px; height: 28px; margin: 6px 0;"></span></div>
+            <div class="stat"><span class="skel" style="width: 150px; height: 14px; margin: 3px 0;"></span><span class="skel" style="width: 32px; height: 28px; margin: 6px 0;"></span></div>
+            <div class="stat"><span class="skel" style="width: 130px; height: 14px; margin: 3px 0;"></span><span class="skel" style="width: 32px; height: 28px; margin: 6px 0;"></span></div>
+          </div>
+          <div class="section" aria-hidden="true">
+            <span class="skel" style="width: 72px; height: 22px; margin: 11px 0;"></span>
+            <div class="dt-wrap">
+              <div style="display: flex; gap: 16px; padding: 14px 16px; border-bottom: 1px solid var(--border-strong);"><span class="skel" style="width: 40px; height: 12px;"></span><span class="skel" style="width: 64px; height: 12px; margin-left: 180px;"></span></div>
+              <div style="display: flex; align-items: center; gap: 16px; height: 56px; padding: 0 16px; border-bottom: 1px solid var(--border);"><span class="skel" style="width: 140px; height: 14px;"></span><span class="skel" style="width: 96px; height: 28px; border-radius: 14px; margin-left: 80px;"></span></div>
+              <div style="display: flex; align-items: center; gap: 16px; height: 56px; padding: 0 16px;"><span class="skel" style="width: 120px; height: 14px;"></span><span class="skel" style="width: 140px; height: 28px; border-radius: 14px; margin-left: 100px;"></span></div>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light"},"state":{"editor":"enum","options":["normal","empty","preparing","loading"],"default":"normal"},"readonly":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.props.state ?? 'normal';
+    const ro = this.props.readonly === true || this.props.readonly === 'true';
+    return {
+      theme: this.props.theme ?? 'light',
+      isEmpty: s === 'empty', isPreparing: s === 'preparing', isNormal: s === 'normal', isLoading: s === 'loading',
+      readonly: ro, notReadonly: !ro,
+      appClass: ro ? 'app has-band' : 'app',
+      rolesHref: ro ? 'RO-RoleDetail.dc.html' : 'Roles.dc.html',
+      pickerHref: ro ? 'RO-RoleDetail.dc.html' : 'RoleDetail-Ready.dc.html',
+      forkliftHref: ro ? 'RO-RoleDetail.dc.html' : 'Roles.dc.html',
+    };
+  }
+}
+</script>
+</body>
+</html>
