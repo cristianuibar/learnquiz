@@ -90,7 +90,7 @@ function seedWeek() {
 it.each([
   ['learner-a', { org: 'company-a', learnerId: 'colleague-a' }, 403],
   ['learner-a', { org: 'company-b', learnerId: 'learner-b' }, 403],
-  ['admin-a', { org: 'company-a', learnerId: 'learner-b' }, 403],
+  ['admin-a', { org: 'company-a', learnerId: 'learner-b' }, 404],
   ['admin-a', { org: 'company-b', learnerId: 'learner-b' }, 403],
   [null, {}, 401],
 ])('isolates profiles: %s requesting %j is refused with %s', async (actor, data, status) => {

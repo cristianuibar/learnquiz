@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
+import { Link, createFileRoute, notFound, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { FieldError, fieldProps } from '@/components/admin/field-error'
 import { RouteError, errorMessage, fieldErrors } from '@/components/inline-error'
@@ -13,10 +13,16 @@ import { generateRoleCurriculum, retryConceptGeneration } from '@/server/curricu
 import { retireRoleDocument } from '@/server/role-documents'
 import { getRoleDetail, updateRoleConcept } from '@/server/role-detail'
 import { Page, PageHeader } from '@/components/admin/page'
+import { PortalNotFound } from '@/components/portal/not-found'
 import { usePortalLinks } from '@/components/portal/portal-context'
 
 export const Route = createFileRoute('/org/$slug/roles_/$roleId')({
-  loader: ({ params }) => getRoleDetail({ data: { slug: params.slug, roleId: params.roleId } }),
+  loader: ({ params }) =>
+    getRoleDetail({ data: { slug: params.slug, roleId: params.roleId } }).catch((err: unknown) => {
+      if ((err as { status?: unknown } | null)?.status === 404) throw notFound({ data: { what: 'role' } })
+      throw err
+    }),
+  notFoundComponent: () => <PortalNotFound what="role" />,
   errorComponent: RouteError,
   component: RoleDetail,
 })
