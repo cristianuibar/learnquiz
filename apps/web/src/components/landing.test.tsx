@@ -263,9 +263,9 @@ it('lists job roles linking to their detail pages and to no page that does not e
   const { container, router, cleanup } = await renderApp('/org/northwind')
   try {
     await act(async () => { container.querySelector<HTMLAnchorElement>('nav[aria-label="Northwind portal"] a[href="/org/northwind/roles"]')!.click(); await router.load() })
-    expect(container.querySelector('h1')?.textContent).toBe('Job roles')
-    expect(container.querySelector('main li')?.textContent).toContain('Barista')
-    expect(container.querySelector('main li a')?.getAttribute('href')).toBe('/org/northwind/roles/barista')
+    expect(container.querySelector('h1')?.textContent).toBe('Roles')
+    const row = [...container.querySelectorAll('main tbody tr')].find((tr) => tr.textContent?.includes('Barista'))!
+    expect(row.querySelector('a')?.getAttribute('href')).toBe('/org/northwind/roles/barista')
     for (const a of container.querySelectorAll<HTMLAnchorElement>('main a')) {
       expect(router.matchRoutes(a.getAttribute('href')!).at(-1)?.pathname.replace(/(.)\/$/, '$1')).toBe(a.getAttribute('href'))
     }

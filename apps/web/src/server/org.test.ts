@@ -115,7 +115,7 @@ it.each(['owner', 'admin'])('%s creates and lists roles with defaults or custom 
   expect(org).toMatchObject({ name: 'Alpha', slug: 'alpha' })
   expect(org.roles).toHaveLength(3)
   expect(org.roles).toEqual(expect.arrayContaining([
-    expect.objectContaining({ id: role.id, name: 'Support specialist', benchmark: 0.85, onboardingDays: 30, topicStatus: 'draft' }),
+    expect.objectContaining({ id: role.id, name: 'Support specialist', benchmark: 0.85, onboardingDays: 30, topicStatus: 'draft', peopleCount: 0, documentCount: 0, conceptsReady: 0, conceptsTotal: 0, failedDocuments: 0 }),
     expect.objectContaining({ id: custom.id, name: 'Team lead', benchmark: 0.9, onboardingDays: 45, topicStatus: 'draft' }),
   ]))
   expect(sqlite.prepare('SELECT job_role_id, learner_id, status FROM topics WHERE job_role_id = ?').all(role.id)).toEqual([

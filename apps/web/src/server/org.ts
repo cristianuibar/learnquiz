@@ -152,7 +152,8 @@ export const listRoles = createServerFn({ method: 'GET' })
   .validator(Slug)
   .handler(async ({ data }) => {
     const { org } = await requireOrgAdmin(data.slug)
-    return { name: org.name, slug: org.slug, roles: await rolesOf(org.id) }
+    const roles = await roleSummaries(org.id)
+    return { name: org.name, slug: org.slug, roles: roles.map(({ people, documents, ...role }) => ({ ...role, peopleCount: people, documentCount: documents })) }
   })
 
 export const createRole = createServerFn({ method: 'POST' })
