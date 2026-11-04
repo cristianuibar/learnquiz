@@ -24,7 +24,7 @@ import { applyAppearance, persistAppearance, readAppearance, type AppearanceChoi
 import { enablePush, pushStatus, type PushState } from '@/lib/push'
 import { endSession, useSession } from '@/lib/session-store'
 import { createSettingsSave } from '@/lib/settings-save'
-import { deviceTimezone, pushPreferencesBody, questionSwitchOn, settingsTimeOptions, toggleSettingsDay, type PushSettings, type QuestionPreferences } from '@/lib/settings-rules'
+import { clampPreferences, deviceTimezone, pushPreferencesBody, questionSwitchOn, settingsTimeOptions, toggleSettingsDay, type PushSettings, type QuestionPreferences } from '@/lib/settings-rules'
 import { useTheme } from '@/theme/ThemeProvider'
 
 const appearanceOptions: { value: AppearanceChoice; label: string }[] = [
@@ -89,7 +89,7 @@ export default function Settings() {
       pushStatus(),
     ]).then(([settings, auth, native]) => {
       if (!active()) return
-      const initial = pushPreferencesBody(settings.prefs, settings.company, deviceTimezone(settings.prefs.timezone))
+      const initial = clampPreferences(settings.prefs, settings.company, deviceTimezone(settings.prefs.timezone))
       setLoaded({ ...settings, prefs: initial, owner: token, email: auth.data.user.email, native })
       prefsQueue.current = createSettingsSave({ initial, isCurrent: sameToken,
         save: (prefs) => api('/push/preferences', { method: 'PUT',
