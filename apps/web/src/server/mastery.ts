@@ -13,15 +13,14 @@ export async function unitMastery(db: Db, learnerId: string, topicId: string) {
     db.select({ id: concepts.id, unitId: concepts.unitId }).from(concepts).where(and(eq(concepts.topicId, topicId), liveConcept())),
     loadPKnown(db, learnerId, topicId),
   ])
-  return unitRows.map((u) => ({
-    unitId: u.id,
-    unitName: u.name,
-    mastery: mean(conceptRows.filter((c) => c.unitId === u.id).map((c) => known.get(c.id) ?? 0)),
-  }))
+  return unitRows.map((u) => {
+    const live = conceptRows.filter((c) => c.unitId === u.id)
+    return { unitId: u.id, unitName: u.name, live: live.length > 0, mastery: mean(live.map((c) => known.get(c.id) ?? 0)) }
+  })
 }
 
 // Back to basics: the last three ended sessions on the topic each scored under 55 % (correct / answered).
-// The weak units are the unlocked ones under 0.6 mastery, earliest first.
+// The weak units are the unlocked ones with live concepts under 0.6 mastery, earliest first.
 export async function basicsUnits(db: Db, learnerId: string, topicId: string): Promise<string[] | null> {
   const recent = await db
     .select({ answered: count(attempts.id), correct: sql<number>`coalesce(sum(${attempts.correct}), 0)` })
@@ -37,6 +36,6 @@ export async function basicsUnits(db: Db, learnerId: string, topicId: string): P
     db.select({ unitId: learnerUnit.unitId }).from(learnerUnit).where(eq(learnerUnit.learnerId, learnerId)),
   ])
   const open = new Set(unlocked.map((u) => u.unitId))
-  const weak = mastery.filter((u) => open.has(u.unitId) && u.mastery < BASICS_MASTERY).map((u) => u.unitId)
+  const weak = mastery.filter((u) => u.live && open.has(u.unitId) && u.mastery < BASICS_MASTERY).map((u) => u.unitId)
   return weak.length ? weak : null
 }
