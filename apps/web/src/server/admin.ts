@@ -1,11 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
-import { getRequestHeaders } from '@tanstack/react-start/server'
 import { and, asc, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '@/db'
 import { organization } from '@/db/auth-schema'
 import { concepts, itemFlags, items, jobRoles, topics } from '@/db/schema'
-import { getAuth } from '@/server/auth'
 import { requireStaff } from '@/server/authz'
 import { retryFailedConcept } from '@/server/concept-retry'
 import { httpError } from '@/server/helpers'
@@ -22,27 +20,6 @@ export const getStaffSession = createServerFn({ method: 'GET' }).handler(async (
   ])
   return { id: staff.id, name: staff.name, email: staff.email, failedJobs: failedConcepts.n + failedRoles.n }
 })
-
-export const listUsers = createServerFn({ method: 'GET' })
-  .validator(z.object({ search: z.string().trim().max(200).default(''), field: z.enum(['email', 'name']).default('email'), offset: z.number().int().min(0).default(0) }))
-  .handler(async ({ data }) => {
-    await requireStaff()
-    const result = await getAuth().api.listUsers({
-      headers: getRequestHeaders(),
-      query: { searchValue: data.search || undefined, searchField: data.field, searchOperator: 'contains', limit: 25, offset: data.offset, sortBy: 'createdAt', sortDirection: 'desc' },
-    })
-    return { users: result.users.map(({ id, name, email, role, banned, banReason }) => ({ id, name, email, role, banned, banReason })), total: result.total }
-  })
-
-export const setUserBan = createServerFn({ method: 'POST' })
-  .validator(z.object({ userId: z.string().min(1).max(100), banned: z.boolean(), reason: z.string().trim().max(500).optional() }))
-  .handler(async ({ data }): Promise<void> => {
-    await requireStaff()
-    const auth = getAuth()
-    const headers = getRequestHeaders()
-    if (data.banned) await auth.api.banUser({ headers, body: { userId: data.userId, banReason: data.reason || undefined } })
-    else await auth.api.unbanUser({ headers, body: { userId: data.userId } })
-  })
 
 // Company concepts still being written or stuck, and role curricula that are building or failed. A retired document's concepts cannot be retried, so they are left out.
 export const getGenerationJobs = createServerFn({ method: 'GET' }).handler(async () => {
