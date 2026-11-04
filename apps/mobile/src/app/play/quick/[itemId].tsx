@@ -9,6 +9,7 @@ import { QuickResult } from '@/components/after-session/QuickResult'
 import { QuestionBody } from '@/components/question/question-body'
 import { ReportSheet } from '@/components/reveal/report-sheet'
 import { QuestionDock } from '@/components/session/QuestionDock'
+import { ReadAloudButton } from '@/components/session/ReadAloudButton'
 import { SessionFrame } from '@/components/session/SessionFrame'
 import { SessionSkeleton } from '@/components/session-skeleton'
 import { Sheet } from '@/components/sheet/sheet'
@@ -150,6 +151,7 @@ function QuickSession({ itemId, pushId }: { itemId: string; pushId?: string }) {
           onEnd={backToToday}
           inert={reporting}
           topBar={{ kind: 'label', label: done ? '' : '1 question' }}
+          trailing={<ReadAloudButton item={item ?? null} blocked={question?.status === 'checking'} />}
           dock={item && question ? (
             <>
               {question.error ? (

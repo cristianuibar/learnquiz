@@ -13,6 +13,7 @@ const fns = vi.hoisted(() => ({
   flagResult: vi.fn(),
   subscribeExpo: vi.fn(),
   unsubscribe: vi.fn(),
+  transcribeAnswer: vi.fn(),
 }))
 
 vi.mock('@/server/curriculum', () => ({ getConceptItems: vi.fn(), getTopicPath: fns.getTopicPath }))
@@ -30,6 +31,7 @@ vi.mock('@/server/play', () => ({
   startMiniSession: vi.fn(),
   startPlacement: vi.fn(),
   startSession: vi.fn(),
+  transcribeAnswer: fns.transcribeAnswer,
 }))
 vi.mock('@/server/profile', () => ({ getProfile: fns.getProfile }))
 vi.mock('@/server/push', () => ({
@@ -168,4 +170,27 @@ it('forwards the endpoint on DELETE /push/expo', async () => {
   const res = await call('/push/expo', { method: 'DELETE', body: JSON.stringify({ endpoint: 'ExponentPushToken[abc]' }), headers: auth })
   expect(res.status).toBe(200)
   expect(fns.unsubscribe).toHaveBeenCalledWith({ data: { endpoint: 'ExponentPushToken[abc]' } })
+})
+
+it('transcribes a multipart recording with the path session ID, with a bearer only', async () => {
+  fns.transcribeAnswer.mockResolvedValue('one')
+  const form = () => {
+    const data = new FormData()
+    data.append('sessionId', 'other'); data.append('itemId', 'i-1'); data.append('audio', new File(['RIFF'], 'answer.wav', { type: 'audio/wav' }))
+    return data
+  }
+  expect((await call('/sessions/s-1/transcribe', { method: 'POST', body: form() })).status).toBe(401)
+  const asJson = await call('/sessions/s-1/transcribe', { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ itemId: 'i-1' }) })
+  expect(asJson.status).toBe(400)
+  expect(fns.transcribeAnswer).not.toHaveBeenCalled()
+
+  const res = await call('/sessions/s-1/transcribe', { method: 'POST', headers: auth, body: form() })
+  expect(res.status).toBe(200)
+  expect(await res.json()).toBe('one')
+  expect(fns.transcribeAnswer).toHaveBeenCalledTimes(1)
+  const data = fns.transcribeAnswer.mock.calls[0][0].data as FormData
+  expect(data).toBeInstanceOf(FormData)
+  expect(data.get('sessionId')).toBe('s-1')
+  expect(data.get('itemId')).toBe('i-1')
+  expect(await (data.get('audio') as File).text()).toBe('RIFF')
 })

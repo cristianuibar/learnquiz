@@ -6,9 +6,9 @@ import {
   useFonts,
 } from '@expo-google-fonts/inter'
 import { useURL } from 'expo-linking'
-import { Stack, useRouter, type Href } from 'expo-router'
+import { Stack, usePathname, useRouter, type Href } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
-import { useEffect, useRef, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
@@ -48,9 +48,15 @@ export default function RootLayout() {
 function SessionRoutes({ fontsLoaded }: { fontsLoaded: boolean }) {
   const session = useSession()
   const router = useRouter()
+  const pathname = usePathname()
   const url = useURL()
   const lastURL = useRef<string | null>(null)
   const mounted = useRef(false)
+  // Set while the resolved stack shows sign-in, until the next resolved screen.
+  const fromSignIn = useRef(false)
+  // Set once the first session resolved. A later loading (a new bearer waiting
+  // for /session) keeps the stack, so an open invitation stays mounted.
+  const [booted, setBooted] = useState(false)
   const resolved = fontsLoaded && session.status !== 'loading'
   useNotificationObserver(resolved && session.status === 'ready' && !session.needsDisclosure)
   // Re-runs the replay below when the last hold on it ends.
@@ -62,23 +68,36 @@ function SessionRoutes({ fontsLoaded }: { fontsLoaded: boolean }) {
       const target = targetFromURL(url)
       if (target && !canOpenTarget(target, session)) holdTarget(target)
     }
+    // Sign-in over Join: removing the protected sign-in screen uncovers Join, not
+    // index. Hand the post-auth decision to index, as when sign-in sits over it.
+    if (resolved) {
+      const signedInOverJoin = fromSignIn.current && session.status === 'ready' && pathname.startsWith('/join/')
+      fromSignIn.current = pathname === '/sign-in'
+      if (signedInOverJoin) {
+        router.replace('/')
+        return
+      }
+    }
     // The native router handles open links. Only replay links held by a gate.
-    if (!resolved) return
+    // index owns the gate's destination, including the protected sign-in screen
+    // being removed. Replaying here would race index's fallback and lose a link.
+    if (!resolved || pathname === '/' || pathname === '/sign-in') return
     const target = takeReplayTarget()
     if (target) {
       if (canOpenTarget(target, session)) router.replace(target as Href)
       else holdTarget(target)
     }
-  }, [url, session.status, session.needsDisclosure, resolved, router, replays])
+  }, [url, session.status, session.needsDisclosure, resolved, router, replays, pathname])
 
   useEffect(() => {
     if (resolved && !mounted.current) {
       mounted.current = true
+      setBooted(true)
       void SplashScreen.hideAsync()
     }
   }, [resolved])
 
-  if (!resolved) return null
+  if (!resolved && !booted) return null
   const signedIn = session.status === 'ready'
   return (
     <ThemeProvider accent={session.branding?.accent}>

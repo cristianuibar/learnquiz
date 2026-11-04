@@ -80,7 +80,8 @@ export function QuestionScreen({
           {props.item.stem}
         </h1>
         <fieldset disabled={locked} aria-busy={locked} className="flex min-w-0 flex-col gap-6">
-          <Body {...props} />
+          {/* Controls get the lock themselves too: some browsers still dispatch pointer events through a disabled fieldset. */}
+          <Body {...props} busy={locked} />
         </fieldset>
       </form>
       {error && (

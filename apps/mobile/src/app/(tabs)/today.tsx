@@ -8,7 +8,7 @@ import { OfflineLead, TodayNotice } from '@/components/today/Notice'
 import { QuestCard } from '@/components/today/QuestCard'
 import { RoleCard } from '@/components/today/RoleCard'
 import { TodayTopBar } from '@/components/today/TodayTopBar'
-import { signOut } from '@/lib/auth'
+import { endSession } from '@/lib/session-store'
 import { PLAY_LOADING, playParams, useStreakPop, useToday } from '@/lib/today'
 import { useTheme } from '@/theme/ThemeProvider'
 
@@ -92,7 +92,7 @@ export default function TodayScreen() {
         {!view ? (
           <Skeleton />
         ) : view.hero.kind === 'empty' ? (
-          <EmptyState onRetry={retry} onSignOut={() => { void signOut() }} />
+          <EmptyState onRetry={retry} onSignOut={() => { void endSession() }} />
         ) : status === 'offline' ? (
           <>
             <OfflineLead hero={view.hero} onPlay={play} />

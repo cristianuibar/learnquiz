@@ -30,7 +30,7 @@ function mockProfile() {
   const day = 86_400_000
   const start = Date.UTC(2026, 10, 2)
   vi.mocked(getProfile).mockResolvedValue({
-    name: 'Dana Learner', topic: { id: 'training', title: 'Workplace safety' }, role: null, benchmark: 0.85,
+    name: 'Dana Learner', topic: { id: 'training', title: 'Workplace safety' }, role: null, benchmark: 0.85, started: true, onboarding: null,
     units: [{ id: 'unit', name: 'Foundations', concepts: [{ id: 'concept', unitId: 'unit', name: 'Emergency exits', critical: true, pKnown: 0.7 }] }],
     proficiency: { achievedAt: null, days: null, estimatedDays: 2, projectedAt: start + 8 * day },
     confidentErrors: [{ id: 'error', conceptId: 'concept', concept: 'Emergency exits', at: start, correctedAt: start + day }],

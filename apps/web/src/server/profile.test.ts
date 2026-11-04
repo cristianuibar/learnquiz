@@ -216,3 +216,31 @@ it('has no projection before training and refuses a target without a company', a
   expect(profile.proficiency.projectedAt).toBeNull()
   expect(() => getProfile({ data: { learnerId: 'learner-a' } as never })).toThrow()
 })
+
+it('reports whether the learner has started the topic, for the learner and the admin alike', async () => {
+  seedWeek()
+  raw.exec('DELETE FROM attempts')
+  const admin = () => { holder.user = { id: 'admin-a', name: 'Admin', isAnonymous: false }; return getProfile({ data: { org: 'company-a', learnerId: 'learner-a' } }) }
+  expect((await getProfile({ data: {} })).started).toBe(false)
+  expect((await admin()).started).toBe(false)
+  holder.user = { id: 'learner-a', name: 'Learner A', isAnonymous: false }
+  raw.prepare('INSERT INTO attempts (id, learner_id, item_id, concept_id, at, answer_json, correct, score, confidence, response_ms, rating, p_known_before, p_known_after) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run('first', 'learner-a', 'i1', 'c1', now - 3600_000, '"answer"', 1, 1, 'sure', 1000, 3, 0.2, 0.4)
+  expect((await getProfile({ data: {} })).started).toBe(true)
+  expect((await admin()).started).toBe(true)
+})
+
+it.each([[0, 1], [15, 16], [45, 30]])('reports onboarding for a role assigned %i days ago as day %i of 30, the same to an admin', async (ago, day) => {
+  seedWeek()
+  raw.prepare('INSERT INTO job_roles (id, org_id, name, benchmark, onboarding_days, created_at) VALUES (?, ?, ?, ?, ?, ?)').run('role', 'org-a', 'Safety officer', 0.85, 30, start)
+  raw.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES (?, ?, ?, ?)').run('learner-a', 'org-a', 'role', now - ago * DAY)
+  const profile = await getProfile({ data: {} })
+  expect(profile.onboarding).toEqual({ day, days: 30 })
+  holder.user = { id: 'admin-a', name: 'Admin', isAnonymous: false }
+  expect((await getProfile({ data: { org: 'company-a', learnerId: 'learner-a' } })).onboarding).toEqual({ day, days: 30 })
+})
+
+it('has no onboarding for a personal topic', async () => {
+  seedWeek()
+  expect((await getProfile({ data: {} })).onboarding).toBeNull()
+})

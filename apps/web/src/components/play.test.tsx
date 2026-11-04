@@ -448,6 +448,23 @@ it('disables the answer controls while a page restored from the browser cache re
   } finally { await cleanup() }
 })
 
+it('keeps the record button disabled when a restored page fails to reload the session', async () => {
+  const { container, cleanup } = await renderPlay(true, false, 'short')
+  try {
+    vi.mocked(getSession).mockRejectedValueOnce(new Error('Network down'))
+    await act(async () => { window.dispatchEvent(Object.assign(new Event('pageshow'), { persisted: true })) })
+    expect(container.textContent).toContain('Network down')
+    const record = byLabel(container, 'Record answer')!
+    expect(record.disabled).toBe(true)
+    await act(async () => {
+      record.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+      record.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled()
+    expect(byLabel(container, 'Stop recording')).toBeNull()
+  } finally { await cleanup() }
+})
+
 const pick = (container: HTMLElement, name: string, value: string) => act(async () => { container.querySelector<HTMLInputElement>(`input[name="${name}"][value="${value}"]`)!.click() })
 const checked = (container: HTMLElement, name: string) => container.querySelector<HTMLInputElement>(`input[name="${name}"]:checked`)?.value
 

@@ -124,3 +124,40 @@ test.each(['undetermined', 'granted'] as const)('Continue still navigates normal
   if (status === 'undetermined') expect(mockRouter.replace).toHaveBeenCalledWith('/opt-in')
   else expect(mockRouter.dismissTo).toHaveBeenCalledWith('/(tabs)/today')
 })
+
+// #530: Continue's lookup outlives a blur (a notification pushes a screen on top).
+// When Summary is focused again, both actions must be usable.
+test.each([
+  ['the completion is saved', 'finished'],
+  ['the permission lookup resolves', 'resolve'],
+  ['the permission lookup fails', 'reject'],
+] as const)('after a blur while %s, refocus leaves Continue and Another session enabled', async (_name, phase) => {
+  const finished = deferred<number>()
+  const permission = deferred<Notifications.NotificationPermissionsStatus>()
+  if (phase === 'finished') jest.mocked(recordFinished).mockReturnValue(finished.promise)
+  jest.mocked(Notifications.getPermissionsAsync).mockReturnValue(permission.promise)
+  const content = () => h(ThemeProvider, { children: h(SessionDone) })
+  const view = await render(content())
+  await fireEvent.press(screen.getByRole('button', { name: 'Continue' }))
+  expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
+
+  mockFocused = false
+  await view.rerender(content())
+  await act(async () => {
+    if (phase === 'finished') finished.resolve(1)
+    else if (phase === 'resolve') permission.resolve({ status: 'granted', canAskAgain: true } as Notifications.NotificationPermissionsStatus)
+    else permission.reject(new Error('unavailable'))
+  })
+  mockFocused = true
+  await view.rerender(content())
+
+  expect(screen.getByRole('button', { name: 'Continue', busy: false })).toBeEnabled()
+  expect(screen.getByRole('button', { name: 'Another session' })).toBeEnabled()
+  expect(mockRouter.replace).not.toHaveBeenCalled()
+  expect(mockRouter.dismissTo).not.toHaveBeenCalled()
+
+  // Continue works again from the refocused Summary.
+  jest.mocked(Notifications.getPermissionsAsync).mockResolvedValue({ status: 'granted', canAskAgain: true } as Notifications.NotificationPermissionsStatus)
+  await fireEvent.press(screen.getByRole('button', { name: 'Continue' }))
+  expect(mockRouter.dismissTo).toHaveBeenCalledWith('/(tabs)/today')
+})

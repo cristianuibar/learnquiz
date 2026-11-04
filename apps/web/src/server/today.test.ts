@@ -283,6 +283,20 @@ describe('getToday', () => {
       expect(plan?.reviewsLeft).toBe(8)
     })
 
+    it('leaves short answers a role session cannot serve out of due and next review', async () => {
+      role()
+      unit('un1', 0)
+      concept('c1', 'un1')
+      place()
+      item('d1', 'c1', { due: NOW - 1000 })
+      item('s1', 'c1', { format: 'short', due: NOW - 1000 })
+      item('s2', 'c1', { format: 'short', due: NOW + DAY })
+      item('k1', 'c1', { due: NOW + 2 * DAY })
+      const { topic, plan } = await getToday()
+      expect(topic?.due).toBe(1)
+      expect(plan).toMatchObject({ reviewsLeft: 1, nextReviewAt: NOW + 2 * DAY })
+    })
+
     it('has no next review when nothing is scheduled in the future', async () => {
       personal()
       unit('un1', 0)

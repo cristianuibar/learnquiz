@@ -15,16 +15,18 @@ export type AccountFormProps = {
   mode: AuthMode
   onModeChange: (mode: AuthMode) => void
   email?: string
+  defaultEmail?: string
   defaultName?: string
+  showModeLink?: boolean
   error?: string | null
   // Owned by the parent when given: the form then sets no state of its own after submit.
   busy?: boolean
   onSubmit: (values: AccountFormValues) => Promise<void>
 }
 
-export function AccountForm({ mode, onModeChange, email, defaultName, error, busy: parentBusy, onSubmit }: AccountFormProps) {
+export function AccountForm({ mode, onModeChange, email, defaultEmail, defaultName, showModeLink = true, error, busy: parentBusy, onSubmit }: AccountFormProps) {
   const { space } = useTheme()
-  const [typedEmail, setTypedEmail] = useState('')
+  const [typedEmail, setTypedEmail] = useState(defaultEmail ?? '')
   const [name, setName] = useState(defaultName ?? '')
   const [password, setPassword] = useState('')
   const [shown, setShown] = useState(false)
@@ -100,11 +102,13 @@ export function AccountForm({ mode, onModeChange, email, defaultName, error, bus
           {signUp ? 'Create account' : 'Sign in'}
         </Button>
       </View>
-      <View style={{ alignItems: 'center' }}>
-        <LinkButton onPress={() => onModeChange(signUp ? 'signIn' : 'signUp')}>
-          {signUp ? 'I already have an account' : 'Create an account'}
-        </LinkButton>
-      </View>
+      {showModeLink && (
+        <View style={{ alignItems: 'center' }}>
+          <LinkButton onPress={() => onModeChange(signUp ? 'signIn' : 'signUp')}>
+            {signUp ? 'I already have an account' : 'Create an account'}
+          </LinkButton>
+        </View>
+      )}
     </View>
   )
 }

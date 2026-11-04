@@ -488,7 +488,10 @@ it('reports the role benchmark, and a mini session earns no session bonus', asyn
   const second = await startMiniSession({ data: { itemId: 'i1' } })
   await answerItem({ data: { sessionId: second.sessionId, itemId: 'i1', answer: { text: '1' }, confidence: 'sure', responseMs: 1000 } })
   await nextItem({ data: { sessionId: second.sessionId } })
-  expect(await endSession({ data: { sessionId: second.sessionId } })).toMatchObject({ kind: 'mini', xp: 10, benchmark: 0.5 })
+  // A role session never serves short answers, so a due one is not a review left.
+  raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run('s1', 'c1', 't1', 'short', '{}', 1, 1)
+  raw.prepare('INSERT INTO learner_item (learner_id, item_id, due, stability, difficulty, state) VALUES (?, ?, ?, ?, ?, ?)').run('u1', 's1', now - 1, 1, 5, 2)
+  expect(await endSession({ data: { sessionId: second.sessionId } })).toMatchObject({ kind: 'mini', xp: 10, benchmark: 0.5, reviewsLeft: 0 })
   expect(scalar(raw, 'SELECT xp FROM learner_topic WHERE topic_id = ?', 't1').xp).toBe(20)
 })
 
@@ -712,6 +715,50 @@ describe('learner practice and unit unlocks', () => {
     expect(scalar(raw, 'SELECT COUNT(*) AS n FROM sessions WHERE learner_id = ?', 'u2').n).toBe(0)
   })
 
+  it('scopes a unit session to that unit and refuses locked or foreign units', async () => {
+    const payload = JSON.stringify({
+      format: 'cloze', stem: 'Solve x + 1 = 2: x = ____.', options: [], accepted_answers: ['1'], model_answer: '1',
+      explanation: 'Subtract 1 from both sides.', difficulty: 1, source_quote: null, grounded: false, bloom: 'apply',
+    })
+    for (const order of [0, 1]) {
+      raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run(`un${order + 1}`, 't1', order, `Unit ${order + 1}`)
+      raw.prepare('INSERT INTO learner_unit (learner_id, unit_id, unlocked_at) VALUES (?, ?, ?)').run('u1', `un${order + 1}`, 1)
+      raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(`c${order + 1}`, 't1', `un${order + 1}`, 0, `Concept ${order + 1}`, '')
+      for (let i = 0; i < 6; i++) {
+        raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+          .run(`c${order + 1}-i${i}`, `c${order + 1}`, 't1', 'cloze', payload, 1, Date.now())
+      }
+    }
+    // Unit 2 has due reviews and a known concept (closer-eligible), so an unscoped session would reach into it.
+    for (let i = 0; i < 3; i++) {
+      raw.prepare('INSERT INTO learner_item (learner_id, item_id, due, stability, difficulty, state) VALUES (?, ?, ?, ?, ?, ?)')
+        .run('u1', `c2-i${i}`, Date.now() - 86_400_000, 1, 5, 2)
+    }
+    raw.prepare('INSERT INTO learner_concept (learner_id, concept_id, p_known, n_attempts, updated_at) VALUES (?, ?, ?, ?, ?)').run('u1', 'c2', 0.95, 5, 1)
+    const queueConcepts = async (data: { topicId: string; unitId?: string }) => {
+      const { sessionId } = await startSession({ data })
+      const ids = JSON.parse(scalar(raw, 'SELECT item_ids_json FROM sessions WHERE id = ?', sessionId).item_ids_json as string) as string[]
+      return ids.map((id) => scalar(raw, 'SELECT concept_id FROM items WHERE id = ?', id).concept_id as string)
+    }
+
+    expect(await queueConcepts({ topicId: 't1' })).toContain('c2')
+    const scoped = await queueConcepts({ topicId: 't1', unitId: 'un1' })
+    expect(scoped.length).toBeGreaterThan(0)
+    expect(new Set(scoped)).toEqual(new Set(['c1']))
+
+    // Refusals write no session.
+    const before = scalar(raw, 'SELECT COUNT(*) AS n FROM sessions').n
+    raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un3', 't1', 2, 'Unit 3')
+    await expect(startSession({ data: { topicId: 't1', unitId: 'un3' } })).rejects.toMatchObject({ status: 409, message: 'Unit is locked' })
+    raw.prepare('INSERT INTO topics (id, learner_id, title, goal, status, created_at) VALUES (?, ?, ?, ?, ?, ?)').run('t2', 'u1', 'Geometry', null, 'ready', 1)
+    raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('ux1', 't2', 0, 'Shapes')
+    raw.prepare('INSERT INTO learner_unit (learner_id, unit_id, unlocked_at) VALUES (?, ?, ?)').run('u1', 'ux1', 1)
+    await expect(startSession({ data: { topicId: 't1', unitId: 'ux1' } })).rejects.toMatchObject({ status: 404, message: 'Unit not found' })
+    await expect(startSession({ data: { topicId: 't1', unitId: 'missing' } })).rejects.toMatchObject({ status: 404, message: 'Unit not found' })
+    expect(scalar(raw, 'SELECT COUNT(*) AS n FROM sessions').n).toBe(before)
+  })
+
   it.each([
     { frontier: 'underfilled', itemCount: 1, hasDue: true },
     { frontier: 'seen-out', itemCount: 6, hasDue: true },
@@ -732,6 +779,26 @@ describe('learner practice and unit unlocks', () => {
       await expect(result).rejects.toMatchObject({ status: 429 })
       expect(scalar(raw, 'SELECT COUNT(*) AS n FROM sessions').n).toBe(0)
     }
+    expect(chatJson).not.toHaveBeenCalled()
+    expect(scalar(raw, 'SELECT COUNT(*) AS n FROM model_calls').n).toBe(20)
+  })
+
+  it('joins a preparation that reserved the final cap slot instead of refusing Start', async () => {
+    seedFrontier(raw, 1, false)
+    const log = raw.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, error, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    for (let i = 0; i < 19; i++) log.run(`call-${i}`, 'u1', 'items', 'muse-spark-1.3', 0, 1, null, Date.now())
+    // Preparation holds the concept claim and the 20th, pending slot while its model call is in flight.
+    log.run('call-prep', 'u1', 'items', 'muse-spark-1.3', 0, 0, 'pending', Date.now())
+    raw.prepare("UPDATE concepts SET gen_status = 'generating', gen_started_at = ? WHERE id = 'c1'").run(Date.now())
+    setTimeout(() => {
+      raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) SELECT ?, concept_id, topic_id, format, payload_json, difficulty_prior, ? FROM items WHERE id = ?')
+        .run('i-prep', Date.now(), 'i1')
+      raw.prepare("UPDATE concepts SET gen_status = 'ready', gen_started_at = NULL WHERE id = 'c1'").run()
+    }, 50)
+
+    const { sessionId } = await startSession({ data: { topicId: 't1' } })
+    const plan = JSON.parse(scalar(raw, 'SELECT plan_json FROM sessions WHERE id = ?', sessionId).plan_json as string)
+    expect(plan.queue).toContain('i-prep')
     expect(chatJson).not.toHaveBeenCalled()
     expect(scalar(raw, 'SELECT COUNT(*) AS n FROM model_calls').n).toBe(20)
   })
@@ -941,6 +1008,25 @@ it('prepareNextSession generates the next concepts\' items after placement so th
   const queue = JSON.parse(scalar(raw, 'SELECT item_ids_json AS ids FROM sessions WHERE id = ?', sessionId).ids as string) as string[]
   expect(queue).toHaveLength(12)
   expect(new Set(queue).size).toBe(12)
+})
+
+it('startSession answers 503 rather than "Nothing to practice yet" when another generation outlives the join wait', async () => {
+  seedTopicAndLearner(raw, 0)
+  raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un1', 't1', 0, 'Basics')
+  raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)').run('c1', 't1', 'un1', 0, 'Variables', '')
+  raw.prepare('INSERT INTO learner_unit (learner_id, unit_id, unlocked_at) VALUES (?, ?, ?)').run('u1', 'un1', 1)
+  vi.useFakeTimers({ toFake: ['setTimeout', 'Date'] })
+  onTestFinished(() => { vi.useRealTimers() })
+  raw.prepare("UPDATE concepts SET gen_status = 'generating', gen_started_at = ? WHERE id = 'c1'").run(Date.now())
+  const before = vi.mocked(chatJson).mock.calls.filter(([o]) => o.purpose === 'items').length
+
+  const start = startSession({ data: { topicId: 't1' } })
+  const rejected = expect(start).rejects.toMatchObject({ status: 503, message: 'Your questions are still being written. Try again in a moment.' })
+  await vi.advanceTimersByTimeAsync(121_000)
+  await rejected
+
+  expect(vi.mocked(chatJson).mock.calls.filter(([o]) => o.purpose === 'items').length - before).toBe(0)
+  expect(scalar(raw, "SELECT gen_status AS s FROM concepts WHERE id = 'c1'").s).toBe('generating')
 })
 
 it('startSession joins an in-flight prepareNextSession generation so one concept is generated once', async () => {
@@ -1236,7 +1322,7 @@ describe('employees training on their role topic', () => {
 
   it('asks the employee to wait while the role topic has no stored items', async () => {
     seedRoleTopic(0)
-    await expect(startPlacement({ data: { topicId: 'rt' } })).rejects.toMatchObject({ status: 409, message: 'Your training is being prepared' })
+    await expect(startPlacement({ data: { topicId: 'rt' } })).rejects.toMatchObject({ status: 409, message: 'Your training at o1 is being prepared' })
     expect(count('sessions')).toBe(0)
     expect(fetchModel).not.toHaveBeenCalled()
   })
@@ -1244,7 +1330,7 @@ describe('employees training on their role topic', () => {
   it('waits for the shared role questions, then starts a session on them without any model call', async () => {
     seedRoleTopic(0)
     raw.exec("UPDATE concepts SET gen_status = 'pending' WHERE topic_id = 'rt'")
-    await expect(startSession({ data: { topicId: 'rt' } })).rejects.toMatchObject({ status: 503, message: expect.stringContaining('being prepared') })
+    await expect(startSession({ data: { topicId: 'rt' } })).rejects.toMatchObject({ status: 503, message: 'Your training at o1 is being prepared. Try again in a few minutes.' })
     expect(count('sessions')).toBe(0)
     // The company queue stores the concept's questions; the next start plays them.
     const item = raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
