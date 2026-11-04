@@ -18,7 +18,7 @@ describe('effectiveWindow', () => {
     ['partial overlap', company, prefs(480, 720), win(540, 720, 'learner')],
     ['disjoint falls back to the company', company, prefs(1100, 1200), win(540, 1020, 'company')],
     ['own days narrow the company days', company, prefs(540, 1020, [5, 3, 6]), { ...win(540, 1020, 'learner'), days: [3, 5] }],
-    ['days outside the company fall back to its days', company, prefs(540, 1020, [6, 7]), win(540, 1020, 'company')],
+    ['no own day left in the company days allows none', company, prefs(540, 1020, [6, 7]), { ...win(540, 1020, 'learner'), days: [] }],
     ['non-member own days', null, prefs(480, 600, [6, 7]), { startMinute: 480, endMinute: 600, days: [6, 7], timezone: 'Asia/Tokyo', source: 'learner' }],
     ['non-member with prefs', null, prefs(480, 600), { startMinute: 480, endMinute: 600, days: weekdays, timezone: 'Asia/Tokyo', source: 'learner' }],
     ['non-member default', null, null, { startMinute: 540, endMinute: 1020, days: weekdays, timezone: 'UTC', source: 'default' }],
