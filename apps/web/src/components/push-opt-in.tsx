@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Share, SquarePlus } from 'lucide-react'
 import { describeWindow, type PushSchedule } from '@learnquiz/api/schedule'
@@ -14,13 +14,18 @@ function pushSupported() {
   return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
 }
 
+// Read on the first client render so an iPhone never paints the Turn on screen first; null while server-rendering.
+const noSubscribe = () => () => {}
+function usePushEnv() {
+  const env = useSyncExternalStore(noSubscribe, () => (needsHomeScreen() ? 'ios' : pushSupported() ? 'push' : 'unsupported'), () => null)
+  return env && { ios: env === 'ios', supported: env === 'push' }
+}
+
 export function PushOptIn({ publicKey, endpoints, schedule }: { publicKey: string | null; endpoints: string[]; schedule: PushSchedule }) {
   const navigate = useNavigate()
-  const [env, setEnv] = useState({ ios: false, supported: true })
+  const env = usePushEnv()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-
-  useEffect(() => setEnv({ ios: needsHomeScreen(), supported: pushSupported() }), [])
 
   const toToday = () => void navigate({ to: '/today' })
 
@@ -38,16 +43,16 @@ export function PushOptIn({ publicKey, endpoints, schedule }: { publicKey: strin
     toToday()
   }
 
-  const canTurnOn = Boolean(publicKey) && env.supported
+  const canTurnOn = Boolean(publicKey) && Boolean(env?.supported)
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col bg-surface-page px-4 pt-12">
       <div className="flex flex-1 flex-col gap-6 pb-4">
-        {env.ios ? <IosSteps /> : <Facts schedule={schedule} canTurnOn={canTurnOn} />}
+        {env && (env.ios ? <IosSteps /> : <Facts schedule={schedule} canTurnOn={canTurnOn} />)}
       </div>
       <div className="sticky bottom-0 -mx-4 flex flex-col gap-3 bg-surface-page px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        {!env.ios && error && <ErrorRow message={error} />}
-        {env.ios ? (
+        {env && !env.ios && error && <ErrorRow message={error} />}
+        {env?.ios ? (
           <Button size="lg" className="w-full" onClick={toToday}>
             I’ve added it
           </Button>
