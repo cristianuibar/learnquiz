@@ -488,7 +488,10 @@ it('reports the role benchmark, and a mini session earns no session bonus', asyn
   const second = await startMiniSession({ data: { itemId: 'i1' } })
   await answerItem({ data: { sessionId: second.sessionId, itemId: 'i1', answer: { text: '1' }, confidence: 'sure', responseMs: 1000 } })
   await nextItem({ data: { sessionId: second.sessionId } })
-  expect(await endSession({ data: { sessionId: second.sessionId } })).toMatchObject({ kind: 'mini', xp: 10, benchmark: 0.5 })
+  // A role session never serves short answers, so a due one is not a review left.
+  raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run('s1', 'c1', 't1', 'short', '{}', 1, 1)
+  raw.prepare('INSERT INTO learner_item (learner_id, item_id, due, stability, difficulty, state) VALUES (?, ?, ?, ?, ?, ?)').run('u1', 's1', now - 1, 1, 5, 2)
+  expect(await endSession({ data: { sessionId: second.sessionId } })).toMatchObject({ kind: 'mini', xp: 10, benchmark: 0.5, reviewsLeft: 0 })
   expect(scalar(raw, 'SELECT xp FROM learner_topic WHERE topic_id = ?', 't1').xp).toBe(20)
 })
 
