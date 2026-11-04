@@ -209,6 +209,9 @@ it('ignores concepts of a retired document when deciding an employee is proficie
   const known = sqlite.prepare('INSERT INTO learner_concept (learner_id, concept_id, p_known, updated_at) VALUES (?, ?, ?, 1)')
   known.run('member', 'live-critical', 0.95)
   known.run('member', 'live-other', 0.9)
+  // A sure miss on a retired critical concept is no longer an open error, matching the member profile.
+  const attempt = sqlite.prepare('INSERT INTO attempts (id, learner_id, item_id, concept_id, at, answer_json, correct, score, confidence, response_ms, rating, p_known_before, p_known_after) VALUES (?, ?, ?, ?, 1, ?, 0, 0, ?, 1000, 1, 0.5, 0.4)')
+  attempt.run('dead-error', 'member', 'dead-item', 'dead-critical', '"skip forklift check"', 'sure')
   const people = await getPeople({ data: { slug: 'alpha' } })
   expect(people.members.find((m) => m.name === 'member')!.training).toEqual({ stage: 'proficient', progress: 1, daysToProficiency: null, criticalConfidentErrors: 0 })
   expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { employees: 1, proficientEmployees: 1 } })
