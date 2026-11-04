@@ -49,6 +49,7 @@ export const STATUS = {
   Pending: { tone: 'dashed', icon: Clock },
   Unreviewed: { tone: 'dashed', icon: DashedAlert },
   'No documents yet': { tone: 'dashed', icon: File },
+  'Documents added': { tone: 'settled', icon: File },
   Uploading: { tone: 'tint', icon: Hourglass },
   'Preparing training': { tone: 'tint', icon: Hourglass },
   'Generating questions': { tone: 'tint', icon: Hourglass },
