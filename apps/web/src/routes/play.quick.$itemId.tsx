@@ -2,7 +2,7 @@ import { createFileRoute, redirect } from '@tanstack/react-router'
 import { z } from 'zod'
 import { RouteError } from '@/components/inline-error'
 import { QuickSession, goneState } from '@/components/quick-session'
-import { getSession, startMiniSession } from '@/server/play'
+import { endSession, getSession, startMiniSession } from '@/server/play'
 
 export const Route = createFileRoute('/play/quick/$itemId')({
   validateSearch: z.object({ pushId: z.string().min(1).optional() }),
@@ -14,7 +14,8 @@ export const Route = createFileRoute('/play/quick/$itemId')({
     try {
       const { sessionId } = await startMiniSession({ data: { itemId: params.itemId, pushId: deps.pushId } })
       const view = await getSession({ data: { sessionId } })
-      if (view.ended || !view.item) return { status: 'answered' as const }
+      // The session also ends when its question is retired before any answer, so only a stored answer counts as answered.
+      if (view.ended || !view.item) return { status: (await endSession({ data: { sessionId } })).total > 0 ? 'answered' as const : 'unavailable' as const }
       return { status: 'question' as const, view }
     } catch (err) {
       const gone = goneState(err)

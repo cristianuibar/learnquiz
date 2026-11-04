@@ -191,14 +191,15 @@ it('opens a notification deep link as an inline one-question screen without redi
   } finally { await cleanup() }
 })
 
+const quickSummary = { sessionId: 'mini-1', kind: 'mini', topicId: 't1', durationMs: 1000, correct: 1, total: 1, ungraded: 0, xp: 10,
+  streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], benchmark: null, reviewsLeft: 3, nextLine: 'Come back soon.', endedEarly: false } as SummaryView
 function mockQuickAnswer() {
   vi.mocked(startMiniSession).mockResolvedValue({ sessionId: 'mini-1' })
   vi.mocked(getSession).mockResolvedValue(quickView)
   vi.mocked(answerItem).mockResolvedValue({ attemptId: 'a0', diagramConceptId: null, score: 1, feedback: null, missingPoints: [], chosenFeedback: null, sourceQuote: null, sourceTitle: null,
     returnsThisSession: false, pKnownBefore: 0.1, pKnownAfter: 0.5, correct: true, correctAnswer: '1', state: 'A', mixUps: [], explanation: 'Subtract one.', xp: 10, critical: false,
     correctOptionIds: null, sourceVersion: null, detail: null } as unknown as Reveal)
-  vi.mocked(endSession).mockResolvedValue({ sessionId: 'mini-1', kind: 'mini', topicId: 't1', durationMs: 1000, correct: 1, total: 1, ungraded: 0, xp: 10,
-    streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], benchmark: null, reviewsLeft: 3, nextLine: 'Come back soon.', endedEarly: false } as SummaryView)
+  vi.mocked(endSession).mockResolvedValue(quickSummary)
 }
 async function checkQuick(container: HTMLElement) {
   await pick(container, 'answer', 'b')
@@ -270,6 +271,20 @@ it.each([
     expect(container.querySelector('[role="alert"]')?.textContent ?? null).toBe(stays ? 'Couldn’t check your answer.' : null)
     expect([...document.body.querySelectorAll('button')].some((b) => b.textContent?.trim() === 'Try again')).toBe(stays)
     expect(vi.mocked(endSession).mock.calls).toEqual(ends ? [[{ data: { sessionId: 'mini-1' } }]] : [])
+  } finally { await cleanup() }
+})
+
+it.each([
+  { total: 0, heading: "This question isn't available any more." },
+  { total: 1, heading: 'You already answered this question.' },
+])('opens an ended quick session as "$heading" with $total stored answers', async ({ total, heading }) => {
+  mockQuickAnswer()
+  vi.mocked(getSession).mockResolvedValue({ ...quickView, ended: true, item: null })
+  vi.mocked(endSession).mockResolvedValue({ ...quickSummary, correct: total, total })
+  const { container, cleanup } = await renderApp('/play/quick/i1?pushId=push-1')
+  try {
+    expect(container.querySelector('h1')?.textContent).toBe(heading)
+    expect(endSession).toHaveBeenCalledExactlyOnceWith({ data: { sessionId: 'mini-1' } })
   } finally { await cleanup() }
 })
 
