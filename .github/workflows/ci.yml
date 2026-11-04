@@ -22,4 +22,5 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
+      - run: pnpm --filter @learnquiz/web exec agent-browser install --with-deps
       - run: pnpm test

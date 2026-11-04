@@ -205,6 +205,8 @@ pnpm build
 ```
 
 `pnpm test` runs the full suite in CI. The production build is a separate local check.
+Viewport tests use Chromium. Before running them locally, install the browser once:
+`pnpm --filter @learnquiz/web exec agent-browser install --with-deps`.
 
 ## Web Push
 
