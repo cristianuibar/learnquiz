@@ -598,7 +598,7 @@ const type = async (input: HTMLInputElement, value: string) => {
 
 it('edits the role in a dialog, then shows the new details and returns focus to Edit role', async () => {
   vi.mocked(updateRole).mockResolvedValue({ id: 'r1' } as never)
-  const { container, button, status } = await mount(makeDetail())
+  const { container, button } = await mount(makeDetail())
   const edit = button('Edit role')!
   await act(async () => { edit.focus(); edit.click() })
   expect(document.querySelector('[role="dialog"]')!.textContent).toContain('Edit role')
@@ -619,7 +619,34 @@ it('edits the role in a dialog, then shows the new details and returns focus to 
   })
   expect(container.querySelector('h1')!.textContent).toBe('Head cashier')
   expect(container.textContent).toContain('Benchmark 90%')
-  expect(status()).toBe('Role saved.')
+  expect([...container.querySelectorAll('[role="status"]')].map((el) => el.textContent)).toContain('Role saved.')
+})
+
+it('announces a role save during PDF progress and completion', async () => {
+  vi.stubGlobal('XMLHttpRequest', FakeXhr)
+  FakeXhr.instances = []
+  vi.mocked(updateRole).mockResolvedValue({ id: 'r1' } as never)
+  const { container, button } = await mount(makeDetail())
+  const announcements = () => [...container.querySelectorAll('[role="status"]')].map((el) => el.textContent)
+  await pickFile(container, new File(['%PDF'], 'sop.pdf', { type: 'application/pdf' }))
+  const xhr = FakeXhr.instances[0]!
+  await act(async () => { xhr.upload.onprogress!({ loaded: 1, total: 4 }) })
+  expect(announcements()).toContain('Uploading sop.pdf, 25%')
+  await act(async () => { button('Edit role')!.click() })
+  await type(dialogField('Name'), 'Head cashier')
+  await act(async () => { document.querySelector<HTMLFormElement>('[role="dialog"] form')!.requestSubmit() })
+  expect(updateRole).toHaveBeenCalledWith({ data: { slug: 'x', roleId: 'r1', name: 'Head cashier', benchmark: 85, onboardingDays: 30 } })
+  await vi.waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull())
+  expect(announcements()).toContain('Role saved.')
+  await act(async () => { xhr.upload.onprogress!({ loaded: 2, total: 4 }) })
+  expect(announcements()).toContain('Uploading sop.pdf, 50%')
+  expect(announcements()).toContain('Role saved.')
+  vi.mocked(getRoleDetail).mockResolvedValue(makeDetail({ documents: [{ ...pdf, id: 'new1', title: 'sop' }] }) as never)
+  xhr.status = 200
+  xhr.responseText = JSON.stringify({ sourceId: 'new1', topicId: 't1', r2Key: 'k', chars: 10, version: 1 })
+  await act(async () => { await xhr.onload!() })
+  expect(announcements()).toContain('sop.pdf uploaded. 1 document ready.')
+  expect(announcements()).toContain('Role saved.')
 })
 
 it('returns focus to Edit role when the dialog is cancelled', async () => {

@@ -31,6 +31,7 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
   const { role, documents, units } = detail
   const [finished, setFinished] = useState<{ name: string; size: number; sourceId: string; refocus: boolean } | null>(null)
   const [announced, setAnnounced] = useState('')
+  const [roleStatus, setRoleStatus] = useState('')
   const [focusId, setFocusId] = useState('')
   const [editOpen, setEditOpen] = useState(false)
   const editGeneration = useRef(0)
@@ -122,7 +123,7 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
         meta={`Benchmark ${Math.round(role.benchmark * 100)}% · Onboarding ${plural(role.onboardingDays, 'day', 'days')} · ${plural(role.people, 'person', 'people')}`}
         actions={!readOnly ? (
           <div className="flex flex-wrap items-center gap-3">
-            <Button ref={editButton} type="button" variant="secondary" aria-haspopup="dialog" onClick={() => { editGeneration.current++; setEditOpen(true) }}>Edit role</Button>
+            <Button ref={editButton} type="button" variant="secondary" aria-haspopup="dialog" onClick={() => { editGeneration.current++; setRoleStatus(''); setEditOpen(true) }}>Edit role</Button>
             {role.topicStatus === 'ready' && !running && (
               <Button asChild variant={pasteOpen ? 'secondary' : 'accent'}>
                 <Link {...links.questions({ role: role.id })}>Review questions</Link>
@@ -132,6 +133,7 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
         ) : undefined}
       />
       <p role="status" aria-live="polite" className="sr-only">{uploadStatus}</p>
+      <p role="status" aria-live="polite" className="sr-only">{roleStatus}</p>
       {!readOnly && (
         <RoleDialog
           open={editOpen}
@@ -140,7 +142,7 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
           role={role}
           onSaved={async () => {
             await router.invalidate()
-            setAnnounced('Role saved.')
+            setRoleStatus('Role saved.')
             // A cancelled save can finish after another edit session has opened.
             if (editSession === editGeneration.current) setEditOpen(false)
           }}
