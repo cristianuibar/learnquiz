@@ -524,6 +524,8 @@ it.each([
     await act(async () => { button(container, 'Check').click() })
     expect(container.querySelector('[role="alert"]')!.textContent).toBe('Couldn’t check your answer. It’s saved on this device.')
     expect(document.activeElement).toBe(button(container, 'Try again'))
+    // The alert shares the sticky dock with Try again, so a long question cannot push it below the fold.
+    expect(button(container, 'Try again').parentElement!.contains(container.querySelector('[role="alert"]'))).toBe(true)
     expect(button(container, 'Check')).toBeUndefined()
     expect(checked(container, 'answer')).toBe('b')
     expect(checked(container, 'confidence')).toBe('sure')
