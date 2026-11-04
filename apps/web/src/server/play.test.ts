@@ -856,6 +856,19 @@ describe('learner practice and unit unlocks', () => {
     expect(chatJson).not.toHaveBeenCalled()
   })
 
+  it('leaves retired-document concepts out of the session unit mastery', async () => {
+    seedSources()
+    raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un1', 't1', 0, 'Basics')
+    for (let i = 1; i <= 4; i++) seedConcept(`dead${i}`, 'un1', i, 'src-old', [])
+    seedConcept('live', 'un1', 5, 'src-new', ['l1'])
+    raw.prepare('INSERT INTO learner_concept (learner_id, concept_id, p_known, updated_at) VALUES (?, ?, ?, ?)').run('u1', 'live', 0.9, 1)
+    const plan = { queue: ['l1'], position: 1, answered: true, reinserted: [], reasons: { due: 0, frontier: 1, closers: 0 }, unitStart: { un1: 0.4 } }
+    raw.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, item_ids_json, plan_json, started_at, ended_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run('s1', 'u1', 't1', 'session', JSON.stringify(['l1']), JSON.stringify(plan), 1, 2)
+
+    expect((await endSession({ data: { sessionId: 's1' } })).masteryMoved).toEqual([{ unitId: 'un1', unitName: 'Basics', before: 0.4, after: 0.9 }])
+  })
+
   it('places from live concepts when the first concept of every unit cites a retired document', async () => {
     seedSources()
     for (const [i, unit] of ['un1', 'un2', 'un3'].entries()) {
