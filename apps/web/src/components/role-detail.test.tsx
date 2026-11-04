@@ -634,6 +634,31 @@ it('returns focus to Edit role when the dialog is cancelled', async () => {
   })
 })
 
+it('keeps a reopened role draft when an earlier cancelled save finishes', async () => {
+  let finishSave!: (value: { id: string }) => void
+  vi.mocked(updateRole).mockReturnValueOnce(new Promise((resolve) => { finishSave = resolve }) as never)
+  const { container, button, router } = await mount(makeDetail())
+  const updated = makeDetail()
+  updated.role = { ...updated.role, name: 'Head cashier' }
+  vi.mocked(getRoleDetail).mockResolvedValue(updated as never)
+  const reloaded = vi.spyOn(router, 'invalidate')
+  await act(async () => { button('Edit role')!.click() })
+  await type(dialogField('Name'), 'Head cashier')
+  await act(async () => { document.querySelector<HTMLFormElement>('[role="dialog"] form')!.requestSubmit() })
+  expect(updateRole).toHaveBeenCalledWith({ data: { slug: 'x', roleId: 'r1', name: 'Head cashier', benchmark: 85, onboardingDays: 30 } })
+  const cancel = [...document.querySelectorAll<HTMLElement>('[role="dialog"] button')].find((b) => b.textContent === 'Cancel')!
+  await act(async () => { cancel.click() })
+  await act(async () => { button('Edit role')!.click() })
+  await type(dialogField('Name'), 'Second draft')
+  dialogField('Name').focus()
+  await act(async () => { finishSave({ id: 'r1' }) })
+  await reloaded.mock.results[0]!.value
+  expect(container.querySelector('h1')!.textContent).toBe('Head cashier')
+  expect(document.querySelector('[role="dialog"]')).not.toBeNull()
+  expect(dialogField('Name').value).toBe('Second draft')
+  expect(document.activeElement).toBe(dialogField('Name'))
+})
+
 it('offers no Edit role when read-only', async () => {
   const { button } = await mount(makeDetail({ readOnly: true }))
   expect(button('Edit role')).toBeUndefined()
