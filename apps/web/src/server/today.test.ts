@@ -309,6 +309,19 @@ describe('getToday', () => {
 
   describe('session of the day', () => {
     it.each([
+      ['a completed 6/8 placement recorded before the fix', [4, 5, 4, 3, 4, 5, 5, 5], DAY_START + 1, true],
+      ['an unfinished 8-answer placement', [4, 3, 2, 1, 2, 3, 4, 5], DAY_START + 1, false],
+      ['a completed placement ended yesterday', [4, 5, 4, 3, 4, 5, 5, 5], DAY_START - 1, false],
+      ['a completed placement still open', [4, 5, 4, 3, 4, 5, 5, 5], null, false],
+    ] as const)('%s', async (_name, levels, endedAt, done) => {
+      role()
+      basics()
+      session('s1', 'placement', endedAt, 8, 6)
+      run('UPDATE sessions SET plan_json = ? WHERE id = ?', JSON.stringify({ log: levels.map((level) => ({ level })) }), 's1')
+      expect((await getToday()).plan).toMatchObject({ sessionDone: done, state: done ? 'done' : 'normal' })
+    })
+
+    it.each([
       ['a 10-answer session ended today', 'session', DAY_START + 1, 10, true],
       ['a 10-answer placement ended today', 'placement', DAY_START + 1, 10, true],
       ['a 9-answer session ended today', 'session', DAY_START + 1, 9, false],
