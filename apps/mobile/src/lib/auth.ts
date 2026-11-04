@@ -164,7 +164,7 @@ async function completeFacebook(state: string, code?: string, error?: string) {
     const messages: Record<string, string> = {
       cancelled: 'Facebook sign-in was cancelled. Please try again.',
       not_linked: 'This email already has an account. Sign in with your email and password.',
-      banned: 'Your account has been suspended. Sign in with email for details on contacting your company admin.',
+      banned: 'Your account has been suspended. Contact your company admin to get access back.',
       expired: 'This Facebook sign-in has expired. Please try again.',
     }
     throw new Error(messages[error ?? ''] ?? 'Facebook sign-in could not finish. Please try again.')
