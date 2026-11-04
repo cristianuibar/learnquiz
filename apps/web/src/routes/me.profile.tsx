@@ -1,4 +1,6 @@
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute, Link, redirect } from '@tanstack/react-router'
+import { SlidersHorizontal } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { RouteError } from '@/components/inline-error'
 import { StartButton } from '@/components/start-button'
 import { TrainingProgress } from '@/components/training-progress'
@@ -19,6 +21,7 @@ export const Route = createFileRoute('/me/profile')({
 })
 
 function MyProfile() {
+  const { user } = Route.useRouteContext()
   const { profile, today } = Route.useLoaderData()
   const { status } = Route.useSearch()
   const { companyMember } = Route.useRouteContext()
@@ -29,6 +32,11 @@ function MyProfile() {
       self
       flag={companyMember}
       status={status === 'flag-sent' ? <p role="status" className="text-body text-ink">Flag sent</p> : undefined}
+      trailing={!user?.isAnonymous && (
+        <Button asChild variant="ghost" size="icon" className="text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
+          <Link to="/me/settings" aria-label="Settings"><SlidersHorizontal aria-hidden className="size-6" /></Link>
+        </Button>
+      )}
       action={first && <StartButton topicId={first.topicId} placement={first.placement} size="lg">Play first session</StartButton>}
     />
   )

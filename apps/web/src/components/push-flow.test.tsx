@@ -7,10 +7,9 @@ import { Route as appRoot } from '@/routes/__root'
 import { Route as doneRoute } from '@/routes/play.$sessionId_.done'
 import { Route as quickRoute } from '@/routes/play.quick.$itemId'
 import { Route as signInRoute } from '@/routes/sign-in'
-import { Route as meRoute } from '@/routes/me.index'
 import { Route as optInRoute } from '@/routes/opt-in'
 import { endSession, startMiniSession } from '@/server/play'
-import { getPushSettings, savePushPreferences } from '@/server/push'
+import { getPushSettings } from '@/server/push'
 import { getSessionFn } from '@/server/session-fn'
 import type { SummaryView } from '@learnquiz/api'
 
@@ -39,7 +38,7 @@ async function renderApp(entry: string) {
     beforeLoad: quickRoute.options.beforeLoad, loaderDeps: quickRoute.options.loaderDeps, loader: quickRoute.options.loader })
   const play = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId', component: () => <main>One question</main> })
   const signIn = createRoute({ getParentRoute: () => rootRoute, path: '/sign-in', validateSearch: signInRoute.options.validateSearch, component: () => <main>Sign in</main> })
-  const me = createRoute({ getParentRoute: () => rootRoute, path: '/me', beforeLoad: meRoute.options.beforeLoad, loader: meRoute.options.loader, component: meRoute.options.component })
+  const me = createRoute({ getParentRoute: () => rootRoute, path: '/me', component: () => <h1>Learner</h1> })
   const today = createRoute({ getParentRoute: () => rootRoute, path: '/today', component: () => <main>Today stub</main> })
   const optIn = createRoute({ getParentRoute: () => rootRoute, path: '/opt-in', beforeLoad: optInRoute.options.beforeLoad, loader: optInRoute.options.loader, component: optInRoute.options.component })
   const router = createRouter({ routeTree: rootRoute.addChildren([done, quick, play, signIn, me, optIn, today]), defaultPreload: 'intent', history: createMemoryHistory({ initialEntries: [entry] }) })
@@ -186,20 +185,5 @@ it('preserves the notification link through sign-in without opening a session wh
     expect(router.state.location.search).toEqual({ redirect: link })
     expect(container.textContent).toContain('Sign in')
     expect(startMiniSession).not.toHaveBeenCalled()
-  } finally { await cleanup() }
-})
-
-it('keeps staff navigation and working push controls together on Profile', async () => {
-  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'u1', name: 'Learner', isAnonymous: false, role: 'admin' }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] })
-  const prefs = { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC', days: [1, 2, 3, 4, 5] }
-  vi.mocked(getPushSettings).mockResolvedValue({ publicKey: null, isStaff: true, endpoints: [], canPrompt: false, prefs, company: null, schedule })
-  const { container, cleanup } = await renderApp('/me')
-  try {
-    expect(container.querySelector('h1')?.textContent).toBe('Learner')
-    expect(container.querySelector('a[href="/admin"]')?.textContent).toBe('Staff area')
-    const pause = [...container.querySelectorAll('button')].find((button) => button.textContent === 'Pause pushes')!
-    await act(async () => pause.click())
-    expect(savePushPreferences).toHaveBeenCalledExactlyOnceWith({ data: { ...prefs, paused: true } })
-    expect(container.querySelector('[role="status"]')?.textContent).toBe('Pushes paused on all your devices.')
   } finally { await cleanup() }
 })

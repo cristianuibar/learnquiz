@@ -65,7 +65,7 @@ function Root() {
   const { user } = Route.useRouteContext()
   const { latestTopicId, branding } = Route.useLoaderData()
   const { pathname } = useLocation()
-  const bare = /^\/(?:join\/.*|welcome|sign-in|today|me\/profile|me\/flag|play(?:\/.*)?|opt-in|t\/.*)\/?$/.test(pathname) // screens that bring their own header
+  const bare = /^\/(?:join\/.*|welcome|sign-in|today|me\/profile|me\/flag|me\/settings|play(?:\/.*)?|opt-in|t\/.*)\/?$/.test(pathname) // screens that bring their own header
   const nav = user && /^\/(?:today|t\/[^/]+\/path|me|me\/profile)\/?$/.test(pathname) // the four bottom-nav screens
   const resolved = useRouterState({ select: (s) => s.resolvedLocation?.pathname })
   const first = useRef(true)
@@ -95,13 +95,17 @@ function Root() {
   )
 }
 
+// Applies the stored appearance (absent = system) before first paint.
+const THEME_SCRIPT = "try{var t=localStorage.getItem('lq-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}"
+
 function RootDocument({ children }: { children: React.ReactNode }) {
   const data = Route.useLoaderData()
   const accent = data?.branding?.accent
   const css = accent ? brandCss(accent) : ''
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
         <HeadContent />
         {css && <style dangerouslySetInnerHTML={{ __html: css }} />}
       </head>
