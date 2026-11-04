@@ -6,7 +6,8 @@ import { effectiveWindow, inWindow, pushContext } from './window'
 
 export const EXPO_TOKEN = /^ExponentPushToken\[[\w-]+\]$/
 
-// Never follow a push-service redirect with subscription material or VAPID authorization.
+// Never follow a push-service redirect with subscription material or VAPID authorization. Workers fetch rejects
+// redirect: 'error' (a TypeError before any request), so use 'manual': a 3xx comes back as-is and counts as failed.
 export async function sendPush(db: Db, subscription: typeof pushSubscriptions.$inferSelect, config: VapidConfig | null, payload: { title: string; body: string; url: string }, ttl = 300) {
   // Check at delivery time as well as selection time so a queued push respects a pause.
   const [prefs] = await db.select().from(pushPrefs).where(eq(pushPrefs.userId, subscription.userId))
@@ -31,7 +32,7 @@ export async function sendPush(db: Db, subscription: typeof pushSubscriptions.$i
     if (expo) {
       // Expo receipts are not fetched; a dead token is dropped when a later ticket reports DeviceNotRegistered.
       const response = await fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST', redirect: 'error', signal: AbortSignal.timeout(10_000),
+        method: 'POST', redirect: 'manual', signal: AbortSignal.timeout(10_000),
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({ to: subscription.endpoint, title: payload.title, priority: 'high', ttl, channelId: 'questions', data: { url: notification.url } }),
       })
@@ -43,7 +44,7 @@ export async function sendPush(db: Db, subscription: typeof pushSubscriptions.$i
       const authorization = await vapidAuthorization(subscription.endpoint, config!)
       const body = await encryptPayload(subscription, JSON.stringify(notification))
       const response = await fetch(subscription.endpoint, {
-        method: 'POST', redirect: 'error', signal: AbortSignal.timeout(10_000),
+        method: 'POST', redirect: 'manual', signal: AbortSignal.timeout(10_000),
         headers: { Authorization: authorization, 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream', TTL: String(ttl) },
         body,
       })
