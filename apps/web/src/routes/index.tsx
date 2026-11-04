@@ -26,15 +26,20 @@ function Landing() {
   async function guest() {
     setBusy(true)
     setError('')
-    const { error } = await authClient.signIn.anonymous()
-    if (error) {
-      setError(error.message ?? 'Could not sign in')
+    try {
+      const { error } = await authClient.signIn.anonymous()
+      if (error) {
+        setError(error.message ?? 'Could not sign in')
+        return
+      }
+      // Navigate before invalidating: re-running this route's beforeLoad would redirect to /start and drop the topic.
+      await router.navigate({ to: '/start', search })
+      await router.invalidate()
+    } catch {
+      setError("Couldn't continue as a guest. Check your connection and try again.")
+    } finally {
       setBusy(false)
-      return
     }
-    // Navigate before invalidating: re-running this route's beforeLoad would redirect to /start and drop the topic.
-    await router.navigate({ to: '/start', search })
-    await router.invalidate()
   }
 
   async function facebook() {

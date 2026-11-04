@@ -34,23 +34,27 @@ export function CredentialsForm({ email, defaultEmail, name, initial = 'up', onM
     if (!up && creds.password === '') return setError('Enter your password.')
     setBusy(true)
     setError('')
-    const { error } = up
-      ? await authClient.signUp.email({ ...creds, name: String(f.get('name')).trim() })
-      : await authClient.signIn.email(creds)
-    if (error) {
-      setBusy(false)
-      if (up && error.code?.startsWith('USER_ALREADY_EXISTS')) {
-        setMode('in')
-        setError('This email already has an account. Sign in instead.')
-      } else setError(error.message ?? (up ? "Couldn't create your account. Check your connection and try again." : "Couldn't sign you in. Check your connection and try again."))
-      return
-    }
     try {
-      await onDone()
-    } catch (err) {
-      setError(errorMessage(err, up ? "Couldn't finish creating your account. Reload and try again." : "Couldn't finish signing in. Reload and try again."))
+      const { error } = up
+        ? await authClient.signUp.email({ ...creds, name: String(f.get('name')).trim() })
+        : await authClient.signIn.email(creds)
+      if (error) {
+        if (up && error.code?.startsWith('USER_ALREADY_EXISTS')) {
+          setMode('in')
+          setError('This email already has an account. Sign in instead.')
+        } else setError(error.message ?? (up ? "Couldn't create your account. Check your connection and try again." : "Couldn't sign you in. Check your connection and try again."))
+        return
+      }
+      try {
+        await onDone()
+      } catch (err) {
+        setError(errorMessage(err, up ? "Couldn't finish creating your account. Reload and try again." : "Couldn't finish signing in. Reload and try again."))
+      }
+    } catch {
+      setError(up ? "Couldn't create your account. Check your connection and try again." : "Couldn't sign you in. Check your connection and try again.")
+    } finally {
+      setBusy(false)
     }
-    setBusy(false)
   }
 
   return (
