@@ -83,17 +83,18 @@ export function PasteTextPanel({ roleId, onClose, onAdded }: { roleId: string; o
         <div className="flex flex-col gap-2">
           <div className="flex items-baseline justify-between gap-4">
             <Label htmlFor={textId}>Text</Label>
-            <TextCount id={countId} value={text} max={MAX_ROLE_DOCUMENT_CHARS} overMessage={overMessage} />
+            {!over && <TextCount id={countId} value={text} max={MAX_ROLE_DOCUMENT_CHARS} />}
           </div>
           <Textarea
             id={textId}
             rows={8}
+            className="field-sizing-fixed resize-y"
             value={text}
             onChange={(e) => setText(e.target.value)}
             aria-invalid={over || errors.text ? true : undefined}
-            aria-describedby={errors.text && !over ? `${textId}-error` : countId}
+            aria-describedby={over || errors.text ? `${textId}-error` : countId}
           />
-          {errors.text && !over && <FieldError id={textId}>{errors.text}</FieldError>}
+          {over ? <FieldError id={textId}>{overMessage(text.length, MAX_ROLE_DOCUMENT_CHARS)}</FieldError> : errors.text && <FieldError id={textId}>{errors.text}</FieldError>}
         </div>
         {general && (
           <p id={`${uid}-general`} role="alert" className="text-label text-ink">

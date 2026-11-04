@@ -70,7 +70,7 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
         crumbs={
           <ol className="flex flex-wrap items-center gap-1">
             <li className="flex items-center gap-1">
-              <Link {...links.roles} className={`inline-flex min-h-11 items-center font-medium underline ${ring}`}>Roles</Link>
+              <Link {...links.roles} className={`inline-flex min-h-11 items-center font-medium hover:underline ${ring}`}>Roles</Link>
               <ChevronRight aria-hidden className="size-4" />
             </li>
             <li><span aria-current="page">{role.name}</span></li>
@@ -84,7 +84,7 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
           </Button>
         ) : undefined}
       />
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-10">
         <DocumentsCard
           detail={detail}
           readOnly={readOnly}

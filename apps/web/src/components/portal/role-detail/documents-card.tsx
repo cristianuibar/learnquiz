@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { Upload } from 'lucide-react'
+import { AlignLeft, Upload } from 'lucide-react'
 import { Banner } from '@/components/admin/banner'
 import { RowMenu } from '@/components/admin/row-menu'
 import { errorMessage } from '@/components/inline-error'
@@ -113,8 +113,8 @@ export function DocumentsCard({ detail, readOnly, pasteOpen, onTogglePaste, pane
         <h2 id="rd-documents-h" className="text-title-2">Documents</h2>
         {canUpload && documents.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="ghost" aria-expanded={pasteOpen} aria-controls="rd-paste" onClick={(e) => onTogglePaste(e.currentTarget)}>Paste text</Button>
-            <Button type="button" variant="secondary" disabled={busy} onClick={() => pick()}>Add document</Button>
+            <Button type="button" variant="ghost" aria-expanded={pasteOpen} aria-controls="rd-paste" onClick={(e) => onTogglePaste(e.currentTarget)}><AlignLeft aria-hidden />Paste text</Button>
+            <Button type="button" variant="secondary" disabled={busy} onClick={() => pick()}><Upload aria-hidden />Add document</Button>
           </div>
         )}
       </div>
