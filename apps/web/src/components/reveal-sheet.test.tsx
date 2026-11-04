@@ -52,7 +52,7 @@ const answer: Answer = { optionId: 'move' }
 let cleanup: (() => void) | null = null
 afterEach(() => { cleanup?.(); cleanup = null })
 
-async function mount(reveal: Reveal, props: { onContinue?: (r: string) => void; onReport?: () => void } = {}) {
+async function mount(reveal: Reveal, props: { onContinue?: (r: string) => void; onReport?: (r: string) => void } = {}) {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   const container = document.createElement('div')
   document.body.appendChild(container)
@@ -65,6 +65,9 @@ async function mount(reveal: Reveal, props: { onContinue?: (r: string) => void; 
       hasCompany
       onContinue={props.onContinue ?? vi.fn()}
       onReport={props.onReport ?? vi.fn()}
+      headingId="reveal-heading"
+      headingRef={null}
+      reportRef={null}
     />,
   ))
   cleanup = () => { act(() => root.unmount()); container.remove() }
@@ -124,6 +127,6 @@ describe('RevealSheet', () => {
     await act(async () => button(c, 'Got it').click())
     expect(onContinue).toHaveBeenCalledWith('Evidence matters')
     await act(async () => button(c, 'Report this question').click())
-    expect(onReport).toHaveBeenCalledTimes(1)
+    expect(onReport).toHaveBeenCalledWith('Evidence matters')
   })
 })
