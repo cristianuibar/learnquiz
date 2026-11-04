@@ -2,6 +2,7 @@ import { createElement as h } from 'react'
 import { Dimensions, StyleSheet } from 'react-native'
 import { fireEvent, render, screen } from '@testing-library/react-native'
 import type { TodayRoleView } from '@learnquiz/api/today'
+import { themes } from '@learnquiz/tokens/native'
 import { ThemeProvider } from '../../theme/ThemeProvider'
 import { RoleCard } from './RoleCard'
 
@@ -18,6 +19,19 @@ const role: TodayRoleView = {
 }
 
 afterEach(() => Dimensions.set({ window: windowSize }))
+
+test.each(['light', 'dark'] as const)('%s progress emphasizes the percentage and mutes the client-built benchmark suffix', async (scheme) => {
+  const view = { ...role, pct: 72, benchmarkPct: 90 }
+  await render(h(ThemeProvider, { scheme, children: h(RoleCard, { role: view, onPress: jest.fn() }) }))
+  expect(screen.getByText('72% of 90% benchmark', { includeHiddenElements: true })).toHaveStyle({
+    color: themes[scheme].ink, fontSize: 14, lineHeight: 20, fontFamily: 'Inter_600SemiBold',
+  })
+  expect(screen.getByText(' of 90% benchmark', { includeHiddenElements: true, normalizer: (text) => text })).toHaveStyle({
+    color: themes[scheme].inkMuted, fontSize: 14, lineHeight: 20, fontFamily: 'Inter_500Medium',
+  })
+  expect(screen.getByRole('link', { name: role.accessibleLabel })).toBeOnTheScreen()
+  expect(screen.getAllByRole('link')).toHaveLength(1)
+})
 
 describe.each([1, 2])('at font scale %s', (fontScale) => {
   beforeEach(() => Dimensions.set({ window: { ...windowSize, width: 320, fontScale } }))

@@ -47,7 +47,10 @@ describe.each(['light', 'dark'] as const)('%s quick result', (scheme) => {
     await render(h(ThemeProvider, {
       scheme, children: h(QuickResult, { reveal, chosenText: reveal.correctAnswer, reviewsLeft: 3 }),
     }))
-    expect(screen.getByRole('header', { name: 'Correct' })).toBeOnTheScreen()
+    const band = screen.getByRole('header', { name: 'Correct' })
+    expect(band).toBeOnTheScreen()
+    expect(band.parent).toHaveProp('accessibilityLiveRegion', 'polite')
+    expect(screen.getAllByRole('header', { name: 'Correct' })).toHaveLength(1)
     expect(screen.queryByText(/\bXP\b/)).toBeNull()
     expect(screen.queryByLabelText(/\bXP\b/)).toBeNull()
   })
