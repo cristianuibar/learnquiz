@@ -103,39 +103,41 @@ export function InviteDialog({ open, onOpenChange, organizationId, roles, onCrea
 
   return (
     <Dialog open={open} onOpenChange={close}>
-      <DialogContent size="wide" aria-describedby={undefined} initialFocus={firstName} onCloseAutoFocus={onCloseAutoFocus}>
+      <DialogContent size="wide" className="flex flex-col max-md:overflow-clip md:max-h-[calc(100dvh-2rem)]" aria-describedby={undefined} initialFocus={firstName} onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader><DialogTitle>Invite people</DialogTitle></DialogHeader>
-        <form ref={formRef} noValidate onSubmit={submit} className="flex flex-col gap-6">
-          {people.map((p, i) => {
-            const e = errors[p.key] ?? {}
-            return (
-              <fieldset key={p.key} className={i > 0 ? 'grid gap-4 border-t border-border pt-4 sm:grid-cols-3' : 'grid gap-4 sm:grid-cols-3'}>
-                <legend className="sr-only">Person {i + 1}</legend>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor={id(p.key, 'name')}>Name</Label>
-                  <Input ref={i === 0 ? firstName : undefined} id={id(p.key, 'name')} maxLength={80} value={p.name} onChange={(ev) => edit(p.key, { name: ev.target.value })} {...fieldProps(id(p.key, 'name'), e.name)} />
-                  {e.name && <FieldError id={id(p.key, 'name')}>{e.name}</FieldError>}
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor={id(p.key, 'email')}>Email</Label>
-                  <Input id={id(p.key, 'email')} type="email" value={p.email} onChange={(ev) => edit(p.key, { email: ev.target.value })} {...fieldProps(id(p.key, 'email'), e.email)} />
-                  {e.email && <FieldError id={id(p.key, 'email')}>{e.email}</FieldError>}
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor={id(p.key, 'role')}>Job role</Label>
-                  <Select id={id(p.key, 'role')} value={p.jobRoleId} onChange={(ev) => edit(p.key, { jobRoleId: ev.target.value })}>
-                    {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-                  </Select>
-                </div>
-              </fieldset>
-            )
-          })}
-          <Button type="button" variant="ghost" className="self-start" onClick={add}>
-            <Plus aria-hidden />
-            Add another person
-          </Button>
-          {banner && <Banner kind="alert">{banner}</Banner>}
-          <DialogFooter>
+        <form ref={formRef} noValidate onSubmit={submit} className="flex min-h-0 flex-col gap-6">
+          <div className="flex min-h-0 flex-col gap-6 overflow-y-auto" onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}>
+            {people.map((p, i) => {
+              const e = errors[p.key] ?? {}
+              return (
+                <fieldset key={p.key} className={i > 0 ? 'grid gap-4 border-t border-border pt-4 sm:grid-cols-3' : 'grid gap-4 sm:grid-cols-3'}>
+                  <legend className="sr-only">Person {i + 1}</legend>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor={id(p.key, 'name')}>Name</Label>
+                    <Input ref={i === 0 ? firstName : undefined} id={id(p.key, 'name')} maxLength={80} value={p.name} onChange={(ev) => edit(p.key, { name: ev.target.value })} {...fieldProps(id(p.key, 'name'), e.name)} />
+                    {e.name && <FieldError id={id(p.key, 'name')}>{e.name}</FieldError>}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor={id(p.key, 'email')}>Email</Label>
+                    <Input id={id(p.key, 'email')} type="email" value={p.email} onChange={(ev) => edit(p.key, { email: ev.target.value })} {...fieldProps(id(p.key, 'email'), e.email)} />
+                    {e.email && <FieldError id={id(p.key, 'email')}>{e.email}</FieldError>}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor={id(p.key, 'role')}>Job role</Label>
+                    <Select id={id(p.key, 'role')} value={p.jobRoleId} onChange={(ev) => edit(p.key, { jobRoleId: ev.target.value })}>
+                      {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                    </Select>
+                  </div>
+                </fieldset>
+              )
+            })}
+            <Button type="button" variant="ghost" className="self-start" onClick={add}>
+              <Plus aria-hidden />
+              Add another person
+            </Button>
+            {banner && <Banner kind="alert">{banner}</Banner>}
+          </div>
+          <DialogFooter className="shrink-0">
             <Button type="button" variant="secondary" onClick={() => close(false)}>Cancel</Button>
             <Button type="submit" aria-disabled={busy || undefined} className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50">Create invite links</Button>
           </DialogFooter>
