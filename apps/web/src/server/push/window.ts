@@ -1,12 +1,12 @@
 import { and, asc, desc, eq, sql } from 'drizzle-orm'
 import type { PushWindow } from '@learnquiz/api/schedule'
 import type { Db } from '@/db'
-import { member } from '@/db/auth-schema'
+import { member, organization } from '@/db/auth-schema'
 import { jobRoles, memberRoleAssignments, orgSettings } from '@/db/schema'
 import { defaultWorkingHours, type WorkingHours } from '@/lib/company-settings'
 
 export type CompanyHours = { timezone: string; workingHours: WorkingHours }
-export type LearnerPrefs = { startMinute: number; endMinute: number; timezone: string }
+export type LearnerPrefs = { startMinute: number; endMinute: number; timezone: string; days: number[] | null }
 export type RoleProgress = { assignedAt: number; onboardingDays: number; proficientAt: number | null }
 
 export const ONBOARDING_CAP = 6
@@ -21,18 +21,20 @@ const minutes = (hhmm: string) => {
 // The window pushes may be sent in: the company's hours, narrowed by the learner's own; non-members use theirs or 9-17 weekdays UTC.
 export function effectiveWindow(company: CompanyHours | null, prefs: LearnerPrefs | null): PushWindow {
   if (!company) {
-    if (prefs) return { startMinute: prefs.startMinute, endMinute: prefs.endMinute, days: [1, 2, 3, 4, 5], timezone: prefs.timezone, source: 'learner' }
+    if (prefs) return { startMinute: prefs.startMinute, endMinute: prefs.endMinute, days: prefs.days ?? [1, 2, 3, 4, 5], timezone: prefs.timezone, source: 'learner' }
     return { startMinute: 540, endMinute: 1020, days: [1, 2, 3, 4, 5], timezone: 'UTC', source: 'default' }
   }
   const { workingHours, timezone } = company
   const base = { startMinute: minutes(workingHours.start), endMinute: minutes(workingHours.end), days: workingHours.days, timezone }
   if (!prefs) return { ...base, source: 'company' }
-  // Learner prefs have no days or zone of their own: their minutes are read in the company timezone.
+  // Learner prefs have no zone of their own: their minutes are read in the company timezone, their days within the company's.
+  const own = prefs.days?.filter((day) => base.days.includes(day))
+  const days = own?.length ? base.days.filter((day) => own.includes(day)) : base.days
   const startMinute = Math.max(base.startMinute, prefs.startMinute)
   const endMinute = Math.min(base.endMinute, prefs.endMinute)
-  if (startMinute >= endMinute) return { ...base, source: 'company' }
-  const narrowed = startMinute !== base.startMinute || endMinute !== base.endMinute
-  return { ...base, startMinute, endMinute, source: narrowed ? 'learner' : 'company' }
+  const hoursOk = startMinute < endMinute
+  const narrowed = (hoursOk && (startMinute !== base.startMinute || endMinute !== base.endMinute)) || days.length !== base.days.length
+  return { ...base, ...(hoursOk ? { startMinute, endMinute } : {}), days, source: narrowed ? 'learner' : 'company' }
 }
 
 // True when `now` (epoch ms) falls on an allowed weekday and in [start, end) of the window's local time.
@@ -52,8 +54,10 @@ export function capPolicy(role: RoleProgress | null, now: number): { dailyCap: n
 }
 
 // The learner's company hours and role progress; null company for the personal edition.
-export async function pushContext(db: Db, userId: string): Promise<{ company: CompanyHours | null; role: RoleProgress | null }> {
+export async function pushContext(db: Db, userId: string): Promise<{ company: (CompanyHours & { name: string }) | null; role: RoleProgress | null }> {
   const row = await db.select({
+    name: orgSettings.companyName,
+    orgName: organization.name,
     timezone: orgSettings.timezone,
     workingHours: orgSettings.workingHours,
     assignedAt: memberRoleAssignments.assignedAt,
@@ -62,6 +66,7 @@ export async function pushContext(db: Db, userId: string): Promise<{ company: Co
     roleId: jobRoles.id,
   })
     .from(member)
+    .innerJoin(organization, eq(organization.id, member.organizationId))
     .leftJoin(orgSettings, eq(orgSettings.orgId, member.organizationId))
     .leftJoin(memberRoleAssignments, and(eq(memberRoleAssignments.userId, member.userId), eq(memberRoleAssignments.orgId, member.organizationId)))
     .leftJoin(jobRoles, and(eq(jobRoles.id, memberRoleAssignments.jobRoleId), eq(jobRoles.orgId, memberRoleAssignments.orgId), eq(jobRoles.status, 'active')))
@@ -71,7 +76,7 @@ export async function pushContext(db: Db, userId: string): Promise<{ company: Co
     .get()
   if (!row) return { company: null, role: null }
   return {
-    company: { timezone: row.timezone ?? 'UTC', workingHours: row.workingHours ?? defaultWorkingHours },
+    company: { name: row.name ?? row.orgName, timezone: row.timezone ?? 'UTC', workingHours: row.workingHours ?? defaultWorkingHours },
     role: row.roleId === null ? null : { assignedAt: row.assignedAt!, onboardingDays: row.onboardingDays!, proficientAt: row.proficientAt },
   }
 }
