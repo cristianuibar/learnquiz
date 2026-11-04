@@ -109,7 +109,8 @@ function Play({ initial }: { initial: SessionView }) {
   const [voiceBusy, setVoiceBusy] = useState(false)
   // Answer controls stay disabled until the current position is known; the server HTML renders them disabled too.
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<{ message: string; retry: () => void } | null>(null)
+  // `ending` marks a failed End session, which keeps Check for the answer on screen.
+  const [error, setError] = useState<{ message: string; retry: () => void; ending?: boolean } | null>(null)
   const shownAt = useRef(Date.now())
   const questionHeading = useRef<HTMLHeadingElement>(null)
 
@@ -161,13 +162,13 @@ function Play({ initial }: { initial: SessionView }) {
     if (item && !reveal) writeDraft(draftKey(view.id, item.id), choice, confidence)
   }, [view.id, item, reveal, choice, confidence])
 
-  async function run(fn: () => Promise<void>, message: (err: unknown) => string = errorMessage) {
+  async function run(fn: () => Promise<void>, message: (err: unknown) => string = errorMessage, ending = false) {
     setBusy(true)
     setError(null)
     try {
       await fn()
     } catch (err) {
-      setError({ message: message(err), retry: () => run(fn, message) })
+      setError({ message: message(err), retry: () => run(fn, message, ending), ending })
     }
     setBusy(false)
   }
@@ -180,11 +181,15 @@ function Play({ initial }: { initial: SessionView }) {
 
   // Answered items stay recorded; the learner returns to Today.
   const leave = () =>
-    run(async () => {
-      stopSpeaking()
-      await end({ data: { sessionId: view.id } })
-      await router.navigate({ to: '/today' })
-    })
+    run(
+      async () => {
+        stopSpeaking()
+        await end({ data: { sessionId: view.id } })
+        await router.navigate({ to: '/today' })
+      },
+      errorMessage,
+      true,
+    )
 
   async function resync() {
     const v = await sync({ data: { sessionId: view.id } })

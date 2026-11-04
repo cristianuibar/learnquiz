@@ -2,6 +2,7 @@ import type { ComponentType, Ref } from 'react'
 import { ChoiceGroup } from '@/components/choice-group'
 import { ClozeQuestion } from '@/components/question/cloze-question'
 import { ErrorRow } from '@/components/question/error-row'
+import { InlineError } from '@/components/inline-error'
 import { MultiQuestion } from '@/components/question/multi-question'
 import { OrderQuestion } from '@/components/question/order-question'
 import { QuestionDock } from '@/components/question/question-dock'
@@ -59,13 +60,15 @@ export function QuestionScreen({
   confidence: Confidence | null
   onConfidence: (c: Confidence) => void
   canCheck: boolean
-  error: { message: string; retry: () => void } | null
+  error: { message: string; retry: () => void; ending?: boolean } | null
   onCheck: () => void
 }) {
   const Body = FORMATS[props.item.format] ?? UnsupportedQuestion
   const answerable = Body !== UnsupportedQuestion
   // Locked while a check is in flight, so Try again resubmits exactly the answer on screen.
   const locked = loading || props.busy
+  // A failed End session retries next to its message; only a failed check takes over the dock.
+  const failedCheck = error && !error.ending ? error : null
   return (
     <>
       <form
@@ -86,11 +89,11 @@ export function QuestionScreen({
       </form>
       {error && (
         <div className="pb-3">
-          <ErrorRow message={error.message} />
+          {error.ending ? <InlineError message={error.message} onRetry={error.retry} /> : <ErrorRow message={error.message} />}
         </div>
       )}
       {answerable && (
-        <QuestionDock confidence={confidence} onConfidence={onConfidence} locked={locked} canCheck={canCheck} failed={Boolean(error)} onRetry={error?.retry ?? onCheck} />
+        <QuestionDock confidence={confidence} onConfidence={onConfidence} locked={locked} canCheck={canCheck} failed={Boolean(failedCheck)} onRetry={failedCheck?.retry ?? onCheck} />
       )}
     </>
   )

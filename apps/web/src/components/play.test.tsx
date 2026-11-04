@@ -510,6 +510,36 @@ it('ends the session from the top bar and returns to Today', async () => {
   } finally { await cleanup() }
 })
 
+it('keeps Check for the answer on screen when ending the session fails, and retries the end on its own', async () => {
+  const { container, cleanup } = await renderPlay(false, false, 'mcq')
+  try {
+    vi.mocked(endSession).mockReset().mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValue({} as never)
+    await pick(container, 'answer', 'b')
+    await pick(container, 'confidence', 'sure')
+    await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="End session"]')!.click() })
+    expect(container.querySelector('[role="alert"]')).not.toBeNull()
+    expect(button(container, 'Check').disabled).toBe(false)
+    await act(async () => { button(container, 'Check').click() })
+    expect(answerItem).toHaveBeenCalledWith({ data: expect.objectContaining({ answer: { optionId: 'b' }, confidence: 'sure' }) })
+    expect(endSession).toHaveBeenCalledTimes(1)
+    expect(container.textContent).toContain('Correct')
+  } finally { await cleanup() }
+})
+
+it('retries ending the session from the error after End session fails', async () => {
+  const { container, cleanup } = await renderPlay(false, false, 'mcq')
+  try {
+    vi.mocked(endSession).mockReset().mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValue({} as never)
+    await pick(container, 'answer', 'b')
+    await pick(container, 'confidence', 'sure')
+    await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="End session"]')!.click() })
+    await act(async () => { button(container, 'Try again').click() })
+    expect(endSession).toHaveBeenCalledTimes(2)
+    expect(answerItem).not.toHaveBeenCalled()
+    expect(container.textContent).toContain('Today page')
+  } finally { await cleanup() }
+})
+
 it.each([
   new TypeError('Failed to fetch'),
   Object.assign(new Error('Internal error'), { status: 503 }),
