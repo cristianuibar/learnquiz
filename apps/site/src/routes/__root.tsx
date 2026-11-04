@@ -1,4 +1,4 @@
-import { HeadContent, Link, Outlet, Scripts, createRootRoute, useMatch } from '@tanstack/react-router'
+import { HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import styles from '../styles.css?url'
 import { themeBootstrap } from '../theme'
@@ -51,23 +51,7 @@ export const Route = createRootRoute({
 })
 
 function RootLayout() {
-  const isHome = useMatch({ from: '/', shouldThrow: false })
-  if (isHome) return <Outlet />
-
-  return (
-    <>
-      <main className="mx-auto max-w-2xl px-4 py-12">
-        <Outlet />
-      </main>
-      <footer className="mx-auto max-w-2xl px-4 pb-8">
-        <nav aria-label="Site" className="flex flex-wrap gap-6">
-          <Link to="/">Learn Quiz</Link>
-          <Link to="/privacy">Privacy</Link>
-          <Link to="/terms">Terms</Link>
-        </nav>
-      </footer>
-    </>
-  )
+  return <Outlet />
 }
 
 function RootDocument({ children }: { children: ReactNode }) {

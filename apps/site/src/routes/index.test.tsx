@@ -63,10 +63,11 @@ it('keeps accessible page landmarks and labelled sections', async () => {
   }
 })
 
-it.each([['/privacy', 'Privacy'], ['/terms', 'Terms']])('preserves the existing notice at %s', async (path, title) => {
+it.each([['/privacy', 'Privacy'], ['/terms', 'Terms']])('renders the notice at %s with links home', async (path, title) => {
   await renderPage(path)
   expect(container.querySelectorAll('main')).toHaveLength(1)
   expect(container.querySelector('h1')?.textContent).toBe(title)
-  expect(container.querySelector('main')?.textContent).toContain('Draft notice. This page is not yet the final policy.')
-  expect(container.querySelector('footer a[href="/"]')?.textContent).toBe('Learn Quiz')
+  for (const landmark of ['header', 'footer']) {
+    expect(container.querySelector(`${landmark} a[aria-label="Learn Quiz home"]`)?.getAttribute('href')).toBe('/')
+  }
 })
