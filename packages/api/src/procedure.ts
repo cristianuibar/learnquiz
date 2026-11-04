@@ -117,7 +117,8 @@ export function describeProcedure(graph: ProcedureGraph): string {
         return edge ? `If ${label}, go to ${target(edge.to)}.` : ''
       }
       const rest = [branch('yes'), branch('no')].filter(Boolean).join(' ')
-      return `${number.get(id)}. ${node.label}?${mark} ${rest}`.trim()
+      const question = node.label.endsWith('?') ? node.label : `${node.label}?`
+      return `${number.get(id)}. ${question}${mark} ${rest}`.trim()
     }
     const next = edges[0]
     return `${number.get(id)}. ${node.label}${mark}.${next ? ` Then go to ${target(next.to)}.` : ''}`
