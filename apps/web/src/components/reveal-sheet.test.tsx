@@ -115,6 +115,12 @@ describe('RevealSheet', () => {
     expect(c.textContent!.includes('Critical step · Comes back first next session')).toBe(critical)
   })
 
+  it('shows the chosen option feedback in D when the concept has no mix-ups', async () => {
+    const c = await mount(result({ state: 'D', correct: false, xp: 0, chosenFeedback: 'Moving first loses evidence.' }))
+    expect(c.textContent).toContain('Moving first loses evidence.')
+    expect(c.textContent).not.toContain('Why it felt right')
+  })
+
   it('passes the reflection to Got it and reports from the footer', async () => {
     const onContinue = vi.fn()
     const onReport = vi.fn()

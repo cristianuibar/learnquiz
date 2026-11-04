@@ -206,6 +206,7 @@ export function RevealSheet({
               : <ul className="list-disc pl-6 text-body">{mixUps.map((m) => <li key={m}>{m}</li>)}</ul>}
           </div>
         )}
+        {mixUps.length === 0 && reveal.chosenFeedback && <p className="text-body">{reveal.chosenFeedback}</p>}
         <div className="flex flex-col gap-1">
           <h3 className="text-label">{revealCopy.whatActuallyMatters}</h3>
           {explanation}
