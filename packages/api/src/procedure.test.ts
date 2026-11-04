@@ -91,3 +91,27 @@ describe('describeProcedure', () => {
     expect(describeProcedure(graph).split('\n')[0]).toBe('1. Is stock available? If yes, go to step 2, Label y.')
   })
 })
+
+it('describes loop conditions and targets without changing the step order', () => {
+  const graph: ProcedureGraph = {
+    nodes: [
+      { id: 'scan', kind: 'step', label: 'Scan', critical: false },
+      { id: 'seal', kind: 'decision', label: 'Seal intact?', critical: false },
+      { id: 'pack', kind: 'step', label: 'Pack', critical: false },
+    ],
+    edges: [{ from: 'scan', to: 'seal', label: null }, { from: 'seal', to: 'pack', label: 'yes' }, { from: 'seal', to: 'scan', label: 'no' }, { from: 'pack', to: 'scan', label: null }],
+  }
+  expect(describeProcedure(graph).split('\n')).toEqual([
+    '1. Scan. Then go to step 2, Seal intact?.',
+    '2. Seal intact? If yes, go to step 3, Pack. If no, go back to: Scan.',
+    '3. Pack. Then go back to: Scan.',
+  ])
+})
+
+it('keeps a return instruction when a step also has a forward edge', () => {
+  const graph: ProcedureGraph = {
+    nodes: [node('a'), node('b'), node('c')],
+    edges: [{ from: 'a', to: 'b', label: null }, { from: 'b', to: 'c', label: null }, { from: 'b', to: 'a', label: null }],
+  }
+  expect(describeProcedure(graph).split('\n')[1]).toBe('2. Label b. Then go to step 3, Label c. Then go back to: Label a.')
+})
