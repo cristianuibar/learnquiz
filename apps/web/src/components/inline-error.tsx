@@ -40,7 +40,8 @@ export function useFocusInvalid(fields: Record<string, string>) {
 export function InlineError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <div role="alert" className="flex flex-wrap items-center gap-3">
-      <p className="text-sm font-medium text-wrong">{message}</p>
+      {/* feedback-wrong is reserved for wrong answers; a load failure is plain ink. */}
+      <p className="text-sm font-medium text-ink">{message}</p>
       <Button variant="secondary" className="px-6" onClick={onRetry}>
         Try again
       </Button>

@@ -176,3 +176,35 @@ it('renders no procedure section when the unit has no stored graph', async () =>
     await cleanup()
   }
 })
+
+it('shows a failed procedure load in ink, not the wrong-answer red, and retries it', async () => {
+  vi.mocked(getUnitProcedure).mockRejectedValueOnce(new Error('The procedure could not be loaded.'))
+  const { container, cleanup } = await render(topic(), '/t/t1/u/u2')
+  try {
+    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toContain('The procedure could not be loaded.'))
+    const message = container.querySelector('[role="alert"] p')!
+    expect(message.classList.contains('text-wrong')).toBe(false)
+    expect(message.classList.contains('text-ink')).toBe(true)
+    vi.mocked(getUnitProcedure).mockResolvedValueOnce(null)
+    await act(async () => button(container, 'Try again')!.click())
+    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')).toBeNull())
+    expect(getUnitProcedure).toHaveBeenLastCalledWith({ data: { unitId: 'u2' } })
+  } finally {
+    await cleanup()
+  }
+})
+
+it('shows an offline procedure load in ink, not the wrong-answer red', async () => {
+  const offline = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+  vi.mocked(getUnitProcedure).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+  const { container, cleanup } = await render(topic(), '/t/t1/u/u2')
+  try {
+    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toContain("You're offline"))
+    const message = container.querySelector('[role="alert"] p')!
+    expect(message.classList.contains('text-wrong')).toBe(false)
+    expect(message.classList.contains('text-ink')).toBe(true)
+  } finally {
+    offline.mockRestore()
+    await cleanup()
+  }
+})
