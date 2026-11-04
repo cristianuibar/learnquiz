@@ -1,0 +1,1 @@
+ALTER TABLE `push_prefs` ADD `days_json` text;

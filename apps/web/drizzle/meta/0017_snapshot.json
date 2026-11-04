@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "2a54675f-ca7e-4ddd-a656-0dc613ee0246",
+  "id": "8569e03e-5b7e-421a-8b64-c3cca83dda1f",
   "prevId": "28da1081-cd46-49a6-b5fa-7d19036b3a49",
   "tables": {
     "attempts": {
@@ -1389,6 +1389,13 @@
           "autoincrement": false,
           "default": "'UTC'"
         },
+        "days_json": {
+          "name": "days_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "updated_at": {
           "name": "updated_at",
           "type": "integer",
@@ -1836,20 +1843,6 @@
         },
         "unlocked_at": {
           "name": "unlocked_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "procedure_json": {
-          "name": "procedure_json",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "procedure_started_at": {
-          "name": "procedure_started_at",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,
