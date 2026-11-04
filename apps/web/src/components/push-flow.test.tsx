@@ -9,19 +9,21 @@ import { Route as quickRoute } from '@/routes/play.quick.$itemId'
 import { Route as signInRoute } from '@/routes/sign-in'
 import { Route as meRoute } from '@/routes/me.index'
 import { Route as optInRoute } from '@/routes/opt-in'
-import { endSession, startMiniSession } from '@/server/play'
+import { answerItem, endSession, getSession, startMiniSession } from '@/server/play'
 import { getPushSettings, savePushPreferences } from '@/server/push'
 import { getSessionFn } from '@/server/session-fn'
-import type { SummaryView } from '@learnquiz/api'
+import type { Reveal, SessionView, SummaryView } from '@learnquiz/api'
 
+vi.mock('motion/react', async (original) => ({ ...(await original<typeof import('motion/react')>()), useReducedMotion: () => true }))
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn(async () => ({ user: { id: 'u1', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })) }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => 't1' }))
 vi.mock('@/server/today', () => ({ getToday: vi.fn() }))
-vi.mock('@/server/play', () => ({ prepareNextSession: vi.fn(async () => ({ ok: true })), endSession: vi.fn(), startMiniSession: vi.fn(), startSession: vi.fn() }))
+vi.mock('@/server/play', () => ({ prepareNextSession: vi.fn(async () => ({ ok: true })), endSession: vi.fn(), startMiniSession: vi.fn(), startSession: vi.fn(), getSession: vi.fn(), answerItem: vi.fn(), reportItem: vi.fn() }))
 vi.mock('@/server/push', () => ({ getPushSettings: vi.fn(), subscribe: vi.fn(), unsubscribe: vi.fn(), sendTestPush: vi.fn(), savePushPreferences: vi.fn() }))
 vi.mock('@/server/model-trace', () => ({ getModelTrace: vi.fn() }))
+vi.mock('@/server/diagrams', () => ({ generateConceptDiagram: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
 
 const schedule = { window: { startMinute: 540, endMinute: 1020, days: [1, 2, 3, 4, 5], timezone: 'UTC', source: 'default' as const }, dailyCap: 3, steadyCap: 3, phase: 'steady' as const, preview: null }
@@ -36,12 +38,13 @@ async function renderApp(entry: string) {
   const rootRoute = createRootRoute({ beforeLoad: appRoot.options.beforeLoad, loader: appRoot.options.loader, component: appRoot.options.component })
   const done = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId/done', beforeLoad: doneRoute.options.beforeLoad, loader: doneRoute.options.loader, component: doneRoute.options.component })
   const quick = createRoute({ getParentRoute: () => rootRoute, path: '/play/quick/$itemId', validateSearch: quickRoute.options.validateSearch,
-    beforeLoad: quickRoute.options.beforeLoad, loaderDeps: quickRoute.options.loaderDeps, loader: quickRoute.options.loader })
+    beforeLoad: quickRoute.options.beforeLoad, loaderDeps: quickRoute.options.loaderDeps, loader: quickRoute.options.loader, component: quickRoute.options.component })
+  const today = createRoute({ getParentRoute: () => rootRoute, path: '/today', component: () => <main>Today</main> })
   const play = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId', component: () => <main>One question</main> })
   const signIn = createRoute({ getParentRoute: () => rootRoute, path: '/sign-in', validateSearch: signInRoute.options.validateSearch, component: () => <main>Sign in</main> })
   const me = createRoute({ getParentRoute: () => rootRoute, path: '/me', beforeLoad: meRoute.options.beforeLoad, loader: meRoute.options.loader, component: meRoute.options.component })
   const optIn = createRoute({ getParentRoute: () => rootRoute, path: '/opt-in', beforeLoad: optInRoute.options.beforeLoad, loader: optInRoute.options.loader, component: optInRoute.options.component })
-  const router = createRouter({ routeTree: rootRoute.addChildren([done, quick, play, signIn, me, optIn]), history: createMemoryHistory({ initialEntries: [entry] }) })
+  const router = createRouter({ routeTree: rootRoute.addChildren([done, quick, today, play, signIn, me, optIn]), history: createMemoryHistory({ initialEntries: [entry] }) })
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -120,14 +123,60 @@ it.each([true, false])('explains a placement that ended early only when it did (
   } finally { await cleanup() }
 })
 
-it('opens a notification deep link through the quick route and redirects into focused play', async () => {
+const quickView: SessionView = {
+  id: 'mini-1', kind: 'mini', topicId: 't1', topicTitle: 'Algebra', progress: { position: 1, total: 1 }, ended: false,
+  item: { id: 'i1', conceptId: 'c1', conceptName: 'Variables', format: 'mcq', difficulty: 1, generatedBy: 'gpt-test', image: null,
+    stem: 'x + 1 = 2; what is x?', options: [{ id: 'a', text: '2' }, { id: 'b', text: '1' }], blank: null },
+} as SessionView
+const pick = (container: HTMLElement, name: string, value: string) => act(async () => { container.querySelector<HTMLInputElement>(`input[name="${name}"][value="${value}"]`)!.click() })
+
+it('opens a notification deep link as an inline one-question screen without redirecting', async () => {
   vi.mocked(startMiniSession).mockResolvedValue({ sessionId: 'mini-1' })
+  vi.mocked(getSession).mockResolvedValue(quickView)
   const { container, router, cleanup } = await renderApp('/play/quick/i1?pushId=push-1')
   try {
     expect(startMiniSession).toHaveBeenCalledExactlyOnceWith({ data: { itemId: 'i1', pushId: 'push-1' } })
-    expect(router.state.location.pathname).toBe('/play/mini-1')
-    expect(container.textContent).toBe('One question')
+    expect(getSession).toHaveBeenCalledWith({ data: { sessionId: 'mini-1' } })
+    expect(router.state.location.pathname).toBe('/play/quick/i1')
+    expect(container.querySelector('h1')?.textContent).toBe('x + 1 = 2; what is x?')
+    expect(container.querySelector('a[aria-label="Close"]')?.getAttribute('href')).toBe('/today')
+    expect(container.textContent).toContain('1 question')
     expect(container.querySelector('nav')).toBeNull()
+  } finally { await cleanup() }
+})
+
+it('answers the quick question inline and offers the way back to Today', async () => {
+  vi.mocked(startMiniSession).mockResolvedValue({ sessionId: 'mini-1' })
+  vi.mocked(getSession).mockResolvedValue(quickView)
+  vi.mocked(answerItem).mockResolvedValue({ attemptId: 'a0', diagramConceptId: null, score: 1, feedback: null, missingPoints: [], chosenFeedback: null, sourceQuote: null, sourceTitle: null,
+    returnsThisSession: false, pKnownBefore: 0.1, pKnownAfter: 0.5, correct: true, correctAnswer: '1', state: 'A', mixUps: [], explanation: 'Subtract one.', xp: 10, critical: false,
+    correctOptionIds: null, sourceVersion: null, detail: null } as unknown as Reveal)
+  vi.mocked(endSession).mockResolvedValue({ sessionId: 'mini-1', kind: 'mini', topicId: 't1', durationMs: 1000, correct: 1, total: 1, ungraded: 0, xp: 10,
+    streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], benchmark: null, reviewsLeft: 3, nextLine: 'Come back soon.', endedEarly: false } as SummaryView)
+  const { container, router, cleanup } = await renderApp('/play/quick/i1?pushId=push-1')
+  try {
+    await pick(container, 'answer', 'b')
+    await pick(container, 'confidence', 'sure')
+    const check = [...document.body.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Check')!
+    await act(async () => check.click())
+    expect(answerItem).toHaveBeenCalledExactlyOnceWith({ data: { sessionId: 'mini-1', itemId: 'i1', answer: { optionId: 'b' }, confidence: 'sure', responseMs: expect.any(Number) } })
+    expect(endSession).toHaveBeenCalledExactlyOnceWith({ data: { sessionId: 'mini-1' } })
+    const text = document.body.textContent ?? ''
+    expect(container.querySelector('h1')?.textContent).toBe('Quick question done')
+    for (const line of ['Correct', '1', '1 review cleared · 3 left today']) expect(text).toContain(line)
+    const back = [...document.body.querySelectorAll<HTMLAnchorElement>('a[href="/today"]')].find((a) => a.textContent?.trim() === 'Back to Today')!
+    await act(async () => back.click())
+    expect(router.state.location.pathname).toBe('/today')
+  } finally { await cleanup() }
+})
+
+it('says the question is gone when the notification item no longer exists', async () => {
+  vi.mocked(startMiniSession).mockRejectedValue(Object.assign(new Error('Question not found'), { status: 404 }))
+  const { container, cleanup } = await renderApp('/play/quick/i1?pushId=push-1')
+  try {
+    expect(container.querySelector('h1')?.textContent).toBe("This question isn't available any more.")
+    expect([...container.querySelectorAll('a[href="/today"]')].map((a) => a.textContent?.trim())).toContain('Back to Today')
+    expect(getSession).not.toHaveBeenCalled()
   } finally { await cleanup() }
 })
 

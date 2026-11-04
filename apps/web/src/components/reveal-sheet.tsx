@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
 import { revealCopy, revealModel } from '@learnquiz/api/reveal'
 import type { Answer, ItemView, Reveal } from '@learnquiz/api'
 
-const TONE = {
+export const TONE = {
   correct: { ground: 'bg-feedback-correct-tint', disc: 'bg-feedback-correct text-on-feedback', text: 'text-feedback-correct', Icon: Check },
   wrong: { ground: 'bg-feedback-wrong-tint', disc: 'bg-feedback-wrong text-on-feedback', text: 'text-feedback-wrong', Icon: X },
   learning: { ground: 'bg-feedback-learning-tint', disc: 'bg-feedback-learning text-on-feedback', text: 'text-feedback-learning', Icon: HalfDisc },

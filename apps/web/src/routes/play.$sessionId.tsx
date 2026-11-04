@@ -9,10 +9,11 @@ import { RevealOverlay } from '@/components/reveal-overlay'
 import { RevealedOptions } from '@/components/revealed-options'
 import { ModelTrace } from '@/components/model-trace'
 import { QuestionScreen } from '@/components/question/question-screen'
+import { toAnswer } from '@/components/question/to-answer'
 import { Working } from '@/components/working'
 import { stopSpeaking } from '@/lib/speech'
 import { isAnswerReady } from '@learnquiz/api'
-import type { Answer, Confidence, ItemFormat, Reveal, SessionView } from '@learnquiz/api'
+import type { Confidence, Reveal, SessionView } from '@learnquiz/api'
 import { checkFailedMessage } from '@learnquiz/api/system-copy'
 import { answerItem, endSession, getSession, nextItem, prepareNextSession } from '@/server/play'
 
@@ -47,17 +48,6 @@ function isRetryableCheckError(err: unknown): boolean {
   const e = err as { status?: number; name?: string }
   if (typeof e?.status === 'number') return e.status >= 500
   return (typeof navigator !== 'undefined' && navigator.onLine === false) || err instanceof TypeError || e?.name === 'AbortError' || e?.name === 'TimeoutError'
-}
-
-function toAnswer(format: ItemFormat, choice: string): Answer {
-  const ids = choice ? choice.split(',') : []
-  switch (format) {
-    case 'mcq': return { optionId: choice }
-    case 'multi': return { optionIds: ids }
-    case 'order': return { order: ids }
-    case 'cloze':
-    case 'short': return { text: choice.trim() }
-  }
 }
 
 // Unsent answers survive a reload; storage can be unavailable (private mode, quota), so failures are ignored.
