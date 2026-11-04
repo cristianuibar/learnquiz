@@ -254,6 +254,23 @@ it('counts live documents with unreviewed active items and summarizes each role'
   expect(overview.roles).toEqual([expect.objectContaining({ id: 'legacy-role', topicId: topic, documents: 2, conceptsReady: 3, conceptsTotal: 4, people: 1, preparing: true })])
 })
 
+it('shows the same preparing state on Roles and Overview while a ready role still generates questions', async () => {
+  sqlite.prepare("UPDATE topics SET status = 'ready' WHERE job_role_id = 'legacy-role'").run()
+  const topic = sqlite.prepare('SELECT id FROM topics WHERE job_role_id = ?').get('legacy-role')!.id as string
+  sqlite.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, created_at, retired_at) VALUES (?, ?, 'text', ?, '', 1, NULL)").run('live-doc', topic, 'Handbook')
+  const concept = sqlite.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary, source_id, gen_status) VALUES (?, ?, ?, 0, ?, ?, ?, ?)')
+  concept.run('c-pending', topic, 'warehouse', 'Label', '', 'live-doc', 'pending')
+  concept.run('c-ready', topic, 'warehouse', 'Scan', '', 'live-doc', 'ready')
+  const expectBoth = async (state: { preparing: boolean; conceptsReady: number; conceptsTotal: number }) => {
+    const expected = [expect.objectContaining({ id: 'legacy-role', topicStatus: 'ready', ...state })]
+    expect((await listRoles({ data: { slug: 'alpha' } })).roles).toEqual(expected)
+    expect((await getOrgOverview({ data: { slug: 'alpha' } })).roles).toEqual(expected)
+  }
+  await expectBoth({ preparing: true, conceptsReady: 1, conceptsTotal: 2 })
+  sqlite.prepare("UPDATE concepts SET gen_status = 'ready' WHERE id = 'c-pending'").run()
+  await expectBoth({ preparing: false, conceptsReady: 2, conceptsTotal: 2 })
+})
+
 it("returns each member's mastery against their job role benchmark", async () => {
   sqlite.prepare("UPDATE topics SET status = 'ready' WHERE job_role_id = 'legacy-role'").run()
   const topic = sqlite.prepare('SELECT id FROM topics WHERE job_role_id = ?').get('legacy-role')!.id as string

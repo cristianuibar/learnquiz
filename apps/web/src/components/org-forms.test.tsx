@@ -182,14 +182,16 @@ it('shows a duplicate role name under the Name field', async () => {
 it.each([
   ['no documents', role(), ['No documents yet', 'Upload SOP']],
   ['preparing', role({ topicStatus: 'generating', preparing: true, documentCount: 1, conceptsReady: 9, conceptsTotal: 24 }), ['Preparing training', '9 of 24 concepts']],
-  ['ready', role({ topicStatus: 'ready', documentCount: 1 }), ['Ready']],
+  ['ready', role({ topicStatus: 'ready', preparing: false, documentCount: 1 }), ['Ready'], ['Preparing training']],
+  ['ready topic still generating questions', role({ topicStatus: 'ready', preparing: true, documentCount: 1, conceptsReady: 1, conceptsTotal: 2 }), ['Preparing training', '1 of 2 concepts'], ['Ready']],
   ['failed topic', role({ topicStatus: 'failed', documentCount: 1 }), ['Training failed']],
   ['failed documents', role({ failedDocuments: 2, documentCount: 2 }), ['Training failed']],
   ['ready topic with only failed documents left', role({ topicStatus: 'ready', failedDocuments: 1, documentCount: 1 }), ['Training failed']],
   ['documents added', role({ documentCount: 1 }), ['Documents added']],
-])('words the training state: %s', async (_name, r, words) => {
+])('words the training state: %s', async (_name, r, words, absent: string[] = []) => {
   const container = await mountRoles([r])
   for (const w of words) expect(container.textContent).toContain(w)
+  for (const w of absent) expect(container.textContent).not.toContain(w)
   expect(container.textContent).not.toContain(' · draft')
 })
 
