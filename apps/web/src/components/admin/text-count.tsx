@@ -1,9 +1,9 @@
 import { CircleAlert } from 'lucide-react'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 
 const fmt = (n: number) => n.toLocaleString('en-US')
 
-export function TextCount({ value, max, id }: { value: string; max: number; id: string }) {
+export function TextCount({ value, max, id, overMessage }: { value: string; max: number; id: string; overMessage?: (count: number, max: number) => ReactNode }) {
   const count = value.length
   const level = count >= max ? 2 : count >= max * 0.9 ? 1 : 0
   const over = count > max
@@ -27,7 +27,7 @@ export function TextCount({ value, max, id }: { value: string; max: number; id: 
         <p id={id} role="alert" className="flex items-start gap-2 text-label tabular-nums text-ink">
           <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
           <span>
-            {fmt(count)} / {fmt(max)} · {fmt(count - max)} over the limit. Shorten the text.
+            {overMessage ? overMessage(count, max) : `${fmt(count)} / ${fmt(max)} · ${fmt(count - max)} over the limit. Shorten the text.`}
           </span>
         </p>
       ) : (

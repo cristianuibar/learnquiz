@@ -54,7 +54,7 @@ beforeAll(() => {
   })
   holder.db = db
   for (const id of ['owner', 'employee', 'other-owner']) {
-    raw.prepare('INSERT INTO user (id, name, email) VALUES (?, ?, ?)').run(id, id, `${id}@learnquiz.test`)
+    raw.prepare('INSERT INTO user (id, name, email) VALUES (?, ?, ?)').run(id, id === 'owner' ? 'Owner Name' : id, `${id}@learnquiz.test`)
   }
   for (const [id, slug] of [['northwind', 'northwind'], ['other-org', 'other-company']]) {
     raw.prepare('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, 1)').run(id, slug, slug)
@@ -71,11 +71,17 @@ beforeAll(() => {
   concept.run('scan-sku', 'picker-topic', 'picker-unit', 1, 'Scan the SKU', 'Scan each SKU.', 0, 'failed', 'Model timed out')
   concept.run('scan-bin', 'picker-topic', 'picker-unit', 0, 'Scan the bin', 'Scan the bin barcode.', 1, 'ready', null)
   concept.run('foreign-concept', 'other-role-topic', 'other-role-unit', 0, 'Foreign rule', 'Foreign summary.', 0, 'ready', null)
-  const source = raw.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, version, created_at, deleted_at) VALUES (?, ?, 'text', ?, 'body', ?, ?, ?)")
-  source.run('old', 'picker-topic', 'Receiving SOP', 1, 1000, null)
-  source.run('new', 'picker-topic', 'Packing SOP', 2, 2000, null)
-  source.run('gone', 'picker-topic', 'Obsolete SOP', 1, 3000, 4000)
-  source.run('foreign', 'other-role-topic', 'Other SOP', 1, 1500, null)
+  const source = raw.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, version, created_at, deleted_at, uploaded_by) VALUES (?, ?, 'text', ?, ?, ?, ?, ?, ?)")
+  source.run('old', 'picker-topic', 'Receiving SOP', 'Check the dock.', 1, 1000, null, null)
+  source.run('new', 'picker-topic', 'Packing SOP', 'body', 2, 2000, null, 'owner')
+  source.run('gone', 'picker-topic', 'Obsolete SOP', 'body', 1, 3000, 4000, 'owner')
+  source.run('foreign', 'other-role-topic', 'Other SOP', 'body', 1, 1500, null, 'other-owner')
+  // Two employees on the picker role count; a second role and another company's assignment do not.
+  raw.prepare('INSERT INTO job_roles (id, org_id, name, created_at) VALUES (?, ?, ?, 1)').run('packer', 'northwind', 'Packer')
+  const assign = raw.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES (?, ?, ?, 1)')
+  assign.run('employee', 'northwind', 'picker')
+  assign.run('owner', 'northwind', 'picker')
+  assign.run('other-owner', 'other-org', 'other-role')
 })
 afterAll(() => raw.close())
 beforeEach(() => {
@@ -93,9 +99,10 @@ it('gives an admin the role documents newest first and its units with concept ge
   expect(result.readOnly).toBe(false)
   expect(result.role).toMatchObject({ id: 'picker', name: 'Warehouse picker', topicId: 'picker-topic', topicStatus: 'ready' })
   expect(result.documents).toEqual([
-    { id: 'new', title: 'Packing SOP', kind: 'text', version: 2, createdAt: 2000 },
-    { id: 'old', title: 'Receiving SOP', kind: 'text', version: 1, createdAt: 1000 },
+    { id: 'new', title: 'Packing SOP', kind: 'text', version: 2, createdAt: 2000, status: 'ready', error: null, sizeBytes: null, pageCount: null, chars: 4, uploaderName: 'Owner Name' },
+    { id: 'old', title: 'Receiving SOP', kind: 'text', version: 1, createdAt: 1000, status: 'ready', error: null, sizeBytes: null, pageCount: null, chars: 15, uploaderName: null },
   ])
+  expect(result.role.people).toBe(2)
   expect(result.units).toEqual([{ id: 'picker-unit', name: 'Picking', summary: 'Pick orders.', concepts: [
     { id: 'scan-bin', name: 'Scan the bin', summary: 'Scan the bin barcode.', critical: true, genStatus: 'ready', genError: null },
     { id: 'scan-sku', name: 'Scan the SKU', summary: 'Scan each SKU.', critical: false, genStatus: 'failed', genError: 'Model timed out' },

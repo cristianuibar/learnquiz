@@ -59,6 +59,8 @@ export const uploadRoleDocument = createServerFn({ method: 'POST' })
     let title = data.title || old?.title || ''
     let bodyText: string
     let bytes: ArrayBuffer | undefined
+    let sizeBytes: number | null = null
+    let pageCount: number | null = null
     if (data.file) {
       const file = data.file
       if (file.size > MAX_ROLE_DOCUMENT_BYTES) throw httpError('Documents must be 10 MB or smaller', 413)
@@ -72,11 +74,13 @@ export const uploadRoleDocument = createServerFn({ method: 'POST' })
         const pdf = await getDocumentProxy(new Uint8Array(bytes.slice(0)))
         const { text } = await extractText(pdf, { mergePages: true })
         bodyText = text.trim()
+        pageCount = pdf.numPages
       } catch {
         throw httpError('This PDF could not be read', 422)
       }
       if (!bodyText) throw httpError('This PDF has no text layer. Paste the text instead.', 422)
       kind = 'pdf'
+      sizeBytes = file.size
       if (!title) title = file.name.replace(/\.pdf$/i, '').trim().slice(0, 200)
     } else {
       bodyText = data.text!.trim()
@@ -95,7 +99,7 @@ export const uploadRoleDocument = createServerFn({ method: 'POST' })
     if (r2Key && bytes) await bucket.put(r2Key, bytes, { httpMetadata: { contentType: 'application/pdf' } })
     const now = Date.now()
     const version = old ? old.version + 1 : 1
-    const newSource = { id, topicId, kind, title, bodyText, r2Key, version, uploadedBy: user.id, status: 'ready' as const, createdAt: now }
+    const newSource = { id, topicId, kind, title, bodyText, r2Key, sizeBytes, pageCount, version, uploadedBy: user.id, status: 'ready' as const, createdAt: now }
     try {
       if (!old) {
         await db.insert(sources).values(newSource)
@@ -111,7 +115,8 @@ export const uploadRoleDocument = createServerFn({ method: 'POST' })
           db.insert(sources).select(
             db.select({
               id: sql<string>`${id}`.as('id'), topicId: sql<string>`${topicId}`.as('topicId'), kind: sql<typeof kind>`${kind}`.as('kind'), title: sql<string>`${title}`.as('title'),
-              bodyText: sql<string>`${bodyText}`.as('bodyText'), r2Key: sql<string | null>`${r2Key}`.as('r2Key'), version: sql<number>`${version}`.as('version'),
+              bodyText: sql<string>`${bodyText}`.as('bodyText'), r2Key: sql<string | null>`${r2Key}`.as('r2Key'),
+              sizeBytes: sql<number | null>`${sizeBytes}`.as('sizeBytes'), pageCount: sql<number | null>`${pageCount}`.as('pageCount'), version: sql<number>`${version}`.as('version'),
               uploadedBy: sql<string>`${user.id}`.as('uploadedBy'), status: sql<'ready'>`${'ready'}`.as('status'), error: sql<string | null>`${null}`.as('error'),
               retiredAt: sql<number | null>`${null}`.as('retiredAt'), deletedAt: sql<number | null>`${null}`.as('deletedAt'), createdAt: sql<number>`${now}`.as('createdAt'),
             }).from(topics).where(and(
