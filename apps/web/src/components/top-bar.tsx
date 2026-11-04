@@ -12,7 +12,7 @@ export function TopBar({ signIn, branding, home = '/' }: { signIn: boolean; bran
         {branding?.logoUrl ? <img src={branding.logoUrl} alt={branding.name} className="max-h-10 max-w-48 object-contain" /> : 'Learn Quiz'}
       </Link>
       {signIn && (
-        <Button variant="ghost" className="text-sm" asChild>
+        <Button variant="ghost" asChild>
           <Link to="/sign-in">Sign in</Link>
         </Button>
       )}
