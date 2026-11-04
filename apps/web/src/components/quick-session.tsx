@@ -85,15 +85,17 @@ function Message({ title }: { title: string }) {
   )
 }
 
-function ResultView({ item, result }: { item: ItemView; result: Result }) {
+function ResultView({ sessionId, item, result }: { sessionId: string; item: ItemView; result: Result }) {
   const { branding } = rootApi.useLoaderData()
+  const end = useServerFn(endSession)
   const heading = useRef<HTMLHeadingElement>(null)
   const reportLink = useRef<HTMLButtonElement>(null)
   const reportId = useId()
   const [reporting, setReporting] = useState(false)
   const [announcement, setAnnouncement] = useState('')
   const reportPending = useRef(false)
-  const { reveal, chosen, reviewsLeft } = result
+  const [reviewsLeft, setReviewsLeft] = useState(result.reviewsLeft)
+  const { reveal, chosen } = result
   const model = revealModel(reveal, { hasCompany: Boolean(branding) })
   const tone = TONE[model.tone]
   const graded = reveal.state !== 'ungraded'
@@ -102,6 +104,35 @@ function ResultView({ item, result }: { item: ItemView; result: Result }) {
   const counter = !graded || reviewsLeft === null ? null : reveal.correct ? `1 review cleared · ${leftToday(reviewsLeft)}` : leftToday(reviewsLeft)
 
   useEffect(() => heading.current?.focus(), [])
+
+  // An unfinished session is missing from Profile, so keep ending it until it lands; finalise is claimed, so repeats are safe.
+  useEffect(() => {
+    if (result.reviewsLeft !== null) return
+    let done = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const retry = (delay: number) => {
+      timer = setTimeout(() => {
+        timer = undefined
+        end({ data: { sessionId } }).then((s) => {
+          done = true
+          setReviewsLeft(s.reviewsLeft)
+        }, (err) => {
+          if (goneState(err)) done = true
+          else if (!done) retry(Math.min(delay * 2, 30_000))
+        })
+      }, delay)
+    }
+    retry(1000)
+    return () => {
+      // Leaving the result page tries once more instead of dropping the session.
+      if (done) return
+      done = true
+      if (timer !== undefined) {
+        clearTimeout(timer)
+        void end({ data: { sessionId } }).catch(() => {})
+      }
+    }
+  }, [end, sessionId, result.reviewsLeft])
 
   // Runs after the closed dialog has dropped aria-hidden from the page.
   useEffect(() => {
@@ -273,7 +304,7 @@ export function QuickSession(props: Props) {
   const item = view?.item ?? null
 
   let body: ReactNode
-  if (state?.status === 'done' && item) body = <ResultView item={item} result={state.result} />
+  if (state?.status === 'done' && view && item) body = <ResultView sessionId={view.id} item={item} result={state.result} />
   else if (state?.status === 'gone' || !view || !item) {
     const kind = state?.status === 'gone' ? state.kind : props.status === 'question' ? 'unavailable' : props.status
     body = <Message title={kind === 'answered' ? 'You already answered this question.' : "This question isn't available any more."} />
