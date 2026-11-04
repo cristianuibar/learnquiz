@@ -9,6 +9,7 @@ it.each([
 	[window(720, 1440, [6, 7]), '12:00 PM–12:00 AM, Saturday and Sunday'],
 	[window(30, 750, [3]), '12:30 AM–12:30 PM, Wednesday'],
 	[window(0, 1440, [1, 2, 3, 4, 5, 6, 7]), '12:00 AM–12:00 AM, Monday to Sunday'],
+	[window(540, 1020, []), '9:00 AM–5:00 PM, no days'],
 ])('describes %o as %s', (value, expected) => {
 	expect(describeWindow(value)).toBe(expected)
 })

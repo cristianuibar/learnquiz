@@ -42,7 +42,7 @@ async function renderApp(entry: string) {
   const me = createRoute({ getParentRoute: () => rootRoute, path: '/me', beforeLoad: meRoute.options.beforeLoad, loader: meRoute.options.loader, component: meRoute.options.component })
   const today = createRoute({ getParentRoute: () => rootRoute, path: '/today', component: () => <main>Today stub</main> })
   const optIn = createRoute({ getParentRoute: () => rootRoute, path: '/opt-in', beforeLoad: optInRoute.options.beforeLoad, loader: optInRoute.options.loader, component: optInRoute.options.component })
-  const router = createRouter({ routeTree: rootRoute.addChildren([done, quick, play, signIn, me, optIn, today]), history: createMemoryHistory({ initialEntries: [entry] }) })
+  const router = createRouter({ routeTree: rootRoute.addChildren([done, quick, play, signIn, me, optIn, today]), defaultPreload: 'intent', history: createMemoryHistory({ initialEntries: [entry] }) })
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -139,6 +139,30 @@ it('keeps mistakes collapsed until the disclosure is opened', async () => {
     const link = container.querySelector<HTMLAnchorElement>('a[href="/play/quick/i1"]')
     expect(link?.getAttribute('aria-label')).toBe('Review: Pallet checks. You were sure')
     expect(link?.closest('[hidden]')).toBeNull()
+  } finally { await cleanup() }
+})
+
+it('starts a mistake review session only when the mistake is clicked, not on hover or focus', async () => {
+  vi.mocked(endSession).mockResolvedValue({ sessionId: 's1', kind: 'session', topicId: 't1', durationMs: 1000, correct: 9, total: 10, ungraded: 0, xp: 0,
+    streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], benchmark: null, reviewsLeft: 0, nextLine: 'Come back soon.', endedEarly: false,
+    mistakes: [{ itemId: 'i1', conceptName: 'Pallet checks', stem: 'x', correctAnswer: 'y', wasSure: false, generatedBy: null }] } satisfies SummaryView)
+  vi.mocked(getPushSettings).mockResolvedValue({ publicKey: 'public-key', isStaff: false, endpoints: [], canPrompt: false,
+    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC', days: [1, 2, 3, 4, 5] }, company: null, schedule })
+  vi.mocked(startMiniSession).mockResolvedValue({ sessionId: 'mini-1' })
+  const { container, router, cleanup } = await renderApp('/play/s1/done')
+  try {
+    await act(async () => [...container.querySelectorAll('button')].find((b) => b.textContent?.includes('Mistakes (1)'))?.click())
+    const link = container.querySelector<HTMLAnchorElement>('a[href="/play/quick/i1"]')!
+    await act(async () => {
+      link.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+      link.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+      link.dispatchEvent(new TouchEvent('touchstart', { bubbles: true }))
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    })
+    expect(startMiniSession).not.toHaveBeenCalled()
+    await act(async () => link.click())
+    expect(startMiniSession).toHaveBeenCalledExactlyOnceWith({ data: { itemId: 'i1', pushId: undefined } })
+    expect(router.state.location.pathname).toBe('/play/mini-1')
   } finally { await cleanup() }
 })
 

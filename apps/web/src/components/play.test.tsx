@@ -750,6 +750,11 @@ describe('reveal overlay', () => {
       expect(router.state.location.pathname).toBe('/play/s1/done')
       expect(container.querySelector('h1')!.textContent).toContain('Session done')
       expect(heard()).toContain('Report sent')
+      // No mastery rows or mistakes: the page fills the screen so the dock still sits at the bottom, not under the trace link.
+      const dock = [...container.querySelectorAll('a')].find((a) => a.textContent === 'Continue')!.parentElement!
+      expect(dock.parentElement!.tagName).toBe('MAIN')
+      expect(dock.parentElement!.lastElementChild).toBe(dock)
+      expect(dock.parentElement!.classList).toContain('min-h-dvh')
     } finally { await cleanup() }
   })
 
