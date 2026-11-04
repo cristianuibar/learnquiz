@@ -45,7 +45,7 @@ export function BottomNav({ topicId }: { topicId: string | null }) {
               Path
             </span>
           )}
-          <Link to="/me" className={tab(me)} aria-current={me ? 'page' : undefined}>
+          <Link to="/me/profile" className={tab(me)} aria-current={me ? 'page' : undefined}>
             {pill(me, <User className="size-6" aria-hidden />)}
             Profile
           </Link>

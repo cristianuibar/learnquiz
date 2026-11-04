@@ -78,6 +78,8 @@ describe('Training progress', () => {
     vi.mocked(getProfile).mockResolvedValue(profile())
     await mount(path)
     expect(text().includes(SELF_LINE)).toBe(self)
+    const settings = [...container.querySelectorAll('a')].find((a) => a.getAttribute('aria-label') === 'Settings')
+    expect(settings?.getAttribute('href') ?? null).toBe(self ? '/me/settings' : null)
     expect(text()).toContain('Dana Learner')
     expect(getToday).not.toHaveBeenCalled()
   })
