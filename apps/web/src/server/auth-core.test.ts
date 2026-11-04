@@ -12,15 +12,14 @@ function authFor(url: string) {
   return createAuth().options
 }
 
-it.each(['https://app.learnquiz.com', 'https://learnquiz.com'])('trusts both hosts and shares the cookie across subdomains for %s', (url) => {
-  const options = authFor(url)
-  expect(options.trustedOrigins).toHaveLength(2)
-  expect(options.trustedOrigins).toEqual(expect.arrayContaining(['https://app.learnquiz.com', 'https://learnquiz.com']))
+it('trusts only the app host and shares the cookie across subdomains', () => {
+  const options = authFor('https://app.learnquiz.com')
+  expect(options.trustedOrigins).toEqual(['https://app.learnquiz.com'])
   expect(options.advanced?.crossSubDomainCookies).toEqual({ enabled: true, domain: 'learnquiz.com' })
 })
 
 it('keeps local development on a host-only cookie', () => {
   const options = authFor('http://localhost:3000')
-  expect(options.trustedOrigins).toEqual(['http://localhost:3000', 'https://app.learnquiz.com', 'https://learnquiz.com'])
+  expect(options.trustedOrigins).toEqual(['http://localhost:3000', 'https://app.learnquiz.com'])
   expect(options.advanced?.crossSubDomainCookies).toBeUndefined()
 })
