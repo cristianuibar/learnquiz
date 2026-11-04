@@ -68,11 +68,13 @@ export function procedureViewModel(layout: ProcedureLayout, metrics: TextMetrics
   })
   const layers = [...new Set(sizes.map((n) => n.layer))].sort((a, b) => a - b)
   const tops = new Map<number, number>()
+  const bottoms = new Map<number, number>()
   let bottom = padding
   for (const layer of layers) {
     const top = bottom + (tops.size ? padding * 3 : 0)
     tops.set(layer, top)
     bottom = top + Math.max(...sizes.filter((n) => n.layer === layer).map((n) => n.height))
+    bottoms.set(layer, bottom)
   }
   const nodes = sizes.map((node) => ({ ...node, y: tops.get(node.layer)! + node.height / 2 }))
   const byId = new Map(nodes.map((node) => [node.id, node]))
@@ -82,7 +84,9 @@ export function procedureViewModel(layout: ProcedureLayout, metrics: TextMetrics
     const side = from.kind === 'decision' && edge.label !== null ? (edge.label === 'yes' ? -1 : 1) : 0
     const start = side ? { x: from.x + side * from.width / 2, y: from.y } : { x: from.x, y: from.y + from.height / 2 }
     const end = { x: to.x, y: to.y - to.height / 2 }
-    const middle = (start.y + end.y) / 2
+    // Turn in the gap below the source's whole layer, not halfway from this
+    // node: a shorter sibling's edge must not cut through a taller neighbour.
+    const middle = Math.min(bottoms.get(from.layer)! + padding * 1.5, end.y - padding / 2)
     const points = side ? [start, { x: end.x, y: start.y }, end]
       : [start, { x: start.x, y: middle }, { x: end.x, y: middle }, end]
     return { ...edge, points, path: points.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${p.y}`).join(' '),
@@ -91,6 +95,28 @@ export function procedureViewModel(layout: ProcedureLayout, metrics: TextMetrics
       labelAnchor: side === -1 ? 'end' as const : side === 1 ? 'start' as const : 'middle' as const }
   })
   return { width: layout.width, height: bottom + padding, nodes, edges }
+}
+
+type ModelNode = { x: number; y: number; width: number; height: number }
+type ModelEdge = { points: { x: number; y: number }[] }
+
+// True when any edge segment passes through the inside of any node box. A
+// drawing like that suggests a connection that does not exist, so callers
+// fall back to the ordered text list instead.
+export function edgesCrossNodes(model: { nodes: ModelNode[]; edges: ModelEdge[] }): boolean {
+  const inset = 0.5
+  return model.edges.some(({ points }) => points.slice(1).some((b, i) => {
+    const a = points[i]!
+    return model.nodes.some((node) => {
+      const left = node.x - node.width / 2 + inset
+      const right = node.x + node.width / 2 - inset
+      const top = node.y - node.height / 2 + inset
+      const bottom = node.y + node.height / 2 - inset
+      const [x1, x2] = a.x <= b.x ? [a.x, b.x] : [b.x, a.x]
+      const [y1, y2] = a.y <= b.y ? [a.y, b.y] : [b.y, a.y]
+      return x1 < right && x2 > left && y1 < bottom && y2 > top
+    })
+  }))
 }
 
 // Never mount an SVG whose bitmap could exceed this viewport budget. Retry
@@ -109,7 +135,7 @@ export function procedurePresentation(graph: ProcedureGraph, width: number, font
     const fontSize = metrics.fontSize * nextScale
     const lineHeight = metrics.lineHeight * nextScale
     const model = procedureViewModel(layout, { ...metrics, fontSize, lineHeight })
-    if (model.height <= maxHeight && model.nodes.every((node) => node.fits)) {
+    if (model.height <= maxHeight && model.nodes.every((node) => node.fits) && !edgesCrossNodes(model)) {
       return { kind: 'svg' as const, model, fontSize, lineHeight, fontScale: nextScale }
     }
   }

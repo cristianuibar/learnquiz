@@ -1,5 +1,5 @@
 import { describeProcedure, layoutProcedure, type ProcedureGraph } from '@learnquiz/api/procedure'
-import { CHAR_EM, MAX_PROCEDURE_SVG_HEIGHT, procedureCaption, procedurePresentation, procedureViewModel, visibleProcedure } from './procedure'
+import { CHAR_EM, edgesCrossNodes, MAX_PROCEDURE_SVG_HEIGHT, procedureCaption, procedurePresentation, procedureViewModel, visibleProcedure } from './procedure'
 
 const graph: ProcedureGraph = {
   nodes: [
@@ -217,4 +217,69 @@ test('a tall window still applies the 1200 dp bitmap ceiling', () => {
     expect(presentation.fontScale).toBe(1.5)
     expect(presentation.model.height).toBeLessThanOrEqual(1200)
   }
+})
+
+
+// Both branches of a decision rejoin at one step, with the tall critical step on
+// the yes side. The no branch's edge used to turn halfway down from its own
+// short node and cut through the critical step, reading as Staging -> Photo.
+const rejoin: ProcedureGraph = {
+  nodes: [
+    { id: 'dock', label: 'Dock door', kind: 'step', critical: false },
+    { id: 'damage', label: 'Damage?', kind: 'decision', critical: false },
+    { id: 'photo', label: 'Photograph the damage and note it on the receipt', kind: 'step', critical: true },
+    { id: 'stage', label: 'Staging', kind: 'step', critical: false },
+    { id: 'away', label: 'Put-away', kind: 'step', critical: false },
+  ],
+  edges: [
+    { from: 'dock', to: 'damage', label: null },
+    { from: 'damage', to: 'photo', label: 'yes' },
+    { from: 'damage', to: 'stage', label: 'no' },
+    { from: 'photo', to: 'away', label: null },
+    { from: 'stage', to: 'away', label: null },
+  ],
+}
+const rejoinMetrics = { fontSize: 13, lineHeight: 18, padding: 8, shieldSize: 16 }
+
+test.each([[286, 1], [326, 1], [326, 1.3], [377, 1], [377, 1.3]])('rejoining branches draw no edge through a node at %s dp and %sx', (width, scale) => {
+  const presentation = procedurePresentation(rejoin, width, scale, 740, rejoinMetrics)
+  expect(presentation?.kind).toBe('svg')
+  if (presentation?.kind !== 'svg') return
+  expect(edgesCrossNodes(presentation.model)).toBe(false)
+  const photo = presentation.model.nodes.find((n) => n.id === 'photo')!
+  const stageEdge = presentation.model.edges.find((e) => e.from === 'stage')!
+  // The horizontal run sits below the tallest node of the source layer.
+  expect(stageEdge.points[1]!.y).toBeGreaterThan(photo.y + photo.height / 2)
+})
+
+test('an edge through a node box is detected, and touching a border is not', () => {
+  const nodes = [{ x: 50, y: 50, width: 40, height: 40 }, { x: 150, y: 50, width: 40, height: 40 }]
+  expect(edgesCrossNodes({ nodes, edges: [{ points: [{ x: 150, y: 70 }, { x: 150, y: 60 }, { x: 50, y: 60 }, { x: 50, y: 120 }] }] })).toBe(true)
+  expect(edgesCrossNodes({ nodes, edges: [{ points: [{ x: 150, y: 70 }, { x: 150, y: 80 }, { x: 50, y: 80 }, { x: 50, y: 120 }] }] })).toBe(false)
+  expect(edgesCrossNodes({ nodes, edges: [{ points: [{ x: 50, y: 70 }, { x: 50, y: 100 }] }] })).toBe(false)
+})
+
+// A decision whose yes and no both lead to the same step: its side exits run
+// through the target's box. The schema allows this shape, so the presentation
+// must fall back to the ordered text list rather than draw a false connection.
+const sameTarget: ProcedureGraph = {
+  nodes: [
+    { id: 'scan', label: 'scan pallet the bay', kind: 'step', critical: false },
+    { id: 'count', label: 'cases label cases label Move scan', kind: 'step', critical: false },
+    { id: 'move', label: 'Move?', kind: 'decision', critical: true },
+    { id: 'notify', label: 'Notify Notify Check staging Move label', kind: 'step', critical: true },
+  ],
+  edges: [
+    { from: 'scan', to: 'count', label: null },
+    { from: 'count', to: 'move', label: null },
+    { from: 'move', to: 'notify', label: 'yes' },
+    { from: 'move', to: 'notify', label: 'no' },
+  ],
+}
+
+test('a layout whose edges would cross a node uses the text list', () => {
+  const model = procedureViewModel(layoutProcedure(sameTarget, 326), rejoinMetrics)
+  expect(model.nodes.every((n) => n.fits)).toBe(true)
+  expect(edgesCrossNodes(model)).toBe(true)
+  expect(procedurePresentation(sameTarget, 326, 1, 740, rejoinMetrics)?.kind).toBe('text')
 })
