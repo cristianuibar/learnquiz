@@ -287,6 +287,7 @@ function ActiveSession({ sessionId, announceReady }: { sessionId: string; announ
         busy={busy}
         error={error?.kind === 'next' ? error.message : null}
         branding={branding}
+        basics={view?.basics === true}
       />
     ) : null}>
       <SessionFrame progress={view?.progress} onEnd={endSession} inert={reveal !== null} dock={dock} trailing={

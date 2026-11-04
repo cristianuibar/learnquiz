@@ -24,6 +24,20 @@ it('composes due first, frontier next, closers last, no adjacent concept repeats
   ids.slice(1).forEach((id, i) => expect(concept[id]).not.toBe(concept[ids[i]]))
 })
 
+it('in back to basics, the earliest weak unit\'s review survives the due cap and opens the session', () => {
+  const later = Array.from({ length: 8 }, (_, i) => ({ id: `l${i}`, conceptId: `L${i}`, confidentError: true, retrievability: 0.1 }))
+  const ids = composeSession({
+    size: 12,
+    due: [...later, { id: 'w1', conceptId: 'W', confidentError: false, retrievability: 0.9 }],
+    frontier: [],
+    closers: [],
+    targetDifficulty: 3,
+    basics: new Map([['W', 0]]),
+  })
+  expect(ids[0]).toBe('w1')
+  expect(ids).toHaveLength(8)
+})
+
 it('reinserts a missed item 5 slots later', () => {
   expect(reinsert(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], 'a', 0)).toEqual(['a', 'b', 'c', 'd', 'e', 'a', 'f', 'g', 'h'])
 })

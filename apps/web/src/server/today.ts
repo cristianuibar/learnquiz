@@ -8,6 +8,7 @@ import { attempts, concepts, items, learnerItem, learnerTopic, placements, sessi
 import { dueCount } from '@/server/due'
 import { loadPKnown } from '@/server/helpers'
 import { liveConcept } from '@/server/live-concept'
+import { basicsUnits } from '@/server/mastery'
 import { loadFrontier, SESSION_SIZE } from '@/server/play'
 import { getLearnerId } from '@/server/session'
 import { assignedRoleTopic, notFlaggedBy, rolePlayable } from '@/server/topic-access'
@@ -60,13 +61,14 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
     return { topic: null, role, plan: null }
   }
   const topicId = topic.id
-  const [placement, lt, dueN, frontier, played, done, cleared, next] = await Promise.all([
+  const [placement, lt, dueN, frontier, basics, played, done, cleared, next] = await Promise.all([
     db.select({ id: placements.id }).from(placements)
       .where(and(eq(placements.learnerId, learnerId), eq(placements.topicId, topicId))).limit(1).get(),
     db.select({ xp: learnerTopic.xp, streakCount: learnerTopic.streakCount, lastSessionAt: learnerTopic.lastSessionAt }).from(learnerTopic)
       .where(and(eq(learnerTopic.learnerId, learnerId), eq(learnerTopic.topicId, topicId))).get(),
     dueCount(db, learnerId, topicId, now, Boolean(assigned)),
     loadFrontier(db, learnerId, topicId),
+    basicsUnits(db, learnerId, topicId),
     hasAttemptOn(topicId),
     // A finished session or placement today with at least 10 answers.
     db.select({ n: count() }).from(sessions)
@@ -92,10 +94,11 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
   const placed = Boolean(placement)
   const start = !placed && placeable ? 'placement' : 'session'
   const sessionDone = (done?.n ?? 0) > 0
+  const unitId = basics?.[0] ?? frontier[0]?.concept.unitId
   const [unit, playable] = await Promise.all([
-    start === 'placement' || !frontier[0]
+    start === 'placement' || !unitId
       ? null
-      : db.select({ name: units.name }).from(units).where(eq(units.id, frontier[0].concept.unitId)).get(),
+      : db.select({ name: units.name }).from(units).where(eq(units.id, unitId)).get(),
     (async () => {
       if (start === 'placement' || dueN > 0) return true
       if (!assigned) return frontier.length > 0
@@ -109,7 +112,7 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
     topic: { id: topicId, title: topic.title, placed, placeable, due: dueN, xp: lt?.xp ?? 0, streak: lt ? streakShown(lt, now) : 0 },
     role,
     plan: {
-      state: sessionDone ? 'done' : played ? 'normal' : 'first',
+      state: sessionDone ? 'done' : basics ? 'basics' : played ? 'normal' : 'first',
       start, nextUnit: unit?.name ?? null, reviewsLeft: Math.min(dueN, 8), reviewsCleared: cleared?.n ?? 0,
       sessionDone, sessionSize: SESSION_SIZE, playable, nextReviewAt: next?.at ?? null,
     },
