@@ -6,7 +6,7 @@ import {
   useFonts,
 } from '@expo-google-fonts/inter'
 import { useURL } from 'expo-linking'
-import { Stack, usePathname, useRouter, type Href } from 'expo-router'
+import { Stack, usePathname, useRootNavigationState, useRouter, type Href } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
@@ -19,6 +19,15 @@ import { canOpenTarget, targetFromURL } from '@/lib/route-gates'
 import { useNotificationObserver } from '@/lib/notification-observer'
 
 SplashScreen.preventAutoHideAsync()
+
+type NavState = { index?: number; routes: { key: string; state?: NavState }[] }
+
+// The key of the screen in front: the focused route, all the way down.
+function focusedRouteKey(state: NavState | undefined): string | null {
+  const route = state?.routes[state.index ?? state.routes.length - 1]
+  if (!route) return null
+  return focusedRouteKey(route.state) ?? route.key
+}
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
@@ -50,6 +59,7 @@ function SessionRoutes({ fontsLoaded }: { fontsLoaded: boolean }) {
   const router = useRouter()
   const pathname = usePathname()
   const url = useURL()
+  const focusedKey = focusedRouteKey(useRootNavigationState() as NavState | undefined)
   const lastURL = useRef<string | null>(null)
   const mounted = useRef(false)
   // Set while the resolved stack shows sign-in, until the next resolved screen.
@@ -70,12 +80,12 @@ function SessionRoutes({ fontsLoaded }: { fontsLoaded: boolean }) {
     }
     // Sign-in over Join: removing the protected sign-in screen uncovers Join, not
     // index. Hand the post-auth decision to index, as when sign-in sits over it,
-    // unless Join's own attempt still runs: then Join navigates or shows its retry.
+    // unless that Join's own attempt still runs: then it navigates or shows its retry.
     if (resolved) {
       const signedInOverJoin = fromSignIn.current && session.status === 'ready' && pathname.startsWith('/join/')
       fromSignIn.current = pathname === '/sign-in'
       if (signedInOverJoin) {
-        if (!joinAttemptHeld()) router.replace('/')
+        if (!focusedKey || !joinAttemptHeld(focusedKey)) router.replace('/')
         return
       }
     }
@@ -88,7 +98,7 @@ function SessionRoutes({ fontsLoaded }: { fontsLoaded: boolean }) {
       if (canOpenTarget(target, session)) router.replace(target as Href)
       else holdTarget(target)
     }
-  }, [url, session.status, session.needsDisclosure, resolved, router, replays, pathname])
+  }, [url, session.status, session.needsDisclosure, resolved, router, replays, pathname, focusedKey])
 
   useEffect(() => {
     if (resolved && !mounted.current) {

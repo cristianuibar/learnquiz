@@ -76,6 +76,7 @@ const replies: Record<string, () => Reply | Promise<Reply>> = {
   '/api/v1/session': () => ({ data: { user: { id: 'user-a', name: 'Ana', isAnonymous: false }, needsDisclosure } }),
   '/api/v1/branding': () => ({ data: null }),
   '/api/v1/invites/inv-1': () => ({ data: invite }),
+  '/api/v1/invites/inv-2': () => ({ data: { ...invite, company: 'Contoso Freight', roleName: 'Forklift driver' } }),
 }
 const baseReplies = { ...replies }
 // Anything else (the unit, push) never answers.
@@ -249,5 +250,34 @@ test('after a failed Join sign-up, a sign-in link over the idle Join still hands
   const replace = jest.spyOn(router, 'replace')
   await submitSignIn()
   expect(navigation.getPathname()).toBe('/today')
+  expect(replace.mock.calls.map(([target]) => target)).toEqual(['/', '/(tabs)/today'])
+})
+
+// Codex review of #568: one Join's attempt hold never blocks another Join's handoff.
+test('a failed attempt on a buried Join does not block the handoff from sign-in over another, idle Join', async () => {
+  const signUp = deferred<Reply>()
+  replies['/api/auth/sign-up/email'] = () => signUp.promise
+  const navigation = renderRouter('src/app', { initialUrl: '/join/inv-1' })
+  await navigation
+  expect(await screen.findByRole('header', { name: 'Train as a warehouse picker' })).toBeOnTheScreen()
+  await fireEvent.changeText(screen.getByLabelText('Create a password'), 'correct horse')
+  await fireEvent.press(screen.getByRole('button', { name: 'Create account' }))
+
+  // Invite B opens over invite A while A's sign-up is still running.
+  await act(async () => { router.push('/join/inv-2') })
+  expect(await screen.findByRole('header', { name: 'Train as a forklift driver' })).toBeOnTheScreen()
+  // A fails offscreen; it acts on that only when it is in front again.
+  await act(async () => { signUp.resolve({ data: {}, status: 500 }) })
+  await flush()
+  expect(navigation.getPathname()).toBe('/join/inv-2')
+  expect(getToken()).toBeNull()
+
+  // A sign-in link opens over B, which is idle, and the learner signs in.
+  await act(async () => { router.push('/sign-in') })
+  expect(navigation.getPathname()).toBe('/sign-in')
+  const replace = jest.spyOn(router, 'replace')
+  await submitSignIn()
+  expect(navigation.getPathname()).toBe('/today')
+  expect(screen.getByText('Today screen')).toBeOnTheScreen()
   expect(replace.mock.calls.map(([target]) => target)).toEqual(['/', '/(tabs)/today'])
 })

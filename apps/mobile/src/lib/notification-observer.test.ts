@@ -18,7 +18,7 @@ jest.mock('expo-router', () => {
   const Stack = ({ children }: { children: unknown }) => React.createElement(Text, null, children)
   Stack.Screen = ({ name }: { name: string }) => React.createElement(Text, null, name)
   Stack.Protected = ({ guard, children }: { guard: boolean; children: unknown }) => guard ? children : null
-  return { Stack, useRouter: () => mockRouter, usePathname: () => '/settings' }
+  return { Stack, useRouter: () => mockRouter, usePathname: () => '/settings', useRootNavigationState: () => undefined }
 })
 jest.mock('@expo-google-fonts/inter', () => ({ useFonts: jest.fn() }))
 jest.mock('expo-splash-screen', () => ({ preventAutoHideAsync: jest.fn(), hideAsync: jest.fn() }))

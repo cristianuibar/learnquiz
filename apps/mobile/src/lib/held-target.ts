@@ -36,18 +36,21 @@ export function deferReplay(): () => void {
 }
 
 // While a join attempt runs (from its submit until Join acts on the result), the
-// root layout must not hand a sign-in over Join to index: Join navigates itself,
-// or shows its retry. Unlike a replay hold it lasts while a screen sits on top.
-const attempts = new Set<symbol>()
+// root layout must not hand a sign-in over that Join to index: Join navigates
+// itself, or shows its retry. Unlike a replay hold it lasts while a screen sits
+// on top. Each hold belongs to one Join screen (its route key), so a buried Join
+// never blocks the handoff of another Join.
+const attempts = new Map<symbol, string>()
 
-export function holdJoinAttempt(): () => void {
+export function holdJoinAttempt(owner: string): () => void {
   const hold = Symbol('join attempt')
-  attempts.add(hold)
+  attempts.set(hold, owner)
   return () => { attempts.delete(hold) }
 }
 
-export function joinAttemptHeld(): boolean {
-  return attempts.size > 0
+export function joinAttemptHeld(owner: string): boolean {
+  for (const held of attempts.values()) if (held === owner) return true
+  return false
 }
 
 // Sign-out ends every join attempt, so no stale hold can block a later session.
