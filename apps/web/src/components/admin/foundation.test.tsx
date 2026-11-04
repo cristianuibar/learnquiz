@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Banner } from './banner'
 import { FieldError, fieldProps } from './field-error'
 import { Meter } from './meter'
+import { PageHeader } from './page'
 import { Stat } from './stat-figure'
 import { Status, STATUS } from './status-chip'
 
@@ -39,6 +40,15 @@ describe('admin foundation', () => {
     expect(el.textContent).toContain('—')
     expect(el.textContent).toContain('No data yet')
     expect(el.textContent).not.toContain('0')
+  })
+
+  it('page header h1 keeps the brand focus ring when focused after navigation', async () => {
+    const el = await render(<PageHeader title="Units" />)
+    const h1 = el.querySelector('h1')!
+    h1.focus()
+    expect(document.activeElement).toBe(h1)
+    expect(h1.classList).not.toContain('outline-none')
+    expect([...h1.classList]).toEqual(expect.arrayContaining(['focus-visible:outline-2', 'focus-visible:outline-offset-2', 'focus-visible:outline-brand']))
   })
 
   it('meter exposes progress semantics', async () => {
