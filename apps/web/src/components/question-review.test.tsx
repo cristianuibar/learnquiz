@@ -300,6 +300,29 @@ describe('question review rows', () => {
     return data
   }
 
+  it('shows the authored image above options when expanded, and leaves text-only questions without an image', async () => {
+    const image = { key: 'label.svg', alt: 'Shipping label with a damaged barcode', width: 1200, height: 800 }
+    const cells = concept('c1', 'Cells', false, [
+      { id: 'q1', stem: STEMS.q1, status: 'active', reviewedAt: REVIEWED },
+      { id: 'q2', stem: STEMS.q2, status: 'active', reviewedAt: REVIEWED },
+    ])
+    Object.assign(cells.questions[0]!.payload, { image })
+    const { c } = await mountAt({ ...(fixture() as object), units: [{ id: 'u1', name: 'Basics', concepts: [cells] }] })
+    const illustrated = row(c, 'q1')
+    expect(illustrated.querySelector('img')).toBeNull()
+    await act(async () => illustrated.querySelector<HTMLButtonElement>('button[aria-label="Show details"]')!.click())
+    const img = illustrated.querySelector('img')
+    expect(img?.getAttribute('src')).toBe('/media/items/q1')
+    expect(img?.getAttribute('alt')).toBe(image.alt)
+    const options = illustrated.querySelector('ol[aria-label="Answer options"]')!
+    expect(img!.compareDocumentPosition(options) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+
+    const textOnly = row(c, 'q2')
+    await act(async () => textOnly.querySelector<HTMLButtonElement>('button[aria-label="Show details"]')!.click())
+    expect(textOnly.querySelector('img')).toBeNull()
+    expect([...textOnly.querySelectorAll('ol[aria-label="Answer options"] li')].map((li) => li.textContent)).toEqual(['AACorrect answer', 'BBFeedback: b'])
+  })
+
   it.each([
     ['unreviewed', 'q7', ['Live', 'Unreviewed'], undefined],
     ['approved', 'q2', ['Live'], 'Approved Oct 31'],
