@@ -8,7 +8,7 @@ import { curriculumPrompt } from '@/lib/llm/prompts'
 import { CurriculumSkeleton } from '@/lib/llm/schemas'
 import { MAX_SOURCE_TEXT_CHARS } from '@/lib/limits'
 import { drainConceptQueue, STALE_CLAIM_MS } from '@/server/concept-gen'
-import { runInBackground } from '@/server/env'
+import { drainsOnRequest, runInBackground } from '@/server/env'
 import { chunks, httpError } from '@/server/helpers'
 import { assertWithinCompanyCap, assertWithinDailyCap } from '@/server/model-cap'
 
@@ -115,7 +115,7 @@ export async function claimRoleBuild({ orgId, ownerId, roleId }: { orgId: string
         throw httpError('A document changed while the curriculum was generating. Build it again.', 409)
       }
       // Questions are generated per concept for the whole company, not per learner.
-      runInBackground(drainConceptQueue())
+      if (drainsOnRequest()) runInBackground(drainConceptQueue())
       return { topicId }
     } catch (e) {
       // Only the build that still holds the claim may fail the topic; a stale one must not overwrite another build's result.

@@ -8,7 +8,7 @@ import { MAX_ROLE_DOCUMENT_BYTES, MAX_ROLE_DOCUMENT_CHARS } from '@/lib/limits'
 import { APP_ORIGINS } from '@/server/auth-core'
 import { requireOrgAdmin } from '@/server/authz'
 import { drainConceptQueue } from '@/server/concept-gen'
-import { getEnv, runInBackground } from '@/server/env'
+import { drainsOnRequest, getEnv, runInBackground } from '@/server/env'
 import { httpError } from '@/server/helpers'
 
 // Server-only: kept apart from role-documents.ts so the client bundle of that module (imported by the upload form) never reaches it.
@@ -149,7 +149,7 @@ export async function addRoleDocument(data: ReturnType<typeof parseDocumentForm>
     if (r2Key) await bucket.delete(r2Key).catch(() => {})
     throw error
   }
-  if (old) runInBackground(drainConceptQueue())
+  if (old && drainsOnRequest()) runInBackground(drainConceptQueue())
   return { sourceId: id, topicId, r2Key, chars: bodyText.length, version, status }
 }
 

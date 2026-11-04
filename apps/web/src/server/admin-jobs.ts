@@ -8,7 +8,7 @@ import { plural } from '@/lib/utils'
 import { requireStaff } from '@/server/authz'
 import { drainConceptQueue } from '@/server/concept-gen'
 import { retryFailedConcept } from '@/server/concept-retry'
-import { runInBackground } from '@/server/env'
+import { drainsOnRequest, runInBackground } from '@/server/env'
 import { liveConcept } from '@/server/live-concept'
 import { COMPANY_CAP_MESSAGE, dailyCapError } from '@/server/model-cap'
 import { claimRoleBuild, releaseStaleBuild } from '@/server/role-curriculum'
@@ -106,7 +106,7 @@ export const retryJobs = createServerFn({ method: 'POST' })
         }
       } else skipped++
     }
-    if (conceptsQueued) runInBackground(drainConceptQueue())
+    if (conceptsQueued && drainsOnRequest()) runInBackground(drainConceptQueue())
     // Awaited, not backgrounded: background work lasts about 30 s and a build can take minutes. A failed build marks its own topic failed.
     // A claimed role build counts as queued only once its build finishes; a daily-cap refusal of its model call is skipped like
     // one refused before the claim, and any other rejected build counts as failed.

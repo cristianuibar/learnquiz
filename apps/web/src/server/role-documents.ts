@@ -6,7 +6,7 @@ import { concepts, items, jobRoles, sources, topics } from '@/db/schema'
 import { findSourceQuote } from '@/lib/curriculum/validate'
 import { requireOrgAdmin } from '@/server/authz'
 import { drainConceptQueue } from '@/server/concept-gen'
-import { getEnv, runInBackground } from '@/server/env'
+import { drainsOnRequest, getEnv, runInBackground } from '@/server/env'
 import { httpError } from '@/server/helpers'
 import { addRoleDocument, LIVE, liveSource, parseDocumentForm, refusal } from '@/server/role-document-upload'
 
@@ -97,6 +97,6 @@ export const retireRoleDocument = createServerFn({ method: 'POST' })
     if (!retired.length) {
       throw await refusal(topic.id)
     }
-    if (moved.length) runInBackground(drainConceptQueue())
+    if (moved.length && drainsOnRequest()) runInBackground(drainConceptQueue())
     return { ok: true }
   })

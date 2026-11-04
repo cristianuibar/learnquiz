@@ -9,7 +9,7 @@ import { retryConceptGeneration } from './curriculum'
 
 // Real handlers, authorization, generateConceptItems, model client and database; fakes are the
 // transport, session provider, Worker bindings, background scheduler and model HTTP only.
-const holder = vi.hoisted(() => ({ db: null as unknown, userId: 'owner' as string | null, background: [] as Promise<unknown>[] }))
+const holder = vi.hoisted(() => ({ db: null as unknown, userId: 'owner' as string | null, background: [] as Promise<unknown>[], drains: false }))
 vi.mock('@tanstack/react-start', () => ({
   createServerFn: () => ({
     validator: (schema: { parse: (data: unknown) => unknown }) => ({
@@ -24,6 +24,7 @@ vi.mock('@/server/auth', () => ({
 }))
 vi.mock('@/server/env', () => ({
   getEnv: () => ({ LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://llm.example', LLM_MODEL: 'muse-spark-1.3' }),
+  drainsOnRequest: () => holder.drains,
   runInBackground: (task: Promise<unknown>) => { holder.background.push(task) },
 }))
 vi.mock('cloudflare:workers', () => ({ env: {}, waitUntil: () => {} }))
@@ -94,6 +95,7 @@ beforeEach(() => {
   raw.exec('SAVEPOINT test')
   holder.userId = 'owner'
   holder.background = []
+  holder.drains = false
   beforeSql = null
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))
@@ -147,12 +149,41 @@ it('fails a concept the model cannot answer, resets it on admin retry and refuse
   expect(states()[0].gen_status).toBe('failed')
 
   fetchModel.mockImplementation(answerModel)
+  holder.drains = true
   await expect(retry('northwind', 'c00')).resolves.toEqual({ ok: true })
-  // The retry schedules the drain in the background; it ends with the concept ready.
+  // Under `vite dev` the retry schedules the drain in the background; it ends with the concept ready.
   await expect(Promise.all(holder.background)).resolves.toEqual([1])
   await expect(retry('northwind', 'c00')).rejects.toMatchObject({ status: 404 })
   expect(states()).toEqual([{ id: 'c00', gen_status: 'ready', gen_error: null }])
   expect(one("SELECT COUNT(*) AS n FROM items WHERE concept_id = 'c00'")).toEqual({ n: 6 })
+})
+
+it('leaves a retried concept pending for the cron in production, and the cron drain generates it', async () => {
+  raw.exec("DELETE FROM concepts WHERE id <> 'c00'; UPDATE concepts SET gen_status = 'failed' WHERE id = 'c00'")
+  await expect(retryConceptGeneration({ data: { slug: 'northwind', conceptId: 'c00' } })).resolves.toEqual({ ok: true })
+  expect(holder.background).toHaveLength(0)
+  expect(one("SELECT gen_status, gen_started_at FROM concepts WHERE id = 'c00'")).toEqual({ gen_status: 'pending', gen_started_at: null })
+  expect(fetchModel).not.toHaveBeenCalled()
+  await drainConceptQueue()
+  expect(states()).toEqual([{ id: 'c00', gen_status: 'ready', gen_error: null }])
+  expect(one("SELECT COUNT(*) AS n FROM items WHERE concept_id = 'c00' AND status = 'active'")).toEqual({ n: 6 })
+})
+
+it('resolves a drain whose claim write throws only after the other claimed concepts finish, leaving that one pending', async () => {
+  raw.exec("DELETE FROM concepts WHERE id NOT IN ('c00', 'c01', 'c02')")
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+  let done = 0
+  fetchModel.mockImplementation(async (url, init) => {
+    const reply = await answerModel(url, init)
+    if (JSON.parse(init!.body as string).response_format.json_schema.name === 'self_check') done++
+    return reply
+  })
+  // The first claim write (c00) throws.
+  beforeSql = { prefix: 'update "concepts"', fn: () => { throw new Error('D1_ERROR: claim failed') } }
+  await expect(drainConceptQueue()).resolves.toBe(3)
+  expect(done).toBe(2)
+  expect(states().map((c) => c.gen_status)).toEqual(['pending', 'ready', 'ready'])
+  expect(error).toHaveBeenCalled()
 })
 
 // The self-check keeps `keep` items in its first round and none after it.

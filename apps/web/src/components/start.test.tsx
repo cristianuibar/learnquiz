@@ -21,7 +21,7 @@ vi.mock('@tanstack/react-start', () => ({
     return builder
   },
 }))
-vi.mock('@/server/env', () => ({ getEnv: () => ({}), runInBackground: () => {} }))
+vi.mock('@/server/env', () => ({ getEnv: () => ({}), drainsOnRequest: () => false, runInBackground: () => {} }))
 vi.mock('@/db', () => ({ getDb: () => null }))
 vi.mock('@/server/session', () => ({ getSessionUser: vi.fn(), getLearnerId: vi.fn() }))
 vi.mock('@/server/play', () => ({ startPlacement: vi.fn() }))
