@@ -16,7 +16,8 @@ export function ProfileHeader({ name, role, headingRef, settingsRef, onSettings 
   const { colors, space } = useTheme()
   return (
     <View style={{ gap: space[1] }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+      {/* The artboard pulls the Settings target into the gutter, aligning its icon with the content edge. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], marginRight: -space[3] }}>
         <Text ref={headingRef} header variant="title1" style={{ flex: 1 }}>Training progress</Text>
         <IconButton ref={settingsRef} icon={SettingsIcon} accessibilityLabel="Settings" onPress={onSettings} />
       </View>
