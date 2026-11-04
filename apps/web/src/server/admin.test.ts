@@ -207,10 +207,14 @@ it('lists unfinished company generation for staff and retries a failed concept o
     concepts: [{ id: 'c-failed', company: 'beta', role: 'Picker', concept: 'Scan the SKU', status: 'failed', error: 'Only 1 of 4 questions passed the self-check.', startedAt: NOW - 9 }],
     roles: [{ id: 'gen-topic', company: 'beta', role: 'Picker', status: 'generating', startedAt: NOW - 5 }],
   })
+  sqlite.prepare('INSERT INTO job_roles (id, org_id, name, created_at) VALUES (?, ?, ?, ?)').run('bad-role', 'beta', 'Packer', NOW)
+  sqlite.prepare('INSERT INTO topics (id, org_id, job_role_id, title, status, created_at) VALUES (?, ?, ?, ?, ?, ?)').run('bad-topic', 'beta', 'bad-role', 'Packer', 'failed', NOW)
+  await expect(getStaffSession()).resolves.toEqual({ id: accounts.get('staff')!.id, name: 'staff', email: 'staff@staff.test', failedJobs: 2 })
   await expect(retryJobConcept({ data: { conceptId: 'c-failed' } })).resolves.toEqual({ ok: true })
   expect(sqlite.prepare('SELECT gen_status, gen_error, gen_started_at FROM concepts WHERE id = ?').get('c-failed')).toEqual({ gen_status: 'pending', gen_error: null, gen_started_at: null })
   expect(boundary.background).toHaveLength(1)
   await expect(retryJobConcept({ data: { conceptId: 'c-failed' } })).rejects.toMatchObject({ status: 404, message: 'Failed concept not found' })
+  await expect(getStaffSession()).resolves.toMatchObject({ failedJobs: 1 })
   await expect(getGenerationJobs()).resolves.toMatchObject({ concepts: [{ id: 'c-failed', status: 'pending', error: null, startedAt: null }] })
 })
 

@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { getRequestHeaders } from '@tanstack/react-start/server'
-import { and, asc, desc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm'
+import { and, asc, count, desc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '@/db'
 import { member, organization, user } from '@/db/auth-schema'
@@ -13,7 +13,14 @@ import { liveConcept } from '@/server/live-concept'
 
 export const getStaffSession = createServerFn({ method: 'GET' }).handler(async () => {
   const staff = await requireStaff()
-  return { id: staff.id, name: staff.name }
+  const db = getDb()
+  const [[failedConcepts], [failedRoles]] = await Promise.all([
+    db.select({ n: count() }).from(concepts).innerJoin(topics, eq(topics.id, concepts.topicId)).innerJoin(organization, eq(organization.id, topics.orgId))
+      .where(and(eq(concepts.genStatus, 'failed'), liveConcept())),
+    db.select({ n: count() }).from(topics).innerJoin(organization, eq(organization.id, topics.orgId)).innerJoin(jobRoles, eq(jobRoles.id, topics.jobRoleId))
+      .where(eq(topics.status, 'failed')),
+  ])
+  return { id: staff.id, name: staff.name, email: staff.email, failedJobs: failedConcepts.n + failedRoles.n }
 })
 
 // Documents belong to the company's roles. Activity and spend belong to learners; attribute them to their current company memberships.
