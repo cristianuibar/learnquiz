@@ -18,7 +18,7 @@ export function ConceptRow({ concept, benchmark }: { concept: Profile['units'][n
           <Bar value={concept.pKnown * 100} benchmark={benchmark * 100} style={{ flex: 1 }}
             accessibilityLabel={`${concept.name} mastery`}
             accessibilityValue={{ text: `${presentation.percent}, ${status}${concept.critical ? ', critical' : ''}, benchmark ${percentText(benchmark)}` }} />
-          <Text variant="label" num>{presentation.percent}</Text>
+          <Text variant="label" num style={{ minWidth: 40, textAlign: 'right' }}>{presentation.percent}</Text>
         </View>
       )}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>

@@ -44,22 +44,27 @@ function UnitRow({ unit, benchmark, first }: { unit: Profile['units'][number]; b
   return (
     <View style={{ paddingTop: space[1], paddingBottom: space[4], borderTopWidth: first ? 0 : 1, borderTopColor: colors.border }}>
       <Pressable accessible focusable accessibilityRole="button" accessibilityState={{ expanded: open }}
-        accessibilityLabel={`${unit.name}, ${presentation.percent}${presentation.estimate ? ', placement estimate' : ''}, benchmark ${percentText(benchmark)}`}
+        accessibilityLabel={`${unit.name}, ${presentation.spokenPercent}${presentation.estimate ? ', placement estimate' : ''}, benchmark ${percentText(benchmark)}`}
         onPress={() => setOpen((value) => !value)} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
         style={({ pressed }) => ({
           flexDirection: 'row', alignItems: 'center', gap: space[2], minHeight: sizes.target,
           paddingVertical: space[2], backgroundColor: pressed ? colors.surfaceSunken : undefined,
           outlineWidth: focused ? 2 : 0, outlineOffset: 2, outlineColor: colors.brand,
         })}>
-        <Text accessible={false} importantForAccessibility="no" variant="bodyLg" style={{ flex: 1, fontFamily: typography.title3.fontFamily }}>{unit.name}</Text>
-        <Text accessible={false} importantForAccessibility="no" variant="label" num muted={presentation.estimate}>{presentation.percent}</Text>
+        <Text accessible={false} importantForAccessibility="no" variant="bodyLg" style={{ flex: 1, fontFamily: typography.labelLg.fontFamily }}>{unit.name}</Text>
+        <Text accessible={false} importantForAccessibility="no" variant="label" num muted={presentation.estimate}
+          style={{ minWidth: 40, textAlign: 'right' }}>{presentation.percent}</Text>
         <Animated.View style={chevronStyle} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           <ChevronDown size={space[4] + space[1]} color={colors.inkMuted} strokeWidth={2} accessible={false} />
         </Animated.View>
       </Pressable>
-      <Bar value={unit.mastery * 100} benchmark={benchmark * 100} estimate={presentation.estimate}
+      <Bar value={presentation.value} benchmark={benchmark * 100} estimate={presentation.estimate}
         accessible={false} style={{ marginRight: space[4] + space[1] + space[2] }} />
-      {presentation.chip && <Chip variant={presentation.chip} style={{ marginTop: space[2] }} />}
+      {presentation.chip && (
+        <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ marginTop: space[2] }}>
+          <Chip variant={presentation.chip} />
+        </View>
+      )}
       {open && (
         <View style={{ gap: space[4], marginTop: space[4] }}>
           {presentation.caption && <Text variant="caption" muted>{presentation.caption}</Text>}

@@ -1,4 +1,5 @@
 import { criticalRows, formatShortDate, percentText, type Profile } from '@learnquiz/api/progress'
+import { unitBar } from './path'
 
 type Unit = Profile['units'][number]
 type Concept = Unit['concepts'][number]
@@ -13,8 +14,9 @@ export function conceptPresentation(concept: Pick<Concept, 'status' | 'critical'
 export function unitPresentation(unit: Pick<Unit, 'state' | 'mastery'>) {
   const estimate = unit.state === 'estimate'
   return {
-    estimate,
+    ...unitBar(unit),
     percent: percentText(unit.mastery, estimate),
+    spokenPercent: `${estimate ? 'about ' : ''}${percentText(unit.mastery)}`,
     chip: estimate ? 'estimate' as const : null,
     caption: estimate ? 'From your placement check. Not practiced yet.' : null,
   }

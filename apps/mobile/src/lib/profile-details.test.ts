@@ -2,6 +2,16 @@ import type { Profile } from '@learnquiz/api/progress'
 import { conceptPresentation, criticalSteps, unitPresentation } from './profile-details'
 
 const concept = { status: 'learning', measured: true, pKnown: 0.724, critical: false } as const
+const NativeDateTimeFormat = Intl.DateTimeFormat
+let dateTimeFormat: jest.SpyInstance
+
+beforeAll(() => {
+  // Jest isolates process.env, so changing TZ here does not change the native
+  // timezone. Simulate a western default while honoring explicit UTC options.
+  dateTimeFormat = jest.spyOn(Intl, 'DateTimeFormat').mockImplementation((locales, options) =>
+    new NativeDateTimeFormat(locales, { timeZone: 'America/Los_Angeles', ...options }))
+})
+afterAll(() => { dateTimeFormat.mockRestore() })
 
 test('chooses the concept mastery chip and independently adds Critical', () => {
   expect(conceptPresentation(concept)).toEqual({ chips: ['learning'], percent: '72%', showBar: true })
@@ -18,18 +28,32 @@ test('chooses the concept mastery chip and independently adds Critical', () => {
 
 test('only estimate units get a chip, dashed bar and placement caption', () => {
   expect(unitPresentation({ state: 'estimate', mastery: 0.4 })).toEqual({
-    estimate: true, percent: '~40%', chip: 'estimate', caption: 'From your placement check. Not practiced yet.',
+    value: 40, estimate: true, percent: '~40%', spokenPercent: 'about 40%', chip: 'estimate', caption: 'From your placement check. Not practiced yet.',
   })
   for (const state of ['mastered', 'learning', 'not_started', 'locked'] as const) {
-    expect(unitPresentation({ state, mastery: 0 })).toEqual({ estimate: false, percent: '0%', chip: null, caption: null })
+    expect(unitPresentation({ state, mastery: 0 })).toEqual({ value: 0, estimate: false, percent: '0%', spokenPercent: '0%', chip: null, caption: null })
   }
+})
+
+test.each([
+  ['not_started', 0.9, '90%'],
+  ['locked', 0.15, '15%'],
+  ['locked', 0.6, '60%'],
+] as const)('%s units keep their percent but never fill their bar from a seeded prior of %s', (state, mastery, percent) => {
+  expect(unitPresentation({ state, mastery })).toEqual({
+    value: 0, estimate: false, percent, spokenPercent: percent, chip: null, caption: null,
+  })
+})
+
+test.each(['learning', 'mastered'] as const)('%s units retain their measured bar', (state) => {
+  expect(unitPresentation({ state, mastery: 0.9 })).toMatchObject({ value: 90, estimate: false, percent: '90%' })
 })
 
 test('critical records use neutral chips and UTC dates even west of UTC', () => {
   const jan1 = Date.UTC(2026, 0, 1, 0, 30)
-  // The Jest config pins a western TZ before workers start, so dropping UTC
+  // This suite pins a western formatter default, so dropping UTC
   // from a formatter crosses the date boundary and fails these assertions.
-  expect(new Date(jan1).getDate()).toBe(31)
+  expect(new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(jan1)).toBe('Dec 31')
   const errors: Profile['confidentErrors'] = [
     { id: 'corrected', conceptId: 'c1', concept: 'Record damage', at: Date.UTC(2026, 9, 28), correctedAt: Date.UTC(2026, 9, 30) },
     { id: 'pending', conceptId: 'c2', concept: 'Check sign-off', at: jan1, correctedAt: null },
