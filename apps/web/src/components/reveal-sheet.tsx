@@ -270,7 +270,7 @@ export function RevealSheet({
           disabled={busy}
           onClick={() => onContinue(variant === 'sureWrong' ? reflection.trim() : '')}
         >
-          {model.continueLabel}
+          Next question
         </Button>
         {onReport && (
           <Button

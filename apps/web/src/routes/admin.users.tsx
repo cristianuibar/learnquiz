@@ -72,8 +72,8 @@ function Users() {
         ))}
       </ul>
       <nav aria-label="User pages" className="mt-6 flex items-center gap-4">
-        <Button variant="secondary" disabled={busy || search.offset === 0} onClick={() => void navigate({ search: { ...search, offset: Math.max(0, search.offset - 25) } })}>Previous</Button>
-        <Button variant="secondary" disabled={busy || search.offset + 25 >= total} onClick={() => void navigate({ search: { ...search, offset: search.offset + 25 } })}>Next</Button>
+        <Button variant="secondary" disabled={busy || search.offset === 0} onClick={() => void navigate({ search: { ...search, offset: Math.max(0, search.offset - 25) } })}>Previous page</Button>
+        <Button variant="secondary" disabled={busy || search.offset + 25 >= total} onClick={() => void navigate({ search: { ...search, offset: search.offset + 25 } })}>Next page</Button>
       </nav>
     </main>
   )

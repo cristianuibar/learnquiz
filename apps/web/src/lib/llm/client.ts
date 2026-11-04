@@ -220,13 +220,13 @@ export async function transcribeAudio(opts: { audio: File; learnerId: string; se
     })
     if (!res.ok) throw new LlmError(`Voice request failed (HTTP ${res.status}).`, res.status === 429 ? 429 : 502)
     const result = await res.json() as { transcript?: unknown }
-    if (typeof result.transcript !== 'string' || !result.transcript.trim()) throw new LlmError('No speech was recognised. Please try again.', 422)
+    if (typeof result.transcript !== 'string' || !result.transcript.trim()) throw new LlmError('No speech was recognized. Record again or type your answer.', 422)
     if (result.transcript.trim().length > 1000) throw new LlmError('Please record a shorter answer.', 422)
     await logCall(log, started, undefined, null, reservedId)
     return result.transcript.trim()
   } catch (e) {
     // Never log the recording, transcript, credentials or provider response body.
-    const error = e instanceof LlmError ? e : new LlmError('Voice transcription failed. Please try again.', 502)
+    const error = e instanceof LlmError ? e : new LlmError("Couldn't transcribe your answer. Record again or type it.", 502)
     await logCall(log, started, undefined, error.message, reservedId)
     throw error
   }

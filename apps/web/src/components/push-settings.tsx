@@ -106,7 +106,7 @@ export function PushSettings({ publicKey, isStaff, endpoints, prefs, prompt = fa
           {isStaff && !prompt && <Button disabled={!ready || !enabled || busy} onClick={() => void act('test')}>Send test push</Button>}
         </div>
       )}
-      {prompt ? <Button variant="ghost" className="self-start" onClick={() => setDismissed(true)}>Not now</Button> : (
+      {prompt ? <Button variant="ghost" className="self-start" onClick={() => setDismissed(true)}>Skip for now</Button> : (
         <>
           <Button variant="secondary" className="self-start" disabled={busy} onClick={() => void act('pause')}>
             {preferences.paused ? 'Resume pushes' : 'Pause pushes'}

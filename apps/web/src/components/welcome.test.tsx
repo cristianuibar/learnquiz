@@ -45,7 +45,7 @@ async function mount(entries: string[], initialIndex = entries.length - 1) {
     container.remove()
     delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT
   }
-  const gotIt = () => [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Got it')!
+  const gotIt = () => [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Start learning')!
   return { router, container, cleanup, gotIt }
 }
 
@@ -87,7 +87,7 @@ describe('welcome disclosure', () => {
     }
   })
 
-  it('stays on the page with an error and re-enables Got it when saving fails', async () => {
+  it('stays on the page with an error and re-enables Start learning when saving fails', async () => {
     vi.mocked(getSessionFn).mockResolvedValue(session(true))
     vi.mocked(acceptDisclosure).mockRejectedValue(new TypeError('Failed to fetch'))
     const { router, container, gotIt, cleanup } = await mount(['/welcome'])

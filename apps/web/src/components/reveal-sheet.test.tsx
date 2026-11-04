@@ -79,12 +79,12 @@ const button = (c: HTMLElement, name: string) =>
 
 describe('RevealSheet', () => {
   it.each([
-    { name: 'A', reveal: result(), heading: 'Correct', xp: true, cont: 'Continue', pair: false, returns: false, extra: 'Record the damage' },
-    { name: 'B', reveal: result({ state: 'B' }), heading: 'Correct', xp: true, cont: 'Continue', pair: false, returns: false, extra: 'Record before moving.' },
-    { name: 'A without quote', reveal: result({ sourceQuote: null }), heading: 'Correct', xp: true, cont: 'Continue', pair: false, returns: false, extra: 'Not quoted from your SOP' },
-    { name: 'C', reveal: result({ state: 'C', correct: false, xp: 0, returnsThisSession: true, chosenFeedback: 'Moving first loses evidence.' }), heading: 'Not quite', xp: false, cont: 'Continue', pair: true, returns: true, extra: 'Moving first loses evidence.' },
-    { name: 'D', reveal: result({ state: 'D', correct: false, xp: 0, returnsThisSession: true, mixUps: ['Speed over proof'] }), heading: 'Not quite', xp: false, cont: 'Got it', pair: true, returns: true, extra: 'Speed over proof' },
-    { name: 'ungraded', reveal: result({ state: 'ungraded', correct: false, xp: 0 }), heading: 'Couldn’t grade this answer', xp: false, cont: 'Continue', pair: false, returns: false, extra: 'Record the damage' },
+    { name: 'A', reveal: result(), heading: 'Correct', xp: true, cont: 'Next question', pair: false, returns: false, extra: 'Record the damage' },
+    { name: 'B', reveal: result({ state: 'B' }), heading: 'Correct', xp: true, cont: 'Next question', pair: false, returns: false, extra: 'Record before moving.' },
+    { name: 'A without quote', reveal: result({ sourceQuote: null }), heading: 'Correct', xp: true, cont: 'Next question', pair: false, returns: false, extra: 'Not quoted from your SOP' },
+    { name: 'C', reveal: result({ state: 'C', correct: false, xp: 0, returnsThisSession: true, chosenFeedback: 'Moving first loses evidence.' }), heading: 'Not quite', xp: false, cont: 'Next question', pair: true, returns: true, extra: 'Moving first loses evidence.' },
+    { name: 'D', reveal: result({ state: 'D', correct: false, xp: 0, returnsThisSession: true, mixUps: ['Speed over proof'] }), heading: 'Not quite', xp: false, cont: 'Next question', pair: true, returns: true, extra: 'Speed over proof' },
+    { name: 'ungraded', reveal: result({ state: 'ungraded', correct: false, xp: 0 }), heading: 'Couldn’t grade this answer', xp: false, cont: 'Next question', pair: false, returns: false, extra: 'Record the damage' },
   ])('shows the $name reveal', async ({ reveal, heading, xp, cont, pair, returns, extra }) => {
     const c = await mount(reveal)
     const text = c.textContent!
@@ -95,7 +95,7 @@ describe('RevealSheet', () => {
     expect(text.includes('This comes back later this session.')).toBe(returns)
     expect(text).toContain(extra)
     expect(button(c, cont)).toBeTruthy()
-    expect(button(c, cont === 'Got it' ? 'Continue' : 'Got it')).toBeUndefined()
+    for (const old of ['Continue', 'Got it']) expect(button(c, old)).toBeUndefined()
   })
 
   it('keeps the explanation and quote behind Why in A', async () => {
@@ -121,7 +121,7 @@ describe('RevealSheet', () => {
     expect(c.textContent).not.toContain('Why it felt right')
   })
 
-  it('passes the reflection to Got it and reports from the footer', async () => {
+  it('passes the reflection to Next question and reports from the footer', async () => {
     const onContinue = vi.fn()
     const onReport = vi.fn()
     const c = await mount(result({ state: 'D', correct: false, xp: 0 }), { onContinue, onReport })
@@ -130,7 +130,7 @@ describe('RevealSheet', () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '  Evidence matters ')
       input.dispatchEvent(new Event('input', { bubbles: true }))
     })
-    await act(async () => button(c, 'Got it').click())
+    await act(async () => button(c, 'Next question').click())
     expect(onContinue).toHaveBeenCalledWith('Evidence matters')
     await act(async () => button(c, 'Report this question').click())
     expect(onReport).toHaveBeenCalledWith('Evidence matters')
@@ -181,6 +181,6 @@ describe('RevealSheet', () => {
     expect(text).not.toContain('The answer')
     expect(text).toContain('Photograph the damage before moving anything.')
     expect(text).toContain('This comes back later this session.')
-    expect(button(c, 'Continue')).toBeTruthy()
+    expect(button(c, 'Next question')).toBeTruthy()
   })
 })
