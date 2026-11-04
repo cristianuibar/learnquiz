@@ -52,7 +52,7 @@ async function renderOptIn() {
   return { container, router, press, async cleanup() { await act(async () => root.unmount()); container.remove() } }
 }
 
-it('shows the facts and preview from the schedule, and no preview card when there is none', async () => {
+it('shows the facts and preview from the schedule, and an example card when there is none', async () => {
   const { container, cleanup } = await renderOptIn()
   try {
     expect(container.querySelector('h1')?.textContent).toBe('Get a question during your shift?')
@@ -65,7 +65,7 @@ it('shows the facts and preview from the schedule, and no preview card when ther
   const steady = await renderOptIn()
   try {
     expect(steady.container.querySelector('ul li')?.textContent).toBe('Up to 2 a day.')
-    expect(steady.container.querySelector('[role="img"]')).toBeNull()
+    expect(steady.container.querySelector('[role="img"]')?.getAttribute('aria-label')).toBe('Example notification from Learn Quiz: Your first question will show up here once it’s ready.')
   } finally { await steady.cleanup() }
 })
 

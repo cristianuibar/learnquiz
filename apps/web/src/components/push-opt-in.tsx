@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button'
 import { enableWebPush, needsHomeScreen } from '@/lib/web-push'
 
 const FAILED = 'Couldn’t turn on questions. Try again.'
+// Shown when no question is ready yet; says what will arrive without inventing an assigned question.
+const EXAMPLE = 'Your first question will show up here once it’s ready.'
 
 function pushSupported() {
   return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
@@ -84,21 +86,19 @@ function Facts({ schedule, canTurnOn }: { schedule: PushSchedule; canTurnOn: boo
       <h1 tabIndex={-1} className="text-title-1 text-ink">
         Get a question during your shift?
       </h1>
-      {schedule.preview && (
-        <div
-          role="img"
-          aria-label={`Preview of a notification from Learn Quiz: ${schedule.preview}`}
-          className="flex flex-col gap-2 rounded-2xl bg-os-card p-4 text-os-ink"
-        >
-          <div aria-hidden className="flex items-center gap-2">
-            <LearnQuizMark className="size-5 shrink-0" />
-            <span className="text-caption text-os-ink-muted">Learn Quiz · now</span>
-          </div>
-          <p aria-hidden className="text-body font-semibold">
-            {schedule.preview}
-          </p>
+      <div
+        role="img"
+        aria-label={schedule.preview ? `Preview of a notification from Learn Quiz: ${schedule.preview}` : `Example notification from Learn Quiz: ${EXAMPLE}`}
+        className="flex flex-col gap-2 rounded-2xl bg-os-card p-4 text-os-ink"
+      >
+        <div aria-hidden className="flex items-center gap-2">
+          <LearnQuizMark className="size-5 shrink-0" />
+          <span className="text-caption text-os-ink-muted">{schedule.preview ? 'Learn Quiz · now' : 'Learn Quiz · example'}</span>
         </div>
-      )}
+        <p aria-hidden className="text-body font-semibold">
+          {schedule.preview ?? EXAMPLE}
+        </p>
+      </div>
       {!canTurnOn && <p className="text-body text-ink-muted">This browser can’t send questions right now.</p>}
       <ul aria-label="How questions work" className="flex flex-col gap-3">
         {facts.map((fact) => (
