@@ -145,7 +145,13 @@ function Jobs() {
           selection={{
             selected,
             onToggle: (id) => setSelected((prev) => { const next = new Set(prev); if (!next.delete(id)) next.add(id); return next }),
-            onToggleAll: () => setSelected((prev) => (failedIds.length > 0 && failedIds.every((id) => prev.has(id)) ? new Set() : new Set(failedIds))),
+            onToggleAll: () => setSelected((prev) => {
+              // Add or remove only this page's failed jobs; selections from other pages stay.
+              const next = new Set(prev)
+              const all = failedIds.length > 0 && failedIds.every((id) => prev.has(id))
+              for (const id of failedIds) { if (all) next.delete(id); else next.add(id) }
+              return next
+            }),
             rowLabel: (r) => `${r.target}, ${r.company}`,
             selectable: (r) => r.state === 'failed',
             allLabel: 'Select all failed',
