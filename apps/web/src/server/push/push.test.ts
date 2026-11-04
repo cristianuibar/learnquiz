@@ -155,7 +155,7 @@ it.each(['/me', '/play/quick/i1'])('sends verifiable VAPID and independently dec
   expect(http).toHaveBeenCalledTimes(1)
   const [destination, init] = http.mock.calls[0]
   expect(destination).toBe(endpoint)
-  expect(init).toMatchObject({ method: 'POST', redirect: 'error', headers: { 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream', TTL: '300' } })
+  expect(init).toMatchObject({ method: 'POST', redirect: 'manual', headers: { 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream', TTL: '300' } })
   const authorization = new Headers(init!.headers).get('Authorization')!
   const [, jwt, publicKey] = /^vapid t=([^,]+), k=(.+)$/.exec(authorization)!
   expect(publicKey).toBe(vapidEnv.VAPID_PUBLIC_KEY)
@@ -284,11 +284,21 @@ it.each([{ ttl: undefined, expected: 300 }, { ttl: 60, expected: 60 }])('sends E
   expect(http).toHaveBeenCalledTimes(1)
   const [destination, init] = http.mock.calls[0]
   expect(destination).toBe(expoUrl)
-  expect(init).toMatchObject({ method: 'POST', redirect: 'error', headers: { 'Content-Type': 'application/json', Accept: 'application/json' } })
+  expect(init).toMatchObject({ method: 'POST', redirect: 'manual', headers: { 'Content-Type': 'application/json', Accept: 'application/json' } })
   expect(init!.signal).toBeInstanceOf(AbortSignal)
   const logId = rows('SELECT id FROM push_log')[0].id
   expect(JSON.parse(init!.body as string)).toEqual({ to: token, title: expoPayload.title, priority: 'high', ttl: expected, channelId: 'questions', data: { url: `/play/quick/i1?pushId=${logId}` } })
   expect(rows('SELECT outcome, http_status FROM push_log')).toEqual([{ outcome: 'accepted', http_status: 200 }])
+})
+
+it('never follows an Expo redirect: a 3xx is logged as failed and only one request is made', async () => {
+  holder.env = {}
+  await subscribeExpo({ data: { token } })
+  http.mockResolvedValueOnce(new Response(null, { status: 302, headers: { Location: 'https://evil.example/collect' } }))
+  await expect(sendPush(holder.db as Db, expoSubscription(), null, expoPayload)).resolves.toEqual({ outcome: 'failed', status: 302 })
+  expect(http).toHaveBeenCalledTimes(1)
+  expect(http.mock.calls[0][1]).toMatchObject({ redirect: 'manual' })
+  expect(rows('SELECT outcome, http_status FROM push_log')).toEqual([{ outcome: 'failed', http_status: 302 }])
 })
 
 it.each([
