@@ -93,6 +93,19 @@ it('saves the Critical switch, named by its column header and concept', async ()
   await vi.waitFor(() => expect(vi.mocked(getRoleDetail).mock.calls.length).toBeGreaterThan(before))
 })
 
+// happy-dom applies no container queries, so this compares the narrow-list rules the header shares with the rows.
+it('stacks the Questions and Critical headers with the concept rows below a 560px list', async () => {
+  const { container } = await mount(makeDetail({ status: 'ready', documents: [pdf], units: unit([concept('c1', 'Cash float', 'ready')]) }))
+  const narrow = (el: Element) => el.className.split(' ').filter((c) => c.startsWith('@max-[560px]:')).sort()
+  const header = container.querySelector('[id$="-crit"]')!.parentElement!.parentElement!
+  const row = container.querySelector('li li')!
+  expect(narrow(header)).toEqual(narrow(row))
+  expect(narrow(header)).toContain('@max-[560px]:grid-cols-1')
+  expect(narrow(header.firstElementChild!)).toEqual(['@max-[560px]:hidden'])
+  const questionsHeader = [...header.querySelectorAll('span')].find((s) => s.textContent === 'Questions')!
+  expect(narrow(questionsHeader)).toEqual(narrow(row.children[1].firstElementChild!))
+})
+
 it('saves the edit form with a Critical value toggled before the page reloaded', async () => {
   vi.mocked(updateRoleConcept).mockResolvedValue({ ok: true })
   const { container, button } = await mount(makeDetail({ status: 'ready', documents: [pdf], units: unit([concept('c1', 'Cash float', 'ready')]) }))
@@ -137,6 +150,14 @@ it('announces build progress every five concepts and when the curriculum is read
   expect(status()).toBe('31 of 31 concepts ready. Curriculum ready.')
   expect(container.textContent).toContain('Curriculum ready · 31 concepts')
   expect(container.textContent).toContain('31 concepts · 12 live questions · 5 critical questions')
+})
+
+it('announces finding concepts while a build has none yet, then the first count', async () => {
+  const { router, status } = await mount(makeDetail({ status: 'generating', documents: [pdf] }))
+  expect(status()).toBe('Finding concepts…')
+  vi.mocked(getRoleDetail).mockResolvedValue(makeDetail({ status: 'generating', documents: [pdf], units: unit([concept('c1', 'Cash float', 'pending'), concept('c2', 'Card reader', 'pending')]) }) as never)
+  await act(() => router.invalidate())
+  expect(status()).toBe('0 of 2 concepts ready')
 })
 
 it('retries a failed concept', async () => {

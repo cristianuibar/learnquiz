@@ -102,6 +102,31 @@ it('polls every 5 s only while nothing is selected and updates are not paused', 
   }
 })
 
+it('resumes polling after the focused Clear selection button unmounts', async () => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+  const { container, unmount } = await mount()
+  try {
+    const calls = () => vi.mocked(getGenerationJobs).mock.calls.length
+    const advance = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms) })
+    await click(box(container, 'Select Battery change procedure, Northwind Logistics'))
+    const clear = button(container, 'Clear selection')
+    await act(async () => { clear.focus() })
+    await click(clear)
+    expect(container.contains(clear)).toBe(false)
+    let n = calls()
+    await advance(5000)
+    expect(calls()).toBeGreaterThan(n)
+
+    await act(async () => { box(container, 'Select Battery change procedure, Northwind Logistics').focus() })
+    n = calls()
+    await advance(10_000)
+    expect(calls()).toBe(n)
+  } finally {
+    await unmount()
+    vi.useRealTimers()
+  }
+})
+
 it('announces counts only when they change', async () => {
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
   const { container, unmount } = await mount()

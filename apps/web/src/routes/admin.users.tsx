@@ -20,11 +20,13 @@ const searchSchema = z.object({
   search: z.string().max(200).catch(''),
   role: z.enum(['all', 'admin', 'user']).catch('all'),
   status: z.enum(['all', 'active', 'banned']).catch('all'),
+  sort: z.enum(['joined', 'name']).catch('joined'),
+  dir: z.enum(['ascending', 'descending']).catch('descending'),
   offset: z.number().int().min(0).catch(0),
 })
 
 type Search = z.infer<typeof searchSchema>
-const DEFAULTS: Search = { search: '', role: 'all', status: 'all', offset: 0 }
+const DEFAULTS: Search = { search: '', role: 'all', status: 'all', sort: 'joined', dir: 'descending', offset: 0 }
 
 export const Route = createFileRoute('/admin/users')({
   validateSearch: searchSchema,
@@ -83,6 +85,8 @@ function Users() {
     {
       key: 'name',
       header: 'Name',
+      sortable: true,
+      sortOrder: { ascending: 'A to Z', descending: 'Z to A' },
       cell: (u) => (
         <>
           <span className="flex items-center gap-2">
@@ -111,7 +115,7 @@ function Users() {
         </>
       ),
     },
-    { key: 'joined', header: 'Joined', cell: (u) => joined(u.createdAt) },
+    { key: 'joined', header: 'Joined', sortable: true, sortOrder: { ascending: 'oldest first', descending: 'newest first' }, cell: (u) => joined(u.createdAt) },
     {
       key: 'action',
       header: <span className="sr-only">Action</span>,
@@ -169,11 +173,15 @@ function Users() {
       </div>
       {failure && <Banner kind="alert">{failure}</Banner>}
       <DataTable
-        caption="Users, newest first"
+        caption="Users"
         columns={columns}
         rows={users}
         rowKey={(u) => u.id}
-        sort={{ key: 'joined', direction: 'descending' }}
+        sort={{ key: search.sort, direction: search.dir }}
+        onSort={(key) => {
+          const sort = key as Search['sort']
+          go({ sort, dir: sort === search.sort ? (search.dir === 'ascending' ? 'descending' : 'ascending') : sort === 'name' ? 'ascending' : 'descending' })
+        }}
         toolbar={
           <div className="flex flex-wrap items-end gap-3 border-b border-border p-4">
             <form
@@ -213,7 +221,7 @@ function Users() {
               </td>
             </tr>
           ) : filtered ? (
-            <NoResults colSpan={columns.length} searchRef={searchRef} onClear={() => void navigate({ search: DEFAULTS })}>No users match these filters.</NoResults>
+            <NoResults colSpan={columns.length} searchRef={searchRef} onClear={() => void navigate({ search: { ...DEFAULTS, sort: search.sort, dir: search.dir } })}>No users match these filters.</NoResults>
           ) : (
             <tr role="row"><td role="cell" colSpan={columns.length} className="px-4 py-12 text-center text-ink">No users have signed up yet.</td></tr>
           )
