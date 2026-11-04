@@ -7,7 +7,7 @@ import { dbSchema } from '@/db'
 import { getAuth } from '@/server/auth'
 import { getModelUsage } from './admin-usage'
 
-const boundary = vi.hoisted(() => ({ db: null as unknown, headers: new Headers(), status: 200, background: [] as unknown[] }))
+const boundary = vi.hoisted(() => ({ db: null as unknown, concurrentWrite: null as (() => void) | null, headers: new Headers(), status: 200, background: [] as unknown[] }))
 
 // Only the request transport and database binding are replaced. Authorization,
 // validation, queries, Better Auth and its admin plugin execute for real.
@@ -46,11 +46,30 @@ beforeAll(async () => {
   for (const file of readdirSync('drizzle').filter((file) => file.endsWith('.sql')).sort()) {
     sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8').replaceAll('--> statement-breakpoint', ''))
   }
-  boundary.db = drizzle(async (query, params, method) => {
+  const run = (query: string, params: unknown[], method: string) => {
     const statement = sqlite.prepare(query)
     statement.setReturnArrays(true)
-    if (method === 'run') { statement.run(...params); return { rows: [] } }
-    return { rows: (method === 'get' ? statement.get(...params) : statement.all(...params)) as never }
+    if (method === 'run') { statement.run(...params as never[]); return { rows: [] } }
+    return { rows: (method === 'get' ? statement.get(...params as never[]) : statement.all(...params as never[])) as never }
+  }
+  // A concurrent writer lands between round trips that read model_calls, as another Worker could on D1.
+  const afterUsageRead = (query: string) => {
+    if (!query.includes('model_calls')) return
+    const write = boundary.concurrentWrite
+    boundary.concurrentWrite = null
+    write?.()
+  }
+  boundary.db = drizzle(async (query, params, method) => {
+    const result = run(query, params, method)
+    afterUsageRead(query)
+    return result
+  }, async (batch) => {
+    // A D1 batch runs as one implicit transaction, so every statement reads the same snapshot.
+    sqlite.exec('BEGIN')
+    const results = batch.map((q) => run(q.sql, q.params, q.method))
+    sqlite.exec('COMMIT')
+    batch.forEach((q) => afterUsageRead(q.sql))
+    return results
   }, { schema: dbSchema })
 
   for (const name of ['staff', 'learner']) {
@@ -119,6 +138,22 @@ it('aggregates settled calls for staff and agrees with a direct SQL sum', async 
   expect(usage.companies.find((c) => c.orgId === 'beta')).toMatchObject({ calls: 2, failures: 1, unpriced: 1, p50: 50, p95: 700 })
   expect(usage.jobs[0]).toMatchObject({ purpose: 'items', model: 'm1', calls: 5 })
   expect(usage.failures).toEqual([{ id: 'b2', createdAt: NOW - 1000, purpose: 'items', model: 'm1', orgId: 'beta', name: 'beta Co', slug: 'beta', error: 'upstream boom' }])
+})
+
+it('reads every section from one snapshot when a pending call settles mid-request', async () => {
+  boundary.concurrentWrite = () => sqlite.prepare("UPDATE model_calls SET ok = 1, error = NULL, cost_usd = 0.05 WHERE id = 'p1'").run()
+  try {
+    const usage = await getModelUsage({ data: range })
+    expect(boundary.concurrentWrite).toBeNull()
+    expect(usage.totals.calls).toBe(7)
+    expect(usage.companies.reduce((sum, c) => sum + c.calls, 0)).toBe(usage.totals.calls)
+    expect(usage.jobs.reduce((sum, j) => sum + j.calls, 0)).toBe(usage.totals.calls)
+    expect(usage.days.reduce((sum, d) => sum + d.calls, 0)).toBe(usage.totals.calls)
+    expect((await getModelUsage({ data: range })).totals.calls).toBe(8)
+  } finally {
+    boundary.concurrentWrite = null
+    sqlite.prepare("UPDATE model_calls SET ok = 0, error = 'pending', cost_usd = NULL WHERE id = 'p1'").run()
+  }
 })
 
 it('returns a per-day latency series, filtered to one job when given', async () => {
