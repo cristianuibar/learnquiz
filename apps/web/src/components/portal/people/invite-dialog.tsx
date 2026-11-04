@@ -57,6 +57,9 @@ export function InviteDialog({ open, onOpenChange, organizationId, roles, onCrea
   const id = (key: number, field: string) => `${uid}-${key}-${field}`
   const edit = (key: number, patch: Partial<Draft>) => setPeople((ps) => ps.map((p) => (p.key === key ? { ...p, ...patch } : p)))
 
+  // Closing after a partial batch still hands over the links already created, so the table and link dialog include them.
+  const close = (o: boolean) => (!o && created.current.length ? onCreated(created.current) : onOpenChange(o))
+
   function add() {
     const key = nextKey.current++
     focusKey.current = key
@@ -99,7 +102,7 @@ export function InviteDialog({ open, onOpenChange, organizationId, roles, onCrea
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={close}>
       <DialogContent size="wide" aria-describedby={undefined} initialFocus={firstName} onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader><DialogTitle>Invite people</DialogTitle></DialogHeader>
         <form ref={formRef} noValidate onSubmit={submit} className="flex flex-col gap-6">
@@ -133,7 +136,7 @@ export function InviteDialog({ open, onOpenChange, organizationId, roles, onCrea
           </Button>
           {banner && <Banner kind="alert">{banner}</Banner>}
           <DialogFooter>
-            <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="button" variant="secondary" onClick={() => close(false)}>Cancel</Button>
             <Button type="submit" aria-disabled={busy || undefined} className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50">Create invite links</Button>
           </DialogFooter>
         </form>

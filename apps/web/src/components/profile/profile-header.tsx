@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Eye } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export function ProfileHeader({
   name,
@@ -14,7 +15,8 @@ export function ProfileHeader({
 }) {
   return (
     <header className="flex flex-col gap-1">
-      <div className="flex items-center justify-between gap-3">
+      {/* The trailing icon button's 12 px inner inset lines its glyph up with the content edge. */}
+      <div className={cn('flex items-center justify-between gap-2', trailing && '-mr-3')}>
         <h1 tabIndex={-1} className="text-title-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
           Training progress
         </h1>

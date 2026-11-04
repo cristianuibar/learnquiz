@@ -78,7 +78,7 @@ function Facts({ schedule, canTurnOn }: { schedule: PushSchedule; canTurnOn: boo
     schedule.phase === 'steady'
       ? `Up to ${schedule.steadyCap} a day.`
       : `Up to ${schedule.dailyCap} a day while you’re onboarding, then ${schedule.steadyCap}.`,
-    `Only ${describeWindow(schedule.window)}.`,
+    `Only ${describeWindow(schedule.window)}. You can narrow it in Settings.`,
     'Skip any. Nothing is lost.',
   ]
   return (

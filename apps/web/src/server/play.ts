@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, count, eq, exists, getTableColumns, gte, inArray, isNotNull, isNull, lt, lte, ne, sql, type SQL } from 'drizzle-orm'
+import { and, asc, count, eq, exists, getTableColumns, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql, type SQL } from 'drizzle-orm'
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core'
 import { z } from 'zod'
 import { getDb, type Db } from '@/db'
@@ -210,6 +210,25 @@ export const startPlacement = createServerFn({ method: 'POST' })
       startedAt: Date.now(),
     })
     return { sessionId }
+  })
+
+// How many questions a session could play now, for the Loading screen while startSession prepares them. Read-only.
+export const getSessionReadiness = createServerFn({ method: 'POST' })
+  .validator(z.object({ topicId: z.string().min(1), unitId: z.string().min(1).optional() }))
+  .handler(async ({ data }): Promise<{ ready: number; total: number } | null> => {
+    const learnerId = await requireLearnerId()
+    const db = getDb()
+    const [topic] = await db.select().from(topics).where(and(eq(topics.id, data.topicId), learnerCanAccess(db, learnerId)))
+    if (!topic) throw httpError('Topic not found', 404)
+    if (topic.status !== 'ready') return null
+    const inUnit = data.unitId ? inArray(items.conceptId, db.select({ id: concepts.id }).from(concepts).where(eq(concepts.unitId, data.unitId))) : undefined
+    // Playable now: unseen, or seen and due.
+    const [row] = await db.select({ n: count() }).from(items)
+      .leftJoin(learnerItem, and(eq(learnerItem.itemId, items.id), eq(learnerItem.learnerId, learnerId)))
+      .where(and(eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId), inUnit,
+        topic.jobRoleId !== null ? ne(items.format, 'short') : undefined,
+        or(isNull(learnerItem.itemId), lte(learnerItem.due, Date.now()))))
+    return { ready: Math.min(row.n, SESSION_SIZE), total: SESSION_SIZE }
   })
 
 export const startSession = createServerFn({ method: 'POST' })

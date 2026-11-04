@@ -37,7 +37,7 @@ vi.mock('@/lib/llm/client', async (importOriginal) => {
 
 vi.mock('cloudflare:workers', () => ({ env: { LLM_PROFILE: 'ollama', LLM_MODEL: 'muse-spark-1.3', LLM_BASE_URL: 'https://llm.example/v1' } }))
 
-import { answerItem, endSession, getSession, nextItem, prepareNextSession, reportItem, startMiniSession, startPlacement, startSession } from './play'
+import { answerItem, endSession, getSession, getSessionReadiness, nextItem, prepareNextSession, reportItem, startMiniSession, startPlacement, startSession } from './play'
 import { getEnv } from '@/server/env'
 import { getConceptItems, getTopicPath } from './curriculum'
 import { getModelTrace } from './model-trace'
@@ -718,6 +718,24 @@ describe('learner practice and unit unlocks', () => {
     vi.mocked(requireLearnerId).mockResolvedValueOnce('u2')
     await expect(startSession({ data: { topicId: 't1' } })).rejects.toMatchObject({ status: 409, message: 'Nothing to practice yet' })
     expect(scalar(raw, 'SELECT COUNT(*) AS n FROM sessions WHERE learner_id = ?', 'u2').n).toBe(0)
+  })
+
+  it('reports how many questions a session could play now, read-only, null until the topic is ready', async () => {
+    seedFrontier(raw, 5, false)
+    // i1-i3 unseen, i4 seen and not due, i5 rejected.
+    raw.prepare("DELETE FROM learner_item WHERE item_id <> 'i4'").run()
+    raw.prepare("UPDATE items SET status = 'rejected' WHERE id = 'i5'").run()
+    const learnerRows = () => scalar(raw, 'SELECT COUNT(*) AS n FROM learner_item').n
+
+    expect(await getSessionReadiness({ data: { topicId: 't1' } })).toEqual({ ready: 3, total: 12 })
+    expect(learnerRows()).toBe(1)
+    raw.prepare("UPDATE learner_item SET due = ? WHERE item_id = 'i4'").run(Date.now() - 1)
+    expect(await getSessionReadiness({ data: { topicId: 't1', unitId: 'un1' } })).toEqual({ ready: 4, total: 12 })
+    expect(await getSessionReadiness({ data: { topicId: 't1', unitId: 'missing' } })).toEqual({ ready: 0, total: 12 })
+
+    raw.prepare("UPDATE topics SET status = 'generating' WHERE id = 't1'").run()
+    expect(await getSessionReadiness({ data: { topicId: 't1' } })).toBeNull()
+    await expect(getSessionReadiness({ data: { topicId: 'nope' } })).rejects.toMatchObject({ status: 404 })
   })
 
   it('scopes a unit session to that unit and refuses locked or foreign units', async () => {

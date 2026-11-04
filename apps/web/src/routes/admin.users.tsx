@@ -52,6 +52,9 @@ function Users() {
   const [open, setOpen] = useState(false)
   const [message, setMessage] = useState<{ user: UserRow; banned: boolean } | null>(null)
   const [failure, setFailure] = useState('')
+  const [query, setQuery] = useState(search.search)
+
+  useEffect(() => setQuery(search.search), [search.search])
 
   useEffect(() => {
     if (!refocusRef.current) return
@@ -176,10 +179,10 @@ function Users() {
               className="min-w-0 flex-1 basis-64"
               onSubmit={(event) => {
                 event.preventDefault()
-                go({ search: String(new FormData(event.currentTarget).get('search')).trim() })
+                go({ search: query.trim() })
               }}
             >
-              <SearchField key={search.search} ref={searchRef} name="search" label="Search by email or name" defaultValue={search.search} maxLength={200} className="max-w-none" />
+              <SearchField ref={searchRef} name="search" label="Search by email or name" value={query} onChange={(e) => setQuery(e.target.value)} maxLength={200} className="max-w-none" />
             </form>
             <label className="flex flex-col gap-1">
               <span className="text-label">Global role</span>

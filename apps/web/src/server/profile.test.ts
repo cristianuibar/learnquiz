@@ -224,6 +224,18 @@ it('uses the assigned role benchmark and recorded time to proficiency', async ()
   expect((await getProfile({ data: {} })).proficiency).toEqual({ achievedAt: start + 3 * DAY, days: 3, estimatedDays: null, projectedAt: null })
 })
 
+it('ends the proficient trend at the week reached when the recent weeks all come after it', async () => {
+  seedWeek()
+  raw.prepare('INSERT INTO job_roles (id, org_id, name, benchmark, created_at) VALUES (?, ?, ?, ?, ?)').run('role', 'org-a', 'Safety officer', 0.95, start)
+  raw.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at, proficient_at) VALUES (?, ?, ?, ?, ?)').run('learner-a', 'org-a', 'role', start, start + 3 * DAY)
+  expect((await getProfile({ data: {} })).reachedWeeks).toEqual([{ start, mastery: 0.75, sessions: 7, partial: true }])
+  // Viewed nine weeks later, the six recent weeks start after the date reached.
+  vi.setSystemTime(start + 9 * WEEK + 2 * DAY)
+  const profile = await getProfile({ data: {} })
+  expect(profile.weeks.map((w) => w.start)).toEqual([4, 5, 6, 7, 8, 9].map((k) => start + k * WEEK))
+  expect(profile.reachedWeeks).toEqual([{ start, mastery: 0.75, sessions: 7, partial: false }])
+})
+
 it('uses a ready role curriculum and falls back to the latest personal topic while it is a draft', async () => {
   seedWeek()
   raw.prepare('INSERT INTO job_roles (id, org_id, name, benchmark, created_at) VALUES (?, ?, ?, ?, ?)').run('role', 'org-a', 'Safety officer', 0.95, start)

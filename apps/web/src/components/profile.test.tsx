@@ -39,6 +39,7 @@ function mockProfile() {
     proficiency: { achievedAt: null, days: null, estimatedDays: 2, projectedAt: start + 8 * day },
     confidentErrors: [{ id: 'error', conceptId: 'concept', concept: 'Emergency exits', at: start, correctedAt: start + day }],
     weeks: [{ start: start - 7 * day, mastery: 0.4, sessions: 3, partial: false }, { start, mastery: 0.7, sessions: 4, partial: true }],
+    reachedWeeks: null,
     sessionCounts: { week: 7, total: 7 },
   })
 }

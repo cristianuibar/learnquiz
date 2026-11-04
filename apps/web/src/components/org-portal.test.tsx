@@ -434,6 +434,27 @@ it('keeps only the person whose email is already invited, with the error, and op
   }
 })
 
+it('shows the links already created when a partly failed batch is cancelled', async () => {
+  inviteMember
+    .mockResolvedValueOnce(inviteReply('new1'))
+    .mockResolvedValueOnce({ data: null, error: { code: 'USER_IS_ALREADY_A_MEMBER_OF_THIS_ORGANIZATION', message: 'User is already a member of this organization' } })
+  const { cleanup } = await openInvite()
+  try {
+    await click(inDialog('button', 'Add another person'))
+    await fillPerson(0, 'Eve', 'eve@acme.test')
+    await fillPerson(1, 'Fay', 'fay@acme.test')
+    await submitInvites()
+    await vi.waitFor(() => expect(inField('Email').value).toBe('fay@acme.test'))
+    const loads = vi.mocked(getPeople).mock.calls.length
+    await click(inDialog('button', 'Cancel'))
+    await vi.waitFor(() => expect(heading().textContent).toBe('Invite link for Eve'))
+    expect(inField('Invite link').value).toBe('http://localhost/join/new1')
+    expect(vi.mocked(getPeople).mock.calls.length).toBeGreaterThan(loads)
+  } finally {
+    await cleanup()
+  }
+})
+
 it('copies the invite link and says so', async () => {
   const { cleanup } = await createTwoLinks()
   try {
