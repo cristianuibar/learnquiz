@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as OptInRouteImport } from './routes/opt-in'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as StartRouteImport } from './routes/start'
 import { Route as TodayRouteImport } from './routes/today'
@@ -53,6 +54,11 @@ const IndexRoute = IndexRouteImport.update({
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OptInRoute = OptInRouteImport.update({
+  id: '/opt-in',
+  path: '/opt-in',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignInRoute = SignInRouteImport.update({
@@ -225,6 +231,7 @@ const OrgSlugRolesRoleIdRoute = OrgSlugRolesRoleIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/opt-in': typeof OptInRoute
   '/sign-in': typeof SignInRoute
   '/start': typeof StartRoute
   '/today': typeof TodayRoute
@@ -261,6 +268,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/opt-in': typeof OptInRoute
   '/sign-in': typeof SignInRoute
   '/start': typeof StartRoute
   '/today': typeof TodayRoute
@@ -298,6 +306,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/opt-in': typeof OptInRoute
   '/sign-in': typeof SignInRoute
   '/start': typeof StartRoute
   '/today': typeof TodayRoute
@@ -337,6 +346,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/opt-in'
     | '/sign-in'
     | '/start'
     | '/today'
@@ -373,6 +383,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/opt-in'
     | '/sign-in'
     | '/start'
     | '/today'
@@ -409,6 +420,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/opt-in'
     | '/sign-in'
     | '/start'
     | '/today'
@@ -447,6 +459,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
+  OptInRoute: typeof OptInRoute
   SignInRoute: typeof SignInRoute
   StartRoute: typeof StartRoute
   TodayRoute: typeof TodayRoute
@@ -483,6 +496,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/opt-in': {
+      id: '/opt-in'
+      path: '/opt-in'
+      fullPath: '/opt-in'
+      preLoaderRoute: typeof OptInRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sign-in': {
@@ -765,6 +785,7 @@ const OrgSlugRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
+  OptInRoute: OptInRoute,
   SignInRoute: SignInRoute,
   StartRoute: StartRoute,
   TodayRoute: TodayRoute,
