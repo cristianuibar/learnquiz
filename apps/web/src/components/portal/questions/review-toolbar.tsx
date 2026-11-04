@@ -27,7 +27,7 @@ export function ReviewToolbar({ search, counts, shown, inputRef, onChange, onCle
 }) {
   const urlQ = search.q ?? ''
   const [value, setValue] = useState(urlQ)
-  // The last q this field sent; a different q in the URL came from elsewhere (Clear filters, back) and replaces the text.
+  // The last q this field sent; a different q in the URL came from elsewhere (back, forward) and replaces the text.
   const sent = useRef(urlQ)
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
@@ -48,11 +48,6 @@ export function ReviewToolbar({ search, counts, shown, inputRef, onChange, onCle
   }, [value])
 
   const active = Boolean(search.q || search.unreviewed || search.flagged || search.critical || search.status)
-  const clear = () => {
-    sent.current = ''
-    setValue('')
-    onClear()
-  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -73,7 +68,7 @@ export function ReviewToolbar({ search, counts, shown, inputRef, onChange, onCle
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <p role="status" className="text-label text-ink tabular-nums">{shown === 1 ? '1 question' : `${shown} questions`}</p>
-        {active && <Button variant="link" onClick={clear}>Clear filters</Button>}
+        {active && <Button variant="link" onClick={onClear}>Clear filters</Button>}
       </div>
     </div>
   )

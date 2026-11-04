@@ -159,6 +159,31 @@ describe('question review filters', () => {
     await vi.waitFor(() => expect(stems(c)).toEqual([STEMS.q6]))
     expect(results(c)).toBe('1 question')
   })
+
+  // The search debounce is 300ms; wait past it to prove a pending search was dropped.
+  const pastDebounce = () => act(() => new Promise((r) => setTimeout(r, 400)))
+
+  it('the no-match card Clear filters drops a search still being typed', async () => {
+    const { c, router } = await mountReview('/org/x/questions?unreviewed=1&flagged=1')
+    await act(async () => setValue(search(c), 'warehouse', 'input'))
+    const card = [...c.querySelectorAll('button')].filter((b) => b.textContent === 'Clear filters')
+    await act(async () => card[1]!.click())
+    await pastDebounce()
+    expect(router.state.location.search).toEqual({})
+    expect(search(c).value).toBe('')
+    expect(document.activeElement).toBe(search(c))
+    expect(stems(c)).toHaveLength(8)
+  })
+
+  it('changing role drops a search still being typed', async () => {
+    const two = () => ({ ...(fixture() as object), roles: [{ id: 'r', name: 'Role' }, { id: 'r2', name: 'Other' }] })
+    const { c, router } = await mountAt(two(), '/org/x/questions', { ...two(), role: { id: 'r2', name: 'Other' } })
+    await act(async () => setValue(search(c), 'warehouse', 'input'))
+    await act(async () => setValue(c.querySelector('select#qs-role')!, 'r2', 'change'))
+    await pastDebounce()
+    expect(router.state.location.search).toEqual({ role: 'r2' })
+    expect(search(c).value).toBe('')
+  })
 })
 
 describe('question review outline', () => {
