@@ -217,6 +217,7 @@ export function People({ org, invite = false, readOnly = org.readOnly }: { org: 
           columns={columns}
           rows={rows}
           rowKey={(p) => (p.kind === 'member' ? p.userId : p.invitationId)}
+          actionsClassName="max-md:row-start-2 max-md:self-center max-md:justify-self-end max-md:has-[>div:empty]:hidden"
           actions={(p) => {
             if (readOnly || p.kind === 'member') return null
             const items = p.status === 'expired'
