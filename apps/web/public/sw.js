@@ -61,7 +61,14 @@ self.addEventListener('push', (event) => {
   }
   if (payload?.body || !titled) options.body = payload?.body || 'Ready for a little learning?'
   const quick = typeof payload?.url === 'string' && payload.url.match(/^\/play\/quick\/([^/?#]+)/)
-  if (quick) options.tag = `q-${decodeURIComponent(quick[1])}`
+  if (quick) {
+    // A malformed escape keeps the raw id as the tag rather than losing the notification.
+    let id = quick[1]
+    try {
+      id = decodeURIComponent(id)
+    } catch {}
+    options.tag = `q-${id}`
+  }
   event.waitUntil(self.registration.showNotification(titled ? payload.title : 'Learn Quiz', options))
 })
 

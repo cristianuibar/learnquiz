@@ -38,6 +38,12 @@ it('shows a title-only question push without a fallback body, tagged so a repeat
   expect(options.data).toEqual({ url: '/play/quick/i1?pushId=p1' })
 })
 
+it('still shows a question push whose item id is not valid percent-encoding', async () => {
+  const { self, dispatch } = worker()
+  await dispatch('push', { data: { json: () => ({ title: 'Which valve isolates the line?', url: '/play/quick/%' }) } })
+  expect(self.registration.showNotification).toHaveBeenLastCalledWith('Which valve isolates the line?', expect.objectContaining({ tag: 'q-%', data: { url: '/play/quick/%' } }))
+})
+
 it('focuses an existing app window or opens the target, refusing off-origin notification URLs', async () => {
   const { self, dispatch } = worker()
   const focus = vi.fn(async () => {})
