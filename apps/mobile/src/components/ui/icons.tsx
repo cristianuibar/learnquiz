@@ -2,6 +2,18 @@ import Svg, { Circle, Path } from 'react-native-svg'
 import type { LucideProps } from 'lucide-react-native'
 import { useTheme } from '../../theme/ThemeProvider'
 
+export function SettingsIcon({ size, color, ...props }: LucideProps) {
+  const { colors, space } = useTheme()
+  return (
+    <Svg width={size ?? space[6]} height={size ?? space[6]} color={color ?? colors.ink} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" accessible={false} {...props}>
+      <Path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h10M18 18h2" />
+      <Circle cx="15" cy="6" r="2" />
+      <Circle cx="9" cy="12" r="2" />
+      <Circle cx="16" cy="18" r="2" />
+    </Svg>
+  )
+}
+
 export function StreakIcon({ size, color, ...props }: LucideProps) {
   const { colors, space } = useTheme()
   return (
