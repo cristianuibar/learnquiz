@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react'
 import type { Profile } from '@learnquiz/api/progress'
+import { CriticalSteps } from '@/components/profile/critical-steps'
 import { EmptyMasteryCard, MasteryCard } from '@/components/profile/mastery-card'
 import { ProfileHeader } from '@/components/profile/profile-header'
+import { UnitAccordion } from '@/components/profile/unit-accordion'
 import { WeeklyTrend } from '@/components/profile/weekly-trend'
 
 // The employee's own screen and the partner's read-only view of a member render the same content.
@@ -14,6 +16,8 @@ export function TrainingProgress({ profile, self, back, action }: { profile: Pro
         <>
           <MasteryCard profile={profile} />
           <WeeklyTrend profile={profile} />
+          <UnitAccordion units={profile.units} benchmark={profile.benchmark} />
+          <CriticalSteps confidentErrors={profile.confidentErrors} />
         </>
       ) : (
         <>

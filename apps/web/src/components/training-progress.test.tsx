@@ -123,4 +123,71 @@ describe('Training progress', () => {
     expect(text()).toContain(shown)
     for (const h of hidden) expect(text()).not.toContain(h)
   })
+
+  const concept = (id: string, unitId: string, name: string, over: Partial<Profile['units'][number]['concepts'][number]> = {}) =>
+    ({ id, unitId, name, critical: false, pKnown: 0.7, measured: true, status: 'learning', ...over }) as Profile['units'][number]['concepts'][number]
+  const units: Profile['units'] = [
+    { id: 'u1', name: 'Receiving', mastery: 0.82, state: 'learning', concepts: [concept('c1', 'u1', 'Check the seal', { critical: true })] },
+    { id: 'u2', name: 'Safety', mastery: 0.4, state: 'estimate', concepts: [concept('c2', 'u2', 'Hazmat sign-off', { measured: false, status: 'not_started' })] },
+  ]
+  const section = (heading: string) => [...container.querySelectorAll('section')].find((s) => s.querySelector('h2')?.textContent === heading)!
+  const unitButton = (name: string) => [...section('By unit').querySelectorAll('h3 > button')].find((b) => b.textContent?.startsWith(name)) as HTMLButtonElement
+  const panelOf = (button: HTMLButtonElement) => document.getElementById(button.getAttribute('aria-controls')!)!
+
+  it('toggles a unit panel from its button and keeps focus on it', async () => {
+    vi.mocked(getProfile).mockResolvedValue(profile({ units }))
+    await mount('/me/profile')
+    const first = unitButton('Receiving')
+    const safety = unitButton('Safety')
+    expect(first.getAttribute('aria-expanded')).toBe('true')
+    expect(panelOf(first).hidden).toBe(false)
+    expect(panelOf(first).textContent).toContain('Check the seal')
+    expect(panelOf(first).textContent).toContain('Critical')
+    expect(safety.getAttribute('aria-expanded')).toBe('false')
+    expect(panelOf(safety).hidden).toBe(true)
+    safety.focus()
+    await act(async () => safety.click())
+    expect(safety.getAttribute('aria-expanded')).toBe('true')
+    expect(panelOf(safety).hidden).toBe(false)
+    expect(document.activeElement).toBe(safety)
+    await act(async () => first.click())
+    expect(first.getAttribute('aria-expanded')).toBe('false')
+    expect(panelOf(first).hidden).toBe(true)
+  })
+
+  it('marks a placement estimate unit with the chip and the note', async () => {
+    vi.mocked(getProfile).mockResolvedValue(profile({ units }))
+    await mount('/me/profile')
+    const safety = unitButton('Safety')
+    expect(safety.textContent).toBe('Safety~40%, placement estimate')
+    const row = safety.closest('li')!
+    expect(row.textContent).toContain('Estimate')
+    expect(unitButton('Receiving').closest('li')!.textContent).not.toContain('Estimate')
+    expect(panelOf(safety).textContent).toContain('From your placement check. Not practiced yet.')
+    expect(panelOf(unitButton('Receiving')).textContent).not.toContain('From your placement check.')
+    expect(panelOf(safety).textContent).toContain('Not started')
+  })
+
+  it('lists critical steps unresolved first with neutral chips', async () => {
+    const oct = (d: number) => Date.UTC(2026, 9, d)
+    const confidentErrors = [
+      { id: 'e1', conceptId: 'c1', concept: 'Damaged pallet: record before moving', at: oct(28), correctedAt: oct(30) },
+      { id: 'e2', conceptId: 'c2', concept: 'Hazmat cartons need sign-off', at: start, correctedAt: null },
+      { id: 'e3', conceptId: 'c3', concept: 'Lift with a spotter', at: oct(20), correctedAt: null },
+    ]
+    vi.mocked(getProfile).mockResolvedValue(profile({ confidentErrors }))
+    await mount('/org/acme/people/learner')
+    const rows = [...section('Critical steps to recheck').querySelectorAll('li')]
+    expect(rows.map((r) => r.querySelector('[data-slot="badge"]')?.textContent)).toEqual(['Comes back first', 'Comes back first', 'Corrected Oct 30'])
+    expect(rows.map((r) => r.querySelector('[data-slot="badge"]')?.getAttribute('data-variant'))).toEqual(['neutral', 'neutral', 'neutral'])
+    expect(rows[0].textContent).toContain('Hazmat cartons need sign-off')
+    expect(rows[2].textContent).toContain('Damaged pallet: record before moving')
+    expect(rows[2].textContent).toContain('Answered with confidence, missed Oct 28')
+  })
+
+  it('shows no critical steps section without confident errors', async () => {
+    vi.mocked(getProfile).mockResolvedValue(profile())
+    await mount('/me/profile')
+    expect(text()).not.toContain('Critical steps to recheck')
+  })
 })
