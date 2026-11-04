@@ -3,7 +3,8 @@ import { errorMessage } from '@/components/inline-error'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { savePushPreferences, sendTestPush, subscribe, unsubscribe } from '@/server/push'
+import { enableWebPush, needsHomeScreen } from '@/lib/web-push'
+import { savePushPreferences, sendTestPush, unsubscribe } from '@/server/push'
 
 type Preferences = { paused: boolean; startMinute: number; endMinute: number; timezone: string }
 const time = (minute: number) => `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`
@@ -27,8 +28,7 @@ export function PushSettings({ publicKey, isStaff, endpoints, prefs, prompt = fa
   const [timezone, setTimezone] = useState(prefs.timezone)
 
   useEffect(() => {
-    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-    if (ios && !(navigator as Navigator & { standalone?: boolean }).standalone && !window.matchMedia('(display-mode: standalone)').matches) {
+    if (needsHomeScreen()) {
       setAddToHome(true)
       return
     }
@@ -52,21 +52,7 @@ export function PushSettings({ publicKey, isStaff, endpoints, prefs, prompt = fa
     setMessage(null)
     try {
       if (action === 'enable') {
-        // Ask only from the user's click, never on page load.
-        const permission = await Notification.requestPermission()
-        if (permission !== 'granted') throw new Error('Allow notifications in your browser settings to enable them.')
-        const registration = await navigator.serviceWorker.ready
-        const applicationServerKey = Uint8Array.from(atob(publicKey!.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0))
-        let current = await registration.pushManager.getSubscription()
-        // A subscription this account has not saved may belong to someone who used this browser before; replace it.
-        if (current && !endpoints.includes(current.endpoint)) {
-          await current.unsubscribe()
-          current = null
-        }
-        current ??= await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey })
-        setSubscription(current)
-        const json = current.toJSON()
-        await subscribe({ data: { endpoint: current.endpoint, keys: { p256dh: json.keys!.p256dh, auth: json.keys!.auth } } })
+        setSubscription(await enableWebPush(publicKey!, endpoints))
         setEnabled(true)
         setMessage('Notifications enabled on this browser.')
       } else if (action === 'disable' && subscription) {
