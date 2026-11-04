@@ -29,6 +29,15 @@ jest.mock('./app/(tabs)/today', () => ({
   __esModule: true,
   default: () => require('react').createElement(require('react-native').Text, null, 'Today screen'),
 }))
+// The tab bar reads Today to enable Path. This file checks routing and counts
+// api calls, so the tab bar sees a fixed Today with no topic and never fetches.
+jest.mock('expo-sqlite/kv-store', () => ({ AsyncStorage: {
+  getItemAsync: async () => null, setItemAsync: async () => {}, removeItemAsync: async () => {}, getAllKeysAsync: async () => [],
+} }))
+jest.mock('./lib/today', () => ({
+  ...jest.requireActual('./lib/today'),
+  useToday: () => ({ today: null, view: null, status: 'loading', refreshing: false, refresh: async () => {} }),
+}))
 jest.mock('react-native-gesture-handler', () => ({ GestureHandlerRootView: 'View' }))
 jest.mock('react-native-keyboard-controller', () => ({
   KeyboardProvider: 'View',
@@ -131,6 +140,9 @@ test('the actual router keeps sign-in closed for a signed-in learner', async () 
   expect(navigation.getPathname()).toBe('/today')
   expect(screen.getByText('Today screen')).toBeOnTheScreen()
   expect(screen.queryByText('Sign in')).toBeNull()
+  // The tab bar is on: Today is selected, and Path waits for a topic.
+  expect(screen.getByRole('tab', { name: 'Today', selected: true })).toBeOnTheScreen()
+  expect(screen.getByRole('tab', { name: 'Path', disabled: true })).toBeOnTheScreen()
 })
 
 test('the actual router replays a held target after startup, sign-in and disclosure', async () => {
