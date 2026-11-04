@@ -6,5 +6,10 @@ import { listRoles } from '@/server/org'
 export const Route = createFileRoute('/org/$slug/roles')({
   loader: ({ params }) => listRoles({ data: { slug: params.slug } }),
   errorComponent: RouteError,
-  component: () => <Roles org={Route.useLoaderData()} />,
+  component: () => <RolesRoute />,
 })
+
+function RolesRoute() {
+  const data = Route.useLoaderData()
+  return <Roles org={data} readOnly={data.readOnly} />
+}

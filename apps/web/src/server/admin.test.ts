@@ -129,7 +129,7 @@ it('refuses every admin function for non-staff, including a company owner', asyn
 it('allows staff to read the company portal without invite secrets or company write access', async () => {
   await expect(getOrgOverview({ data: { slug: 'alpha' } })).resolves.toMatchObject({ name: 'alpha', roles: [{ id: 'alpha', name: 'alpha role' }], readOnly: true })
   await expect(getPeople({ data: { slug: 'alpha' } })).resolves.toMatchObject({ readOnly: true, people: [{ kind: 'member', email: 'learner@staff.test' }] })
-  await expect(listRoles({ data: { slug: 'alpha' } })).rejects.toMatchObject({ status: 403 })
+  await expect(listRoles({ data: { slug: 'alpha' } })).resolves.toMatchObject({ readOnly: true, roles: [{ id: 'alpha' }] })
   await expect(createRole({ data: { slug: 'alpha', name: 'Staff-created role' } })).rejects.toMatchObject({ status: 403 })
   const response = await authRequest('organization/invite-member', {
     organizationId: 'alpha', email: 'another@staff.test', role: 'member', jobRoleId: 'alpha', inviteeName: 'Another',

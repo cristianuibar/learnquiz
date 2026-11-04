@@ -5,9 +5,18 @@ import { PortalNav } from '@/components/portal/portal-nav'
 import { PortalProvider } from '@/components/portal/portal-context'
 import { getPortalShell } from '@/server/org-shell'
 
+function staffRedirect(slug: string, pathname: string) {
+  const rest = pathname.replace(/\/+$/, '').split('/').slice(3)
+  if (rest[0] === 'roles' && rest.length === 1) return redirect({ to: '/admin/companies/$slug/portal/roles', params: { slug } })
+  if (rest[0] === 'roles' && rest.length === 2) return redirect({ to: '/admin/companies/$slug/portal/roles/$roleId', params: { slug, roleId: rest[1] } })
+  return redirect({ to: '/admin/companies/$slug/portal', params: { slug } })
+}
+
 export const Route = createFileRoute('/org/$slug')({
-  beforeLoad: ({ context, location }) => {
+  beforeLoad: ({ context, location, params }) => {
     if (!context.user || context.user.isAnonymous) throw redirect({ to: '/sign-in', search: { redirect: location.href } })
+    // Learn Quiz staff who aren't owner/admin of this company get the read-only staff portal instead.
+    if (context.user.role === 'admin' && !context.adminCompanies.some((c) => c.slug === params.slug)) throw staffRedirect(params.slug, location.pathname)
   },
   loader: ({ params }) => getPortalShell({ data: { slug: params.slug } }),
   errorComponent: OrgError,

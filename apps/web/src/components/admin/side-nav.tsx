@@ -10,8 +10,9 @@ export type SideNavItem = {
 
 const focusRing = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand'
 
+// `band` offsets everything sticky/fixed by the 48px read-only band above.
 // Sticky side navigation from lg up; below lg a top bar with a Menu button opens the same nav as a sheet.
-export function SideNav({ label, header, items, foot, children }: { label: string; header: ReactNode; items: SideNavItem[]; foot?: ReactNode; children: ReactNode }) {
+export function SideNav({ label, header, items, foot, band = false, children }: { label: string; header: ReactNode; items: SideNavItem[]; foot?: ReactNode; band?: boolean; children: ReactNode }) {
   const [open, setOpen] = useState(false)
   const listId = useId()
   const menuRef = useRef<HTMLButtonElement>(null)
@@ -32,8 +33,8 @@ export function SideNav({ label, header, items, foot, children }: { label: strin
   }, [open])
 
   return (
-    <div className="grid min-h-screen content-start lg:grid-cols-[248px_minmax(0,1fr)]">
-      <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-border bg-surface-card pl-4 pr-2 lg:hidden">
+    <div className={`grid ${band ? 'min-h-[calc(100vh-48px)]' : 'min-h-screen'} content-start lg:grid-cols-[248px_minmax(0,1fr)]`}>
+      <header className={`sticky ${band ? 'top-12' : 'top-0'} z-30 flex h-14 items-center justify-between gap-2 border-b border-border bg-surface-card pl-4 pr-2 lg:hidden`}>
         <div className="flex min-w-0 items-center gap-3">{header}</div>
         <button
           ref={menuRef}
@@ -49,10 +50,10 @@ export function SideNav({ label, header, items, foot, children }: { label: strin
           </svg>
         </button>
       </header>
-      {open && <div aria-hidden="true" className="fixed inset-0 top-14 z-20 bg-scrim lg:hidden" onClick={() => setOpen(false)} />}
+      {open && <div aria-hidden="true" className={`fixed inset-0 ${band ? 'top-[104px]' : 'top-14'} z-20 bg-scrim lg:hidden`} onClick={() => setOpen(false)} />}
       <nav
         aria-label={label}
-        className={`${open ? 'fixed inset-x-0 bottom-0 top-14 z-30 flex overflow-y-auto' : 'hidden'} flex-col gap-6 border-border bg-surface-card px-3 py-4 lg:sticky lg:top-0 lg:z-auto lg:flex lg:h-screen lg:overflow-y-auto lg:border-r`}
+        className={`${open ? `fixed inset-x-0 bottom-0 ${band ? 'top-[104px]' : 'top-14'} z-30 flex overflow-y-auto` : 'hidden'} flex-col gap-6 border-border bg-surface-card px-3 py-4 lg:sticky ${band ? 'lg:top-12 lg:h-[calc(100vh-48px)]' : 'lg:top-0 lg:h-screen'} lg:z-auto lg:flex lg:overflow-y-auto lg:border-r`}
       >
         <div className="hidden min-h-11 items-center gap-3 px-2 py-1 lg:flex">{header}</div>
         <ul id={listId} className="flex flex-col gap-1">

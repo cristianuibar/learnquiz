@@ -8,7 +8,7 @@ import { Page, PageHeader } from '@/components/admin/page'
 import { Skel } from '@/components/admin/skeleton'
 import { Stat, StatsCard } from '@/components/admin/stat-figure'
 import { Status, type STATUS } from '@/components/admin/status-chip'
-import { usePortalLinks } from '@/components/portal/portal-context'
+import { usePortal, usePortalLinks } from '@/components/portal/portal-context'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { TRAINING_STATUS } from '@/lib/training-status'
@@ -66,6 +66,7 @@ function TrainingCell({ role }: { role: RoleRow }) {
 
 function RolesSection({ roles, readOnly }: { roles: RoleRow[]; readOnly: boolean }) {
   const links = usePortalLinks()
+  const { base } = usePortal()
   const columns: Column<RoleRow>[] = [
     {
       key: 'role', header: 'Role', stack: 'full',
@@ -86,6 +87,7 @@ function RolesSection({ roles, readOnly }: { roles: RoleRow[]; readOnly: boolean
       </div>
       <DataTable
         stack
+        band={base === 'staff'}
         caption="Job roles and their training status"
         columns={columns}
         rows={roles}

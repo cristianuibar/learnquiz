@@ -71,7 +71,7 @@ export function Curriculum({ detail, readOnly, controls, error, announce }: {
         {total > 0 && !running && <p className="text-body text-ink-muted">{stats}</p>}
       </div>
       {error}
-      {finished && (
+      {finished && !readOnly && (
         <Banner
           kind="info"
           action={<Button asChild variant="primary"><Link {...links.questions({ role: role.id })}>Review questions</Link></Button>}

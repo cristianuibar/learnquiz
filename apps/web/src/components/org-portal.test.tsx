@@ -55,7 +55,7 @@ it('sends signed-out visitors on a portal page to sign-in and back after login',
   }
 })
 
-it('shows the portal nav on portal pages, trimmed for Learn Quiz staff, with a working mobile menu', async () => {
+it('shows the portal nav on portal pages, with a working mobile menu', async () => {
   vi.mocked(getPeople).mockResolvedValue({ id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles: [], people: [], readOnly: false } as never)
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'u', name: 'U', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] } as never)
@@ -89,13 +89,6 @@ it('shows the portal nav on portal pages, trimmed for Learn Quiz staff, with a w
     await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
     expect(menu().getAttribute('aria-expanded')).toBe('false')
     expect(document.activeElement).toBe(menu())
-
-    vi.mocked(getPortalShell).mockResolvedValue({ ...shell, role: null, readOnly: true })
-    await act(async () => { await router.invalidate() })
-    expect(links().map((a) => a.textContent)).toEqual(['Overview', 'People'])
-    expect(container.textContent).toContain('Read only')
-    expect(container.textContent).toContain('Staff view')
-    expect(signOut()).toBeNull()
   } finally {
     await act(async () => root.unmount())
     container.remove()
