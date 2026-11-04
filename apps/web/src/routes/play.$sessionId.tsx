@@ -117,6 +117,8 @@ function Play({ initial }: { initial: SessionView }) {
   // Read by the pageshow handler, which is registered once.
   const revealShowing = useRef(false)
   revealShowing.current = Boolean(reveal)
+  // A sent report waits for the dialog to close: while it is open the live region is aria-hidden.
+  const reportPending = useRef(false)
 
   const { item, progress } = view
   const placement = view.kind === 'placement'
@@ -184,7 +186,7 @@ function Play({ initial }: { initial: SessionView }) {
   const finish = () =>
     run(async () => {
       await end({ data: { sessionId: view.id } })
-      await router.navigate({ to: '/play/$sessionId/done', params: { sessionId: view.id } })
+      await router.navigate({ to: '/play/$sessionId/done', params: { sessionId: view.id }, state: { reportSent: reportPending.current } })
     })
 
   // Answered items stay recorded; the learner returns to Today.
@@ -252,9 +254,16 @@ function Play({ initial }: { initial: SessionView }) {
   }
 
   function reportSent(why: string) {
-    setAnnouncement('Report sent')
+    reportPending.current = true
     submitNext(why)
   }
+
+  // Runs after the closed dialog has dropped aria-hidden from the page.
+  useEffect(() => {
+    if (reveal || !reportPending.current) return
+    reportPending.current = false
+    setAnnouncement('Report sent')
+  }, [reveal])
 
   const revealed = !view.ended && item && reveal ? { item, reveal } : null
   const answer = revealed ? toAnswer(revealed.item.format, choice) : null

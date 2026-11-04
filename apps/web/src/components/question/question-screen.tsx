@@ -103,7 +103,8 @@ export function QuestionScreen({
         />
       ) : (
         error && (
-          <div className="pb-3">
+          // Sticky like the dock, so a failure and its Try again stay on screen below a long question.
+          <div className="sticky bottom-0 -mx-4 border-t border-border bg-surface-page px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             {error.ending ? <InlineError message={error.message} onRetry={error.retry} /> : <ErrorRow message={error.message} />}
           </div>
         )
