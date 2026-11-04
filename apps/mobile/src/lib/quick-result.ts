@@ -142,14 +142,15 @@ export function createQuickSession(options: QuickSessionOptions): QuickSessionHa
 
   async function applySession(view: SessionView, previous: QuickSessionState, controller: AbortController): Promise<void> {
     if (view.ended || view.item === null) {
-      // Auto-ending a retired/flagged mini session has zero answers.
+      // Auto-ending a retired/flagged mini session has zero answers. An ungraded
+      // short answer records no attempt, so it counts only in `ungraded`.
       const summary = await request<SummaryView>(`/sessions/${encodeURIComponent(view.id)}/end`, {
         method: 'POST', signal: controller.signal,
       })
       if (aborted(controller)) return
       sessionId = null
       submission = null
-      emit({ status: summary.total > 0 ? 'answered' : 'unavailable' })
+      emit({ status: summary.total + (summary.ungraded ?? 0) > 0 ? 'answered' : 'unavailable' })
       return
     }
     const keep = (previous.status === 'question' || previous.status === 'checking')
