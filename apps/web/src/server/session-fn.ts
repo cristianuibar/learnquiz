@@ -37,7 +37,7 @@ export const getSessionFn = createServerFn({ method: 'GET' }).handler(
       .filter(({ role }) => role.split(',').some((r) => r === 'owner' || r === 'admin'))
       .map(({ name, slug }) => ({ name, slug }))
     return {
-      user: user && { id: user.id, name: user.name, isAnonymous: Boolean(user.isAnonymous), role: user.role },
+      user: user && { id: user.id, name: user.name, email: user.email, isAnonymous: Boolean(user.isAnonymous), role: user.role },
       facebookEnabled: facebookEnabled(),
       needsDisclosure: Boolean(unconsented),
       companyMember: companies.length > 0,

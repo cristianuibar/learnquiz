@@ -28,17 +28,18 @@ function PortalRoot() {
   return <PortalProvider slug={slug ?? ''} base="org" readOnly={false}><Outlet /></PortalProvider>
 }
 
-async function mount(path: string, component: RouteComponent, init: string, loader?: () => unknown) {
+async function mount(path: string, component: RouteComponent, init: string, loader?: () => unknown, context?: object) {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   const rootRoute = createRootRoute({ component: PortalRoot })
   const route = createRoute({ getParentRoute: () => rootRoute, path, component, loader })
-  const router = createRouter({ routeTree: rootRoute.addChildren([route]), history: createMemoryHistory({ initialEntries: [init] }) })
+  const slugRoute = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', component: () => <p>Company page</p> })
+  const router = createRouter({ routeTree: rootRoute.addChildren([route, slugRoute]), history: createMemoryHistory({ initialEntries: [init] }), context } as never)
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
   roots.push({ unmount: () => root.unmount(), container })
   await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
-  return container
+  return Object.assign(container, { router })
 }
 
 async function type(input: HTMLInputElement, value: string) {
@@ -59,10 +60,14 @@ function described(container: HTMLElement, id: string) {
   return { input, text: target?.textContent }
 }
 
+const label = (c: HTMLElement, text: string) =>
+  [...c.querySelectorAll('label')].find((l) => l.textContent?.includes(text))!.control as HTMLInputElement
+
 it.each(['   ', ' '])('shows a plain role-name message on /org/new for whitespace-only input %j', async (role) => {
-  const container = await mount('/org/new', newRoute.options.component!, '/org/new')
-  await type(container.querySelector<HTMLInputElement>('#name')!, 'Acme')
-  await type(container.querySelector<HTMLInputElement>('#role')!, role)
+  const container = await mount('/org/new', newRoute.options.component!, '/org/new', undefined, { user: { email: 'dana@northwind.test' } })
+  expect(container.textContent).toContain('Signed in as dana@northwind.test')
+  await type(label(container, 'Company name'), 'Acme')
+  await type(label(container, 'First job role'), role)
   await submit(container)
   const { input, text } = described(container, 'role')
   expect(text).toBe('Enter a role name')
@@ -70,6 +75,31 @@ it.each(['   ', ' '])('shows a plain role-name message on /org/new for whitespac
   expect(document.activeElement).toBe(input)
   expect(createCompany).not.toHaveBeenCalled()
   expect(container.textContent).not.toContain('"code"')
+})
+
+it('keeps the entries and focuses the submit button when creating the company fails', async () => {
+  vi.mocked(createCompany).mockRejectedValueOnce(new Error('Server said no'))
+  const container = await mount('/org/new', newRoute.options.component!, '/org/new')
+  await type(label(container, 'Company name'), 'Acme')
+  await type(label(container, 'First job role'), 'Cashier')
+  const button = container.querySelector<HTMLButtonElement>('button[type="submit"]')!
+  await act(async () => { button.focus(); container.querySelector('form')!.requestSubmit(button) })
+  const alert = container.querySelector('[role="alert"]')!
+  expect(alert.textContent).toContain("Couldn't create the company.")
+  expect(alert.textContent).toContain('Server said no')
+  expect(alert.textContent).toContain('Your entries are still here.')
+  expect(label(container, 'Company name').value).toBe('Acme')
+  expect(label(container, 'First job role').value).toBe('Cashier')
+  expect(document.activeElement).toBe(button)
+})
+
+it('opens the new company once it is created', async () => {
+  vi.mocked(createCompany).mockResolvedValueOnce({ slug: 'acme' } as never)
+  const container = await mount('/org/new', newRoute.options.component!, '/org/new')
+  await type(label(container, 'Company name'), 'Acme')
+  await type(label(container, 'First job role'), 'Cashier')
+  await submit(container)
+  expect(container.router.state.location.pathname).toBe('/org/acme')
 })
 
 it.each(['   ', ' '])('shows a plain role-name message on the roles screen for whitespace-only input %j', async (role) => {
