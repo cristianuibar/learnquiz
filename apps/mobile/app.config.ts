@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import type { ExpoConfig } from 'expo/config'
 
 export default function config(): ExpoConfig {
-  const projectId = process.env.EAS_PROJECT_ID
+  const projectId = process.env.EAS_PROJECT_ID || '580a4fa9-148e-4503-a37e-1e630a9e249a'
   return {
     name: 'Learn Quiz',
     slug: 'learnquiz',
@@ -46,9 +46,7 @@ export default function config(): ExpoConfig {
       ['expo-audio', { recordAudioAndroid: true, enableBackgroundPlayback: false }],
     ],
     runtimeVersion: { policy: 'fingerprint' },
-    ...(projectId && {
-      extra: { eas: { projectId } },
-      updates: { url: `https://u.expo.dev/${projectId}` },
-    }),
+    extra: { eas: { projectId } },
+    updates: { url: `https://u.expo.dev/${projectId}` },
   }
 }
