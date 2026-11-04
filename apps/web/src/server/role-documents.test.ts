@@ -21,12 +21,13 @@ vi.mock('@tanstack/react-start', () => ({
 }))
 vi.mock('@tanstack/react-start/server', () => ({ getRequestHeaders: () => new Headers() }))
 vi.mock('@/db', () => ({ getDb: () => state.db }))
-vi.mock('@/server/env', () => ({ getEnv: () => ({ MEDIA: state.bucket }), runInBackground: (task: Promise<unknown>) => { state.background.push(task) } }))
+vi.mock('@/server/env', () => ({ getEnv: () => ({ MEDIA: state.bucket, BETTER_AUTH_URL: 'http://127.0.0.1:8800' }), runInBackground: (task: Promise<unknown>) => { state.background.push(task) } }))
 vi.mock('@/server/concept-gen', () => ({ drainConceptQueue: drain }))
 vi.mock('@/server/session', () => ({ getSessionUser: async () => state.user ? { id: state.user, isAnonymous: state.anonymous } : null }))
 vi.mock('@/server/auth', () => ({ getAuth: () => ({ api: { getSession: async () => state.user ? { user: { id: state.user, isAnonymous: state.anonymous }, session: { activeOrganizationId: state.active } } : null } }) }))
 
-import { MAX_ROLE_DOCUMENT_CHARS } from '@/lib/limits'
+import { MAX_ROLE_DOCUMENT_BYTES, MAX_ROLE_DOCUMENT_CHARS } from '@/lib/limits'
+import { Route } from '@/routes/api/org.$orgId.roles.$roleId.documents'
 import { retireRoleDocument, uploadRoleDocument } from './role-documents'
 
 let sqlite: DatabaseSync
@@ -273,4 +274,45 @@ it('refuses retiring a document for a plain member', async () => {
   state.user = 'member-a'
   await expect(retireRoleDocument({ data: { slug: 'acme', roleId: 'role-a', sourceId: 'src-1' } })).rejects.toMatchObject({ status: 403 })
   expect(itemStatus()['item-1']).toBe('active')
+})
+
+// The browser upload route: same handler as the server function, with the org and role taken from the URL.
+const post = (body: FormData, origin = 'http://127.0.0.1:8800') => (Route.options.server!.handlers as unknown as {
+  POST: (ctx: { request: Request; params: { orgId: string; roleId: string } }) => Promise<Response>
+}).POST({
+  request: new Request('http://127.0.0.1:8800/api/org/acme/roles/role-a/documents', { method: 'POST', headers: { Origin: origin }, body }),
+  params: { orgId: 'acme', roleId: 'role-a' },
+})
+
+it('stores a PDF posted to the upload route, taking the company and role from the URL', async () => {
+  const response = await post(form({ slug: 'globex', roleId: 'role-b', file: textPdf() }))
+  const result = await response.json() as { sourceId: string }
+  const key = `orgs/org-a/roles/role-a/sources/${result.sourceId}.pdf`
+  expect(response.status).toBe(200)
+  expect(result).toEqual({ sourceId: result.sourceId, topicId: 'topic-role-a', r2Key: key, chars: SENTENCE.length, version: 1 })
+  expect(state.bucket.put).toHaveBeenCalledTimes(1)
+  expect(state.bucket.put.mock.calls[0][0]).toBe(key)
+  expect(sqlite.prepare('SELECT topic_id, uploaded_by FROM sources WHERE id = ?').get(result.sourceId)).toEqual({ topic_id: 'topic-role-a', uploaded_by: 'owner-a' })
+})
+
+it('answers 413 from the upload route for a file over the size limit, storing nothing', async () => {
+  const bytes = new Uint8Array(MAX_ROLE_DOCUMENT_BYTES + 1)
+  bytes.set(Buffer.from('%PDF-'))
+  const big = new File([bytes], 'Big.pdf', { type: 'application/pdf' })
+  const response = await post(form({ file: big }))
+  expect(response.status).toBe(413)
+  expect(await response.json()).toEqual({ error: 'Documents must be 10 MB or smaller' })
+  expect(state.bucket.put).not.toHaveBeenCalled()
+  expect(sourceRows()).toEqual([])
+})
+
+it.each([
+  ['a foreign origin', 'owner-a', 'https://evil.example'],
+  ['a plain member', 'member-a', 'http://127.0.0.1:8800'],
+] as const)('answers 403 from the upload route for %s, storing nothing', async (_label, user, origin) => {
+  state.user = user
+  const response = await post(form({ file: textPdf() }), origin)
+  expect(response.status).toBe(403)
+  expect(state.bucket.put).not.toHaveBeenCalled()
+  expect(sourceRows()).toEqual([])
 })
