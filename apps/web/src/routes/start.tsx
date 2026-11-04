@@ -66,7 +66,7 @@ function Start() {
   return (
     <main className="mx-auto w-full max-w-xl px-4 pt-8 pb-16">
       <div className="mb-8 flex items-baseline justify-between gap-4">
-        <h1 className="text-3xl font-bold tracking-tight">What do you want to learn?</h1>
+        <h1 className="text-title-1 text-ink">What do you want to learn?</h1>
         <span className="shrink-0 text-sm font-medium text-muted-foreground">1 of 2</span>
       </div>
       {status === 'idle' ? (

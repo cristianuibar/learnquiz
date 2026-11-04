@@ -154,7 +154,7 @@ it('shows status, progress toward benchmark and last active for each person', as
     const items = [...container.querySelectorAll('li')].map((li) => li.textContent)
     expect(items.some((t) => t!.includes('Ana') && t!.includes('Invited'))).toBe(true)
     const ben = items.find((t) => t!.includes('Ben'))!
-    expect(ben).toContain('Active')
+    expect(ben).toContain('Still learning')
     expect(ben).toContain('50% of benchmark')
     expect(ben).toContain('Last active: 5 Mar 2026')
     const cy = items.find((t) => t!.includes('Cy'))!
@@ -177,6 +177,30 @@ it('shows the training figures on the overview, with a dash for unknown values',
     expect(figures).toEqual({
       Employees: '4', Proficient: '1', 'Average days to proficiency': '-', 'Critical-step errors this week': '2', 'Documents waiting for review': '-',
     })
+  } finally {
+    await cleanup()
+  }
+})
+
+it('tells an admin to invite the first employee when the company has no members', async () => {
+  vi.mocked(getPeople).mockResolvedValue({ id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles: [], readOnly: false, invites: [], members: [] } as never)
+  const { container, cleanup } = await renderAt('/org/x/people', { path: '/people', loader: peopleRoute.options.loader as (ctx: { params: { slug: string } }) => ReturnType<typeof getPeople>, component: peopleRoute.options.component })
+  try {
+    expect(container.textContent).toContain('Invite your first employee.')
+  } finally {
+    await cleanup()
+  }
+})
+
+it('links an empty job role list on the overview to the roles page', async () => {
+  vi.mocked(getOrgOverview).mockResolvedValue({
+    id: 'org', name: 'Acme', slug: 'x', readOnly: false, roles: [],
+    training: { employees: 0, proficientEmployees: 0, daysToProficiency: null, criticalErrorsThisWeek: 0, documentsToReview: 0 },
+  } as never)
+  const { container, cleanup } = await renderAt('/org/x', { path: '/', loader: indexRoute.options.loader as (ctx: { params: { slug: string } }) => ReturnType<typeof getOrgOverview>, component: indexRoute.options.component })
+  try {
+    const link = [...container.querySelectorAll('main a')].find((a) => a.textContent === 'Create your first job role.')
+    expect(link?.getAttribute('href')).toBe('/org/x/roles')
   } finally {
     await cleanup()
   }

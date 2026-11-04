@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { z } from 'zod'
 import { errorMessage, RouteError } from '@/components/inline-error'
 import { Button } from '@/components/ui/button'
@@ -40,7 +40,7 @@ function Users() {
 
   return (
     <main>
-      <h1 className="text-3xl font-bold tracking-tight">Users</h1>
+      <h1 className="text-title-1 text-ink">Users</h1>
       <form className="mt-8 flex flex-wrap items-end gap-3" onSubmit={(event) => {
         event.preventDefault()
         const form = new FormData(event.currentTarget)
@@ -52,13 +52,15 @@ function Users() {
       </form>
       {error && <p role="alert" className="mt-4 font-medium text-wrong">{error}</p>}
       <p role="status" className="mt-6">{plural(total, 'user', 'users')} found</p>
-      {users.length === 0 && <p className="mt-4">No users on this page.</p>}
+      {users.length === 0 && (search.offset > 0
+        ? <p className="mt-4">No users on this page. <Link to="/admin/users" search={{ ...search, offset: 0 }} className="inline-flex min-h-11 items-center rounded-md underline focus-visible:ring-[3px] focus-visible:ring-ring/50">Go to page 1</Link></p>
+        : <p className="mt-4">{search.search ? 'No users match this search. Try another name or email.' : 'No users have signed up yet.'}</p>)}
       <ul className="mt-4 flex flex-col gap-4">
         {users.map((user) => (
           <li key={user.id} className="rounded-lg border p-4">
-            <p className="font-medium">{user.name} <span className="font-normal text-muted-foreground">{user.email}</span></p>
-            <p className="mt-1 text-sm">{user.role || 'user'} · {user.banned ? 'Banned' : 'Active'}</p>
-            {user.banned && user.banReason && <p className="mt-2 text-sm">{user.banReason}</p>}
+            <p className="font-medium">{user.name} <span className="font-normal text-ink-muted">{user.email}</span></p>
+            <p className="mt-1 text-body">{user.role || 'user'} · {user.banned ? 'Banned' : 'Active'}</p>
+            {user.banned && user.banReason && <p className="mt-2 text-body">{user.banReason}</p>}
             {user.id !== staff.id && (user.banned
               ? <Button className="mt-4" variant="secondary" disabled={busy} onClick={() => void changeBan(user.id, false)} aria-label={`Unban ${user.email}`}>Unban</Button>
               : <form className="mt-4 flex flex-wrap items-end gap-3" onSubmit={(event) => {

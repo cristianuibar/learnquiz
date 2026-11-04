@@ -34,7 +34,7 @@ function Path() {
   const estimated = (unit: (typeof units)[number]) => learner.placed && unit.unlocked && !unit.measured
   return (
     <main className="mx-auto w-full max-w-2xl px-4 pt-8 pb-4">
-      <h1 className="text-3xl font-bold tracking-tight">{topic.title}</h1>
+      <h1 className="text-title-1 text-ink">{topic.title}</h1>
       <ModelLabel model={topic.generatedBy} />
       <ModelTrace key={topic.id} scope={{ scope: 'topic', topicId: topic.id }} />
       {learner.placed ? (

@@ -21,7 +21,7 @@ it('uses the singular for a one-day onboarding period on the company page', asyn
     const root = createRoot(container)
     try {
       await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
-      expect(container.querySelector('li .text-sm')!.textContent).toMatch(new RegExp(`${text}$`))
+      expect(container.querySelector('li p:last-child')!.textContent).toMatch(new RegExp(`${text}$`))
     } finally {
       await act(async () => root.unmount())
       container.remove()
