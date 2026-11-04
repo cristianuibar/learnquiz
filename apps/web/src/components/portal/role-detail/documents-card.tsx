@@ -140,6 +140,7 @@ export function DocumentsCard({ detail, readOnly, pasteOpen, onTogglePaste, pane
               name={sending ? state.file.name : finishing!.name}
               loaded={sending ? state.loaded : finishing!.size}
               total={sending ? state.total : finishing!.size}
+              sent={!sending || Boolean(state.sent)}
               onCancel={cancel}
             />
           )}
