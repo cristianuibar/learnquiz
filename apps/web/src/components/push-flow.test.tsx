@@ -256,6 +256,27 @@ it('tries once more to end the quick session when the learner leaves before a re
   } finally { await cleanup() }
 })
 
+it('tries once more to end the quick session when a retry still in flight at leaving fails', async () => {
+  mockQuickAnswer()
+  let failRetry: ((err: Error) => void) | undefined
+  vi.mocked(endSession).mockRejectedValueOnce(new Error('Network down'))
+    .mockImplementationOnce(() => new Promise((_, reject) => { failRetry = reject }))
+  const { container, router, cleanup } = await renderApp('/play/quick/i1?pushId=push-1')
+  try {
+    vi.useFakeTimers()
+    await checkQuick(container)
+    await act(async () => vi.advanceTimersByTime(1000))
+    expect(endSession).toHaveBeenCalledTimes(2)
+    vi.useRealTimers()
+    const back = [...document.body.querySelectorAll<HTMLAnchorElement>('a[href="/today"]')].find((a) => a.textContent?.trim() === 'Back to Today')!
+    await act(async () => back.click())
+    expect(router.state.location.pathname).toBe('/today')
+    expect(endSession).toHaveBeenCalledTimes(2)
+    await act(async () => failRetry!(new Error('Network down')))
+    expect(vi.mocked(endSession).mock.calls).toEqual(Array(3).fill([{ data: { sessionId: 'mini-1' } }]))
+  } finally { vi.useRealTimers(); await cleanup() }
+})
+
 it('announces Report sent on the result only after the report sheet stops hiding the page', async () => {
   mockQuickAnswer()
   vi.mocked(reportItem).mockResolvedValue({ ok: true } as never)

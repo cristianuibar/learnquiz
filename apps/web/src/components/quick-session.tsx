@@ -109,27 +109,30 @@ function ResultView({ sessionId, item, result }: { sessionId: string; item: Item
   useEffect(() => {
     if (result.reviewsLeft !== null) return
     let done = false
+    let left = false
     let timer: ReturnType<typeof setTimeout> | undefined
+    // Leaving the result page tries once more instead of dropping the session.
+    const last = () => void end({ data: { sessionId } }).catch(() => {})
     const retry = (delay: number) => {
       timer = setTimeout(() => {
         timer = undefined
         end({ data: { sessionId } }).then((s) => {
           done = true
-          setReviewsLeft(s.reviewsLeft)
+          if (!left) setReviewsLeft(s.reviewsLeft)
         }, (err) => {
           if (goneState(err)) done = true
-          else if (!done) retry(Math.min(delay * 2, 30_000))
+          else if (left) last()
+          else retry(Math.min(delay * 2, 30_000))
         })
       }, delay)
     }
     retry(1000)
     return () => {
-      // Leaving the result page tries once more instead of dropping the session.
-      if (done) return
-      done = true
-      if (timer !== undefined) {
+      left = true
+      // A call still in flight makes the last try itself if it fails.
+      if (!done && timer !== undefined) {
         clearTimeout(timer)
-        void end({ data: { sessionId } }).catch(() => {})
+        last()
       }
     }
   }, [end, sessionId, result.reviewsLeft])
