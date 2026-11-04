@@ -78,11 +78,13 @@ export async function ensureConceptItems(
     // A refused claim on a dead concept must not fall through to generating unclaimed.
     const [dead] = await db.select({ id: concepts.id }).from(concepts).where(and(eq(concepts.id, concept.id), sql`not (${liveConcept()})`))
     if (dead) return existing.map(asItem)
-    const status = async () => (await db.select({ s: concepts.genStatus }).from(concepts).where(eq(concepts.id, concept.id)))[0]?.s
-    if ((await status()) === 'generating') {
+    const status = async () => (await db.select({ s: concepts.genStatus, startedAt: concepts.genStartedAt }).from(concepts).where(eq(concepts.id, concept.id)))[0]
+    const current = await status()
+    // A stale claim has no live writer; a capped caller that may not reclaim it refuses instead of waiting for nothing.
+    if (current?.s === 'generating' && (current.startedAt ?? 0) >= now - STALE_CLAIM_MS) {
       // Wait for the in-flight writer, then read what it stored without spending the cap again.
       const deadline = Date.now() + JOIN_MAX_WAIT_MS
-      while ((await status()) === 'generating' && Date.now() < deadline) await new Promise((r) => setTimeout(r, JOIN_POLL_MS))
+      while ((await status())?.s === 'generating' && Date.now() < deadline) await new Promise((r) => setTimeout(r, JOIN_POLL_MS))
       const stored = await db
         .select()
         .from(items)
