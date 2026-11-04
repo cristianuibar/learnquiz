@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AccessibilityInfo, findNodeHandle, Pressable, View, type Text as NativeText } from 'react-native'
+import { AccessibilityInfo, findNodeHandle, View, type Text as NativeText } from 'react-native'
 import { useFocusEffect, useRouter } from 'expo-router'
-import { ChevronRight } from 'lucide-react-native'
 import type { Profile as ProfileData } from '@learnquiz/api/progress'
 import type { Today } from '@learnquiz/api/today'
 import { MasteryCard } from '@/components/profile/MasteryCard'
@@ -14,7 +13,7 @@ import { AlertRow } from '@/components/ui/AlertRow'
 import { Button } from '@/components/ui/Button'
 import { Screen } from '@/components/ui/Screen'
 import { Text } from '@/components/ui/Text'
-import { endSession, useSession } from '@/lib/session-store'
+import { useSession } from '@/lib/session-store'
 import { api, ApiError } from '@/lib/api'
 import { getToken } from '@/lib/auth'
 import { firstSessionParams } from '@/lib/profile-progress'
@@ -30,7 +29,7 @@ type ProgressState = {
 }
 
 export default function Profile() {
-  const { colors, space, sizes } = useTheme()
+  const { space } = useTheme()
   const router = useRouter()
   const { user, status: sessionStatus } = useSession()
   const token = getToken()
@@ -133,8 +132,6 @@ export default function Profile() {
     })()
     return () => controller.abort()
   }, [token, sessionStatus, attempt]))
-  const [focused, setFocused] = useState(false)
-  const [busy, setBusy] = useState(false)
   const retry = () => {
     retryStartedWithFocus.current = true
     setAttempt((value) => value + 1)
@@ -145,18 +142,6 @@ export default function Profile() {
       Try again
     </Button>
   )
-
-  const handleSignOut = async () => {
-    if (busy) return
-    setBusy(true)
-    // endSession() never rejects and always drops the session, so the route guard
-    // alone moves the learner to sign-in, even when cleanup or push unregistration fails.
-    try {
-      await endSession()
-    } finally {
-      setBusy(false)
-    }
-  }
 
   return (
     <Screen contentContainerStyle={{ paddingTop: space[2], paddingBottom: space[8] }}
@@ -195,41 +180,6 @@ export default function Profile() {
           ) : <ProfileEmpty profile={profile} />)}
         </>
       )}
-      <View style={{ gap: space[1] }}>
-        <Text header variant="title3">
-          Account
-        </Text>
-        <Pressable
-          accessible
-          focusable
-          accessibilityRole="link"
-          accessibilityLabel="What we record"
-          onPress={() => router.push({ pathname: '/welcome', params: { review: '1' } })}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          style={({ pressed }) => ({
-            minHeight: sizes.topbarH,
-            paddingVertical: space[3],
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: space[3],
-            backgroundColor: pressed ? colors.surfaceSunken : 'transparent',
-            outlineWidth: focused ? 2 : 0,
-            outlineOffset: 2,
-            outlineColor: colors.brand,
-          })}
-        >
-          <Text variant="bodyLg" style={{ flex: 1 }} importantForAccessibility="no">
-            What we record
-          </Text>
-          <ChevronRight size={space[6]} color={colors.inkMuted} strokeWidth={2} accessible={false} />
-        </Pressable>
-        <View style={{ paddingTop: space[3] }}>
-          <Button variant="secondary" busy={busy} onPress={handleSignOut}>
-            Sign out
-          </Button>
-        </View>
-      </View>
     </Screen>
   )
 }
