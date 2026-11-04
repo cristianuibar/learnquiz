@@ -149,11 +149,17 @@ function Summary({ summary, finished, toToday, active }: {
   const onContinue = async () => {
     if (pending || !active.current) return
     setPending(true)
+    // A blur during the lookup drops this tap; the refocused Summary is usable again.
+    const dropped = () => {
+      if (active.current) return false
+      setPending(false)
+      return true
+    }
     try {
       await finished
-      if (!active.current) return
+      if (dropped()) return
       const [counts, permission] = await Promise.all([readPromptCounts(), Notifications.getPermissionsAsync()])
-      if (!active.current) return
+      if (dropped()) return
       const prompt = shouldPromptOptIn({
         ...counts,
         permission: permission.status as PushPermission,
@@ -162,7 +168,7 @@ function Summary({ summary, finished, toToday, active }: {
       if (prompt) router.replace('/opt-in')
       else toToday()
     } catch {
-      if (active.current) toToday()
+      if (!dropped()) toToday()
     }
   }
 
