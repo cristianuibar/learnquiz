@@ -11,13 +11,13 @@ afterEach(async () => {
   for (const c of cleanups.splice(0)) await c()
 })
 
-async function setup() {
+async function setup(from = '2026-10-05') {
   const onApply = vi.fn()
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
   await act(async () => {
-    root.render(<DateRange from="2026-10-05" to="2026-11-03" max="2026-11-03" onApply={onApply} />)
+    root.render(<DateRange from={from} to="2026-11-03" max="2026-11-03" onApply={onApply} />)
   })
   cleanups.push(async () => { await act(async () => root.unmount()); container.remove() })
   return onApply
@@ -60,6 +60,16 @@ describe('DateRange', () => {
     await keydown(document.activeElement!, 'PageDown')
     await keydown(document.activeElement!, 'PageDown')
     expect(active()).toBe('October 17, 2026, in range')
+  })
+
+  it('opens a range that starts before the shown months with focus on its end day', async () => {
+    await setup('2026-08-06')
+    await click(trigger())
+    expect(document.body.textContent).not.toContain('August 2026')
+    const stops = [...document.querySelectorAll<HTMLButtonElement>('[role="grid"] button')].filter((b) => b.tabIndex === 0)
+    expect(stops).toHaveLength(1)
+    expect(stops[0]).toBe(document.activeElement)
+    expect(active()).toBe('November 3, 2026, end')
   })
 
   it('picks a new range, applies it and returns focus to the trigger', async () => {
