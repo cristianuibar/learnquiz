@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { brandCss } from '@learnquiz/tokens'
-import { HeadContent, Outlet, Scripts, createRootRoute, redirect, useLocation, useRouterState } from '@tanstack/react-router'
+import { HeadContent, Outlet, Scripts, createRootRoute, redirect, useLocation, useRouter, useRouterState } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 import { BottomNav } from '@/components/bottom-nav'
@@ -68,12 +68,19 @@ function Root() {
   const bare = /^\/(?:join\/.*|welcome|sign-in|today|me\/profile|me\/flag|me\/settings|play(?:\/.*)?|opt-in|t\/.*|org\/.*|admin(?:\/.*)?)\/?$/.test(pathname) // screens that bring their own header
   const nav = user && /^\/(?:today|t\/[^/]+\/path|me|me\/profile)\/?$/.test(pathname) // the four bottom-nav screens
   const resolved = useRouterState({ select: (s) => s.resolvedLocation?.pathname })
+  const router = useRouter()
   const first = useRef(true)
 
   // After a navigation, move focus to the new page's heading (not on first load).
   useEffect(() => {
     if (first.current) {
       first.current = false
+      return
+    }
+    const key = router.state.resolvedLocation?.state.focus
+    const control = key && document.querySelector<HTMLElement>(`[data-focus="${key}"]`)
+    if (control) {
+      control.focus()
       return
     }
     const h1 = document.querySelector('h1')

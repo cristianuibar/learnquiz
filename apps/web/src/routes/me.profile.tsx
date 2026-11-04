@@ -34,7 +34,7 @@ function MyProfile() {
       status={status === 'flag-sent' ? <p role="status" className="text-body text-ink">Flag sent</p> : undefined}
       trailing={!user?.isAnonymous && (
         <Button asChild variant="ghost" size="icon" className="text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
-          <Link to="/me/settings" aria-label="Settings"><SlidersHorizontal aria-hidden className="size-6" /></Link>
+          <Link to="/me/settings" data-focus="settings" aria-label="Settings"><SlidersHorizontal aria-hidden className="size-6" /></Link>
         </Button>
       )}
       action={first && <StartButton topicId={first.topicId} placement={first.placement} size="lg">Play first session</StartButton>}
