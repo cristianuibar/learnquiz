@@ -45,6 +45,15 @@ beforeEach(() => {
   vi.mocked(getPortalShell).mockResolvedValue(shell)
   vi.mocked(getStaffSession).mockResolvedValue({ name: 'Sam', failedJobs: 0 } as never)
   vi.mocked(getRoleDetail).mockResolvedValue(detail as never)
+  vi.mocked(getOrgOverview).mockResolvedValue({
+    name: 'Northwind', slug: 'northwind', readOnly: true, nextStep: null,
+    roles: [{ ...detail.role, documents: 1, failedDocuments: 0, conceptsReady: 3, conceptsTotal: 12, preparing: true, topicStatus: 'generating' }],
+    training: { employees: 0, proficientEmployees: 0, daysToProficiency: null, criticalErrorsThisWeek: 0, documentsToReview: 0, firstProficientUserId: null, openErrorUserId: null },
+  } as never)
+  vi.mocked(listRoles).mockResolvedValue({
+    name: 'Northwind', slug: 'northwind', readOnly: true,
+    roles: [{ ...detail.role, topicStatus: 'ready', documentCount: 1, failedDocuments: 0, conceptsReady: 12, conceptsTotal: 12, preparing: false, peopleCount: 3 }],
+  })
   session('admin')
 })
 
@@ -81,6 +90,21 @@ async function renderAt(path: string) {
   cleanups.push(async () => { await act(async () => root.unmount()); container.remove() })
   return { container, router }
 }
+
+it.each([
+  ['Picker', '/roles/picker', 'Picker'],
+  ['All roles', '/roles', 'Roles'],
+  ['Watch the build', '/roles/picker', 'Picker'],
+])('opens %s from the read-only staff Overview', async (label, destination, heading) => {
+  const { container, router } = await renderAt('/admin/companies/northwind/portal')
+  expect(container.querySelector('h1')?.textContent).toBe('Overview')
+  const link = [...container.querySelectorAll<HTMLAnchorElement>('main a')].find((a) => a.textContent === label)
+  expect(link?.getAttribute('href')).toBe(`/admin/companies/northwind/portal${destination}`)
+  await act(async () => { link!.click() })
+  await vi.waitFor(() => expect(router.state.location.pathname).toBe(`/admin/companies/northwind/portal${destination}`))
+  expect(container.querySelector('h1')?.textContent).toBe(heading)
+  expect(container.querySelector('[aria-label="Read-only view"]')).not.toBeNull()
+})
 
 it('shows a role to staff with no way to change anything', async () => {
   const { container } = await renderAt('/admin/companies/northwind/portal/roles/picker')
