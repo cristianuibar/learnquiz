@@ -129,6 +129,27 @@ it.each<[string, string, boolean]>([
   expect(gradeAnswer({ ...base, format: 'cloze', accepted_answers: [accepted] }, { text }).correct).toBe(correct)
 })
 
+it.each<[string, string, boolean]>([
+  ['7', '-7', false],
+  ['-7', '7', false],
+  ['0.5', '-0.5', false],
+  ['12', '1/2', false],
+  ['1/2', '12', false],
+  ['123456', '-123456', false],
+  ['123456', '123/456', false],
+  ['0.123456', '-0.123456', false],
+  ['-7', '-7', true],
+  ['-0.5', '-0.5', true],
+  ['1/2', '1/2', true],
+  [' 1 / 2 ', '1/2', true],
+  ['−7', '-7', true],
+  ['.5', '5', false],
+  ['-.5', '-5', false],
+  ['-.5', '-.5', true],
+])('cloze preserves mathematical syntax: %j vs accepted %j', (text, accepted, correct) => {
+  expect(gradeAnswer({ ...base, format: 'cloze', accepted_answers: [accepted] }, { text }).correct).toBe(correct)
+})
+
 it('never serves an order item in the stored order, deterministically per seed', () => {
   const item = { id: 'i', conceptId: 'c', conceptName: 'C', format: 'order' as const, difficultyPrior: 3, payload: order }
   for (let n = 0; n < 200; n++) {

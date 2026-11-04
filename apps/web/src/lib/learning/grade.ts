@@ -12,6 +12,11 @@ export function normalize(text: string): string {
     .trim()
 }
 
+function numericExpression(text: string): string | null {
+  if (!/\d/.test(text) || !/^[\d\s.+/−-]+$/.test(text)) return null
+  return text.trim().replace(/−/g, '-').replace(/\s*([+/-])\s*/g, '$1')
+}
+
 // True when a and b differ by at most one insertion, deletion or substitution.
 function withinOneEdit(a: string, b: string): boolean {
   if (Math.abs(a.length - b.length) > 1) return false
@@ -59,10 +64,16 @@ export function gradeAnswer(payload: ItemPayload, answer: Answer) {
   }
   if (payload.format === 'cloze') {
     const given = normalize(answer.text ?? '')
+    const givenNumber = numericExpression(answer.text ?? '')
     const correct = payload.accepted_answers.some((a) => {
+      const wantNumber = numericExpression(a)
+      // Compare numeric expressions before prose normalization or typo tolerance.
+      if (givenNumber !== null || wantNumber !== null) {
+        if (givenNumber === null || wantNumber === null) return false
+        if (/^\d+$/.test(givenNumber) && /^\d+$/.test(wantNumber)) return BigInt(givenNumber) === BigInt(wantNumber)
+        return givenNumber === wantNumber
+      }
       const want = normalize(a)
-      if (/^\d+$/.test(given) && /^\d+$/.test(want)) return BigInt(given) === BigInt(want)
-      if (/^[\d.]+$/.test(want)) return given === want
       return given === want || (want.length >= 6 && withinOneEdit(given, want))
     })
     return { correct, correctAnswer: payload.accepted_answers[0] ?? payload.model_answer, chosenFeedback: null }
