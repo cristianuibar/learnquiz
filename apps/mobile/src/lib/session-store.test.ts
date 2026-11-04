@@ -61,6 +61,16 @@ test('a missing token resolves signed out without making protected calls', async
   expect(api).not.toHaveBeenCalled()
 })
 
+test.each([false, true])('retains companyMember=%s from /session across an offline relaunch', async (companyMember) => {
+  jest.mocked(api).mockResolvedValueOnce({ user, needsDisclosure: false, companyMember }).mockResolvedValueOnce(null)
+  const first = await mount()
+  expect(current.companyMember).toBe(companyMember)
+  await first.unmount()
+  jest.mocked(api).mockRejectedValueOnce(new ApiError(null, 'Network request failed'))
+  await mount()
+  expect(current.companyMember).toBe(companyMember)
+})
+
 test('a null session user clears the secure token and never loads branding', async () => {
   jest.mocked(api).mockResolvedValue({ user: null, needsDisclosure: false })
   jest.mocked(handleUnauthorized).mockImplementation(async () => { event('signedOut') })

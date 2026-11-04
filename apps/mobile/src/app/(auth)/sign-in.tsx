@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { View, type Text as NativeText } from 'react-native'
+import { Alert, Linking, View, type Text as NativeText } from 'react-native'
 import { useKeyboardState } from 'react-native-keyboard-controller'
 import { useIsFocused, useLocalSearchParams } from 'expo-router'
 import { FacebookSignIn } from '@/components/facebook-sign-in'
 import { AlertRow } from '@/components/ui/AlertRow'
 import { AccountForm, type AccountFormValues } from '@/components/account-form'
 import { Mark } from '@/components/ui/Mark'
+import { LinkButton } from '@/components/ui/LinkButton'
 import { Screen, useHeadingFocus } from '@/components/ui/Screen'
 import { Text } from '@/components/ui/Text'
 import { api } from '@/lib/api'
@@ -99,6 +100,17 @@ export default function SignInScreen() {
         error={state.error}
         onSubmit={submit}
       />
+      <View style={{ gap: space[2] }}>
+        <Text variant="body">New to Learn Quiz? Create your account on the web, then sign in here.</Text>
+        <LinkButton
+          accessibilityLabel="Open web sign-up, opens browser"
+          onPress={() => {
+            void Linking.openURL('https://app.learnquiz.com/sign-in').catch(() => {
+              Alert.alert('Could not open browser', 'Visit https://app.learnquiz.com/sign-in to create your account.')
+            })
+          }}
+        >Open web sign-up</LinkButton>
+      </View>
     </Screen>
   )
 }

@@ -1,5 +1,5 @@
 import { createElement, useLayoutEffect } from 'react'
-import { AccessibilityInfo, AppState, Text, type AppStateStatus } from 'react-native'
+import { AccessibilityInfo, AppState, Linking, Text, type AppStateStatus } from 'react-native'
 import { act, fireEvent, render, screen } from '@testing-library/react-native'
 import { todayFixtures, todayView, type Today, type TodayView } from '@learnquiz/api/today'
 import { offlineTitle, todayError } from '@learnquiz/api/system-copy'
@@ -29,7 +29,7 @@ jest.mock('expo-image', () => ({ Image: require('react-native').Image }))
 jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }))
 
 jest.mock('./auth', () => ({ getToken: jest.fn(), handleUnauthorized: jest.fn(() => Promise.resolve()) }))
-jest.mock('./session-store', () => ({ useSession: jest.fn() }))
+jest.mock('./session-store', () => ({ useSession: jest.fn(), endSession: jest.fn(async () => {}) }))
 jest.mock('./today-cache', () => ({ loadTodayCache: jest.fn(), saveTodayCache: jest.fn() }))
 jest.mock('./api', () => {
   const actual = jest.requireActual('./api')
@@ -105,6 +105,33 @@ beforeEach(() => {
   jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {})
 })
 afterEach(() => { jest.useRealTimers() })
+
+test.each(['light', 'dark'] as const)('empty Today gives personal learners web guidance in %s mode', async (scheme) => {
+  mockSession.mockReturnValue({ ...sessionFor('u1'), companyMember: false })
+  mockApi.mockResolvedValue({ topic: null, role: null, plan: null })
+  const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true)
+  await render(createElement(ThemeProvider, { scheme, children: createElement(TodayScreen) }))
+  expect(screen.getByText('Your topic may still be preparing. Open Learn Quiz on the web to check it or start a new topic.')).toBeOnTheScreen()
+  expect(screen.queryByText('Your company hasn’t assigned you a role. Ask your manager.')).toBeNull()
+  await fireEvent.press(screen.getByRole('button', { name: 'Open topics on the web, opens browser' }))
+  expect(openURL).toHaveBeenCalledWith('https://app.learnquiz.com/start')
+  await fireEvent.press(screen.getByRole('button', { name: 'Try again' }))
+  expect(mockApi).toHaveBeenCalledTimes(2)
+  await fireEvent.press(screen.getByRole('button', { name: 'Sign out' }))
+  expect(require('./session-store').endSession).toHaveBeenCalledTimes(1)
+  openURL.mockRestore()
+})
+
+test.each(['light', 'dark'] as const)('empty Today keeps company-role guidance in %s mode', async (scheme) => {
+  // Membership comes from /session, even if company branding could not load.
+  mockSession.mockReturnValue({ ...sessionFor('u1'), companyMember: true })
+  mockApi.mockResolvedValue({ topic: null, role: null, plan: null })
+  await render(createElement(ThemeProvider, { scheme, children: createElement(TodayScreen) }))
+  expect(screen.getByText('Your company hasn’t assigned you a role. Ask your manager.')).toBeOnTheScreen()
+  expect(screen.queryByRole('button', { name: 'Open topics on the web, opens browser' })).toBeNull()
+  expect(screen.getByRole('button', { name: 'Try again' })).toBeEnabled()
+  expect(screen.getByRole('button', { name: 'Sign out' })).toBeEnabled()
+})
 
 test('Today notices a connection drop without a failed Today request and clears on recovery', async () => {
   jest.useFakeTimers()
