@@ -1,3 +1,4 @@
+import { Platform } from 'react-native'
 import { PUSH_TOKEN_KEY, type PushPermission } from './push-prompt'
 
 export type EnableResult = 'granted' | 'denied' | 'unavailable'
@@ -25,6 +26,7 @@ export interface PushStore {
 export interface PushDeps {
   notifications?: PushNotifications
   isDevice?: boolean
+  platform?: string
   projectId?: string | null
   secure?: PushSecureStore
   store?: PushStore
@@ -66,7 +68,11 @@ function projectId(deps: PushDeps): string | null {
   const id = deps.projectId === undefined
     ? require('expo-constants').default?.expoConfig?.extra?.eas?.projectId
     : deps.projectId
-  return (deps.isDevice ?? require('expo-device').isDevice) && typeof id === 'string' && id ? id : null
+  // An iOS simulator cannot get a push token, but an Android emulator with Google Play
+  // services can, so only iOS needs a physical device.
+  const device = deps.isDevice ?? require('expo-device').isDevice
+  const android = (deps.platform ?? Platform.OS) === 'android'
+  return (device || android) && typeof id === 'string' && id ? id : null
 }
 function authToken(deps: PushDeps): string | null {
   return deps.getAuthToken ? deps.getAuthToken() : require('./auth').getToken()
