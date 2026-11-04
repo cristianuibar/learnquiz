@@ -119,3 +119,17 @@ it('sends the whole of a long role document, so steps past 20,000 characters rea
   const body = JSON.parse(fetchModel.mock.calls[0]![1].body as string) as { messages: { content: string }[] }
   expect(body.messages[1]!.content).toContain(steps)
 })
+
+it('builds from every document the unit cites and rebuilds when any of them is replaced', async () => {
+  run('INSERT INTO sources (id, topic_id, kind, title, body_text, version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', 'lockout', 'topic', 'text', 'Lockout policy', 'Lock out the press before cleaning.', 1, 1)
+  run('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary, source_id) VALUES (?, ?, ?, ?, ?, ?, ?)', 'c2', 'topic', 'unit', 1, 'Lockout', 'Lock it out.', 'lockout')
+  expect(await getUnitProcedure({ data: { unitId: 'unit' } })).toMatchObject({ status: 'ready', source: { title: 'Dispatch SOP', version: 3 } })
+  const prompt = (JSON.parse(fetchModel.mock.calls[0]![1].body as string) as { messages: { content: string }[] }).messages[1]!.content
+  expect(prompt).toContain('Check stock. If available, pack and dispatch.')
+  expect(prompt).toContain('Lock out the press before cleaning.')
+  await getUnitProcedure({ data: { unitId: 'unit' } })
+  expect(fetchModel).toHaveBeenCalledTimes(1)
+  run('UPDATE sources SET version = 2 WHERE id = ?', 'lockout')
+  await getUnitProcedure({ data: { unitId: 'unit' } })
+  expect(fetchModel).toHaveBeenCalledTimes(2)
+})

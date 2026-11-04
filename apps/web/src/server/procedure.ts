@@ -17,21 +17,22 @@ export type UnitProcedureResult =
   | { status: 'pending' }
   | null
 
-type Stored = { sourceId: string; version: number; graph: ProcedureGraph }
+// `sources` lists every document the graph was built from as id@version, so replacing any of them rebuilds it.
+type Stored = { sources: string; graph: ProcedureGraph }
 
 function parseStored(json: string | null): Stored | null {
   if (!json) return null
   try {
     const v = JSON.parse(json) as Stored
     const graph = ProcedureGraph.safeParse(v.graph)
-    return typeof v.sourceId === 'string' && typeof v.version === 'number' && graph.success ? { ...v, graph: graph.data } : null
+    return typeof v.sources === 'string' && graph.success ? { sources: v.sources, graph: graph.data } : null
   } catch {
     return null
   }
 }
 
 // The flowchart is stored once per unit and shared by everyone who can open the topic; it is rebuilt only when the
-// unit's source changes version. Returns null when the unit has no usable source (no model call, no claim).
+// version of any of the unit's documents changes. Returns null when the unit has no usable source (no model call, no claim).
 export const getUnitProcedure = createServerFn({ method: 'GET' })
   .validator(z.object({ unitId: z.string().min(1) }))
   .handler(async ({ data }): Promise<UnitProcedureResult> => {
@@ -43,17 +44,19 @@ export const getUnitProcedure = createServerFn({ method: 'GET' })
     if (!row) throw httpError('Unit not found', 404)
     const { unit, topic } = row
 
-    // First usable source by concept order; a blank body counts as unusable, so scan for the first non-blank one.
+    // Every usable document the unit's concepts cite, in concept order; a blank body counts as unusable.
     const linked = await db.select({ id: sources.id, title: sources.title, version: sources.version, bodyText: sources.bodyText })
       .from(concepts).innerJoin(sources, eq(sources.id, concepts.sourceId))
       .where(and(eq(concepts.unitId, unit.id), isNull(sources.retiredAt), isNull(sources.deletedAt), eq(sources.status, 'ready')))
       .orderBy(asc(concepts.order))
-    const usable = linked.find((s) => s.bodyText.trim())
-    if (!usable) return null
+    const documents = linked.filter((s, i) => s.bodyText.trim() && linked.findIndex((o) => o.id === s.id) === i)
+    if (!documents.length) return null
 
     const stored = parseStored(unit.procedureJson)
-    const meta = { title: usable.title, version: usable.version }
-    if (stored && stored.sourceId === usable.id && stored.version === usable.version) return { status: 'ready', graph: stored.graph, source: meta }
+    // The caption names the unit's first document.
+    const meta = { title: documents[0]!.title, version: documents[0]!.version }
+    const key = documents.map((d) => `${d.id}@${d.version}`).join(',')
+    if (stored?.sources === key) return { status: 'ready', graph: stored.graph, source: meta }
 
     if (topic.orgId) await assertWithinCompanyCap(db, topic.orgId)
     const now = Date.now()
@@ -70,12 +73,12 @@ export const getUnitProcedure = createServerFn({ method: 'GET' })
         purpose: 'procedure',
         schema: ProcedureGraph,
         schemaName: 'procedure_graph',
-        ...procedurePrompt({ topic: topic.title, unit: { name: unit.name, summary: unit.summary }, sourceText: usable.bodyText }),
+        ...procedurePrompt({ topic: topic.title, unit: { name: unit.name, summary: unit.summary }, documents }),
         learnerId,
         orgId: topic.orgId,
         topicId: topic.id,
       })
-      const value: Stored = { sourceId: usable.id, version: usable.version, graph }
+      const value: Stored = { sources: key, graph }
       await db.update(units).set({ procedureJson: JSON.stringify(value), procedureStartedAt: null }).where(claim)
       return { status: 'ready', graph, source: meta }
     } catch (e) {
