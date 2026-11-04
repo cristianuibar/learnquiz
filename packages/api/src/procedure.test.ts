@@ -28,6 +28,38 @@ describe('layoutProcedure', () => {
     }
   })
 
+  it('keeps a decision\'s branches on its sides after its layer spreads', () => {
+    const graph: ProcedureGraph = {
+      nodes: [node('a'), node('b'), node('d', 'decision'), node('y'), node('n')],
+      edges: [
+        { from: 'a', to: 'b', label: null },
+        { from: 'a', to: 'd', label: null },
+        { from: 'd', to: 'y', label: 'yes' },
+        { from: 'd', to: 'n', label: 'no' },
+      ],
+    }
+    const { nodes } = layoutProcedure(graph, 600)
+    const at = (id: string) => nodes.find((n) => n.id === id)!
+    expect(at('y').x).toBeLessThan(at('d').x)
+    expect(at('n').x).toBeGreaterThan(at('d').x)
+  })
+
+  it('keeps a yes branch reached earlier on the left of its decision', () => {
+    const graph: ProcedureGraph = {
+      nodes: [node('start'), node('ready', 'decision'), node('pack'), node('wait')],
+      edges: [
+        { from: 'start', to: 'ready', label: null },
+        { from: 'start', to: 'pack', label: null },
+        { from: 'ready', to: 'pack', label: 'yes' },
+        { from: 'ready', to: 'wait', label: 'no' },
+      ],
+    }
+    const { nodes } = layoutProcedure(graph, 600)
+    const at = (id: string) => nodes.find((n) => n.id === id)!
+    expect(at('pack').x).toBeLessThan(at('ready').x)
+    expect(at('wait').x).toBeGreaterThan(at('ready').x)
+  })
+
   it('keeps layers when an edge loops back', () => {
     const graph: ProcedureGraph = {
       nodes: [node('a'), node('b'), node('c', 'decision')],
@@ -49,5 +81,13 @@ describe('describeProcedure', () => {
     expect(text).toContain('Label n (critical step)')
     expect(text).toContain('If yes, go to step 3, Label y')
     expect(text).toContain('If no, go to step 4, Label n')
+  })
+
+  it('does not double the question mark on a decision label that already has one', () => {
+    const graph: ProcedureGraph = {
+      nodes: [{ id: 'd', kind: 'decision', label: 'Is stock available?', critical: false }, node('y')],
+      edges: [{ from: 'd', to: 'y', label: 'yes' }],
+    }
+    expect(describeProcedure(graph).split('\n')[0]).toBe('1. Is stock available? If yes, go to step 2, Label y.')
   })
 })

@@ -27,12 +27,14 @@ function traverse(graph: ProcedureGraph) {
   let roots = graph.nodes.filter((n) => !hasIncoming.has(n.id)).map((n) => n.id)
   if (roots.length === 0 && graph.nodes.length > 0) roots = [graph.nodes[0]!.id]
 
+  // Each node keeps its column offset from the parent that placed it; layout resolves it after spreading the parent's layer.
   const layer = new Map<string, number>()
-  const column = new Map<string, number>()
+  const parent = new Map<string, string>()
+  const offset = new Map<string, number>()
   const order: string[] = []
   const seed = (id: string) => {
     layer.set(id, 0)
-    column.set(id, 0)
+    offset.set(id, 0)
     const queue = [id]
     for (let i = 0; i < queue.length; i++) {
       const current = queue[i]!
@@ -41,30 +43,49 @@ function traverse(graph: ProcedureGraph) {
       const edges = out.get(current)!
       edges.forEach((edge, index) => {
         if (layer.has(edge.to)) return
-        let offset = 0
+        let shift = 0
         if (node.kind === 'decision' && edges.length > 1) {
-          offset = edge.label === 'yes' ? -1 : edge.label === 'no' ? 1 : index === 0 ? -1 : 1
+          shift = edge.label === 'yes' ? -1 : edge.label === 'no' ? 1 : index === 0 ? -1 : 1
         }
         layer.set(edge.to, layer.get(current)! + 1)
-        column.set(edge.to, column.get(current)! + offset)
+        parent.set(edge.to, current)
+        offset.set(edge.to, shift)
         queue.push(edge.to)
       })
     }
   }
   for (const id of roots) if (!layer.has(id)) seed(id)
   for (const node of graph.nodes) if (!layer.has(node.id)) seed(node.id)
-  return { out, layer, column, order }
+  return { out, layer, parent, offset, order }
 }
 
 export function layoutProcedure(graph: ProcedureGraph, width: number): ProcedureLayout {
-  const { layer, column, order } = traverse(graph)
+  const { out, layer, parent, offset, order } = traverse(graph)
+  const byId = new Map(graph.nodes.map((n) => [n.id, n]))
   const byLayer = new Map<number, string[]>()
   for (const id of order) {
     const l = layer.get(id)!
     byLayer.set(l, [...(byLayer.get(l) ?? []), id])
   }
-  for (const ids of byLayer.values()) {
-    const sorted = [...ids].sort((a, b) => column.get(a)! - column.get(b)! || ids.indexOf(a) - ids.indexOf(b))
+  const column = new Map<string, number>()
+  for (const l of [...byLayer.keys()].sort((a, b) => a - b)) {
+    const ids = byLayer.get(l)!
+    for (const id of ids) {
+      const from = parent.get(id)
+      column.set(id, (from === undefined ? 0 : column.get(from)!) + offset.get(id)!)
+    }
+    // A branch that lands in its decision's own layer still sits on its side: yes left, no right.
+    const side = new Map<string, number>()
+    for (const id of ids) {
+      if (byId.get(id)!.kind !== 'decision') continue
+      for (const edge of out.get(id)!) {
+        if (edge.label && layer.get(edge.to) === l) {
+          side.set(edge.to, edge.label === 'yes' ? -0.5 : 0.5)
+        }
+      }
+    }
+    const key = (id: string) => column.get(id)! + (side.get(id) ?? 0)
+    const sorted = [...ids].sort((a, b) => key(a) - key(b) || ids.indexOf(a) - ids.indexOf(b))
     let last = -Infinity
     for (const id of sorted) {
       const col = Math.max(column.get(id)!, last + 1)
@@ -117,7 +138,8 @@ export function describeProcedure(graph: ProcedureGraph): string {
         return edge ? `If ${label}, go to ${target(edge.to)}.` : ''
       }
       const rest = [branch('yes'), branch('no')].filter(Boolean).join(' ')
-      return `${number.get(id)}. ${node.label}?${mark} ${rest}`.trim()
+      const question = node.label.endsWith('?') ? node.label : `${node.label}?`
+      return `${number.get(id)}. ${question}${mark} ${rest}`.trim()
     }
     const next = edges[0]
     return `${number.get(id)}. ${node.label}${mark}.${next ? ` Then go to ${target(next.to)}.` : ''}`

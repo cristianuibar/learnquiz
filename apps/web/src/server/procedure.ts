@@ -12,6 +12,10 @@ import { assertWithinCompanyCap } from '@/server/model-cap'
 import { requireLearnerId } from '@/server/session'
 import { learnerCanAccess } from '@/server/topic-access'
 
+// chatJson can take two 120 s attempts on Fireworks and two more on the Meta fallback, so a live claim must outlast
+// that whole retry window; only a crashed request's claim is ever this old.
+const STALE_CLAIM_MS = 10 * 60 * 1000
+
 export type UnitProcedureResult =
   | ({ status: 'ready' } & UnitProcedure)
   | { status: 'pending' }
@@ -60,11 +64,11 @@ export const getUnitProcedure = createServerFn({ method: 'GET' })
 
     if (topic.orgId) await assertWithinCompanyCap(db, topic.orgId)
     const now = Date.now()
-    // Atomic D1 claim works across worker instances. A crashed request can be retried after three minutes.
+    // Atomic D1 claim works across worker instances. A crashed request can be retried once its claim is stale.
     const claimed = await db.update(units).set({ procedureStartedAt: now })
       .where(and(eq(units.id, unit.id),
         unit.procedureJson === null ? isNull(units.procedureJson) : eq(units.procedureJson, unit.procedureJson),
-        or(isNull(units.procedureStartedAt), lt(units.procedureStartedAt, now - 180_000))))
+        or(isNull(units.procedureStartedAt), lt(units.procedureStartedAt, now - STALE_CLAIM_MS))))
       .returning({ id: units.id })
     if (!claimed.length) return { status: 'pending' }
     const claim = and(eq(units.id, unit.id), eq(units.procedureStartedAt, now))
