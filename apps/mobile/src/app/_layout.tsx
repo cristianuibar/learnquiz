@@ -14,7 +14,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { ThemeProvider } from '@/theme/ThemeProvider'
 import { SessionProvider, useSession } from '@/lib/session-store'
-import { holdTarget, replayVersion, subscribeReplay, takeReplayTarget } from '@/lib/held-target'
+import { holdTarget, joinAttemptHeld, replayVersion, subscribeReplay, takeReplayTarget } from '@/lib/held-target'
 import { canOpenTarget, targetFromURL } from '@/lib/route-gates'
 import { useNotificationObserver } from '@/lib/notification-observer'
 
@@ -69,12 +69,13 @@ function SessionRoutes({ fontsLoaded }: { fontsLoaded: boolean }) {
       if (target && !canOpenTarget(target, session)) holdTarget(target)
     }
     // Sign-in over Join: removing the protected sign-in screen uncovers Join, not
-    // index. Hand the post-auth decision to index, as when sign-in sits over it.
+    // index. Hand the post-auth decision to index, as when sign-in sits over it,
+    // unless Join's own attempt still runs: then Join navigates or shows its retry.
     if (resolved) {
       const signedInOverJoin = fromSignIn.current && session.status === 'ready' && pathname.startsWith('/join/')
       fromSignIn.current = pathname === '/sign-in'
       if (signedInOverJoin) {
-        router.replace('/')
+        if (!joinAttemptHeld()) router.replace('/')
         return
       }
     }

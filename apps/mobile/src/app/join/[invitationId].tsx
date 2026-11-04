@@ -14,7 +14,7 @@ import { Text } from '@/components/ui/Text'
 import { api, mediaSource } from '@/lib/api'
 import { acceptInvitation, signIn, signUp, subscribeAuth } from '@/lib/auth'
 import { peekHeldTarget, takeHeldTarget } from '@/lib/held-target'
-import { useReplayHold } from '@/lib/use-replay-hold'
+import { useAttemptHold, useReplayHold } from '@/lib/use-replay-hold'
 import {
   createJoinFlow,
   decideJoinNavigation,
@@ -109,6 +109,8 @@ function Invite({ invitationId, invite }: { invitationId: string; invite: Invite
   // From each submit while this screen is in front, only the join flow navigates:
   // a session refresh that lands after a failed accept must not replay a held link.
   const holdReplay = useReplayHold()
+  // From submit until this screen acts on the result, even under a pushed screen.
+  const attemptHold = useAttemptHold()
   // Async work never touches state or the router. It leaves its result here, and
   // the effect below acts on it only while this screen is focused.
   const pending = useRef<Pending | null>(null)
@@ -139,9 +141,10 @@ function Invite({ invitationId, invite }: { invitationId: string; invite: Invite
     const inFlight = attempt.current !== null && flow.isLive(attempt.current)
     flow.signedOut()
     attempt.current = null
+    attemptHold.end()
     busyRef.current = false
     settle({ kind: 'reset', error: inFlight ? joinFailed : null })
-  }), [flow])
+  }), [flow, attemptHold])
 
   // The only place that acts on async results, and the only router call of the flow.
   useEffect(() => {
@@ -150,6 +153,7 @@ function Invite({ invitationId, invite }: { invitationId: string; invite: Invite
     const finish = () => {
       pending.current = null
       attempt.current = null
+      attemptHold.end()
       busyRef.current = false
       setBusy(false)
       setFrozen(null)
@@ -164,7 +168,7 @@ function Invite({ invitationId, invite }: { invitationId: string; invite: Invite
     if (outcome.kind === 'error') {
       if (!flow.isLive(token)) {
         pending.current = null
-        if (attempt.current === token) attempt.current = null
+        if (attempt.current === token) { attempt.current = null; attemptHold.end() }
         return
       }
       finish()
@@ -176,7 +180,7 @@ function Invite({ invitationId, invite }: { invitationId: string; invite: Invite
     if (decision.kind === 'keep') return // the session store catches up and re-runs this
     if (decision.kind === 'drop') {
       pending.current = null
-      if (attempt.current === token) attempt.current = null
+      if (attempt.current === token) { attempt.current = null; attemptHold.end() }
       return
     }
     if (decision.kind === 'offline') { finish(); setError(networkError); return }
@@ -184,12 +188,13 @@ function Invite({ invitationId, invite }: { invitationId: string; invite: Invite
     // Take the held link while this screen still holds replay, then leave.
     if (decision.takesHeld) takeHeldTarget()
     router.replace(decision.target as Href)
-  }, [focused, settled, session, flow, router])
+  }, [focused, settled, session, flow, router, attemptHold])
 
   function start(): number | null {
     if (busyRef.current) return null
     busyRef.current = true
     holdReplay()
+    attemptHold.begin()
     const token = flow.begin()
     attempt.current = token
     setBusy(true)

@@ -35,8 +35,24 @@ export function deferReplay(): () => void {
   }
 }
 
+// While a join attempt runs (from its submit until Join acts on the result), the
+// root layout must not hand a sign-in over Join to index: Join navigates itself,
+// or shows its retry. Unlike a replay hold it lasts while a screen sits on top.
+const attempts = new Set<symbol>()
+
+export function holdJoinAttempt(): () => void {
+  const hold = Symbol('join attempt')
+  attempts.add(hold)
+  return () => { attempts.delete(hold) }
+}
+
+export function joinAttemptHeld(): boolean {
+  return attempts.size > 0
+}
+
 // Sign-out ends every join attempt, so no stale hold can block a later session.
 export function releaseReplayHolds(): void {
+  attempts.clear()
   if (holds.size === 0) return
   holds.clear()
   holdsEnded()

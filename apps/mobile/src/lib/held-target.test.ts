@@ -1,4 +1,4 @@
-import { deferReplay, holdTarget, releaseReplayHolds, replayVersion, subscribeReplay, takeHeldTarget, takeReplayTarget } from './held-target'
+import { deferReplay, holdJoinAttempt, holdTarget, joinAttemptHeld, releaseReplayHolds, replayVersion, subscribeReplay, takeHeldTarget, takeReplayTarget } from './held-target'
 
 test('take with nothing held returns null', () => {
   expect(takeHeldTarget()).toBeNull()
@@ -66,5 +66,33 @@ describe('replay holds', () => {
     release()
     expect(listener).not.toHaveBeenCalled()
     unsubscribe()
+  })
+})
+
+describe('join attempt holds', () => {
+  beforeEach(() => { releaseReplayHolds(); takeHeldTarget() })
+
+  test('an attempt hold lasts until it is released, and does not hold replay', () => {
+    holdTarget('/unit/u1')
+    const first = holdJoinAttempt()
+    const second = holdJoinAttempt()
+    expect(joinAttemptHeld()).toBe(true)
+    first()
+    first()
+    expect(joinAttemptHeld()).toBe(true)
+    second()
+    expect(joinAttemptHeld()).toBe(false)
+    expect(takeReplayTarget()).toBe('/unit/u1')
+  })
+
+  test('sign-out ends every attempt hold, and a stale release does nothing', () => {
+    const release = holdJoinAttempt()
+    releaseReplayHolds()
+    expect(joinAttemptHeld()).toBe(false)
+    const next = holdJoinAttempt()
+    release()
+    expect(joinAttemptHeld()).toBe(true)
+    next()
+    expect(joinAttemptHeld()).toBe(false)
   })
 })

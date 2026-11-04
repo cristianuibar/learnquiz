@@ -70,19 +70,29 @@ const invite = {
   otherAccount: false, roleName: 'Warehouse picker', accent: null, logoUrl: null,
 }
 let needsDisclosure = false
-const replies: Record<string, () => { data: unknown; token?: string }> = {
+type Reply = { data: unknown; token?: string; status?: number }
+const replies: Record<string, () => Reply | Promise<Reply>> = {
   '/api/auth/sign-in/email': () => ({ data: {}, token: 'token-a' }),
   '/api/v1/session': () => ({ data: { user: { id: 'user-a', name: 'Ana', isAnonymous: false }, needsDisclosure } }),
   '/api/v1/branding': () => ({ data: null }),
   '/api/v1/invites/inv-1': () => ({ data: invite }),
 }
+const baseReplies = { ...replies }
 // Anything else (the unit, push) never answers.
-globalThis.fetch = jest.fn((input: RequestInfo | URL) => {
-  const reply = replies[new URL(String(input)).pathname]?.()
-  if (!reply) return new Promise<Response>(() => {})
-  return Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify(reply.data),
-    headers: { get: (name: string) => (name === 'set-auth-token' ? reply.token ?? null : null) } } as unknown as Response)
+globalThis.fetch = jest.fn(async (input: RequestInfo | URL) => {
+  const make = replies[new URL(String(input)).pathname]
+  if (!make) return new Promise<Response>(() => {})
+  const reply = await make()
+  const status = reply.status ?? 200
+  return { ok: status < 400, status, text: async () => JSON.stringify(reply.data),
+    headers: { get: (name: string) => (name === 'set-auth-token' ? reply.token ?? null : null) } } as unknown as Response
 }) as typeof fetch
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((res) => { resolve = res })
+  return { promise, resolve }
+}
 
 const flush = () => act(async () => { for (let i = 0; i < 20; i++) await Promise.resolve() })
 const setIndexOpen = (open: boolean) => { mockIndexOpen = open; mockIndexListeners.forEach((listener) => listener()) }
@@ -93,6 +103,7 @@ beforeEach(async () => {
   takeHeldTarget()
   needsDisclosure = false
   mockIndexOpen = true
+  for (const path of Object.keys(replies)) if (!(path in baseReplies)) delete replies[path]
 })
 afterEach(() => { jest.restoreAllMocks() })
 
@@ -173,4 +184,70 @@ test('going Back from sign-in to Join while signed out stays on Join', async () 
   expect(navigation.getPathname()).toBe('/join/inv-1')
   expect(replace).not.toHaveBeenCalled()
   expect(screen.getByRole('button', { name: 'Create account' })).toBeOnTheScreen()
+})
+
+// #553: a warm sign-in link opens over Join while Join's own attempt runs. The
+// protected sign-in screen can only be on top while signed out, so it opens
+// during Join's sign-up and drops out once that sign-up stores its token, with
+// the accept still in flight. Join, not the layout's handoff, owns what follows.
+test('a sign-in link over Join while its accept runs leaves the failed accept on Join with its retry', async () => {
+  const signUp = deferred<Reply>()
+  const accept = deferred<Reply>()
+  const accepted = jest.fn()
+  replies['/api/auth/sign-up/email'] = () => signUp.promise
+  replies['/api/auth/organization/accept-invitation'] = () => { accepted(); return accept.promise }
+  const navigation = renderRouter('src/app', { initialUrl: '/join/inv-1' })
+  await navigation
+  expect(await screen.findByRole('header', { name: 'Train as a warehouse picker' })).toBeOnTheScreen()
+  await fireEvent.changeText(screen.getByLabelText('Create a password'), 'correct horse')
+  await fireEvent.press(screen.getByRole('button', { name: 'Create account' }))
+
+  await act(async () => { router.push('/sign-in') })
+  expect(navigation.getPathname()).toBe('/sign-in')
+  const replace = jest.spyOn(router, 'replace')
+
+  // Join's sign-up lands: the session turns ready, sign-in drops out over Join,
+  // and the accept is still running.
+  await act(async () => { signUp.resolve({ data: {}, token: 'token-a' }) })
+  await flush()
+  expect(getToken()).toBe('token-a')
+  expect(accepted).toHaveBeenCalledTimes(1)
+  expect(navigation.getPathname()).toBe('/join/inv-1')
+  expect(replace).not.toHaveBeenCalled()
+
+  await act(async () => { accept.resolve({ data: {}, status: 500 }) })
+  await flush()
+  expect(navigation.getPathname()).toBe('/join/inv-1')
+  expect(replace).not.toHaveBeenCalled()
+  expect(screen.getByText('Couldn’t join. Try again.')).toBeOnTheScreen()
+  const retry = screen.getByRole('button', { name: 'Join Northwind Logistics' })
+  expect(retry).toBeOnTheScreen()
+
+  // The retry is Join's: it accepts again and goes on to Today.
+  replies['/api/auth/organization/accept-invitation'] = () => { accepted(); return { data: {} } }
+  await fireEvent.press(retry)
+  await flush()
+  expect(accepted).toHaveBeenCalledTimes(2)
+  expect(navigation.getPathname()).toBe('/today')
+  expect(replace.mock.calls.map(([target]) => target)).toEqual(['/(tabs)/today'])
+})
+
+test('after a failed Join sign-up, a sign-in link over the idle Join still hands off to index', async () => {
+  replies['/api/auth/sign-up/email'] = () => ({ data: {}, status: 500 })
+  const navigation = renderRouter('src/app', { initialUrl: '/join/inv-1' })
+  await navigation
+  expect(await screen.findByRole('header', { name: 'Train as a warehouse picker' })).toBeOnTheScreen()
+  await fireEvent.changeText(screen.getByLabelText('Create a password'), 'correct horse')
+  await fireEvent.press(screen.getByRole('button', { name: 'Create account' }))
+  await flush()
+  // Join's attempt ended on its error; the learner is still signed out.
+  expect(screen.getByText('Couldn’t sign in. Try again.')).toBeOnTheScreen()
+  expect(getToken()).toBeNull()
+
+  await act(async () => { router.push('/sign-in') })
+  expect(navigation.getPathname()).toBe('/sign-in')
+  const replace = jest.spyOn(router, 'replace')
+  await submitSignIn()
+  expect(navigation.getPathname()).toBe('/today')
+  expect(replace.mock.calls.map(([target]) => target)).toEqual(['/', '/(tabs)/today'])
 })

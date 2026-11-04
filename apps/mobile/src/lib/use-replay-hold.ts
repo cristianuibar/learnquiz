@@ -1,6 +1,6 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useFocusEffect } from 'expo-router'
-import { deferReplay } from './held-target'
+import { deferReplay, holdJoinAttempt } from './held-target'
 
 // A hold on the root layout's held-link replay that lasts only while the calling
 // screen owns navigation: it ends when the screen loses focus (another screen
@@ -18,4 +18,21 @@ export function useReplayHold(): () => void {
     release.current?.()
     release.current = next
   }, [])
+}
+
+// The join attempt hold (holdJoinAttempt) for one screen: begin on submit, end when
+// the screen acts on the result. Unmount ends it too, and so does sign-out.
+export function useAttemptHold(): { begin: () => void; end: () => void } {
+  const release = useRef<(() => void) | null>(null)
+  const end = useCallback(() => {
+    release.current?.()
+    release.current = null
+  }, [])
+  const begin = useCallback(() => {
+    const next = holdJoinAttempt()
+    release.current?.()
+    release.current = next
+  }, [])
+  useEffect(() => end, [end])
+  return useRef({ begin, end }).current
 }
