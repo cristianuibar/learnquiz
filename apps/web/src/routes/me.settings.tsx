@@ -122,6 +122,8 @@ function Settings() {
       await sendTestPush({ data: { endpoint: subscription!.endpoint } })
       setTestMessage('Test push accepted. Check your device for the notification.')
     } catch (e) {
+      // The server dropped an expired subscription, so the next switch-on subscribes this browser again.
+      if ((e as { status?: unknown } | null)?.status === 410) setEndpoints((known) => known.filter((endpoint) => endpoint !== subscription!.endpoint))
       setTestError(errorMessage(e, 'Could not send the test push. Try again.'))
     }
   }
