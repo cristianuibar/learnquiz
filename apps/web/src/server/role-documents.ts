@@ -76,27 +76,32 @@ export const retireRoleDocument = createServerFn({ method: 'POST' })
     if (topic.status === 'generating') throw httpError('The curriculum is generating. Try again when it finishes.', 409)
     const source = await db.select().from(sources).where(liveSource(data.sourceId, topic.id)).get()
     if (!source) throw httpError('Document not found', 404)
-    const cited = await citedConcepts(topic.id, source.id)
     // Conditional at write time: a build may claim the topic after the check above.
-    const retiredAt = Date.now()
-    const retiredHere = exists(db.select({ one: sql`1` }).from(sources).where(and(eq(sources.id, source.id), eq(sources.retiredAt, retiredAt))))
+    const notGenerating = exists(db.select({ one: sql`1` }).from(topics).where(and(eq(topics.id, topic.id), ne(topics.status, 'generating'))))
     // Misconceptions were drawn from the old text and may contradict the other document.
     const requeue = { misconceptionsJson: '[]', genStatus: 'pending' as const, genStartedAt: null, genError: null }
-    const moved = cited.filter((c) => c.other)
-    const [retired] = await db.batch([
-      db.update(sources).set({ retiredAt }).where(and(
-        liveSource(source.id, topic.id),
-        exists(db.select({ one: sql`1` }).from(topics).where(and(eq(topics.id, topic.id), ne(topics.status, 'generating')))),
-      )).returning({ id: sources.id }),
-      db.update(items).set({ status: 'retired' }).where(and(eq(items.sourceId, source.id), inArray(items.status, LIVE), retiredHere)),
-      ...moved.map((c) => db.update(concepts).set({ ...requeue, sourceId: c.other!.id, sourceQuote: c.quote })
-        .where(and(eq(concepts.id, c.concept.id), eq(concepts.sourceId, source.id), retiredHere))),
-      db.update(concepts).set({ genStatus: 'failed', genError: 'The document behind this concept was retired', genStartedAt: null })
-        .where(and(eq(concepts.sourceId, source.id), retiredHere)),
-    ])
-    if (!retired.length) {
-      throw await refusal(topic.id)
+    // An alternate document may be retired or replaced between the read and the write; then read again and pick anew.
+    for (let attempt = 1; ; attempt++) {
+      const cited = await citedConcepts(topic.id, source.id)
+      const moved = cited.filter((c) => c.other)
+      const alternatesLive = [...new Set(moved.map((c) => c.other!.id))]
+        .map((id) => exists(db.select({ one: sql`1` }).from(sources).where(liveSource(id, topic.id))))
+      const retiredAt = Date.now()
+      const retiredHere = exists(db.select({ one: sql`1` }).from(sources).where(and(eq(sources.id, source.id), eq(sources.retiredAt, retiredAt))))
+      const [retired] = await db.batch([
+        db.update(sources).set({ retiredAt }).where(and(liveSource(source.id, topic.id), notGenerating, ...alternatesLive)).returning({ id: sources.id }),
+        db.update(items).set({ status: 'retired' }).where(and(eq(items.sourceId, source.id), inArray(items.status, LIVE), retiredHere)),
+        ...moved.map((c) => db.update(concepts).set({ ...requeue, sourceId: c.other!.id, sourceQuote: c.quote })
+          .where(and(eq(concepts.id, c.concept.id), eq(concepts.sourceId, source.id), retiredHere))),
+        db.update(concepts).set({ genStatus: 'failed', genError: 'The document behind this concept was retired', genStartedAt: null })
+          .where(and(eq(concepts.sourceId, source.id), retiredHere)),
+      ])
+      if (retired.length) {
+        if (moved.length && drainsOnRequest()) runInBackground(drainConceptQueue())
+        return { ok: true }
+      }
+      const stillLive = await db.select({ id: sources.id }).from(sources).where(and(liveSource(source.id, topic.id), notGenerating)).get()
+      if (!stillLive) throw await refusal(topic.id)
+      if (attempt === 3) throw httpError('The documents changed while retiring. Try again.', 409)
     }
-    if (moved.length && drainsOnRequest()) runInBackground(drainConceptQueue())
-    return { ok: true }
   })
