@@ -119,6 +119,19 @@ it('approves, moves focus to the next unreviewed question and announces the coun
   expect([...c.querySelectorAll('[role=status]')].map((s) => s.textContent)).toContain('Approved. 1 unreviewed.')
 })
 
+it('approving skips a retired flagged question and moves to the next unreviewed one', async () => {
+  const a1 = { id: 'a1', status: 'active', payload: stemOf('A1') }
+  const f = { id: 'f', status: 'retired', reviewedAt: Date.UTC(2026, 9, 29), payload: stemOf('F'), flags: [{ id: 'fl', reporterId: 'p1', reporterName: 'Ana', createdAt: Date.UTC(2026, 9, 29), reason: 'wrong', label: 'Wrong answer', note: null, attempt: null }] }
+  const b1 = { id: 'b1', status: 'active', reviewedAt: null, payload: stemOf('B1') }
+  const c = await mountAt(
+    review([concept('a', [{ ...a1, reviewedAt: null }]), concept('b', [f, b1])], 2), '/org/x/questions',
+    review([concept('a', [{ ...a1, reviewedAt: Date.UTC(2026, 9, 30) }]), concept('b', [f, b1])], 1),
+  )
+  await act(async () => button(c, 'Approve and next').click())
+  await vi.waitFor(() => expect(document.activeElement?.textContent).toBe('Stem B1'))
+  expect(document.activeElement!.closest('li')!.querySelector('button[aria-label="Hide details"]')!.getAttribute('aria-expanded')).toBe('true')
+})
+
 it('approving moves to the next open question in the same concept even after the list re-sorts', async () => {
   const a1 = { id: 'a1', status: 'active', payload: stemOf('A1') }
   const a2 = { id: 'a2', status: 'active', reviewedAt: null, payload: stemOf('A2') }
