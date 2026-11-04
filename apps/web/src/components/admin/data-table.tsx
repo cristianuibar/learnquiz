@@ -79,7 +79,7 @@ function Frame({ band, toolbar, footer, scrollRef, region, children }: {
 
 const TABLE = 'w-full border-separate border-spacing-0 text-[14px]/[20px] tabular-nums'
 
-export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSort, selection, actions, band, toolbar, footer, empty }: {
+export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSort, selection, actions, band, toolbar, footer, empty, total }: {
   caption: string
   columns: Column<T>[]
   rows: T[]
@@ -93,6 +93,8 @@ export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSo
   toolbar?: ReactNode
   footer?: ReactNode
   empty?: ReactNode
+  /** Totals row: label spans the first `span` columns, the remaining columns render from `row`. */
+  total?: { label: string; span?: number; row: T }
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [scrolls, setScrolls] = useState(false)
@@ -234,6 +236,23 @@ export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSo
             )
           })}
         </tbody>
+        {total && (
+          <tfoot role="rowgroup">
+            <tr role="row">
+              <th scope="row" role="rowheader" colSpan={total.span ?? 1} className={cn(td, 'border-t border-border-strong border-b-0 text-left font-bold text-ink')}>{total.label}</th>
+              {columns.slice(total.span ?? 1).map((c) => (
+                <td
+                  key={c.key}
+                  role="cell"
+                  data-label={labelOf(c)}
+                  className={cn(td, 'border-t border-border-strong border-b-0 font-bold text-ink', c.align === 'end' && 'text-right', c.hideBelowLg && 'dt-hide-lg max-xl:hidden', c.className)}
+                >
+                  {c.cell(total.row)}
+                </td>
+              ))}
+            </tr>
+          </tfoot>
+        )}
       </table>
     </Frame>
   )

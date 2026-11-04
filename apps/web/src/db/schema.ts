@@ -225,6 +225,7 @@ export const modelCalls = sqliteTable('model_calls', {
   learnerId: text('learner_id'),
   sessionId: text('session_id'),
   topicId: text('topic_id'),
+  orgId: text('org_id'), // Null for calls without a company topic.
   purpose: text('purpose').notNull(),
   model: text('model').notNull(),
   latencyMs: integer('latency_ms').notNull(),
@@ -235,7 +236,7 @@ export const modelCalls = sqliteTable('model_calls', {
   ok: integer('ok', { mode: 'boolean' }).notNull(),
   error: text('error'),
   createdAt: integer('created_at').notNull(),
-}, (t) => [index('model_calls_created_at_idx').on(t.createdAt)])
+}, (t) => [index('model_calls_created_at_idx').on(t.createdAt), index('model_calls_org_created_at_idx').on(t.orgId, t.createdAt)])
 
 // Company training roles: the benchmark is the mastery threshold, onboarding_days the period it should be met in.
 export const jobRoles = sqliteTable('job_roles', {
