@@ -93,6 +93,25 @@ it('saves the Critical switch, named by its column header and concept', async ()
   await vi.waitFor(() => expect(vi.mocked(getRoleDetail).mock.calls.length).toBeGreaterThan(before))
 })
 
+it('keeps the last Critical choice when the switch is toggled on then off before the first save lands', async () => {
+  // The server commits each write when its request finishes; the first request is the slow one.
+  let persisted = false
+  const finish: Array<() => void> = []
+  vi.mocked(updateRoleConcept).mockImplementation(({ data }) => new Promise((resolve) => {
+    finish.push(() => { persisted = (data as { critical: boolean }).critical; resolve({ ok: true }) })
+  }))
+  const { container } = await mount(makeDetail({ status: 'ready', documents: [pdf], units: unit([concept('c1', 'Cash float', 'ready')]) }))
+  const sw = container.querySelector<HTMLElement>('[role="switch"]')!
+  await act(async () => { sw.click() })
+  await act(async () => { sw.click() })
+  expect(sw.getAttribute('aria-checked')).toBe('false')
+  // Finish whatever is in flight, newest first, until nothing is left.
+  while (finish.length) await act(async () => { for (const done of finish.splice(0).reverse()) done() })
+  expect(persisted).toBe(false)
+  expect(vi.mocked(updateRoleConcept).mock.calls.map(([{ data }]) => (data as { critical: boolean }).critical)).toEqual([true, false])
+  expect(sw.getAttribute('aria-checked')).toBe('false')
+})
+
 // happy-dom applies no container queries, so this compares the narrow-list rules the header shares with the rows.
 it('stacks the Questions and Critical headers with the concept rows below a 560px list', async () => {
   const { container } = await mount(makeDetail({ status: 'ready', documents: [pdf], units: unit([concept('c1', 'Cash float', 'ready')]) }))
