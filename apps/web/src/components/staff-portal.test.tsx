@@ -86,6 +86,8 @@ it('shows a role to staff with no way to change anything', async () => {
   expect(container.textContent).toContain('Pallet check')
   expect(container.textContent).toContain('Critical')
   expect(container.querySelector('[role="switch"]')).toBeNull()
+  const crumb = [...container.querySelectorAll('ol a')].find((a) => a.textContent === 'Overview')
+  expect(crumb?.getAttribute('href')).toBe('/admin/companies/northwind/portal')
   const buttons = [...container.querySelectorAll('button')].map((b) => `${b.textContent} ${b.getAttribute('aria-label') ?? ''}`)
   for (const gone of [/Edit/, /Retry/, /Upload/, /Add document/, /Paste text/]) expect(buttons.filter((b) => gone.test(b))).toEqual([])
 })
