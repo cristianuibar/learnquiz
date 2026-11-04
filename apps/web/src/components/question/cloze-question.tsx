@@ -47,9 +47,9 @@ export function ClozeQuestion({ item, choice, onChoice }: QuestionProps) {
           inputMode={numeric ? 'numeric' : undefined}
           pattern={numeric ? '[0-9]*' : undefined}
           aria-label={numeric ? 'Missing number' : 'Missing word'}
-          maxLength={numeric ? 3 : 40}
+          maxLength={numeric ? 3 : 120}
           onChange={(e) => {
-            const next = numeric ? e.target.value.replace(/\D/g, '').slice(0, 3) : e.target.value.slice(0, 40)
+            const next = numeric ? e.target.value.replace(/\D/g, '').slice(0, 3) : e.target.value.slice(0, 120)
             // Written back even when the filtered value equals the current answer, so no stray character stays in the field.
             e.target.value = next
             onChoice(next)

@@ -11,6 +11,8 @@ import { getModelTrace } from '@/server/model-trace'
 import { getPushSettings } from '@/server/push'
 import { generateConceptDiagram } from '@/server/diagrams'
 import { getCompanyBranding } from '@/server/org-settings'
+import { gradeAnswer, toItemView } from '@/lib/learning/grade'
+import { ItemPayload } from '@/lib/llm/schemas'
 import type { ItemView, Reveal, SessionView } from '@learnquiz/api'
 
 vi.mock('motion/react', async (original) => ({ ...(await original<typeof import('motion/react')>()), useReducedMotion: () => true }))
@@ -340,6 +342,31 @@ it('focuses the blank again after a restored page or an in-place resync, but lea
     await pick(container, 'confidence', 'sure')
     await click(button(container, 'Check'))
     expect(document.activeElement).toBe(button(container, 'Try again'))
+  } finally { await cleanup() }
+})
+
+it.each([
+  'the fundamental theorem of differential calculus',
+  'the fundamental theorem of differential calculus and the relation to integration and differentiation of smooth functions',
+])('checks the full accepted text cloze answer: %s', async (answer) => {
+  const payload = ItemPayload.parse({
+    format: 'cloze', stem: 'This result is called ____.', options: [], accepted_answers: [answer],
+    model_answer: answer, explanation: 'It relates differentiation and integration.',
+    difficulty: 1, source_quote: null, grounded: false, bloom: 'remember',
+  })
+  const item = toItemView({ id: 'i1', conceptId: 'c1', conceptName: 'Calculus', format: 'cloze', difficultyPrior: 1, payload }, 's1')
+  const { container, initialReveal, cleanup } = await renderPlay(false, false, 'cloze', false, item)
+  try {
+    vi.mocked(answerItem).mockImplementation(async ({ data }) => ({ ...initialReveal, ...gradeAnswer(payload, data.answer) }))
+    const input = container.querySelector<HTMLInputElement>('input[aria-label="Missing word"]')!
+    await act(async () => type(input, answer))
+    expect(input.value).toBe(answer)
+    // happy-dom does not enforce native maxlength while dispatching input events.
+    expect(input.maxLength).toBe(120)
+    await pick(container, 'confidence', 'sure')
+    await click(button(container, 'Check'))
+    expect(answerItem).toHaveBeenCalledWith({ data: expect.objectContaining({ answer: { text: answer }, confidence: 'sure' }) })
+    expect(document.querySelector('[role="dialog"] h2')!.textContent).toBe('Correct')
   } finally { await cleanup() }
 })
 
