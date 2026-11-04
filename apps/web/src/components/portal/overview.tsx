@@ -180,7 +180,7 @@ export function Overview({ data, readOnly }: { data: OverviewData; readOnly: boo
           </section>
           {nextStep && !readOnly && (
             <Banner
-              action={<Button variant="accent" asChild><Link {...links.questions({ topicId: nextStep.topicId })}>Review questions</Link></Button>}
+              action={<Button variant="accent" asChild><Link {...links.questions({ role: nextStep.roleId })}>Review questions</Link></Button>}
             >
               <strong>Next step:</strong> review {plural(nextStep.unreviewed, 'new question', 'new questions')} from {nextStep.documentTitle}.
             </Banner>

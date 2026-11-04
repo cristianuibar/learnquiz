@@ -1,18 +1,17 @@
-import { createServerFn } from '@tanstack/react-start'
+import { createServerFn, createServerOnlyFn } from '@tanstack/react-start'
 import { getRequestHeaders } from '@tanstack/react-start/server'
-import { and, asc, count, desc, eq, gt, isNull, lte, max, notExists, or, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gt, isNull, lte, notExists, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/sqlite-core'
 import type { InviteView } from '@learnquiz/api/invite'
 import { brandProblem } from '@learnquiz/tokens'
 import { z } from 'zod'
 import { getDb } from '@/db'
-import { invitation, member, organization, user } from '@/db/auth-schema'
-import { attempts, concepts, jobRoles, items, learnerConcept, memberRoleAssignments, orgSettings, sessions, sources, topics } from '@/db/schema'
+import { invitation, member, organization } from '@/db/auth-schema'
+import { attempts, concepts, jobRoles, items, learnerConcept, memberRoleAssignments, orgSettings, sources, topics } from '@/db/schema'
 import { roleMastery } from '@/lib/learning/path'
 import { WEEK, benchmarkMet } from '@/lib/learning/profile'
 import { getAuth } from '@/server/auth'
 import { requireOrgAdmin, requireOrgReader } from '@/server/authz'
-import { getEnv } from '@/server/env'
 import { httpError, mean } from '@/server/helpers'
 import { liveConcept } from '@/server/live-concept'
 import { getSessionUser } from '@/server/session'
@@ -34,13 +33,14 @@ const slugify = (name: string) =>
     .replace(/^-|-$/g, '')
     .slice(0, 40) || 'company'
 
-const rolesOf = (orgId: string) =>
+// Server-only so exporting them for People keeps the database out of the client bundle.
+export const rolesOf = createServerOnlyFn((orgId: string) =>
   getDb()
     .select({ id: jobRoles.id, name: jobRoles.name, benchmark: jobRoles.benchmark, onboardingDays: jobRoles.onboardingDays, topicId: topics.id, topicStatus: topics.status })
     .from(jobRoles)
     .innerJoin(topics, eq(topics.jobRoleId, jobRoles.id))
     .where(and(eq(jobRoles.orgId, orgId), eq(jobRoles.status, 'active')))
-    .orderBy(asc(jobRoles.createdAt))
+    .orderBy(asc(jobRoles.createdAt)))
 
 // Per active role: people assigned, live documents, and how many of the topic's live concepts are generated.
 async function roleSummaries(orgId: string) {
@@ -61,9 +61,9 @@ async function roleSummaries(orgId: string) {
   })
 }
 
-type Training = { stage: 'onboarding' | 'proficient'; progress: number; daysToProficiency: number | null; criticalConfidentErrors: number; mastery: number; benchmark: number }
+export type Training = { assignedAt: number; stage: 'onboarding' | 'proficient'; progress: number; daysToProficiency: number | null; criticalConfidentErrors: number; mastery: number; benchmark: number }
 
-async function trainingOf(orgId: string) {
+export const trainingOf = createServerOnlyFn(async (orgId: string) => {
   const db = getDb()
   const now = Date.now()
   const correction = alias(attempts, 'correction')
@@ -101,6 +101,7 @@ async function trainingOf(orgId: string) {
     const proficient = benchmarkMet(progressRow.list, progressRow.benchmark)
     const reachedAt = progressRow.proficientAt
     training.set(userId, {
+      assignedAt: progressRow.assignedAt,
       stage: proficient ? 'proficient' : 'onboarding',
       // Critical concepts must each reach the benchmark too, so the weakest one caps progress below 100% until proficiency is met.
       progress: progressRow.list.length ? (progressRow.benchmark > 0 ? Math.min(1, ...[mean(progressRow.list.map((c) => c.pKnown)), ...progressRow.list.filter((c) => c.critical).map((c) => c.pKnown)].map((p) => p / progressRow.benchmark)) : 1) : 0,
@@ -115,7 +116,7 @@ async function trainingOf(orgId: string) {
     if (row) row.criticalConfidentErrors++
   }
   return training
-}
+})
 
 async function insertRole(orgId: string, data: { name: string } & Partial<z.output<typeof Role>>) {
   const db = getDb()
@@ -213,38 +214,6 @@ export const getOrgOverview = createServerFn({ method: 'GET' })
     const top = unreviewed[0]
     const nextStep: { unreviewed: number; documentTitle: string; roleId: string; topicId: string } | null = top?.roleId ? { unreviewed: top.unreviewed, documentTitle: top.title, roleId: top.roleId, topicId: top.topicId } : null
     return { name: org.name, slug: org.slug, readOnly, roles, nextStep, training: { employees: progress.size + (invited?.n ?? 0), proficientEmployees: proficient.length, daysToProficiency: days.length ? Math.ceil(mean(days)) : null, criticalErrorsThisWeek: errors?.n ?? 0, documentsToReview: unreviewed.length, firstProficientUserId: first, openErrorUserId: openError?.userId ?? null } }
-  })
-
-export const getPeople = createServerFn({ method: 'GET' })
-  .validator(Slug)
-  .handler(async ({ data }) => {
-    const { org, readOnly } = await requireOrgReader(data.slug)
-    const db = getDb()
-    const [roles, members, invites, training, active] = await Promise.all([
-      rolesOf(org.id),
-      db
-        .select({ id: member.id, userId: member.userId, name: user.name, email: user.email, role: member.role, jobRole: jobRoles.name })
-        .from(member)
-        .innerJoin(user, eq(user.id, member.userId))
-        .leftJoin(memberRoleAssignments, and(eq(memberRoleAssignments.userId, member.userId), eq(memberRoleAssignments.orgId, member.organizationId)))
-        .leftJoin(jobRoles, eq(jobRoles.id, memberRoleAssignments.jobRoleId))
-        .where(eq(member.organizationId, org.id))
-        .orderBy(asc(member.createdAt)),
-      readOnly ? [] : db
-        .select({ id: invitation.id, name: invitation.inviteeName, email: invitation.email, jobRole: jobRoles.name, expiresAt: invitation.expiresAt })
-        .from(invitation)
-        .leftJoin(jobRoles, eq(jobRoles.id, invitation.jobRoleId))
-        .where(and(eq(invitation.organizationId, org.id), eq(invitation.status, 'pending')))
-        .orderBy(desc(invitation.createdAt)),
-      trainingOf(org.id),
-      db.select({ userId: sessions.learnerId, at: max(sessions.startedAt) })
-        .from(sessions)
-        .innerJoin(topics, eq(topics.id, sessions.topicId))
-        .innerJoin(jobRoles, and(eq(jobRoles.id, topics.jobRoleId), eq(jobRoles.orgId, org.id)))
-        .groupBy(sessions.learnerId),
-    ])
-    const lastActive = new Map(active.map((row) => [row.userId, row.at]))
-    return { id: org.id, name: org.name, slug: org.slug, baseUrl: getEnv().BETTER_AUTH_URL, roles, members: members.map((row) => ({ ...row, training: training.get(row.userId) ?? null, lastActiveAt: lastActive.get(row.userId) ?? null })), readOnly, invites: invites.map((i) => ({ ...i, expired: i.expiresAt.getTime() < Date.now() })) }
   })
 
 // Public on purpose: the invitation id is the secret in the invite link, and the page needs it before the invitee has an account.

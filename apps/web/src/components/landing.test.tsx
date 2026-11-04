@@ -23,6 +23,7 @@ const holder = vi.hoisted(() => ({ db: null as unknown }))
 // Run the real routes and server handlers; replace only transport, bindings and authentication.
 vi.mock('@tanstack/react-start', () => ({
   useServerFn: (fn: unknown) => fn,
+  createServerOnlyFn: (fn: unknown) => fn,
   createServerFn: () => {
     const builder = { validator: () => builder, handler: (fn: unknown) => fn }
     return builder

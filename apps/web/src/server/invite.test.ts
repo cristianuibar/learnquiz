@@ -10,6 +10,7 @@ const holder = vi.hoisted(() => ({ db: null as unknown, media: { get: vi.fn() } 
 
 // Fake the request/auth boundaries; keep validation, authorization and SQL real.
 vi.mock('@tanstack/react-start', () => ({
+  createServerOnlyFn: (fn: unknown) => fn,
   createServerFn: () => ({
     validator: (schema: { parse: (data: unknown) => unknown }) => ({
       handler: (fn: (input: { data: unknown }) => unknown) => (input: { data: unknown }) => fn({ data: schema.parse(input.data) }),
