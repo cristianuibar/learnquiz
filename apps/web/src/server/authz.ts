@@ -20,7 +20,7 @@ export async function checkMembership(db: Db, userId: string, org: string, admin
   return row
 }
 
-async function requireUser() {
+export async function requireUser() {
   const user = await getSessionUser()
   if (!user) throw httpError('Sign in first', 401)
   return user

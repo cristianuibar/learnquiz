@@ -82,7 +82,8 @@ function Foot({ shell }: { shell: Shell }) {
   )
 }
 
-export function PortalNav({ shell, children }: { shell: Shell; children: ReactNode }) {
+// `current` false (a not-found page under the portal) leaves every item unmarked.
+export function PortalNav({ shell, current = true, children }: { shell: Shell; current?: boolean; children: ReactNode }) {
   const links = usePortalLinks()
   const items = [
     { to: links.overview, label: 'Overview', icon: icons.overview },
@@ -92,7 +93,8 @@ export function PortalNav({ shell, children }: { shell: Shell; children: ReactNo
     { to: links.settings, label: 'Settings', icon: icons.settings },
   ]
   // Learn Quiz staff get read-only Overview and People; the server 403s them on Roles, Questions and Settings.
-  const shown = shell.readOnly ? items.filter((i) => i.label === 'Overview' || i.label === 'People') : items
+  const marked = current ? items : items.map((i) => ({ ...i, to: { ...i.to, activeOptions: { ...('activeOptions' in i.to ? i.to.activeOptions : {}), exact: true } } }))
+  const shown = shell.readOnly ? marked.filter((i) => i.label === 'Overview' || i.label === 'People') : marked
   return (
     <SideNav label={`${shell.name} portal`} header={<Header shell={shell} />} items={shown} foot={<Foot shell={shell} />}>
       {children}

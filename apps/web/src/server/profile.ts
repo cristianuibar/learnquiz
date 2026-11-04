@@ -31,7 +31,7 @@ export const getProfile = createServerFn({ method: 'GET' })
       learnerId = data.learnerId
       const target = await db.select({ id: member.id }).from(member)
         .where(and(eq(member.organizationId, org.id), eq(member.userId, learnerId))).get()
-      if (!target) throw httpError('Learner is not a member of this company', 403)
+      if (!target) throw httpError('Person not found', 404)
     } else {
       learnerId = await requireLearnerId()
     }
