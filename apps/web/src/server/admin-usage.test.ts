@@ -25,6 +25,7 @@ vi.mock('@tanstack/react-start', () => ({
 vi.mock('@tanstack/react-start/server', () => ({ getRequestHeaders: () => boundary.headers, setCookie: () => {}, setResponseStatus: (status: number) => { boundary.status = status } }))
 vi.mock('@/db', async (original) => ({ ...await original<typeof import('@/db')>(), getDb: () => boundary.db }))
 vi.mock('@/server/env', () => ({ getEnv: () => ({ BETTER_AUTH_URL: 'http://localhost:3000', BETTER_AUTH_SECRET: 'staff-tests-only-secret-at-least-32-characters' }),
+  drainsOnRequest: () => false,
   runInBackground: (task: unknown) => { boundary.background.push(task) },
 }))
 // The queue itself is covered by concept-gen.test.ts; here only the wake-up is observed.

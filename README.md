@@ -247,8 +247,10 @@ from the web app to the site, in this order:
 curl -sIL -o /dev/null -w '%{url_effective}\n' https://learnquiz.com/join/x
 ```
 
-`apps/web/src/worker.ts` delegates HTTP requests to TanStack Start. Queue and scheduled
-handlers are empty; background processing and scheduled reminders are not shipped.
+`apps/web/src/worker.ts` delegates HTTP requests to TanStack Start. In production the
+per-minute cron (the scheduled handler) drains concept question generation and sends
+learning pushes on the quarter hour; under `vite dev`, where no cron fires, the request
+that queues concepts drains them itself. The queue handler is empty.
 
 ## Disclosure for the judges
 

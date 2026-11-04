@@ -4,6 +4,7 @@ import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { concepts, learnerTopic } from '@/db/schema'
 import { ACCOUNT_DAILY_MODEL_CALL_CAP, COMPANY_DAILY_MODEL_CALL_CAP } from '@/lib/limits'
+import { drainConceptQueue } from './concept-gen'
 import * as curriculum from './curriculum'
 import { getLatestTopicIdFn } from './latest-topic'
 import { getSession, startSession } from './play'
@@ -11,7 +12,7 @@ import { getToday } from './today'
 
 // Keep the handlers, validation, authorization, model client and database real.
 // Only the transport, session provider, Worker bindings and model HTTP are faked.
-const holder = vi.hoisted(() => ({ db: null as unknown, userId: 'owner' as string | null }))
+const holder = vi.hoisted(() => ({ db: null as unknown, userId: 'owner' as string | null, drains: false, background: [] as Promise<unknown>[] }))
 vi.mock('@tanstack/react-start', () => ({
   createServerFn: () => ({
     handler: (fn: () => unknown) => () => fn(),
@@ -24,6 +25,11 @@ vi.mock('@tanstack/react-start/server', () => ({ getRequestHeaders: () => new He
 vi.mock('@/db', () => ({ getDb: () => holder.db }))
 vi.mock('@/server/auth', () => ({
   getAuth: () => ({ api: { getSession: async () => holder.userId ? { user: { id: holder.userId } } : null } }),
+}))
+vi.mock('@/server/env', async (original) => ({
+  ...await original<typeof import('@/server/env')>(),
+  drainsOnRequest: () => holder.drains,
+  runInBackground: (task: Promise<unknown>) => { holder.background.push(task) },
 }))
 vi.mock('cloudflare:workers', () => ({
   env: { LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://llm.example', LLM_MODEL: 'muse-spark-1.3' },
@@ -126,6 +132,8 @@ afterAll(() => raw.close())
 beforeEach(() => {
   raw.exec('SAVEPOINT test')
   holder.userId = 'owner'
+  holder.drains = false
+  holder.background = []
   beforeClaim.hook = null
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))
@@ -183,6 +191,30 @@ it('builds one ready role topic from every live document with grounded critical 
   await expect(generate()).rejects.toMatchObject({ status: 409 })
   expect(storedPath()).toEqual({ units: { n: 4 }, concepts: { n: 16 }, edges: { n: 12 } })
   expect(fetchModel).toHaveBeenCalledTimes(1)
+})
+
+it('leaves new concepts pending for the cron and generates their questions on the next drain', async () => {
+  await expect(generate()).resolves.toEqual({ topicId: 'picker-topic' })
+  expect(holder.background).toHaveLength(0)
+  expect(raw.prepare("SELECT gen_status, gen_started_at, COUNT(*) AS n FROM concepts WHERE topic_id = 'picker-topic' GROUP BY 1, 2").all())
+    .toEqual([{ gen_status: 'pending', gen_started_at: null, n: 16 }])
+  expect(fetchModel).toHaveBeenCalledTimes(1)
+
+  fetchModel.mockImplementation(async (_url, init) => {
+    const schema = JSON.parse(init!.body as string).response_format.json_schema.name
+    if (schema === 'item_batch') {
+      return modelReply({ items: Array.from({ length: 6 }, (_, i) => ({
+        format: 'short', stem: `Question ${fetchModel.mock.calls.length}-${i}?`, options: [], accepted_answers: [], model_answer: 'Scan.',
+        explanation: 'The SOP requires it.', difficulty: 3, source_quote: 'Warehouse', grounded: true, bloom: 'apply',
+      })) })
+    }
+    return modelReply({ results: Array.from({ length: 6 }, (_, index) => ({ index, keep: true, reasons: [] })) })
+  })
+  raw.exec("UPDATE topics SET org_id = 'northwind' WHERE id = 'picker-topic'") // the cron only drains company topics
+  while (await drainConceptQueue()) { /* until idle */ }
+  expect(raw.prepare("SELECT DISTINCT gen_status FROM concepts WHERE topic_id = 'picker-topic'").all()).toEqual([{ gen_status: 'ready' }])
+  expect(raw.prepare("SELECT COUNT(*) AS concepts, MIN(n) AS lo, MAX(n) AS hi FROM (SELECT COUNT(*) AS n FROM items WHERE status = 'active' GROUP BY concept_id)").get())
+    .toEqual({ concepts: 16, lo: 6, hi: 6 })
 })
 
 it.each([

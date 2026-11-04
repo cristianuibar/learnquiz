@@ -32,6 +32,7 @@ vi.mock('@tanstack/react-start', () => ({
 vi.mock('@tanstack/react-start/server', () => ({ getRequestHeaders: () => boundary.headers, setCookie: () => {}, setResponseStatus: (status: number) => { boundary.status = status } }))
 vi.mock('@/db', async (original) => ({ ...await original<typeof import('@/db')>(), getDb: () => boundary.db }))
 vi.mock('@/server/env', () => ({ getEnv: () => ({ BETTER_AUTH_URL: 'http://localhost:3000', BETTER_AUTH_SECRET: 'staff-tests-only-secret-at-least-32-characters' }),
+  drainsOnRequest: () => false,
   runInBackground: (task: unknown) => { boundary.background.push(task) },
 }))
 // The queue itself is covered by concept-gen.test.ts; here only the wake-up is observed.
@@ -269,16 +270,16 @@ it('lists failed, generating, pending and ready jobs in queue order with counts 
   await expect(getGenerationJobs({ data: { filter: 'notReady', offset: 100 } })).resolves.toMatchObject({ rows: [], total: 7 })
 })
 
-it('retries a failed concept once without waking the queue per concept', async () => {
+it('retries a failed concept once and leaves it pending without draining on the request', async () => {
   seedContent()
   sqlite.prepare('INSERT INTO job_roles (id, org_id, name, created_at) VALUES (?, ?, ?, ?)').run('bad-role', 'beta', 'Packer', NOW)
   sqlite.prepare('INSERT INTO topics (id, org_id, job_role_id, title, status, created_at) VALUES (?, ?, ?, ?, ?, ?)').run('bad-topic', 'beta', 'bad-role', 'Packer', 'failed', NOW)
   await expect(getStaffSession()).resolves.toEqual({ id: accounts.get('staff')!.id, name: 'staff', email: 'staff@staff.test', failedJobs: 2 })
   await expect(retryJobs({ data: { ids: ['concept:c-failed', 'concept:c-failed'] } })).resolves.toEqual({ queued: 1, skipped: 0, failed: 0 })
   expect(sqlite.prepare('SELECT gen_status, gen_error, gen_started_at FROM concepts WHERE id = ?').get('c-failed')).toEqual({ gen_status: 'pending', gen_error: null, gen_started_at: null })
-  expect(boundary.background).toHaveLength(1)
+  expect(boundary.background).toHaveLength(0)
   await expect(retryJobs({ data: { ids: ['concept:c-failed'] } })).resolves.toEqual({ queued: 0, skipped: 1, failed: 0 })
-  expect(boundary.background).toHaveLength(1)
+  expect(boundary.background).toHaveLength(0)
   await expect(retryJobs({ data: { ids: ['concept:missing', 'other:thing'] } })).resolves.toEqual({ queued: 0, skipped: 2, failed: 0 })
   await expect(getStaffSession()).resolves.toMatchObject({ failedJobs: 1 })
   const { rows } = await getGenerationJobs({ data: { filter: 'pending', offset: 0 } })

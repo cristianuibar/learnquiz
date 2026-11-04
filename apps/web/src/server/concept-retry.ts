@@ -2,7 +2,7 @@ import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm'
 import { getDb } from '@/db'
 import { concepts, topics } from '@/db/schema'
 import { drainConceptQueue } from '@/server/concept-gen'
-import { runInBackground } from '@/server/env'
+import { drainsOnRequest, runInBackground } from '@/server/env'
 import { httpError } from '@/server/helpers'
 import { liveConcept } from '@/server/live-concept'
 
@@ -18,5 +18,5 @@ export async function retryFailedConcept(conceptId: string, orgId?: string, wake
     const [dead] = await db.select({ id: concepts.id }).from(concepts).where(and(eq(concepts.id, conceptId), sql`not (${liveConcept()})`, inArray(concepts.topicId, scope)))
     throw dead ? httpError('The document behind this concept was retired', 409) : httpError('Failed concept not found', 404)
   }
-  if (wake) runInBackground(drainConceptQueue())
+  if (wake && drainsOnRequest()) runInBackground(drainConceptQueue())
 }

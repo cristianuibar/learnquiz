@@ -21,7 +21,7 @@ vi.mock('@tanstack/react-start', () => ({
 }))
 vi.mock('@tanstack/react-start/server', () => ({ getRequestHeaders: () => new Headers() }))
 vi.mock('@/db', () => ({ getDb: () => state.db }))
-vi.mock('@/server/env', () => ({ getEnv: () => ({ MEDIA: state.bucket, BETTER_AUTH_URL: 'http://127.0.0.1:8800' }), runInBackground: (task: Promise<unknown>) => { state.background.push(task) } }))
+vi.mock('@/server/env', () => ({ getEnv: () => ({ MEDIA: state.bucket, BETTER_AUTH_URL: 'http://127.0.0.1:8800' }), drainsOnRequest: () => false, runInBackground: (task: Promise<unknown>) => { state.background.push(task) } }))
 vi.mock('@/server/concept-gen', () => ({ drainConceptQueue: drain }))
 vi.mock('@/server/session', () => ({ getSessionUser: async () => state.user ? { id: state.user, isAnonymous: state.anonymous } : null }))
 vi.mock('@/server/auth', () => ({ getAuth: () => ({ api: { getSession: async () => state.user ? { user: { id: state.user, isAnonymous: state.anonymous }, session: { activeOrganizationId: state.active } } : null } }) }))
@@ -200,7 +200,7 @@ function seedV1(topicStatus = 'ready') {
 }
 const itemStatus = () => Object.fromEntries((sqlite.prepare('SELECT id, status FROM items ORDER BY id').all() as { id: string; status: string }[]).map((r) => [r.id, r.status]))
 
-it('replaces a document with version 2, retires its items and requeues the concepts that cited it', async () => {
+it('replaces a document with version 2, retires its items and requeues the concepts that cited it without draining on the request', async () => {
   seedV1()
   const result = await uploadRoleDocument({ data: form({ replacesId: 'src-1', text: 'Always wear a vest on the dock.' }) })
   expect(result).toEqual({ sourceId: result.sourceId, topicId: 'topic-role-a', r2Key: null, chars: 31, version: 2, status: 'ready' })
@@ -210,8 +210,8 @@ it('replaces a document with version 2, retires its items and requeues the conce
   expect(itemStatus()).toEqual({ 'item-1': 'retired', 'item-2': 'retired', 'item-other': 'active' })
   expect(sqlite.prepare("SELECT source_id, source_quote, gen_status, gen_started_at, gen_error FROM concepts WHERE id = 'con-1'").get())
     .toEqual({ source_id: result.sourceId, source_quote: 'wear a vest', gen_status: 'pending', gen_started_at: null, gen_error: null })
-  expect(drain).toHaveBeenCalledTimes(1)
-  expect(state.background).toHaveLength(1)
+  expect(drain).not.toHaveBeenCalled()
+  expect(state.background).toHaveLength(0)
 })
 
 it('records the size and page count of a replacement PDF', async () => {
@@ -266,7 +266,7 @@ it('repoints a concept published after the concept read but before the replaceme
     { id: 'con-1', source_id: result.sourceId, gen_status: 'pending', gen_started_at: null, gen_error: null },
     { id: 'con-late', source_id: result.sourceId, gen_status: 'pending', gen_started_at: null, gen_error: null },
   ])
-  expect(drain).toHaveBeenCalledTimes(1)
+  expect(drain).not.toHaveBeenCalled()
 })
 
 it('refuses retiring a document when a build claims the topic after the check', async () => {
@@ -341,15 +341,15 @@ it('previews a retire: question count, concepts another document also covers, an
   expect(sqlite.prepare('SELECT count(*) AS n FROM sources WHERE retired_at IS NOT NULL').get()).toEqual({ n: 0 })
 })
 
-it('retiring repoints concepts another document covers and fails the orphans', async () => {
+it('retiring repoints concepts another document covers and fails the orphans, without draining on the request', async () => {
   seedShared()
   await retireRoleDocument({ data: { ...ids, sourceId: 'src-1' } })
   expect(sqlite.prepare('SELECT id, source_id, source_quote, misconceptions_json, gen_status, gen_error FROM concepts ORDER BY id').all()).toEqual([
     { id: 'con-1', source_id: 'src-2', source_quote: 'Wear a  vest', misconceptions_json: '[]', gen_status: 'pending', gen_error: null },
     { id: 'con-2', source_id: 'src-1', source_quote: 'stop at the red line', misconceptions_json: '[]', gen_status: 'failed', gen_error: 'The document behind this concept was retired' },
   ])
-  expect(drain).toHaveBeenCalledTimes(1)
-  expect(state.background).toHaveLength(1)
+  expect(drain).not.toHaveBeenCalled()
+  expect(state.background).toHaveLength(0)
 })
 
 // The browser upload route: same handler as the server function, with the org and role taken from the URL.

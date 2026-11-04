@@ -27,6 +27,12 @@ export function getEnv(): AppEnv {
 }
 
 // Keeps background work alive after the response (about 30 s); a failure is logged, never thrown into the request.
+// Only `vite dev` drains concept questions from the request, since no cron fires there. In production the per-minute cron
+// is the only drainer: a request-scoped drain is cut off mid-call and leaves its claimed concepts stalled until the claim goes stale.
+export function drainsOnRequest(): boolean {
+  return import.meta.env.DEV
+}
+
 export function runInBackground(task: Promise<unknown>): void {
   waitUntil(task.catch((e) => console.error('background task failed', e)))
 }

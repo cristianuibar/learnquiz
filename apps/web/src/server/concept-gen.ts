@@ -84,7 +84,8 @@ export async function drainConceptQueue(opts: { limit: number; concurrency: numb
     .limit(opts.limit)
   const queue = due.map((r) => r.id)
   await Promise.all(Array.from({ length: Math.min(opts.concurrency, queue.length) }, async () => {
-    for (let id = queue.shift(); id; id = queue.shift()) await processConcept(db, id)
+    // One concept's failure (a claim write that throws) must not settle the sweep while other workers are mid-call; it stays pending.
+    for (let id = queue.shift(); id; id = queue.shift()) await processConcept(db, id).catch((e) => console.error('concept drain failed', id, e))
   }))
   return due.length
 }
