@@ -29,6 +29,9 @@ export function RevealedOptions({
           >
             {mark === 'correct' && <Check aria-hidden className="size-5 shrink-0 text-feedback-correct" />}
             {mark === 'wrong' && <X aria-hidden className="size-5 shrink-0 text-feedback-wrong" />}
+            {mark !== 'correct' && mark !== 'wrong' && item.format === 'multi' && (
+              <span aria-hidden className="size-5 shrink-0 rounded-sm border-2 border-border-strong" />
+            )}
             <span className="flex-1">{o.text}</span>
             {mark === 'correct' && <span className="text-label text-feedback-correct">{revealCopy.correct}</span>}
             {mark === 'wrong' && <span className="text-label text-feedback-wrong">{revealCopy.notQuite}</span>}

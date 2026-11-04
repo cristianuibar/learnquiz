@@ -20,6 +20,8 @@ export function CredentialsForm({ email, defaultEmail, name, initial = 'up', onM
 
   function setMode(next: 'up' | 'in') {
     setModeState(next)
+    // The name field remounts with its default value, so its readiness resets with it.
+    if (next === 'up') setHasName(Boolean(name?.trim()))
     onModeChange?.(next)
   }
 
