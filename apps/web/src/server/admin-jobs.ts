@@ -66,11 +66,12 @@ const status = (e: unknown) => (e as { status?: number } | null)?.status
 // Retries failed jobs one by one; jobs that are no longer retryable are skipped, not failed.
 export const retryJobs = createServerFn({ method: 'POST' })
   .validator(z.object({ ids: z.array(z.string().min(1).max(120)).min(1).max(100) }))
-  .handler(async ({ data }): Promise<{ queued: number; skipped: number }> => {
+  .handler(async ({ data }): Promise<{ queued: number; skipped: number; failed: number }> => {
     await requireStaff()
     const db = getDb()
     let queued = 0
     let skipped = 0
+    let failed = 0
     let conceptsQueued = 0
     const runs: Array<() => Promise<unknown>> = []
     for (const id of new Set(data.ids)) {
@@ -95,7 +96,6 @@ export const retryJobs = createServerFn({ method: 'POST' })
         if (!ownerId) { skipped++; continue }
         try {
           runs.push(await claimRoleBuild({ orgId: row.orgId, ownerId, roleId: row.roleId }))
-          queued++
         } catch (e) {
           if (![404, 409, 422, 429].includes(status(e) ?? 0)) throw e
           skipped++
@@ -104,6 +104,8 @@ export const retryJobs = createServerFn({ method: 'POST' })
     }
     if (conceptsQueued) runInBackground(drainConceptQueue())
     // Awaited, not backgrounded: background work lasts about 30 s and a build can take minutes. A failed build marks its own topic failed.
-    await Promise.allSettled(runs.map((run) => run()))
-    return { queued, skipped }
+    // A claimed role build counts as queued only once its build finishes; a rejected build counts as failed.
+    const results = await Promise.allSettled(runs.map((run) => run()))
+    for (const r of results) { if (r.status === 'fulfilled') queued++; else failed++ }
+    return { queued, skipped, failed }
   })

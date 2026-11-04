@@ -51,13 +51,19 @@ it('retries the selected failed jobs, then confirms in a focused banner', async 
     expect(box(container, 'Select Battery change procedure, Northwind Logistics').checked).toBe(true)
     expect(box(container, 'Select Late check-out requests, Tallis Hotels').checked).toBe(true)
 
-    vi.mocked(retryJobs).mockResolvedValueOnce({ queued: 2, skipped: 0 })
+    vi.mocked(retryJobs).mockResolvedValueOnce({ queued: 2, skipped: 0, failed: 0 })
     await click(button(container, 'Retry 2 jobs'))
     expect(retryJobs).toHaveBeenLastCalledWith({ data: { ids: ['c1', 'c2'] } })
     const banner = [...container.querySelectorAll('[role="status"]')].find((e) => e.textContent?.includes('queued again'))!
     expect(banner.textContent).toContain('2 jobs queued again.')
     expect(document.activeElement).toBe(banner)
     expect(container.querySelectorAll('input[type="checkbox"]:checked')).toHaveLength(0)
+
+    vi.mocked(retryJobs).mockResolvedValueOnce({ queued: 1, skipped: 0, failed: 1 })
+    await click(box(container, 'Select Battery change procedure, Northwind Logistics'))
+    await click(button(container, 'Retry 1 job'))
+    const partial = [...container.querySelectorAll('[role="status"]')].find((e) => e.textContent?.includes('queued again'))!
+    expect(partial.textContent).toContain('1 job queued again, 1 failed again.')
   } finally {
     await unmount()
   }

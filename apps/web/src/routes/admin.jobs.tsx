@@ -76,10 +76,10 @@ function Jobs() {
     setBusy(true)
     setError('')
     try {
-      const { queued, skipped } = await retryJobs({ data: { ids } })
+      const { queued, skipped, failed } = await retryJobs({ data: { ids } })
       setSelected(new Set())
       await router.invalidate()
-      setNotice({ text: `${plural(queued, 'job', 'jobs')} queued again${skipped > 0 ? `, ${skipped} skipped` : ''}.` })
+      setNotice({ text: `${plural(queued, 'job', 'jobs')} queued again${skipped > 0 ? `, ${skipped} skipped` : ''}${failed > 0 ? `, ${failed} failed again` : ''}.` })
     } catch (err) {
       setError(errorMessage(err))
     } finally {

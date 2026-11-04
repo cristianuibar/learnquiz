@@ -11,7 +11,7 @@ import { getPeople } from '@/server/people'
 import { getContentFlags, getStaffSession, listUsers, resolveFlag, setUserBan } from './admin'
 import { getGenerationJobs, retryJobs } from './admin-jobs'
 
-const boundary = vi.hoisted(() => ({ db: null as unknown, headers: new Headers(), status: 200, background: [] as unknown[] }))
+const boundary = vi.hoisted(() => ({ db: null as unknown, headers: new Headers(), status: 200, background: [] as unknown[], chatJson: (() => new Promise(() => {})) as () => Promise<unknown> }))
 
 // Only the request transport and database binding are replaced. Authorization,
 // validation, queries, Better Auth and its admin plugin execute for real.
@@ -34,7 +34,7 @@ vi.mock('@/server/env', () => ({ getEnv: () => ({ BETTER_AUTH_URL: 'http://local
 }))
 // The queue itself is covered by concept-gen.test.ts; here only the wake-up is observed.
 // A role build that reaches the model never answers, so a started build stays in its claimed state.
-vi.mock('@/lib/llm/client', async (original) => ({ ...await original<typeof import('@/lib/llm/client')>(), chatJson: () => new Promise(() => {}) }))
+vi.mock('@/lib/llm/client', async (original) => ({ ...await original<typeof import('@/lib/llm/client')>(), chatJson: () => boundary.chatJson() }))
 vi.mock('@/server/concept-gen', async (original) => ({ ...await original<typeof import('@/server/concept-gen')>(), drainConceptQueue: async () => 'drained' }))
 
 let sqlite: DatabaseSync
@@ -98,6 +98,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(NOW)
   boundary.background = []
+  boundary.chatJson = () => new Promise(() => {})
 })
 afterEach(() => { sqlite.exec('ROLLBACK'); vi.useRealTimers() })
 afterAll(() => sqlite.close())
@@ -225,12 +226,12 @@ it('retries a failed concept once without waking the queue per concept', async (
   sqlite.prepare('INSERT INTO job_roles (id, org_id, name, created_at) VALUES (?, ?, ?, ?)').run('bad-role', 'beta', 'Packer', NOW)
   sqlite.prepare('INSERT INTO topics (id, org_id, job_role_id, title, status, created_at) VALUES (?, ?, ?, ?, ?, ?)').run('bad-topic', 'beta', 'bad-role', 'Packer', 'failed', NOW)
   await expect(getStaffSession()).resolves.toEqual({ id: accounts.get('staff')!.id, name: 'staff', email: 'staff@staff.test', failedJobs: 2 })
-  await expect(retryJobs({ data: { ids: ['concept:c-failed', 'concept:c-failed'] } })).resolves.toEqual({ queued: 1, skipped: 0 })
+  await expect(retryJobs({ data: { ids: ['concept:c-failed', 'concept:c-failed'] } })).resolves.toEqual({ queued: 1, skipped: 0, failed: 0 })
   expect(sqlite.prepare('SELECT gen_status, gen_error, gen_started_at FROM concepts WHERE id = ?').get('c-failed')).toEqual({ gen_status: 'pending', gen_error: null, gen_started_at: null })
   expect(boundary.background).toHaveLength(1)
-  await expect(retryJobs({ data: { ids: ['concept:c-failed'] } })).resolves.toEqual({ queued: 0, skipped: 1 })
+  await expect(retryJobs({ data: { ids: ['concept:c-failed'] } })).resolves.toEqual({ queued: 0, skipped: 1, failed: 0 })
   expect(boundary.background).toHaveLength(1)
-  await expect(retryJobs({ data: { ids: ['concept:missing', 'other:thing'] } })).resolves.toEqual({ queued: 0, skipped: 2 })
+  await expect(retryJobs({ data: { ids: ['concept:missing', 'other:thing'] } })).resolves.toEqual({ queued: 0, skipped: 2, failed: 0 })
   await expect(getStaffSession()).resolves.toMatchObject({ failedJobs: 1 })
   const { rows } = await getGenerationJobs({ data: { filter: 'pending', offset: 0 } })
   expect(rows).toEqual([expect.objectContaining({ id: 'concept:c-failed', state: 'pending', error: null, startedAt: null })])
@@ -249,10 +250,17 @@ it('rebuilds a failed role curriculum once for the company owner', async () => {
   // The claimed build runs inside the request and never settles (the model hangs); the losing call settles with a skip.
   const a = retryJobs({ data: { ids } })
   const b = retryJobs({ data: { ids } })
-  await expect(Promise.race([a, b])).resolves.toEqual({ queued: 0, skipped: 1 })
+  await expect(Promise.race([a, b])).resolves.toEqual({ queued: 0, skipped: 1, failed: 0 })
   expect(topicStatus()).toBe('generating')
-  await expect(retryJobs({ data: { ids } })).resolves.toEqual({ queued: 0, skipped: 1 })
+  await expect(retryJobs({ data: { ids } })).resolves.toEqual({ queued: 0, skipped: 1, failed: 0 })
   expect(boundary.background).toHaveLength(0)
+})
+
+it('counts a role build whose model call fails as failed, not queued', async () => {
+  seedAlphaRoleBuild(['Step one: scan the box.'])
+  boundary.chatJson = () => Promise.reject(new Error('timeout'))
+  await expect(retryJobs({ data: { ids: ['curriculum:retry-topic'] } })).resolves.toEqual({ queued: 0, skipped: 0, failed: 1 })
+  expect(topicStatus()).toBe('failed')
 })
 
 it('lists an abandoned role build as failed and lets it be retried', async () => {
@@ -267,11 +275,11 @@ it('lists an abandoned role build as failed and lets it be retried', async () =>
 
 it('skips a failed role build without usable documents or an owner', async () => {
   seedAlphaRoleBuild(['Step one.', '  '])
-  await expect(retryJobs({ data: { ids: ['curriculum:retry-topic'] } })).resolves.toEqual({ queued: 0, skipped: 1 })
+  await expect(retryJobs({ data: { ids: ['curriculum:retry-topic'] } })).resolves.toEqual({ queued: 0, skipped: 1, failed: 0 })
   expect(topicStatus()).toBe('failed')
   sqlite.prepare('UPDATE sources SET body_text = ?').run('Filled in.')
   sqlite.prepare("UPDATE member SET role = 'member' WHERE organization_id = 'alpha'").run()
-  await expect(retryJobs({ data: { ids: ['curriculum:retry-topic'] } })).resolves.toEqual({ queued: 0, skipped: 1 })
+  await expect(retryJobs({ data: { ids: ['curriculum:retry-topic'] } })).resolves.toEqual({ queued: 0, skipped: 1, failed: 0 })
   expect(topicStatus()).toBe('failed')
   expect(boundary.background).toHaveLength(0)
 })
