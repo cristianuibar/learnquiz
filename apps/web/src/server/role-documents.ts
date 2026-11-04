@@ -78,6 +78,10 @@ export const retireRoleDocument = createServerFn({ method: 'POST' })
     if (!source) throw httpError('Document not found', 404)
     // Conditional at write time: a build may claim the topic after the check above.
     const notGenerating = exists(db.select({ one: sql`1` }).from(topics).where(and(eq(topics.id, topic.id), ne(topics.status, 'generating'))))
+    // Keep a readable source available for Replace, even if two retirements race.
+    const otherDocument = exists(db.select({ one: sql`1` }).from(sources).where(and(
+      eq(sources.topicId, topic.id), ne(sources.id, source.id), eq(sources.status, 'ready'), isNull(sources.retiredAt), isNull(sources.deletedAt),
+    )))
     // Misconceptions were drawn from the old text and may contradict the other document.
     const requeue = { misconceptionsJson: '[]', genStatus: 'pending' as const, genStartedAt: null, genError: null }
     // An alternate document may be retired or replaced between the read and the write; then read again and pick anew.
@@ -89,7 +93,7 @@ export const retireRoleDocument = createServerFn({ method: 'POST' })
       const retiredAt = Date.now()
       const retiredHere = exists(db.select({ one: sql`1` }).from(sources).where(and(eq(sources.id, source.id), eq(sources.retiredAt, retiredAt))))
       const [retired] = await db.batch([
-        db.update(sources).set({ retiredAt }).where(and(liveSource(source.id, topic.id), notGenerating, ...alternatesLive)).returning({ id: sources.id }),
+        db.update(sources).set({ retiredAt }).where(and(liveSource(source.id, topic.id), notGenerating, otherDocument, ...alternatesLive)).returning({ id: sources.id }),
         db.update(items).set({ status: 'retired' }).where(and(eq(items.sourceId, source.id), inArray(items.status, LIVE), retiredHere)),
         ...moved.map((c) => db.update(concepts).set({ ...requeue, sourceId: c.other!.id, sourceQuote: c.quote })
           .where(and(eq(concepts.id, c.concept.id), eq(concepts.sourceId, source.id), retiredHere))),
@@ -100,8 +104,9 @@ export const retireRoleDocument = createServerFn({ method: 'POST' })
         if (moved.length && drainsOnRequest()) runInBackground(drainConceptQueue())
         return { ok: true }
       }
-      const stillLive = await db.select({ id: sources.id }).from(sources).where(and(liveSource(source.id, topic.id), notGenerating)).get()
+      const stillLive = await db.select({ id: sources.id, otherDocument }).from(sources).where(and(liveSource(source.id, topic.id), notGenerating)).get()
       if (!stillLive) throw await refusal(topic.id)
+      if (!stillLive.otherDocument) throw httpError('Keep at least one readable document. Use Replace to change the last document.', 409)
       if (attempt === 3) throw httpError('The documents changed while retiring. Try again.', 409)
     }
   })

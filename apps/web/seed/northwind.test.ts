@@ -277,7 +277,8 @@ it('seeds the three employee stages through the real SOP pipeline and preserves 
   expect(samProfile.units.map((u) => u.state)).toEqual(samProfile.units.map(() => 'mastered'))
   expect(samProfile.units.flatMap((u) => u.concepts).filter((c) => withItems.includes(c.id)).every((c) => c.measured)).toBe(true)
   expect(samProfile.mastery).toBe(samMastery)
-  // Retiring the SOP retires the authored label question with the generated ones.
+  // Another readable document must remain when the SOP and its questions are retired.
+  raw.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, status, created_at) VALUES ('remaining-sop', ?, 'text', 'Remaining SOP', ?, 'ready', ?)").run(result.topicId, sopText, now)
   await retireRoleDocument({ data: { slug: result.slug, roleId: NORTHWIND.roleId, sourceId: NORTHWIND.sourceId } })
   expect(raw.prepare('SELECT status FROM items WHERE id = ?').get('northwind-demo-v1:label-item')).toEqual({ status: 'retired' })
 })

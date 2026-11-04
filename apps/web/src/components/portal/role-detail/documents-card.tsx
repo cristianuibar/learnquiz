@@ -41,6 +41,7 @@ export function DocumentsCard({ detail, readOnly, pasteOpen, pasteFor, onToggleP
   const { role, documents } = detail
   const canUpload = !readOnly && (role.topicStatus === 'draft' || role.topicStatus === 'failed')
   const canChange = !readOnly && role.topicStatus !== 'generating'
+  const canRetire = documents.filter((doc) => doc.status === 'ready').length > 1
   const input = useRef<HTMLInputElement>(null)
   const replacing = useRef<string | undefined>(undefined)
   const [error, setError] = useState('')
@@ -139,8 +140,8 @@ export function DocumentsCard({ detail, readOnly, pasteOpen, pasteFor, onToggleP
       ...(p.orphaned > 0 ? [{
         icon: FileX,
         text: p.orphaned === 1
-          ? `The ${other}${doc.title} concept has no other source. It leaves training until you add a document.`
-          : `The ${other}${p.orphaned} ${doc.title} concepts have no other source. They leave training until you add a document.`,
+          ? `The ${other}${doc.title} concept has no other source. It leaves training.`
+          : `The ${other}${p.orphaned} ${doc.title} concepts have no other source. They leave training.`,
       }] : []),
       { icon: Users, text: 'People keep their progress. Nothing is deleted.' },
     ]
@@ -158,6 +159,9 @@ export function DocumentsCard({ detail, readOnly, pasteOpen, pasteFor, onToggleP
         )}
       </div>
       {canChange && <input ref={input} type="file" accept="application/pdf" hidden tabIndex={-1} aria-hidden onChange={chosen} />}
+      {canChange && !canRetire && documents.some((doc) => doc.status === 'ready') && (
+        <p className="text-body text-ink-muted">Keep at least one readable document. Use Replace to change the last document.</p>
+      )}
       {error && <Banner kind="alert">{error}</Banner>}
       {(reject || serverError) && (
         <Banner
@@ -217,7 +221,7 @@ export function DocumentsCard({ detail, readOnly, pasteOpen, pasteFor, onToggleP
                     <Upload aria-hidden />
                     Replace
                   </Button>
-                  <RowMenu label={doc.title} items={[{ label: 'Retire', onSelect: () => void askRetire(doc) }]} />
+                  {canRetire && <RowMenu label={doc.title} items={[{ label: 'Retire', onSelect: () => void askRetire(doc) }]} />}
                 </>
               ))}
             />
