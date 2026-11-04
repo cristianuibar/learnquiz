@@ -62,6 +62,8 @@ async function renderToday(today: Today) {
   }
 }
 
+const buildingNote = 'Play unlocks as soon as your first questions are ready. This page updates on its own, so you can come back later.'
+
 const playButton = (buttons: HTMLButtonElement[]) => buttons.find((b) => b.textContent?.trim().startsWith('Play'))
 
 describe('Today fixtures', () => {
@@ -119,6 +121,31 @@ describe('Today fixtures', () => {
     try {
       expect(playButton(buttons())).toBeUndefined()
       expect(container.textContent).toContain('Building your questions')
+      expect(container.textContent).toContain(buildingNote)
+    } finally {
+      await cleanup()
+    }
+  })
+
+  it('shows preparing without a count as no questions ready yet', async () => {
+    const { container, cleanup } = await renderToday({ ...todayFixtures.preparing, role: { ...todayFixtures.preparing.role!, building: null } })
+    try {
+      expect(container.querySelector('[role=status]')?.textContent).toBe('No questions are ready yet')
+      expect(container.querySelector('[role=progressbar][aria-label="Questions ready"]')).toBeNull()
+      expect(container.textContent).toContain(buildingNote)
+    } finally {
+      await cleanup()
+    }
+  })
+
+  it('explains a disabled Play while questions build', async () => {
+    const building = todayFixtures.building
+    const { container, buttons, cleanup } = await renderToday({ ...building, plan: { ...building.plan!, playable: false } })
+    try {
+      const play = playButton(buttons())!
+      expect(play.hasAttribute('disabled')).toBe(true)
+      const described = container.querySelector(`[id="${play.getAttribute('aria-describedby')}"]`)
+      expect(described?.textContent).toBe(buildingNote)
     } finally {
       await cleanup()
     }

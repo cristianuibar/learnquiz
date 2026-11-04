@@ -56,6 +56,9 @@ function base(over: Overrides = {}): Today {
 
 const play = { label: 'Play · 5 min', accessibleLabel: 'Play, 5 minutes', disabled: false }
 
+const buildingNote =
+  'Play unlocks as soon as your first questions are ready. This page updates on its own, so you can come back later.'
+
 describe('todayView hero', () => {
   describe('building', () => {
     it('shows progress and the next unit in the play label', () => {
@@ -66,6 +69,7 @@ describe('todayView hero', () => {
         ready: 28,
         total: 42,
         status: '28 of 42 topics ready',
+        note: null,
         play: { label: 'Play Picking · 5 min', accessibleLabel: 'Play Picking, 5 minutes', disabled: false },
       })
     })
@@ -81,11 +85,12 @@ describe('todayView hero', () => {
         ready: 1,
         total: 3,
         status: '1 of 3 topics ready',
+        note: null,
         play,
       })
     })
 
-    it('has null progress and status when preparing without building info', () => {
+    it('has null progress and an honest status when preparing without building info', () => {
       const view = todayView(
         base({ role: { preparing: true, building: null, mastery: null }, plan: { nextUnit: null } }),
         now,
@@ -95,7 +100,8 @@ describe('todayView hero', () => {
         title: 'Building your questions',
         ready: null,
         total: null,
-        status: null,
+        status: 'No questions are ready yet',
+        note: buildingNote,
         play: { ...play, disabled: true },
       })
     })
@@ -116,6 +122,7 @@ describe('todayView hero', () => {
       )
       if (view.hero.kind !== 'building') throw new Error('expected building hero')
       expect(view.hero.play.disabled).toBe(true)
+      expect(view.hero.note).toBe(buildingNote)
     })
 
     it('is beaten by done', () => {
@@ -546,6 +553,7 @@ describe('todayFixtures', () => {
       ready: 28,
       total: 42,
       status: '28 of 42 topics ready',
+      note: null,
       play: { label: 'Play Receiving · 5 min', accessibleLabel: 'Play Receiving, 5 minutes', disabled: false },
     })
     expect(v.quests).toEqual([{ key: 'session', label: 'One session', count: null, done: false }])
@@ -574,6 +582,7 @@ describe('todayFixtures', () => {
       ready: 0,
       total: 42,
       status: '0 of 42 topics ready',
+      note: buildingNote,
       play: { label: 'Play · 5 min', accessibleLabel: 'Play, 5 minutes', disabled: true },
     })
     expect(v.quests).toEqual([])

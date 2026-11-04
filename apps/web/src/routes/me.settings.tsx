@@ -143,44 +143,46 @@ function Settings() {
 
   if (!user) return null
   return (
-    <main className="mx-auto flex w-full max-w-xl flex-col gap-8 px-4 pt-6 pb-8">
-      <header className="flex items-center gap-2">
-        <Link to="/me/profile" aria-label="Back" className="-ml-3 inline-flex size-12 items-center justify-center rounded-full text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
+    <main className="mx-auto w-full max-w-xl">
+      <header className="flex h-14 items-center gap-2 px-2">
+        <Link to="/me/profile" state={{ focus: 'settings' }} aria-label="Back" className="inline-flex size-12 items-center justify-center rounded-full text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
           <ChevronLeft aria-hidden className="size-6" />
         </Link>
-        <h1 tabIndex={-1} className="text-title-1 text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">Settings</h1>
+        <h1 tabIndex={-1} className="text-title-2 text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">Settings</h1>
       </header>
-      <section aria-labelledby="settings-learning" className="flex flex-col gap-4">
-        <h2 id="settings-learning" className={h2}>Learning questions</h2>
-        <PushSwitch checked={!prefs.paused} disabled={saving} onChange={toggleSwitch} />
-        <HoursField
-          start={prefs.startMinute}
-          end={prefs.endMinute}
-          startOptions={timeOptions(company, 0, prefs.endMinute - 30, prefs.startMinute)}
-          endOptions={timeOptions(company, prefs.startMinute + 30, 1440, prefs.endMinute)}
-          caption={company && `Inside ${company.name}’s hours: ${formatMinute(company.startMinute)}–${formatMinute(company.endMinute)}`}
-          disabled={saving}
-          onStart={(startMinute) => void save({ ...prefs, startMinute })}
-          onEnd={(endMinute) => void save({ ...prefs, endMinute })}
-        />
-        <DaysToggles available={company?.days ?? [1, 2, 3, 4, 5, 6, 7]} days={prefs.days} disabled={saving} notice={dayNotice} onToggle={toggleDay} />
-        {saveError && <p role="alert" className={alertClass}>{SAVE_ERROR}</p>}
-        {isStaff && (
-          <>
-            <Button variant="secondary" className="self-start" disabled={!saved} onClick={() => void sendTest()}>Send test push</Button>
-            {testMessage && <p role="status" className="text-body text-ink">{testMessage}</p>}
-            {testError && <p role="alert" className={alertClass}>{testError}</p>}
-          </>
-        )}
-      </section>
-      <section aria-labelledby="settings-appearance" className="flex flex-col gap-4">
-        <h2 id="settings-appearance" className={h2}>Appearance</h2>
-        <AppearanceControl value={theme} onChange={(next) => { setTheme(next); applyTheme(next) }} />
-      </section>
-      <section aria-labelledby="settings-account" className="flex flex-col gap-4">
-        <h2 id="settings-account" className={h2}>Account</h2>
-        <AccountRows email={email} companies={adminCompanies} isAdmin={user.role === 'admin'} signingOut={signingOut} error={signOutError} onSignOut={() => void signOut()} />
-      </section>
+      <div className="flex flex-col gap-8 px-4 pt-2 pb-8">
+        <section aria-labelledby="settings-learning" className="flex flex-col gap-4">
+          <h2 id="settings-learning" className={h2}>Learning questions</h2>
+          <PushSwitch checked={!prefs.paused} disabled={saving} onChange={toggleSwitch} />
+          <HoursField
+            start={prefs.startMinute}
+            end={prefs.endMinute}
+            startOptions={timeOptions(company, 0, prefs.endMinute - 30, prefs.startMinute)}
+            endOptions={timeOptions(company, prefs.startMinute + 30, 1440, prefs.endMinute)}
+            caption={company && `Inside ${company.name}’s hours: ${formatMinute(company.startMinute)}–${formatMinute(company.endMinute)}`}
+            disabled={saving}
+            onStart={(startMinute) => void save({ ...prefs, startMinute })}
+            onEnd={(endMinute) => void save({ ...prefs, endMinute })}
+          />
+          <DaysToggles available={company?.days ?? [1, 2, 3, 4, 5, 6, 7]} days={prefs.days} disabled={saving} notice={dayNotice} onToggle={toggleDay} />
+          {saveError && <p role="alert" className={alertClass}>{SAVE_ERROR}</p>}
+          {isStaff && (
+            <>
+              <Button variant="secondary" className="self-start" disabled={!saved} onClick={() => void sendTest()}>Send test push</Button>
+              {testMessage && <p role="status" className="text-body text-ink">{testMessage}</p>}
+              {testError && <p role="alert" className={alertClass}>{testError}</p>}
+            </>
+          )}
+        </section>
+        <section aria-labelledby="settings-appearance" className="flex flex-col gap-4">
+          <h2 id="settings-appearance" className={h2}>Appearance</h2>
+          <AppearanceControl value={theme} onChange={(next) => { setTheme(next); applyTheme(next) }} />
+        </section>
+        <section aria-labelledby="settings-account" className="flex flex-col gap-4">
+          <h2 id="settings-account" className={h2}>Account</h2>
+          <AccountRows email={email} companies={adminCompanies} isAdmin={user.role === 'admin'} signingOut={signingOut} error={signOutError} onSignOut={() => void signOut()} />
+        </section>
+      </div>
     </main>
   )
 }

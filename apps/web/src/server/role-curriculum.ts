@@ -58,15 +58,15 @@ async function publishRoleCurriculum(db: Db, topicId: string, claimAt: number, v
 const staleBuild = (now: number) =>
   and(eq(topics.status, 'generating'), or(isNull(topics.genStartedAt), lt(topics.genStartedAt, now - STALE_CLAIM_MS)))
 
-// Marks an abandoned build failed so the role can be rebuilt and take documents again.
-export async function releaseStaleBuild(db: Db, topicId: string): Promise<boolean> {
+// Marks an abandoned build failed so the role can be rebuilt and take documents again; without a topicId, releases every stale role build.
+export async function releaseStaleBuild(db: Db, topicId?: string): Promise<boolean> {
   const released = await db.update(topics).set({ status: 'failed' })
-    .where(and(eq(topics.id, topicId), staleBuild(Date.now()))).returning({ id: topics.id })
+    .where(and(topicId ? eq(topics.id, topicId) : isNotNull(topics.jobRoleId), staleBuild(Date.now()))).returning({ id: topics.id })
   return released.length > 0
 }
 
-// Callers authenticate the actor; every query still scopes the role to its company.
-export async function buildRoleCurriculum({ orgId, ownerId, roleId }: { orgId: string; ownerId: string; roleId: string }): Promise<{ topicId: string }> {
+// Refusals throw before anything is claimed; the returned run owns the claim.
+export async function claimRoleBuild({ orgId, ownerId, roleId }: { orgId: string; ownerId: string; roleId: string }): Promise<() => Promise<{ topicId: string }>> {
   const db = getDb()
   const [row] = await db
     .select({ topic: topics })
@@ -89,39 +89,46 @@ export async function buildRoleCurriculum({ orgId, ownerId, roleId }: { orgId: s
     .where(and(eq(topics.id, topicId), or(inArray(topics.status, ['draft', 'failed']), staleBuild(now))))
     .returning({ id: topics.id })
   if (!claimed.length) throw httpError('The curriculum is already generating or ready.', 409)
-  try {
-    // Read after the claim: a replacement committed before it is seen here, and one after it is refused while generating.
-    const documents = await liveDocuments()
-    if (unusable(documents)) throw missingDocuments()
-    let skeleton: CurriculumSkeleton
+  return async () => {
     try {
-      skeleton = await chatJson({
-        purpose: 'curriculum', schema: CurriculumSkeleton, schemaName: 'curriculum_skeleton',
-        ...curriculumPrompt({ topic: row.topic.title, goal: row.topic.goal, levelHint: 3, sourceDocuments: documents }),
-        maxTokens: 16000, learnerId: ownerId, orgId, topicId,
-      })
+      // Read after the claim: a replacement committed before it is seen here, and one after it is refused while generating.
+      const documents = await liveDocuments()
+      if (unusable(documents)) throw missingDocuments()
+      let skeleton: CurriculumSkeleton
+      try {
+        skeleton = await chatJson({
+          purpose: 'curriculum', schema: CurriculumSkeleton, schemaName: 'curriculum_skeleton',
+          ...curriculumPrompt({ topic: row.topic.title, goal: row.topic.goal, levelHint: 3, sourceDocuments: documents }),
+          maxTokens: 16000, learnerId: ownerId, orgId, topicId,
+        })
+      } catch (e) {
+        if (e instanceof LlmError && e.status === 429) throw httpError(e.message, 429)
+        if (e instanceof LlmError && e.status === 422) throw httpError('The model did not produce a valid document curriculum. Try again.', 422)
+        throw httpError('The model did not answer. Try again.', 503)
+      }
+      const valid = validateSkeleton(skeleton, documents)
+      if (valid.units.some((u) => u.concepts.some((c) => !c.grounded))) {
+        throw httpError('The curriculum contains concepts without a matching document quote. Try again.', 422)
+      }
+      // Publish the complete path and its ready status together; never publish a generic fallback for an SOP.
+      if (!(await publishRoleCurriculum(db, topicId, now, valid, jobModel('curriculum').model))) {
+        throw httpError('A document changed while the curriculum was generating. Build it again.', 409)
+      }
+      // Questions are generated per concept for the whole company, not per learner.
+      runInBackground(drainConceptQueue())
+      return { topicId }
     } catch (e) {
-      if (e instanceof LlmError && e.status === 429) throw httpError(e.message, 429)
-      if (e instanceof LlmError && e.status === 422) throw httpError('The model did not produce a valid document curriculum. Try again.', 422)
-      throw httpError('The model did not answer. Try again.', 503)
+      // Only the build that still holds the claim may fail the topic; a stale one must not overwrite another build's result.
+      await db.update(topics).set({ status: 'failed' })
+        .where(and(eq(topics.id, topicId), eq(topics.status, 'generating'), eq(topics.genStartedAt, now))).catch(() => {})
+      throw e
     }
-    const valid = validateSkeleton(skeleton, documents)
-    if (valid.units.some((u) => u.concepts.some((c) => !c.grounded))) {
-      throw httpError('The curriculum contains concepts without a matching document quote. Try again.', 422)
-    }
-    // Publish the complete path and its ready status together; never publish a generic fallback for an SOP.
-    if (!(await publishRoleCurriculum(db, topicId, now, valid, jobModel('curriculum').model))) {
-      throw httpError('A document changed while the curriculum was generating. Build it again.', 409)
-    }
-    // Questions are generated per concept for the whole company, not per learner.
-    runInBackground(drainConceptQueue())
-    return { topicId }
-  } catch (e) {
-    // Only the build that still holds the claim may fail the topic; a stale one must not overwrite another build's result.
-    await db.update(topics).set({ status: 'failed' })
-      .where(and(eq(topics.id, topicId), eq(topics.status, 'generating'), eq(topics.genStartedAt, now))).catch(() => {})
-    throw e
   }
+}
+
+// Callers authenticate the actor; every query still scopes the role to its company.
+export async function buildRoleCurriculum(args: { orgId: string; ownerId: string; roleId: string }): Promise<{ topicId: string }> {
+  return (await claimRoleBuild(args))()
 }
 
 const RoleDocument = z.object({

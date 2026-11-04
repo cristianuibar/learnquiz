@@ -4,11 +4,15 @@ import { createRoot } from 'react-dom/client'
 import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet, redirect, RouterProvider } from '@tanstack/react-router'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { Route as appRootRoute } from '@/routes/__root'
+import { Route as profileRoute } from '@/routes/me.profile'
+import { Route as settingsRoute } from '@/routes/me.settings'
 import { Route as startRoute } from '@/routes/start'
 import { Route as todayRoute } from '@/routes/today'
 import { createTopic } from '@/server/curriculum'
 import { getLatestTopicIdFn } from '@/server/latest-topic'
 import { getCompanyBranding } from '@/server/org-settings'
+import { getProfile } from '@/server/profile'
+import { getPushSettings } from '@/server/push'
 import { getSessionFn } from '@/server/session-fn'
 import { startPlacement, startSession } from '@/server/play'
 import { getToday } from '@/server/today'
@@ -17,7 +21,9 @@ vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
 vi.mock('@/server/curriculum', () => ({ createTopic: vi.fn() }))
 vi.mock('@/server/play', () => ({ startPlacement: vi.fn(), startSession: vi.fn() }))
 vi.mock('@/server/today', () => ({ getToday: vi.fn() }))
-vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
+vi.mock('@/lib/auth-client', () => ({ authClient: { useSession: () => ({ data: { user: { email: 'learner@example.test' } } }) } }))
+vi.mock('@/server/profile', () => ({ getProfile: vi.fn(), getMemberFlags: vi.fn(async () => []) }))
+vi.mock('@/server/push', () => ({ getPushSettings: vi.fn(), subscribe: vi.fn(), unsubscribe: vi.fn(), sendTestPush: vi.fn(), savePushPreferences: vi.fn() }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: vi.fn() }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: vi.fn() }))
 vi.mock('@/server/session-fn', () => ({
@@ -25,6 +31,11 @@ vi.mock('@/server/session-fn', () => ({
 }))
 
 beforeEach(() => {
+  vi.mocked(getProfile).mockResolvedValue({
+    name: 'Learner', topic: { id: 'training', title: 'Workplace safety' }, role: null, benchmark: 0.85, started: true, onboarding: null, mastery: 0.7, units: [],
+    proficiency: { achievedAt: null, days: null, estimatedDays: 2, projectedAt: null }, confidentErrors: [], weeks: [], sessionCounts: { week: 0, total: 0 },
+  })
+  vi.mocked(getPushSettings).mockResolvedValue({ publicKey: '', isStaff: false, endpoints: [], prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC', days: [1, 2, 3, 4, 5] }, company: null, canPrompt: false, schedule: { window: { startMinute: 540, endMinute: 1020, days: [1, 2, 3, 4, 5], timezone: 'UTC', source: 'default' }, dailyCap: 3, steadyCap: 3, phase: 'steady', preview: null } } as Awaited<ReturnType<typeof getPushSettings>>)
   vi.mocked(getLatestTopicIdFn).mockResolvedValue(null)
   vi.mocked(getCompanyBranding).mockResolvedValue(null)
   vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'learner', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] })
@@ -44,8 +55,9 @@ async function renderStart(initialEntry = '/start') {
   const loading = createRoute({ getParentRoute: () => rootRoute, path: '/play/loading', component: () => <h1>Preparing</h1> })
   const done = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId/done', component: () => <h1>Session done</h1> })
   const me = createRoute({ getParentRoute: () => rootRoute, path: '/me', component: () => <h1>Learner</h1> })
-  const profile = createRoute({ getParentRoute: () => rootRoute, path: '/me/profile', component: () => <h1>Learner</h1> })
-  const router = createRouter({ routeTree: rootRoute.addChildren([index, start, today, loading, play, done, me, profile]), history: createMemoryHistory({ initialEntries: [initialEntry] }) })
+  const profile = createRoute({ getParentRoute: () => rootRoute, path: '/me/profile', beforeLoad: profileRoute.options.beforeLoad, loader: profileRoute.options.loader, validateSearch: profileRoute.options.validateSearch, component: profileRoute.options.component })
+  const settings = createRoute({ getParentRoute: () => rootRoute, path: '/me/settings', beforeLoad: settingsRoute.options.beforeLoad, loader: settingsRoute.options.loader, component: settingsRoute.options.component })
+  const router = createRouter({ routeTree: rootRoute.addChildren([index, start, today, loading, play, done, me, profile, settings]), history: createMemoryHistory({ initialEntries: [initialEntry] }) })
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -151,10 +163,24 @@ it('shows the three tabs on Today and moves focus to the page heading on Profile
     expect(router.state.location.pathname).toBe('/me/profile')
     expect(links()[2].getAttribute('aria-current')).toBe('page')
     expect(links()[0].getAttribute('aria-current')).toBeNull()
-    expect(container.querySelector('header')).toBeNull() // Training progress brings its own header
+    expect(container.querySelectorAll('header')).toHaveLength(1) // only Training progress's own header, no top bar
     const h1 = container.querySelector('h1')!
-    expect(h1.textContent).toBe('Learner')
+    expect(h1.textContent).toBe('Training progress')
     expect(document.activeElement).toBe(h1)
+  } finally {
+    await cleanup()
+  }
+})
+
+it('returns focus to the Settings link when Back leaves Settings for Profile', async () => {
+  const { container, router, cleanup } = await renderStart('/me/profile')
+  try {
+    const gear = () => container.querySelector<HTMLAnchorElement>('a[aria-label="Settings"]')!
+    await act(async () => { gear().click(); await router.load() })
+    expect(router.state.location.pathname).toBe('/me/settings')
+    await act(async () => { container.querySelector<HTMLAnchorElement>('a[aria-label="Back"]')!.click(); await router.load() })
+    expect(router.state.location.pathname).toBe('/me/profile')
+    expect(document.activeElement).toBe(gear())
   } finally {
     await cleanup()
   }
