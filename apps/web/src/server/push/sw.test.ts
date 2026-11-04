@@ -28,6 +28,16 @@ it('displays push payloads and a visible fallback for an empty or malformed push
   }
 })
 
+it('shows a title-only question push without a fallback body, tagged so a repeat replaces it', async () => {
+  const { self, dispatch } = worker()
+  await dispatch('push', { data: { json: () => ({ title: 'Which valve isolates the line?', url: '/play/quick/i1?pushId=p1' }) } })
+  const [title, options] = self.registration.showNotification.mock.lastCall as unknown as [string, { body?: string; tag?: string; data: unknown }]
+  expect(title).toBe('Which valve isolates the line?')
+  expect(options.body).toBeUndefined()
+  expect(options.tag).toBe('q-i1')
+  expect(options.data).toEqual({ url: '/play/quick/i1?pushId=p1' })
+})
+
 it('focuses an existing app window or opens the target, refusing off-origin notification URLs', async () => {
   const { self, dispatch } = worker()
   const focus = vi.fn(async () => {})

@@ -8,19 +8,21 @@ import { Route as doneRoute } from '@/routes/play.$sessionId_.done'
 import { Route as quickRoute } from '@/routes/play.quick.$itemId'
 import { Route as signInRoute } from '@/routes/sign-in'
 import { Route as optInRoute } from '@/routes/opt-in'
-import { endSession, startMiniSession } from '@/server/play'
+import { answerItem, endSession, getSession, reportItem, startMiniSession } from '@/server/play'
 import { getPushSettings } from '@/server/push'
 import { getSessionFn } from '@/server/session-fn'
-import type { SummaryView } from '@learnquiz/api'
+import type { Reveal, SessionView, SummaryView } from '@learnquiz/api'
 
+vi.mock('motion/react', async (original) => ({ ...(await original<typeof import('motion/react')>()), useReducedMotion: () => true }))
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn(async () => ({ user: { id: 'u1', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] })) }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => 't1' }))
 vi.mock('@/server/today', () => ({ getToday: vi.fn() }))
-vi.mock('@/server/play', () => ({ prepareNextSession: vi.fn(async () => ({ ok: true })), endSession: vi.fn(), startMiniSession: vi.fn(), startSession: vi.fn() }))
+vi.mock('@/server/play', () => ({ prepareNextSession: vi.fn(async () => ({ ok: true })), endSession: vi.fn(), startMiniSession: vi.fn(), startSession: vi.fn(), getSession: vi.fn(), answerItem: vi.fn(), reportItem: vi.fn() }))
 vi.mock('@/server/push', () => ({ getPushSettings: vi.fn(), subscribe: vi.fn(), unsubscribe: vi.fn(), sendTestPush: vi.fn(), savePushPreferences: vi.fn() }))
 vi.mock('@/server/model-trace', () => ({ getModelTrace: vi.fn() }))
+vi.mock('@/server/diagrams', () => ({ generateConceptDiagram: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
 
 const schedule = { window: { startMinute: 540, endMinute: 1020, days: [1, 2, 3, 4, 5], timezone: 'UTC', source: 'default' as const }, dailyCap: 3, steadyCap: 3, phase: 'steady' as const, preview: null }
@@ -35,7 +37,7 @@ async function renderApp(entry: string) {
   const rootRoute = createRootRoute({ beforeLoad: appRoot.options.beforeLoad, loader: appRoot.options.loader, component: appRoot.options.component })
   const done = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId/done', beforeLoad: doneRoute.options.beforeLoad, loader: doneRoute.options.loader, component: doneRoute.options.component })
   const quick = createRoute({ getParentRoute: () => rootRoute, path: '/play/quick/$itemId', validateSearch: quickRoute.options.validateSearch,
-    beforeLoad: quickRoute.options.beforeLoad, loaderDeps: quickRoute.options.loaderDeps, loader: quickRoute.options.loader })
+    beforeLoad: quickRoute.options.beforeLoad, loaderDeps: quickRoute.options.loaderDeps, loader: quickRoute.options.loader, component: quickRoute.options.component })
   const play = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId', component: () => <main>One question</main> })
   const signIn = createRoute({ getParentRoute: () => rootRoute, path: '/sign-in', validateSearch: signInRoute.options.validateSearch, component: () => <main>Sign in</main> })
   const me = createRoute({ getParentRoute: () => rootRoute, path: '/me', component: () => <h1>Learner</h1> })
@@ -141,6 +143,13 @@ it('keeps mistakes collapsed until the disclosure is opened', async () => {
   } finally { await cleanup() }
 })
 
+const quickView: SessionView = {
+  id: 'mini-1', kind: 'mini', topicId: 't1', topicTitle: 'Algebra', progress: { position: 1, total: 1 }, ended: false,
+  item: { id: 'i1', conceptId: 'c1', conceptName: 'Variables', format: 'mcq', difficulty: 1, generatedBy: 'gpt-test', image: null,
+    stem: 'x + 1 = 2; what is x?', options: [{ id: 'a', text: '2' }, { id: 'b', text: '1' }], blank: null },
+} as SessionView
+const pick = (container: HTMLElement, name: string, value: string) => act(async () => { container.querySelector<HTMLInputElement>(`input[name="${name}"][value="${value}"]`)!.click() })
+
 it('starts a mistake review session only when the mistake is clicked, not on hover or focus', async () => {
   vi.mocked(endSession).mockResolvedValue({ sessionId: 's1', kind: 'session', topicId: 't1', durationMs: 1000, correct: 9, total: 10, ungraded: 0, xp: 0,
     streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], benchmark: null, reviewsLeft: 0, nextLine: 'Come back soon.', endedEarly: false,
@@ -148,6 +157,7 @@ it('starts a mistake review session only when the mistake is clicked, not on hov
   vi.mocked(getPushSettings).mockResolvedValue({ publicKey: 'public-key', isStaff: false, endpoints: [], canPrompt: false,
     prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC', days: [1, 2, 3, 4, 5] }, company: null, schedule })
   vi.mocked(startMiniSession).mockResolvedValue({ sessionId: 'mini-1' })
+  vi.mocked(getSession).mockResolvedValue(quickView)
   const { container, router, cleanup } = await renderApp('/play/s1/done')
   try {
     await act(async () => [...container.querySelectorAll('button')].find((b) => b.textContent?.includes('Mistakes (1)'))?.click())
@@ -161,18 +171,115 @@ it('starts a mistake review session only when the mistake is clicked, not on hov
     expect(startMiniSession).not.toHaveBeenCalled()
     await act(async () => link.click())
     expect(startMiniSession).toHaveBeenCalledExactlyOnceWith({ data: { itemId: 'i1', pushId: undefined } })
-    expect(router.state.location.pathname).toBe('/play/mini-1')
+    expect(router.state.location.pathname).toBe('/play/quick/i1')
+    expect(container.querySelector('h1')?.textContent).toBe('x + 1 = 2; what is x?')
   } finally { await cleanup() }
 })
 
-it('opens a notification deep link through the quick route and redirects into focused play', async () => {
+it('opens a notification deep link as an inline one-question screen without redirecting', async () => {
   vi.mocked(startMiniSession).mockResolvedValue({ sessionId: 'mini-1' })
+  vi.mocked(getSession).mockResolvedValue(quickView)
   const { container, router, cleanup } = await renderApp('/play/quick/i1?pushId=push-1')
   try {
     expect(startMiniSession).toHaveBeenCalledExactlyOnceWith({ data: { itemId: 'i1', pushId: 'push-1' } })
-    expect(router.state.location.pathname).toBe('/play/mini-1')
-    expect(container.textContent).toBe('One question')
+    expect(getSession).toHaveBeenCalledWith({ data: { sessionId: 'mini-1' } })
+    expect(router.state.location.pathname).toBe('/play/quick/i1')
+    expect(container.querySelector('h1')?.textContent).toBe('x + 1 = 2; what is x?')
+    expect(container.querySelector('a[aria-label="Close"]')?.getAttribute('href')).toBe('/today')
+    expect(container.textContent).toContain('1 question')
     expect(container.querySelector('nav')).toBeNull()
+  } finally { await cleanup() }
+})
+
+function mockQuickAnswer() {
+  vi.mocked(startMiniSession).mockResolvedValue({ sessionId: 'mini-1' })
+  vi.mocked(getSession).mockResolvedValue(quickView)
+  vi.mocked(answerItem).mockResolvedValue({ attemptId: 'a0', diagramConceptId: null, score: 1, feedback: null, missingPoints: [], chosenFeedback: null, sourceQuote: null, sourceTitle: null,
+    returnsThisSession: false, pKnownBefore: 0.1, pKnownAfter: 0.5, correct: true, correctAnswer: '1', state: 'A', mixUps: [], explanation: 'Subtract one.', xp: 10, critical: false,
+    correctOptionIds: null, sourceVersion: null, detail: null } as unknown as Reveal)
+  vi.mocked(endSession).mockResolvedValue({ sessionId: 'mini-1', kind: 'mini', topicId: 't1', durationMs: 1000, correct: 1, total: 1, ungraded: 0, xp: 10,
+    streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], benchmark: null, reviewsLeft: 3, nextLine: 'Come back soon.', endedEarly: false } as SummaryView)
+}
+async function checkQuick(container: HTMLElement) {
+  await pick(container, 'answer', 'b')
+  await pick(container, 'confidence', 'sure')
+  const check = [...document.body.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Check')!
+  await act(async () => check.click())
+}
+
+it('answers the quick question inline and offers the way back to Today', async () => {
+  mockQuickAnswer()
+  const { container, router, cleanup } = await renderApp('/play/quick/i1?pushId=push-1')
+  try {
+    await checkQuick(container)
+    expect(answerItem).toHaveBeenCalledExactlyOnceWith({ data: { sessionId: 'mini-1', itemId: 'i1', answer: { optionId: 'b' }, confidence: 'sure', responseMs: expect.any(Number) } })
+    expect(endSession).toHaveBeenCalledExactlyOnceWith({ data: { sessionId: 'mini-1' } })
+    const text = document.body.textContent ?? ''
+    expect(container.querySelector('h1')?.textContent).toBe('Quick question done')
+    for (const line of ['Correct', '1', '1 review cleared · 3 left today']) expect(text).toContain(line)
+    const back = [...document.body.querySelectorAll<HTMLAnchorElement>('a[href="/today"]')].find((a) => a.textContent?.trim() === 'Back to Today')!
+    await act(async () => back.click())
+    expect(router.state.location.pathname).toBe('/today')
+  } finally { await cleanup() }
+})
+
+it('announces Report sent on the result only after the report sheet stops hiding the page', async () => {
+  mockQuickAnswer()
+  vi.mocked(reportItem).mockResolvedValue({ ok: true } as never)
+  const { container, cleanup } = await renderApp('/play/quick/i1?pushId=push-1')
+  try {
+    await checkQuick(container)
+    const status = [...container.querySelectorAll('[role="status"]')].find((el) => el.classList.contains('sr-only'))!
+    await act(async () => [...container.querySelectorAll('button')].find((b) => b.textContent === 'Report this question')!.click())
+    expect(container.getAttribute('aria-hidden')).toBe('true')
+    await act(async () => [...document.body.querySelectorAll('button')].find((b) => b.textContent?.includes('The question is unclear'))!.click())
+    // Screen readers skip text written while the page is still aria-hidden, so the page must be unhidden first.
+    const records: MutationRecord[] = []
+    const observer = new MutationObserver((batch) => records.push(...batch))
+    observer.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['aria-hidden'], attributeOldValue: true })
+    await act(async () => [...document.body.querySelectorAll('button')].find((b) => b.textContent?.includes('Send report'))!.click())
+    records.push(...observer.takeRecords())
+    observer.disconnect()
+    const unhidden = records.findIndex((r) => r.type === 'attributes' && r.target === container && r.oldValue === 'true')
+    const announced = records.findIndex((r) => r.type !== 'attributes' && status.contains(r.target) && status.textContent === 'Report sent')
+    expect(unhidden).toBeGreaterThan(-1)
+    expect(announced).toBeGreaterThan(unhidden)
+    expect(reportItem).toHaveBeenCalledOnce()
+    expect(status.textContent).toBe('Report sent')
+    expect(status.closest('[aria-hidden="true"]')).toBeNull()
+    expect(container.querySelector('h1')?.textContent).toBe('Quick question done')
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 0)))
+    expect(document.activeElement?.textContent).toBe('Report this question')
+  } finally { await cleanup() }
+})
+
+it.each([
+  { message: 'This question has been retired', after: quickView, heading: "This question isn't available any more.", ends: true },
+  { message: 'Already answered. Continue to the next question.', after: { ...quickView, ended: true, item: null }, heading: 'You already answered this question.', ends: false },
+  // An earlier request still holds the answer claim: nothing is stored yet, so the question stays for Try again.
+  { message: 'Already answered. Continue to the next question.', after: quickView, heading: 'x + 1 = 2; what is x?', ends: false },
+])('shows "$heading" when Check is refused with 409 "$message"', async ({ message, after, heading, ends }) => {
+  mockQuickAnswer()
+  vi.mocked(getSession).mockResolvedValueOnce(quickView).mockResolvedValueOnce(after)
+  vi.mocked(answerItem).mockRejectedValue(Object.assign(new Error(message), { status: 409 }))
+  const { container, cleanup } = await renderApp('/play/quick/i1?pushId=push-1')
+  try {
+    await checkQuick(container)
+    expect(container.querySelector('h1')?.textContent).toBe(heading)
+    const stays = heading === quickView.item!.stem
+    expect(container.querySelector('[role="alert"]')?.textContent ?? null).toBe(stays ? 'Couldn’t check your answer.' : null)
+    expect([...document.body.querySelectorAll('button')].some((b) => b.textContent?.trim() === 'Try again')).toBe(stays)
+    expect(vi.mocked(endSession).mock.calls).toEqual(ends ? [[{ data: { sessionId: 'mini-1' } }]] : [])
+  } finally { await cleanup() }
+})
+
+it('says the question is gone when the notification item no longer exists', async () => {
+  vi.mocked(startMiniSession).mockRejectedValue(Object.assign(new Error('Question not found'), { status: 404 }))
+  const { container, cleanup } = await renderApp('/play/quick/i1?pushId=push-1')
+  try {
+    expect(container.querySelector('h1')?.textContent).toBe("This question isn't available any more.")
+    expect([...container.querySelectorAll('a[href="/today"]')].map((a) => a.textContent?.trim())).toContain('Back to Today')
+    expect(getSession).not.toHaveBeenCalled()
   } finally { await cleanup() }
 })
 

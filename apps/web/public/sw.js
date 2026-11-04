@@ -52,12 +52,17 @@ self.addEventListener('push', (event) => {
   } catch {
     // Even an empty or malformed push must show a user-visible notification.
   }
-  event.waitUntil(self.registration.showNotification(payload?.title || 'Learn Quiz', {
-    body: payload?.body || 'Ready for a little learning?',
+  // A titled push (a question) carries no fallback body; a repeat for the same item replaces the earlier one.
+  const titled = typeof payload?.title === 'string' && payload.title.length > 0
+  const options = {
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
     data: { url: payload?.url || '/me' },
-  }))
+  }
+  if (payload?.body || !titled) options.body = payload?.body || 'Ready for a little learning?'
+  const quick = typeof payload?.url === 'string' && payload.url.match(/^\/play\/quick\/([^/?#]+)/)
+  if (quick) options.tag = `q-${decodeURIComponent(quick[1])}`
+  event.waitUntil(self.registration.showNotification(titled ? payload.title : 'Learn Quiz', options))
 })
 
 self.addEventListener('notificationclick', (event) => {
