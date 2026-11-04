@@ -184,6 +184,17 @@ describe('question review filters', () => {
     expect(router.state.location.search).toEqual({ role: 'r2' })
     expect(search(c).value).toBe('')
   })
+
+  it('changing role drops a search still being typed while the new role loads', async () => {
+    const two = () => ({ ...(fixture() as object), roles: [{ id: 'r', name: 'Role' }, { id: 'r2', name: 'Other' }] })
+    const { c, router } = await mountAt(two())
+    vi.mocked(getQuestionReview).mockImplementationOnce(() => new Promise((r) => setTimeout(() => r({ ...two(), role: { id: 'r2', name: 'Other' } } as never), 500)))
+    await act(async () => setValue(search(c), 'warehouse', 'input'))
+    await act(async () => setValue(c.querySelector('select#qs-role')!, 'r2', 'change'))
+    await act(() => new Promise((r) => setTimeout(r, 700)))
+    expect(router.state.location.search).toEqual({ role: 'r2' })
+    expect(search(c).value).toBe('')
+  })
 })
 
 describe('question review outline', () => {
