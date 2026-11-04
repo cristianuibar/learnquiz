@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { Route as appRootRoute } from '@/routes/__root'
 import { Route as pathRoute } from '@/routes/t.$topicId.path'
 import { Route as playRoute } from '@/routes/play.$sessionId'
+import { Route as unitRoute } from '@/routes/t.$topicId.u.$unitId'
 import { getConceptItems, getTopicPath } from '@/server/curriculum'
 import { answerItem, getSession } from '@/server/play'
 import { getSessionFn } from '@/server/session-fn'
@@ -62,9 +63,10 @@ async function renderApp(initialEntry = '/today') {
   })
   const start = createRoute({ getParentRoute: () => rootRoute, path: '/today', component: () => <h1>Today</h1> })
   const path = createRoute({ getParentRoute: () => rootRoute, path: '/t/$topicId/path', loader: pathRoute.options.loader, component: pathRoute.options.component, errorComponent: pathRoute.options.errorComponent })
+  const unit = createRoute({ getParentRoute: () => rootRoute, path: '/t/$topicId/u/$unitId', loader: unitRoute.options.loader, component: unitRoute.options.component, errorComponent: unitRoute.options.errorComponent })
   const play = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId', loader: playRoute.options.loader, component: playRoute.options.component, errorComponent: playRoute.options.errorComponent })
   const done = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId/done', component: () => <h1>Session complete</h1> })
-  const router = createRouter({ routeTree: rootRoute.addChildren([start, path, play, done]), history: createMemoryHistory({ initialEntries: [initialEntry] }), defaultPendingMinMs: 0 })
+  const router = createRouter({ routeTree: rootRoute.addChildren([start, path, unit, play, done]), history: createMemoryHistory({ initialEntries: [initialEntry] }), defaultPendingMinMs: 0 })
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -99,7 +101,7 @@ it.each(['session', 'path'] as const)('recovers an offline Path navigation when 
   }
 })
 
-it('shows the offline message for answered questions on Path and loads them with Try again online', async () => {
+it('shows the offline message for answered questions on a unit and loads them with Try again online', async () => {
   vi.mocked(getTopicPath).mockResolvedValue({
     topic: { id: 'topic', title: 'Arithmetic', goal: null, status: 'ready', generatedBy: null },
     preparing: false,
@@ -113,7 +115,7 @@ it('shows the offline message for answered questions on Path and loads them with
     units: [{ id: 'unit', order: 0, name: 'Basics', summary: '', mastery: 0, measured: false, unlocked: true, state: 'not_started', criticalCount: 0, canPractice: true, source: null, concepts: [{ id: 'concept', order: 0, name: 'Addition', summary: '', visual: false, grounded: false, critical: false, answeredCount: 1, pKnown: 0, measured: false, status: 'not_started' }] }],
     edges: [],
   })
-  const { container, cleanup } = await renderApp('/t/topic/path')
+  const { container, cleanup } = await renderApp('/t/topic/u/unit')
   try {
     const showButton = () => [...container.querySelectorAll('button')].find((button) => button.textContent === 'Show answered questions')
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
@@ -133,7 +135,7 @@ it('shows the offline message for answered questions on Path and loads them with
   }
 })
 
-it('opens and closes the answered questions on Path from the same button', async () => {
+it('opens and closes the answered questions on a unit from the same button', async () => {
   vi.mocked(getTopicPath).mockResolvedValue({
     topic: { id: 'topic', title: 'Arithmetic', goal: null, status: 'ready', generatedBy: null },
     preparing: false,
@@ -153,7 +155,7 @@ it('opens and closes the answered questions on Path from the same button', async
       payload: { format: 'cloze', stem: '2 + 2 = ____', options: [], accepted_answers: ['4'], model_answer: '4', explanation: 'Two plus two is four.', difficulty: 1, source_quote: null, grounded: false, bloom: 'remember' },
     }],
   })
-  const { container, cleanup } = await renderApp('/t/topic/path')
+  const { container, cleanup } = await renderApp('/t/topic/u/unit')
   try {
     const button = () => [...container.querySelectorAll('button')].find((b) => b.textContent?.endsWith('answered questions'))!
     const list = () => document.getElementById(button().getAttribute('aria-controls')!)!

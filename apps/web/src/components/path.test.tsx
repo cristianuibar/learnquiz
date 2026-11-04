@@ -53,7 +53,7 @@ it('lists the units in order with state labels, the Next marker and the benchmar
     expect(container.querySelector('header')?.textContent).toContain('66% of 85% benchmark · Day 16 of 30')
     // The Path brings its own header, so the root top bar is not rendered.
     expect(container.querySelectorAll('header')).toHaveLength(1)
-    const rows = [...container.querySelectorAll<HTMLElement>('li[id^="unit-"]')]
+    const rows = [...container.querySelectorAll<HTMLElement>('[id^="unit-"]')]
     expect(rows.map((row) => row.id)).toEqual(['unit-u1', 'unit-u2', 'unit-u3', 'unit-u4'])
     expect(rows.map((row) => row.getAttribute('aria-label'))).toEqual(units.map((u, i) => unitAriaLabel(u, i, u.id === 'u2')))
     expect(rows[1].getAttribute('aria-label')).toBe('Unit 2, Unit u2, Next up: 68%, Still learning, 3 critical concepts')
@@ -69,8 +69,7 @@ it('shows only the preparing status while the training is being prepared', async
   const { container, cleanup } = await renderPath(topic({ preparing: true, company: 'Acme', nextUnitId: null }))
   try {
     expect(container.querySelector('[role="status"]')?.textContent).toBe('Your training at Acme is being prepared')
-    expect(container.querySelectorAll('li[id^="unit-"]')).toHaveLength(0)
-    expect(container.textContent).not.toContain('Answered questions')
+    expect(container.querySelectorAll('[id^="unit-"]')).toHaveLength(0)
   } finally {
     await cleanup()
   }
