@@ -87,7 +87,7 @@ export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSo
   stack?: boolean
   sort?: { key: string; direction: SortDirection }
   onSort?: (key: string) => void
-  selection?: { selected: ReadonlySet<string>; onToggle: (key: string) => void; onToggleAll: () => void; rowLabel: (row: T) => string }
+  selection?: { selected: ReadonlySet<string>; onToggle: (key: string) => void; onToggleAll: () => void; rowLabel: (row: T) => string; selectable?: (row: T) => boolean; allLabel?: string }
   actions?: (row: T) => ReactNode
   band?: boolean
   toolbar?: ReactNode
@@ -113,7 +113,8 @@ export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSo
     ? `, sorted by ${labelOf(sortCol).toLowerCase()}, ${(sortCol.sortOrder ?? DEFAULT_ORDER)[sort.direction]}`
     : ''
   const grouped = columns.some((c) => c.group)
-  const allSelected = !!selection && rows.length > 0 && rows.every((r) => selection.selected.has(rowKey(r)))
+  const pickable = selection?.selectable ? rows.filter(selection.selectable) : rows
+  const allSelected = !!selection && pickable.length > 0 && pickable.every((r) => selection.selected.has(rowKey(r)))
   const rowSpan = grouped ? 2 : undefined
 
   const headCell = (c: Column<T>, span?: number) =>
@@ -157,7 +158,7 @@ export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSo
     <label className="-my-3 flex min-h-11 min-w-11 items-center justify-center">
       <input
         type="checkbox"
-        aria-label={`Select all ${rows.length} on this page`}
+        aria-label={selection.allLabel ?? `Select all ${rows.length} on this page`}
         checked={allSelected}
         onChange={selection.onToggleAll}
         className="size-5 accent-brand"
@@ -190,26 +191,29 @@ export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSo
           {rows.length === 0 && empty}
           {rows.map((row) => {
             const key = rowKey(row)
-            const selected = !!selection?.selected.has(key)
+            const pick = !selection || (selection.selectable?.(row) ?? true)
+            const selected = pick && !!selection?.selected.has(key)
             const bg = selected ? 'bg-brand-tint' : cn('group-hover/row:bg-row-hover', stack && 'max-md:group-hover/row:bg-transparent')
             return (
               <tr
                 key={key}
                 role="row"
-                aria-selected={selection ? selected : undefined}
+                aria-selected={selection && pick ? selected : undefined}
                 className={cn('group/row', stack && 'max-md:grid max-md:grid-cols-3 max-md:gap-x-3 max-md:gap-y-2 max-md:border-b max-md:border-border max-md:px-4 max-md:py-3 max-md:last:border-b-0', stack && selected && 'max-md:bg-brand-tint')}
               >
                 {selection && (
                   <td role="cell" className={cn(td, 'px-0', bg, stack && 'max-md:col-span-2 max-md:block max-md:h-auto max-md:border-0 max-md:p-0')}>
-                    <label className="flex min-h-11 max-md:justify-start min-w-11 items-center justify-center">
-                      <input
-                        type="checkbox"
-                        aria-label={`Select ${selection.rowLabel(row)}`}
-                        checked={selected}
-                        onChange={() => selection.onToggle(key)}
-                        className="size-5 accent-brand"
-                      />
-                    </label>
+                    {pick && (
+                      <label className="flex min-h-11 max-md:justify-start min-w-11 items-center justify-center">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${selection.rowLabel(row)}`}
+                          checked={selected}
+                          onChange={() => selection.onToggle(key)}
+                          className="size-5 accent-brand"
+                        />
+                      </label>
+                    )}
                   </td>
                 )}
                 {columns.map((c) => (
