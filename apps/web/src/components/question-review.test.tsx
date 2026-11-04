@@ -160,11 +160,15 @@ describe('question review filters', () => {
     expect(results(c)).toBe('1 question')
   })
 
-  // The search debounce is 300ms; wait past it to prove a pending search was dropped.
-  const pastDebounce = () => act(() => new Promise((r) => setTimeout(r, 400)))
+  // The search debounce is 300ms; step fake timers past it to prove a pending search was dropped.
+  const fakeTimers = () => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  const advance = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms))
+  const pastDebounce = () => advance(400)
+  afterEach(() => vi.useRealTimers())
 
   it('the no-match card Clear filters drops a search still being typed', async () => {
     const { c, router } = await mountReview('/org/x/questions?unreviewed=1&flagged=1')
+    fakeTimers()
     await act(async () => setValue(search(c), 'warehouse', 'input'))
     const card = [...c.querySelectorAll('button')].filter((b) => b.textContent === 'Clear filters')
     await act(async () => card[1]!.click())
@@ -178,6 +182,7 @@ describe('question review filters', () => {
   it('changing role drops a search still being typed', async () => {
     const two = () => ({ ...(fixture() as object), roles: [{ id: 'r', name: 'Role' }, { id: 'r2', name: 'Other' }] })
     const { c, router } = await mountAt(two(), '/org/x/questions', { ...two(), role: { id: 'r2', name: 'Other' } })
+    fakeTimers()
     await act(async () => setValue(search(c), 'warehouse', 'input'))
     await act(async () => setValue(c.querySelector('select#qs-role')!, 'r2', 'change'))
     await pastDebounce()
@@ -188,10 +193,11 @@ describe('question review filters', () => {
   it('changing role drops a search still being typed while the new role loads', async () => {
     const two = () => ({ ...(fixture() as object), roles: [{ id: 'r', name: 'Role' }, { id: 'r2', name: 'Other' }] })
     const { c, router } = await mountAt(two())
+    fakeTimers()
     vi.mocked(getQuestionReview).mockImplementationOnce(() => new Promise((r) => setTimeout(() => r({ ...two(), role: { id: 'r2', name: 'Other' } } as never), 500)))
     await act(async () => setValue(search(c), 'warehouse', 'input'))
     await act(async () => setValue(c.querySelector('select#qs-role')!, 'r2', 'change'))
-    await act(() => new Promise((r) => setTimeout(r, 700)))
+    await advance(700)
     expect(router.state.location.search).toEqual({ role: 'r2' })
     expect(search(c).value).toBe('')
   })
