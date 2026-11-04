@@ -499,6 +499,21 @@ it.each([
   expect(JSON.parse(expoCall[1]!.body as string).ttl).toBe(ttl)
 })
 
+it('shortens the ttl for a later device by the time spent sending to an earlier one', async () => {
+  await seedLearner()
+  vi.setSystemTime(new Date('2026-11-02T16:30:00Z'))
+  // The first device takes 20 minutes to answer, so the second may only be held until the 17:00 window end.
+  http.mockImplementationOnce(async () => {
+    vi.setSystemTime(new Date('2026-11-02T16:50:00Z'))
+    return new Response(null, { status: 201 })
+  })
+  expect(await sendDuePushes(Date.now(), holder.db as Db)).toBe(2)
+  const webCall = http.mock.calls.find(([destination]) => String(destination) === endpoint)!
+  const expoCall = http.mock.calls.find(([destination]) => String(destination) === expoUrl)!
+  expect(new Headers(webCall[1]!.headers).get('TTL')).toBe('1800')
+  expect(JSON.parse(expoCall[1]!.body as string).ttl).toBe(600)
+})
+
 it('measures the local day and window end in the learner timezone', async () => {
   await seedLearner()
   // 14:30Z is 09:30 in New York (UTC-5) and the local day began at 05:00Z; two of the three pushes were yesterday local time.

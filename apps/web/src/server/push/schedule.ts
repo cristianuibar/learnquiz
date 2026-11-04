@@ -44,11 +44,12 @@ export async function sendDuePushes(now: number, db: Db = getDb()) {
       if (last?.at != null && last.at > now - MIN_GAP_MS) continue
       const item = await pickPushItem(db, prefs.userId, now)
       if (!item) continue
-      const ttl = Math.min(MAX_TTL_SECONDS, window.endMinute * 60 - seconds)
       const subscriptions = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, prefs.userId))
       for (const subscription of subscriptions) {
         // Web pushes need VAPID; Expo tokens do not.
         if (!config && !EXPO_TOKEN.test(subscription.endpoint)) continue
+        // Sends run one after another, so take off the time already spent to keep each device inside the window end.
+        const ttl = Math.min(MAX_TTL_SECONDS, window.endMinute * 60 - seconds - Math.floor((Date.now() - now) / 1000))
         const { outcome } = await sendPush(db, subscription, config, { title: item.stem, body: 'Tap to answer.', url: `/play/quick/${item.itemId}` }, ttl)
         if (outcome !== 'skipped') sent++
       }
