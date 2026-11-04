@@ -25,12 +25,12 @@ beforeEach(() => {
 })
 afterEach(() => { vi.restoreAllMocks(); sessionStorage.clear() })
 
-async function renderPlay() {
+async function renderPlay(image = { src: '/media/items/i1', alt: 'Pick-face location label A12-04-C-2', width: 328, height: 148 }) {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   const initial: SessionView = {
     id: 's1', kind: 'session', topicId: 't1', topicTitle: 'Receiving', progress: { position: 1, total: 1 }, ended: false, voiceEnabled: false,
     item: {
-      id: 'i1', conceptId: 'c1', conceptName: 'Sign-off', format: 'mcq', difficulty: 1, generatedBy: 'gpt-test', image: { src: '/media/items/i1', alt: 'Pick-face location label A12-04-C-2', width: 328, height: 148 },
+      id: 'i1', conceptId: 'c1', conceptName: 'Sign-off', format: 'mcq', difficulty: 1, generatedBy: 'gpt-test', image,
       stem: 'Which cartons need sign-off?', blank: null,
       options: [{ id: 'a', text: 'Chilled' }, { id: 'b', text: 'Dry goods' }, { id: 'c', text: 'Packaging' }, { id: 'd', text: 'Frozen' }],
     },
@@ -62,6 +62,15 @@ it('shows the diagram above the options at its aspect ratio', async () => {
     expect(el.getAttribute('src')).toBe('/media/items/i1')
     expect(el.style.aspectRatio).toBe('328 / 148')
     expect(el.compareDocumentPosition(container.querySelector('input[name="answer"]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  } finally { await cleanup() }
+})
+
+it('frames a tall diagram at its own aspect ratio within the 280px cap', async () => {
+  const { container, cleanup } = await renderPlay({ src: '/media/items/i1', alt: 'Pick-face location label A12-04-C-2', width: 200, height: 400 })
+  try {
+    const el = img(container)!
+    expect(el.style.aspectRatio).toBe('200 / 400')
+    expect(el.style.maxWidth).toBe('min(100%, 140px)')
   } finally { await cleanup() }
 })
 
