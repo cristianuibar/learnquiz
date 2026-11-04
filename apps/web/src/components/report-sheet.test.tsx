@@ -19,7 +19,7 @@ async function mount(onSent = vi.fn()) {
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
-  await act(async () => root.render(<ReportSheet itemId="i1" attemptId="a1" company="Acme" onBack={vi.fn()} onSent={onSent} />))
+  await act(async () => root.render(<ReportSheet itemId="i1" attemptId="a1" company="Acme" onBack={vi.fn()} onSent={onSent} headingId="report-heading" />))
   cleanup = () => { act(() => root.unmount()); container.remove() }
   return { c: container, onSent }
 }

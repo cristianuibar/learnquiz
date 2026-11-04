@@ -2,14 +2,15 @@
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet, RouterProvider } from '@tanstack/react-router'
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Route as playRoute } from '@/routes/play.$sessionId'
 import { Route as appRootRoute } from '@/routes/__root'
-import { answerItem, endSession, getSession, nextItem, prepareNextSession, transcribeAnswer } from '@/server/play'
+import { answerItem, endSession, getSession, nextItem, prepareNextSession, reportItem, transcribeAnswer } from '@/server/play'
 import { getModelTrace } from '@/server/model-trace'
 import { generateConceptDiagram } from '@/server/diagrams'
 import type { ItemView, Reveal, SessionView } from '@learnquiz/api'
 
+vi.mock('motion/react', async (original) => ({ ...(await original<typeof import('motion/react')>()), useReducedMotion: () => true }))
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
 vi.mock('@/server/play', () => ({ prepareNextSession: vi.fn(async () => ({ ok: true })), answerItem: vi.fn(), getSession: vi.fn(), transcribeAnswer: vi.fn(), nextItem: vi.fn(), endSession: vi.fn(), reportItem: vi.fn() }))
 vi.mock('@/server/model-trace', () => ({ getModelTrace: vi.fn() }))
@@ -70,7 +71,7 @@ async function renderPlay(voiceEnabled: boolean | null = true, permissionPending
   }
   vi.mocked(getSession).mockResolvedValue(initial)
   vi.mocked(transcribeAnswer).mockReset().mockResolvedValue('one')
-  vi.mocked(answerItem).mockReset().mockResolvedValue({ correct: true, correctAnswer: '1', state: 'A', mixUps: [], explanation: 'Subtract one.', xp: 10, critical: false, correctOptionIds: null, sourceVersion: null, detail: null } as unknown as Reveal)
+  vi.mocked(answerItem).mockReset().mockResolvedValue({ attemptId: 'a0', diagramConceptId: null, score: 1, feedback: null, missingPoints: [], chosenFeedback: null, sourceQuote: null, sourceTitle: null, returnsThisSession: false, pKnownBefore: 0.1, pKnownAfter: 0.5, correct: true, correctAnswer: '1', state: 'A', mixUps: [], explanation: 'Subtract one.', xp: 10, critical: false, correctOptionIds: null, sourceVersion: null, detail: null } as unknown as Reveal)
   vi.mocked(nextItem).mockReset()
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
   const play = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId', loader: playRoute.options.loader, gcTime: playRoute.options.gcTime, component: playRoute.options.component })
@@ -94,7 +95,8 @@ const locked = (el: HTMLElement): boolean => {
   const fieldset = el.parentElement?.closest('fieldset')
   return (el as HTMLInputElement).disabled || Boolean(fieldset && (fieldset.disabled || locked(fieldset)))
 }
-const button = (container: HTMLElement, label: string) => [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === label)!
+// The reveal overlay portals into document.body, so buttons are found there.
+const button = (_container: HTMLElement, label: string) => [...document.body.querySelectorAll('button')].find((b) => b.textContent?.trim() === label)!
 const byLabel = (container: HTMLElement, label: string) => container.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)
 function type(el: HTMLElement, value: string) {
   Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value')!.set!.call(el, value)
@@ -156,8 +158,7 @@ it.each([
     })
     await act(async () => { button(container, 'Check').click() })
     if (repeats) {
-      expect(container.querySelector('[role="status"]')!.textContent).toContain('No source: written by gpt-test from general knowledge')
-      expect(container.querySelector('label[for="why"]')!.textContent).toBe('In one line, why? (optional)')
+      expect(document.querySelector('[role="dialog"]')!.textContent).toContain('Subtract one.')
     }
     await act(async () => {
       const next = button(container, 'Continue')
@@ -206,7 +207,7 @@ it('records on tap, uploads WAV on stop, lets the learner edit the transcript, a
     })
     await click(button(container, 'Check'))
     expect(answerItem).toHaveBeenCalledWith({ data: expect.objectContaining({ answer: { text: 'one more step' }, confidence: 'sure' }) })
-    expect(container.textContent).toContain('Correct, you were sure')
+    expect(document.querySelector('[role="dialog"] h2')!.textContent).toBe('Correct')
   } finally { await cleanup() }
 })
 
@@ -219,7 +220,7 @@ it.each([
     totalCostUsd: 0,
     calls: [{ id: 'plan1', purpose: 'plan', model: 'muse-wonder-1.0', latencyMs: 120, ok, promptTokens: 10, completionTokens: 20, reasoningTokens: 0, costUsd: 0, createdAt: 1 }],
   })
-  const { container, cleanup } = await renderPlay(false)
+  const { container, initial, cleanup } = await renderPlay(false)
   try {
     expect(button(container, 'Model trace')).toBeUndefined()
     await act(async () => {
@@ -228,6 +229,9 @@ it.each([
       container.querySelector<HTMLInputElement>('input[value="sure"]')!.click()
     })
     await act(async () => { button(container, 'Check').click() })
+    // The result sheet is modal, so the trace is reached on the screen after Continue.
+    vi.mocked(nextItem).mockResolvedValueOnce({ ...initial, item: null })
+    await act(async () => { button(container, 'Continue').click() })
     await act(async () => button(container, 'Model trace').click())
     expect(getModelTrace).toHaveBeenCalledWith({ data: { scope: 'session', sessionId: 's1' } })
     const dialog = document.querySelector('[role="dialog"]')!
@@ -368,7 +372,7 @@ it.each([false, null])('offers typing when voice availability is %s', async (voi
     })
     await click(button(container, 'Check'))
     expect(answerItem).toHaveBeenCalledWith({ data: expect.objectContaining({ answer: { text: '1' }, confidence: 'sure' }) })
-    expect(container.textContent).toContain('Correct, you were sure')
+    expect(document.querySelector('[role="dialog"] h2')!.textContent).toBe('Correct')
   } finally { await cleanup() }
 })
 
@@ -390,19 +394,17 @@ it.each([false, true])('submits a short answer and shows its reveal (ungraded=%s
     })
     await act(async () => { button(container, 'Check').click() })
     expect(answerItem).toHaveBeenCalledWith({ data: expect.objectContaining({ answer: { text: 'Both sides get smaller.' } }) })
-    const status = container.querySelector('[role="status"]')!
-    expect(status.querySelector('img')?.getAttribute('src')).toBe('/media/concepts/c1')
+    const dialog = document.querySelector('[role="dialog"]')!
     if (ungraded) {
-      expect(status.querySelector('h2')?.textContent).toBe('Could not grade this answer')
-      expect(status.textContent).toMatch(/Your answerBoth sides get smaller\.The answer is Equal changes preserve equality\./)
-      expect(status.textContent).toContain('Compare your answer with the model answer.')
-      expect(status.querySelector('#why')).toBeNull()
+      expect(dialog.querySelector('h2')?.textContent).toBe('Couldn’t grade this answer')
+      expect(dialog.textContent).toMatch(/Your answerBoth sides get smaller\.The answerEqual changes preserve equality\./)
+      expect(dialog.textContent).toContain('Subtract equal quantities.')
+      expect(dialog.querySelector('input')).toBeNull()
     } else {
-      expect(status.textContent).toContain('Score: 50%')
-      expect(status.textContent).toContain('Subtract equal quantities.')
-      expect(status.textContent).toContain('From Algebra notes')
-      expect(status.textContent).toContain('Explain why both sides stay equal.')
-      expect(status.textContent).toContain('Subtract the same amount from both sides.')
+      expect(dialog.querySelector('h2')?.textContent).toBe('Not quite')
+      expect(dialog.textContent).toContain('Subtract equal quantities.')
+      expect(dialog.textContent).toContain('Explain why both sides stay equal.')
+      expect(dialog.textContent).toContain('Subtract the same amount from both sides.')
     }
     vi.mocked(nextItem).mockResolvedValueOnce({ ...initial, item: { ...initial.item!, id: 'i2', stem: 'Next question' } })
     await act(async () => { button(container, ungraded ? 'Continue' : 'Got it').click() })
@@ -522,6 +524,8 @@ it.each([
     await act(async () => { button(container, 'Check').click() })
     expect(container.querySelector('[role="alert"]')!.textContent).toBe('Couldn’t check your answer. It’s saved on this device.')
     expect(document.activeElement).toBe(button(container, 'Try again'))
+    // The alert shares the sticky dock with Try again, so a long question cannot push it below the fold.
+    expect(button(container, 'Try again').parentElement!.contains(container.querySelector('[role="alert"]'))).toBe(true)
     expect(button(container, 'Check')).toBeUndefined()
     expect(checked(container, 'answer')).toBe('b')
     expect(checked(container, 'confidence')).toBe('sure')
@@ -534,7 +538,7 @@ it.each([
     await act(async () => { button(container, 'Try again').click() })
     expect(answerItem).toHaveBeenCalledTimes(3)
     expect(answerItem).toHaveBeenLastCalledWith({ data: expect.objectContaining({ answer: { optionId: 'a' }, confidence: 'sure' }) })
-    expect(container.textContent).toContain('Correct')
+    expect(document.querySelector('[role="dialog"] h2')!.textContent).toBe('Correct')
   } finally { await cleanup() }
 })
 
@@ -570,4 +574,115 @@ it('locks the answer and confidence while a check is in flight, so Try again sen
     await act(async () => { button(container, 'Try again').click() })
     expect(answerItem).toHaveBeenLastCalledWith({ data: expect.objectContaining({ answer: { optionId: 'b' }, confidence: 'sure' }) })
   } finally { await cleanup() }
+})
+
+describe('reveal overlay', () => {
+  const sureWrong = {
+    attemptId: 'a1', diagramConceptId: null, state: 'D', correct: false, xp: 0, critical: false, correctOptionIds: ['a'], sourceVersion: null, detail: null,
+    score: 0, feedback: null, missingPoints: [], correctAnswer: '2', explanation: 'Add, then compare.', chosenFeedback: null,
+    sourceQuote: null, sourceTitle: null, mixUps: [], returnsThisSession: false, pKnownBefore: 0.5, pKnownAfter: 0.3,
+  } as unknown as Reveal
+  const sureCorrect = { ...sureWrong, state: 'A', correct: true, xp: 10, sourceQuote: 'Quote', sourceTitle: 'Notes' } as unknown as Reveal
+
+  async function check(reveal: Reveal) {
+    const view = await renderPlay(false, false, 'mcq')
+    vi.mocked(answerItem).mockResolvedValueOnce(reveal)
+    await act(async () => {
+      view.container.querySelector<HTMLInputElement>('input[name="answer"]')!.click()
+      view.container.querySelector<HTMLInputElement>('input[value="sure"]')!.click()
+    })
+    await act(async () => { button(view.container, 'Check').click() })
+    return view
+  }
+  const dialog = () => document.querySelector<HTMLElement>('[role="dialog"]')
+  const linkByText = (text: string) => [...document.querySelectorAll<HTMLElement>('button')].find((b) => b.textContent?.trim() === text)!
+
+  it('opens a dialog over the answered question and focuses the result heading', async () => {
+    const { container, cleanup } = await check(sureWrong)
+    try {
+      const heading = dialog()!.querySelector('h2')!
+      expect(dialog()!.getAttribute('aria-labelledby')).toBe(heading.id)
+      expect(document.activeElement).toBe(heading)
+      expect(container.textContent).toContain('x + 1 = 2; what is x?')
+    } finally { await cleanup() }
+  })
+
+  it('keeps the reflection when Report is opened and cancelled, and returns focus to the Report link', async () => {
+    const { cleanup } = await check(sureWrong)
+    try {
+      await act(async () => { type(dialog()!.querySelector('input')!, 'Because it matters') })
+      await click(linkByText('Report this question'))
+      expect(dialog()!.textContent).toContain('Send report')
+      await click(document.querySelector<HTMLElement>('button[aria-label="Back to result"]'))
+      expect(dialog()!.querySelector('input')!.value).toBe('Because it matters')
+      expect(document.activeElement).toBe(linkByText('Report this question'))
+    } finally { await cleanup() }
+  })
+
+  it('keeps the Why disclosure open across Report and Back', async () => {
+    const { cleanup } = await check(sureCorrect)
+    try {
+      await click(linkByText('Why'))
+      expect(linkByText('Why').getAttribute('aria-expanded')).toBe('true')
+      await click(linkByText('Report this question'))
+      await click(document.querySelector<HTMLElement>('button[aria-label="Back to result"]'))
+      expect(linkByText('Why').getAttribute('aria-expanded')).toBe('true')
+      expect(document.activeElement).toBe(linkByText('Report this question'))
+    } finally { await cleanup() }
+  })
+
+  it('sends the report, then continues with the reflection, and announces it on the next question', async () => {
+    const { container, initial, cleanup } = await check(sureWrong)
+    try {
+      vi.mocked(reportItem).mockReset().mockResolvedValue({} as never)
+      vi.mocked(nextItem).mockResolvedValueOnce({ ...initial, progress: { position: 2, total: 2 }, item: { ...initial.item!, id: 'i2', stem: 'Second question' } })
+      await act(async () => { type(dialog()!.querySelector('input')!, '  Because it matters  ') })
+      await click(linkByText('Report this question'))
+      await click(document.querySelector<HTMLElement>('[role="radiogroup"] [role="radio"]'))
+      await click(linkByText('Send report'))
+      expect(reportItem).toHaveBeenCalledWith({ data: expect.objectContaining({ itemId: 'i1', reason: expect.any(String), attemptId: 'a1' }) })
+      expect(nextItem).toHaveBeenCalledWith({ data: { sessionId: 's1', why: 'Because it matters' } })
+      expect(vi.mocked(reportItem).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(nextItem).mock.invocationCallOrder[0])
+      expect(dialog()).toBeNull()
+      expect(container.querySelector('h1')!.textContent).toBe('Second question')
+      expect([...document.querySelectorAll('[role="status"]')].map((n) => n.textContent)).toContain('Report sent')
+    } finally { await cleanup() }
+  })
+
+  it('returns to the result when continuing after a sent report fails, so Got it retries without reporting again', async () => {
+    const { cleanup } = await check(sureWrong)
+    try {
+      vi.mocked(reportItem).mockReset().mockResolvedValue({} as never)
+      vi.mocked(nextItem).mockRejectedValueOnce(new Error('Network down'))
+      await act(async () => { type(dialog()!.querySelector('input')!, 'Because it matters') })
+      await click(linkByText('Report this question'))
+      await click(document.querySelector<HTMLElement>('[role="radiogroup"] [role="radio"]'))
+      await click(linkByText('Send report'))
+      expect(dialog()!.querySelector('[role="alert"]')).not.toBeNull()
+      expect(linkByText('Report this question')).toBeUndefined()
+      await click(linkByText('Got it'))
+      expect(reportItem).toHaveBeenCalledTimes(1)
+      expect(nextItem).toHaveBeenLastCalledWith({ data: { sessionId: 's1', why: 'Because it matters' } })
+    } finally { await cleanup() }
+  })
+
+  it('ignores scrim clicks and Escape', async () => {
+    const { cleanup } = await check(sureWrong)
+    try {
+      await act(async () => { document.querySelector('.bg-scrim')!.dispatchEvent(new Event('pointerdown', { bubbles: true })) })
+      await act(async () => { document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
+      expect(dialog()).not.toBeNull()
+      expect(nextItem).not.toHaveBeenCalled()
+    } finally { await cleanup() }
+  })
+
+  it('does not reload the session when the page is restored from the cache while the result shows', async () => {
+    const { cleanup } = await check(sureWrong)
+    try {
+      vi.mocked(getSession).mockClear()
+      await act(async () => { window.dispatchEvent(Object.assign(new Event('pageshow'), { persisted: true })) })
+      expect(getSession).not.toHaveBeenCalled()
+      expect(dialog()).not.toBeNull()
+    } finally { await cleanup() }
+  })
 })

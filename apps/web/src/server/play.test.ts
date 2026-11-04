@@ -894,6 +894,19 @@ describe('learner practice and unit unlocks', () => {
     expect(chatJson).not.toHaveBeenCalled()
   })
 
+  it('leaves retired-document concepts out of the session unit mastery', async () => {
+    seedSources()
+    raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un1', 't1', 0, 'Basics')
+    for (let i = 1; i <= 4; i++) seedConcept(`dead${i}`, 'un1', i, 'src-old', [])
+    seedConcept('live', 'un1', 5, 'src-new', ['l1'])
+    raw.prepare('INSERT INTO learner_concept (learner_id, concept_id, p_known, updated_at) VALUES (?, ?, ?, ?)').run('u1', 'live', 0.9, 1)
+    const plan = { queue: ['l1'], position: 1, answered: true, reinserted: [], reasons: { due: 0, frontier: 1, closers: 0 }, unitStart: { un1: 0.4 } }
+    raw.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, item_ids_json, plan_json, started_at, ended_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run('s1', 'u1', 't1', 'session', JSON.stringify(['l1']), JSON.stringify(plan), 1, 2)
+
+    expect((await endSession({ data: { sessionId: 's1' } })).masteryMoved).toEqual([{ unitId: 'un1', unitName: 'Basics', before: 0.4, after: 0.9 }])
+  })
+
   it('places from live concepts when the first concept of every unit cites a retired document', async () => {
     seedSources()
     for (const [i, unit] of ['un1', 'un2', 'un3'].entries()) {
@@ -1414,6 +1427,21 @@ describe('employees training on their role topic', () => {
     }
     expect(formats.length).toBeGreaterThan(0)
     expect(formats).not.toContain('short')
+    expect(chatJson).not.toHaveBeenCalled()
+    expect(fetchModel).not.toHaveBeenCalled()
+  })
+
+  it('practises a later concept\'s stored mcq when the first four frontier concepts hold only short questions', async () => {
+    seedRoleTopic(0)
+    const concept = raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)')
+    const item = raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    for (let c = 1; c <= 4; c++) {
+      concept.run(`rshort${c}`, 'rt', 'ru0', c, `Short ${c}`, '')
+      item.run(`rs-only${c}`, `rshort${c}`, 'rt', 'short', short(c), 1, c)
+    }
+    item.run('ri-later', 'rc1', 'rt', 'mcq', mcq(1), 1, 1)
+    const { sessionId } = await startSession({ data: { topicId: 'rt' } })
+    expect(JSON.parse(scalar(raw, 'SELECT plan_json FROM sessions WHERE id = ?', sessionId).plan_json as string).queue).toEqual(['ri-later'])
     expect(chatJson).not.toHaveBeenCalled()
     expect(fetchModel).not.toHaveBeenCalled()
   })

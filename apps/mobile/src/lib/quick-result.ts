@@ -114,6 +114,10 @@ function statusOf(error: unknown): number | null {
   return null
 }
 
+function answeredConflict(error: unknown): boolean {
+  return error instanceof Error && /already answered|session has ended/i.test(error.message)
+}
+
 const ANSWER_TIMEOUT_MS = 130_000
 
 export function createQuickSession(options: QuickSessionOptions): QuickSessionHandle {
@@ -136,11 +140,16 @@ export function createQuickSession(options: QuickSessionOptions): QuickSessionHa
     return disposed || controller.signal.aborted
   }
 
-  function applySession(view: SessionView, previous: QuickSessionState): void {
+  async function applySession(view: SessionView, previous: QuickSessionState, controller: AbortController): Promise<void> {
     if (view.ended || view.item === null) {
+      // Auto-ending a retired/flagged mini session has zero answers.
+      const summary = await request<SummaryView>(`/sessions/${encodeURIComponent(view.id)}/end`, {
+        method: 'POST', signal: controller.signal,
+      })
+      if (aborted(controller)) return
       sessionId = null
       submission = null
-      emit({ status: 'answered' })
+      emit({ status: summary.total > 0 ? 'answered' : 'unavailable' })
       return
     }
     const keep = (previous.status === 'question' || previous.status === 'checking')
@@ -173,12 +182,12 @@ export function createQuickSession(options: QuickSessionOptions): QuickSessionHa
         signal: controller.signal,
       })
       if (aborted(controller)) return
-      applySession(view, previous)
+      await applySession(view, previous, controller)
     } catch (error) {
       if (aborted(controller)) return
       const status = statusOf(error)
       if (status === 404) emit({ status: 'unavailable' })
-      else if (status === 409) emit({ status: 'answered' })
+      else if (status === 409) emit({ status: answeredConflict(error) ? 'answered' : 'unavailable' })
       else emit({ status: 'error' })
     } finally {
       if (current === controller) current = null
@@ -239,7 +248,7 @@ export function createQuickSession(options: QuickSessionOptions): QuickSessionHa
         try {
           const view = await request<SessionView>(`/sessions/${encodeURIComponent(sessionId)}`, { signal: controller.signal })
           if (aborted(controller)) return
-          applySession(view, { status: 'checking', session, draft, error: null })
+          await applySession(view, { status: 'checking', session, draft, error: null }, controller)
         } catch (failure) {
           if (aborted(controller)) return
           emit({ status: statusOf(failure) === 404 ? 'unavailable' : 'error' })
