@@ -3,10 +3,10 @@ import { Check } from 'lucide-react'
 import { DashedCircle, HalfDisc } from '@/components/status-icons'
 
 // Portal row: name, status chip, bar and percentage. Status is never colour alone (icon + text).
-// `mastery` and `benchmark` are whole percentages (0..100).
-export function PortalMasteryBar({ name, label, mastery, benchmark }: { name: ReactNode; label: string; mastery: number; benchmark: number }) {
+// `mastery` is a whole percentage (0..100). Mastered follows the server's proficiency stage, which also requires every critical concept.
+export function PortalMasteryBar({ name, label, mastery, stage }: { name: ReactNode; label: string; mastery: number; stage: 'onboarding' | 'proficient' }) {
   const status =
-    mastery >= benchmark
+    stage === 'proficient'
       ? { text: 'Mastered', Icon: Check, tone: 'text-feedback-correct bg-feedback-correct-tint' }
       : mastery > 0
         ? { text: 'Still learning', Icon: HalfDisc, tone: 'text-feedback-learning bg-feedback-learning-tint' }
