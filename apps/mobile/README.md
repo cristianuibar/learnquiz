@@ -108,8 +108,17 @@ apkanalyzer manifest print ./learnquiz-installed.apk
 
 In the manifest metadata, `expo.modules.updates.UPDATES_CONFIGURATION_REQUEST_HEADERS_KEY`
 contains `expo-channel-name` (for example, `preview`), and
-`expo.modules.updates.EXPO_RUNTIME_VERSION` is the runtime. If the latter refers
-to `@string/expo_runtime_version`, resolve it with:
+`expo.modules.updates.EXPO_RUNTIME_VERSION` names the runtime. With the fingerprint
+policy it refers to `@string/expo_runtime_version`, whose value is the placeholder
+`file:fingerprint`. expo-updates then reads the real runtime from the APK asset
+`assets/fingerprint`, which the build writes. Print that hash with:
+
+```sh
+unzip -p ./learnquiz-installed.apk assets/fingerprint; echo
+```
+
+It must equal the runtime version that `eas update` prints. If the string resource
+is anything other than `file:fingerprint`, that string is the runtime:
 
 ```sh
 apkanalyzer resources value --config default --type string --name expo_runtime_version ./learnquiz-installed.apk
