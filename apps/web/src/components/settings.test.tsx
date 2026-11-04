@@ -126,6 +126,24 @@ it('never turns off the last day and saves other toggles', async () => {
   expect(day('Tue').getAttribute('aria-pressed')).toBe('true')
 })
 
+it('pauses and changes hours when the company dropped every chosen day, keeping the saved days (#703)', async () => {
+  // Like an older server, reject an empty days list.
+  vi.mocked(savePushPreferences).mockImplementation(async ({ data }) => {
+    if (data.days?.length === 0) throw new Error('Choose days inside Acme’s hours')
+    return { ok: true } as never
+  })
+  const { days: _days, ...rest } = prefs
+  await render({ push: { company: { ...company, days: [2, 4, 5] }, prefs: { ...rest, days: [] } } })
+  await click(switchEl())
+  expect(switchEl().getAttribute('aria-checked')).toBe('false')
+  await choose('#settings-from', '600')
+  expect(vi.mocked(savePushPreferences).mock.calls).toEqual([[{ data: { ...rest, paused: true } }], [{ data: { ...rest, paused: true, startMinute: 600 } }]])
+  expect(alertText()).toBeUndefined()
+  // Choosing a day again still saves it.
+  await click(byText('button[aria-pressed]', 'Tue'))
+  expect(savePushPreferences).toHaveBeenLastCalledWith({ data: { ...rest, paused: true, startMinute: 600, days: [2] } })
+})
+
 it('offers only times inside the company window', async () => {
   await render({ push: { company, prefs: { ...prefs, startMinute: 360, endMinute: 1080 } } })
   const labels = (id: string) => [...container.querySelectorAll<HTMLOptionElement>(`${id} option`)].map((o) => o.textContent)

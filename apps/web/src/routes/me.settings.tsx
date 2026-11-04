@@ -85,7 +85,9 @@ function Settings() {
     setPrefs(next)
     try {
       await before?.()
-      await savePushPreferences({ data: next })
+      // No day left means the company dropped every chosen day: leave days out so the saved ones stay.
+      const { days, ...rest } = next
+      await savePushPreferences({ data: days.length ? next : rest })
     } catch {
       setPrefs(previous)
       setSaveError(true)
