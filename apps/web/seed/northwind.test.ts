@@ -3,7 +3,8 @@ import { DatabaseSync } from 'node:sqlite'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { getAuth } from '@/server/auth'
 import { drainConceptQueue } from '@/server/concept-gen'
-import { getOrgOverview, getPeople } from '@/server/org'
+import { getOrgOverview } from '@/server/org'
+import { getPeople } from '@/server/people'
 import { NORTHWIND, seedNorthwind } from './northwind'
 
 const request = vi.hoisted(() => ({ headers: new Headers() }))
@@ -23,6 +24,7 @@ const bindings = vi.hoisted(() => ({ waitUntil: (task: Promise<unknown>) => { ba
 // Better Auth (including invitation hooks), Drizzle, SQL and reporting run for real.
 vi.mock('cloudflare:workers', () => bindings)
 vi.mock('@tanstack/react-start', () => ({
+  createServerOnlyFn: (fn: unknown) => fn,
   createServerFn: () => ({
     validator: (schema: { parse: (data: unknown) => unknown }) => ({
       handler: (handler: (input: { data: unknown }) => unknown) => (input: { data: unknown }) => handler({ data: schema.parse(input.data) }),
@@ -202,17 +204,16 @@ it('seeds the three employee stages through the real SOP pipeline and preserves 
 
   await signIn(NORTHWIND.emails.owner, secret.ownerPassword)
   const people = await getPeople({ data: { slug: result.slug } })
-  // Progress is the lower of mean mastery and the weakest critical concept, each against the benchmark.
-  const { known } = raw.prepare(`SELECT MIN(AVG(COALESCE(lc.p_known, 0)), MIN(CASE WHEN c.critical THEN COALESCE(lc.p_known, 0) ELSE 1 END)) AS known FROM concepts c
-    LEFT JOIN learner_concept lc ON lc.concept_id = c.id AND lc.learner_id = (SELECT id FROM user WHERE email = ?) WHERE c.topic_id = ?`).get(NORTHWIND.emails.onboarding, result.topicId) as { known: number }
-  expect(people.members.map(({ email, training, lastActiveAt }) => ({ email, training, lastActiveAt }))).toEqual(expect.arrayContaining([
-    { email: NORTHWIND.emails.owner, training: null, lastActiveAt: null },
-    { email: NORTHWIND.emails.onboarding, training: expect.objectContaining({ stage: 'onboarding', progress: expect.closeTo(known / 0.85, 10), daysToProficiency: null, criticalConfidentErrors: 1 }), lastActiveAt: now - 86_400_000 - 60_000 },
-    { email: NORTHWIND.emails.proficient, training: expect.objectContaining({ stage: 'proficient', progress: 1, daysToProficiency: 6, criticalConfidentErrors: 0 }), lastActiveAt: now - 4 * 86_400_000 - 60_000 },
+  expect(people.people.map((p) => p.kind === 'member'
+    ? { email: p.email, status: p.status, openCriticalErrors: p.openCriticalErrors, proficientInDays: p.proficientInDays, lastActiveAt: p.lastActiveAt }
+    : { email: p.email, status: p.status, jobRole: p.jobRole })).toEqual(expect.arrayContaining([
+    { email: NORTHWIND.emails.onboarding, status: 'active', openCriticalErrors: 1, proficientInDays: null, lastActiveAt: now - 86_400_000 - 60_000 },
+    { email: NORTHWIND.emails.proficient, status: 'proficient', openCriticalErrors: 0, proficientInDays: 6, lastActiveAt: now - 4 * 86_400_000 - 60_000 },
+    { email: NORTHWIND.emails.invited, status: 'invited', jobRole: 'Warehouse picker' },
   ]))
-  expect(people.members).toHaveLength(3)
-  expect(people.invites).toEqual([expect.objectContaining({ email: NORTHWIND.emails.invited, expired: false, jobRole: 'Warehouse picker' })])
-  expect(await getOrgOverview({ data: { slug: result.slug } })).toMatchObject({ training: { employees: 3, proficientEmployees: 1, daysToProficiency: 6, criticalErrorsThisWeek: 1, documentsToReview: null } })
+  // The owner has no job role, so does not train and is not listed.
+  expect(people.people).toHaveLength(3)
+  expect(await getOrgOverview({ data: { slug: result.slug } })).toMatchObject({ training: { employees: 3, proficientEmployees: 1, daysToProficiency: 6, criticalErrorsThisWeek: 1, documentsToReview: 1 } })
   await signIn(NORTHWIND.emails.onboarding, secret.learnerPassword)
 
   raw.prepare('UPDATE learner_concept SET p_known = 0.32 WHERE learner_id = (SELECT id FROM user WHERE email = ?)').run(NORTHWIND.emails.onboarding)
