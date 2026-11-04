@@ -27,18 +27,17 @@ export function usePortalLinks() {
       overview,
       roles: linkOptions({ to: '/admin/companies/$slug/portal/roles', params: { slug } }),
       role: (roleId: string) => linkOptions({ to: '/admin/companies/$slug/portal/roles/$roleId', params: { slug, roleId } }),
-      // Staff have no routes for these yet (a follow-on issue adds them), so they fall back to the staff overview.
-      questions: (_filter: { role?: string; item?: string } = {}) => overview,
-      people: overview,
-      person: (_id: string) => overview,
-      settings: overview,
+      questions: ({ role, item, flagged }: { role?: string; item?: string; flagged?: true } = {}) => linkOptions({ to: '/admin/companies/$slug/portal/questions', params: { slug }, search: { role, item, flagged }, activeOptions: { includeSearch: false } }),
+      people: linkOptions({ to: '/admin/companies/$slug/portal/people', params: { slug } }),
+      person: (id: string) => linkOptions({ to: '/admin/companies/$slug/portal/people/$id', params: { slug, id } }),
+      settings: linkOptions({ to: '/admin/companies/$slug/portal/settings', params: { slug } }),
     }
   }
   return {
     overview: linkOptions({ to: '/org/$slug', params: { slug }, activeOptions: { exact: true } }),
     roles: linkOptions({ to: '/org/$slug/roles', params: { slug } }),
     role: (roleId: string) => linkOptions({ to: '/org/$slug/roles/$roleId', params: { slug, roleId } }),
-    questions: ({ role, item }: { role?: string; item?: string } = {}) => linkOptions({ to: '/org/$slug/questions', params: { slug }, search: { role, item }, activeOptions: { includeSearch: false } }),
+    questions: ({ role, item, flagged }: { role?: string; item?: string; flagged?: true } = {}) => linkOptions({ to: '/org/$slug/questions', params: { slug }, search: { role, item, flagged }, activeOptions: { includeSearch: false } }),
     people: linkOptions({ to: '/org/$slug/people', params: { slug } }),
     person: (id: string) => linkOptions({ to: '/org/$slug/people/$id', params: { slug, id } }),
     settings: linkOptions({ to: '/org/$slug/settings', params: { slug } }),

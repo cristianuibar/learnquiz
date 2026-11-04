@@ -15,7 +15,7 @@ import { getSessionFn } from '@/server/session-fn'
 import { getToday } from '@/server/today'
 import { authClient } from '@/lib/auth-client'
 
-vi.mock('@/server/profile', () => ({ getProfile: vi.fn(), getMemberFlags: vi.fn(async () => []) }))
+vi.mock('@/server/profile', () => ({ getProfile: vi.fn(), getMemberFlags: vi.fn(async () => ({ readOnly: false, flags: [] })) }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => null }))
@@ -33,6 +33,7 @@ function mockProfile() {
   const day = 86_400_000
   const start = Date.UTC(2026, 10, 2)
   vi.mocked(getProfile).mockResolvedValue({
+    readOnly: false,
     name: 'Dana Learner', topic: { id: 'training', title: 'Workplace safety' }, role: null, benchmark: 0.85, started: true, onboarding: null,
     mastery: 0.7,
     units: [{ id: 'unit', name: 'Foundations', mastery: 0.7, state: 'learning', concepts: [{ id: 'concept', unitId: 'unit', name: 'Emergency exits', critical: true, pKnown: 0.7, measured: true, status: 'learning' }] }],

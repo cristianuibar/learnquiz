@@ -8,7 +8,7 @@ import { attempts, concepts, itemFlags, items, jobRoles, learnerConcept, learner
 import { conceptStatus, roleMastery, unitState } from '@/lib/learning/path'
 import type { ItemPayload } from '@/lib/llm/schemas'
 import { benchmarkMet, masterySeries, onboardingDay, WEEK } from '@/lib/learning/profile'
-import { requireOrgAdmin } from '@/server/authz'
+import { requireOrgReader } from '@/server/authz'
 import { httpError, mean } from '@/server/helpers'
 import { liveConcept } from '@/server/live-concept'
 import { reasonLabels } from '@/server/question-review'
@@ -32,8 +32,8 @@ export type MemberFlag = { id: string; label: string; note: string | null; conce
 // A person's question reports, scoped to this company's role topics.
 export const getMemberFlags = createServerFn({ method: 'GET' })
   .validator(z.object({ org: id, learnerId: id }).strict())
-  .handler(async ({ data }): Promise<MemberFlag[]> => {
-    const { org } = await requireOrgAdmin(data.org)
+  .handler(async ({ data }): Promise<{ readOnly: boolean; flags: MemberFlag[] }> => {
+    const { org, readOnly } = await requireOrgReader(data.org)
     const db = getDb()
     await requireMember(db, org.id, data.learnerId)
     const rows = await db.select({ f: itemFlags, payloadJson: items.payloadJson, roleId: topics.jobRoleId, concept: concepts.name, unit: units.name })
@@ -45,20 +45,23 @@ export const getMemberFlags = createServerFn({ method: 'GET' })
       .innerJoin(units, eq(units.id, concepts.unitId))
       .where(eq(itemFlags.userId, data.learnerId))
       .orderBy(desc(itemFlags.createdAt))
-    return rows.map((r) => ({
+    return { readOnly, flags: rows.map((r) => ({
       id: r.f.id, label: reasonLabels[r.f.reason] ?? r.f.reason, note: r.f.note, concept: r.concept, unit: r.unit,
       stem: (JSON.parse(r.payloadJson) as ItemPayload).stem, roleId: r.roleId!, itemId: r.f.itemId, createdAt: r.f.createdAt, resolvedAt: r.f.resolvedAt,
-    }))
+    })) }
   })
 
 export const getProfile = createServerFn({ method: 'GET' })
   .validator(ProfileInput)
-  .handler(async ({ data }): Promise<Profile> => {
+  .handler(async ({ data }): Promise<Profile & { readOnly: boolean }> => {
     const db = getDb()
     let learnerId: string
     let orgId: string | undefined
+    let readOnly = false
     if ('learnerId' in data) {
-      const { org } = await requireOrgAdmin(data.org)
+      const reader = await requireOrgReader(data.org)
+      const { org } = reader
+      readOnly = reader.readOnly
       orgId = org.id
       learnerId = data.learnerId
       await requireMember(db, org.id, learnerId)
@@ -179,6 +182,7 @@ export const getProfile = createServerFn({ method: 'GET' })
     })
 
     return {
+      readOnly,
       name: person?.name ?? '',
       topic: topic ? { id: topic.id, title: topic.title } : null,
       role: role?.name ?? null,

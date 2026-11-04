@@ -2,17 +2,20 @@ import { eq } from 'drizzle-orm'
 import { getDb } from '@/db'
 import { invitation } from '@/db/auth-schema'
 import { orgSettings } from '@/db/schema'
-import { requireMember } from '@/server/authz'
+import { requireMember, requireOrgReader } from '@/server/authz'
 import { getEnv } from '@/server/env'
 
 export async function serveCompanyLogo(orgId: string) {
   try {
-    const { org } = await requireMember(orgId)
+    const { org } = await requireMember(orgId).catch((error: { status?: number }) => {
+      if (error.status === 403) return requireOrgReader(orgId)
+      throw error
+    })
     const settings = await getDb().select({ logoKey: orgSettings.logoKey }).from(orgSettings).where(eq(orgSettings.orgId, org.id)).get()
     return await logoResponse(settings?.logoKey)
   } catch (error) {
     const status = (error as { status?: number }).status
-    if (status === 401 || status === 403) return new Response(status === 401 ? 'Sign in first' : 'Forbidden', { status })
+    if (status === 401 || status === 403 || status === 404) return new Response(status === 401 ? 'Sign in first' : status === 404 ? 'Logo not found' : 'Forbidden', { status })
     throw error
   }
 }

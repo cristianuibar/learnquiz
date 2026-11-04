@@ -20,7 +20,7 @@ vi.mock('@/server/role-detail', () => ({ getRoleDetail: vi.fn(), updateRoleConce
 vi.mock('@/server/curriculum', () => ({ generateRoleCurriculum: vi.fn(), retryConceptGeneration: vi.fn() }))
 vi.mock('@/server/role-documents', () => ({ uploadRoleDocument: vi.fn(), retireRoleDocument: vi.fn(), previewRetireRoleDocument: vi.fn(), removeRoleDocument: vi.fn() }))
 vi.mock('@/server/org', () => ({ createRole: vi.fn(), updateRole: vi.fn() }))
-vi.mock('@/server/profile', () => ({ getProfile: vi.fn(), getMemberFlags: vi.fn(async () => []) }))
+vi.mock('@/server/profile', () => ({ getProfile: vi.fn(), getMemberFlags: vi.fn(async () => ({ readOnly: false, flags: [] })) }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => null }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))

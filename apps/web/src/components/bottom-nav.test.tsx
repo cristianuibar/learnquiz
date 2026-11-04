@@ -22,7 +22,7 @@ vi.mock('@/server/curriculum', () => ({ createTopic: vi.fn() }))
 vi.mock('@/server/play', () => ({ startPlacement: vi.fn(), startSession: vi.fn() }))
 vi.mock('@/server/today', () => ({ getToday: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: { useSession: () => ({ data: { user: { email: 'learner@example.test' } } }) } }))
-vi.mock('@/server/profile', () => ({ getProfile: vi.fn(), getMemberFlags: vi.fn(async () => []) }))
+vi.mock('@/server/profile', () => ({ getProfile: vi.fn(), getMemberFlags: vi.fn(async () => ({ readOnly: false, flags: [] })) }))
 vi.mock('@/server/push', () => ({ getPushSettings: vi.fn(), subscribe: vi.fn(), unsubscribe: vi.fn(), sendTestPush: vi.fn(), savePushPreferences: vi.fn() }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: vi.fn() }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: vi.fn() }))
@@ -32,6 +32,7 @@ vi.mock('@/server/session-fn', () => ({
 
 beforeEach(() => {
   vi.mocked(getProfile).mockResolvedValue({
+    readOnly: false,
     name: 'Learner', topic: { id: 'training', title: 'Workplace safety' }, role: null, benchmark: 0.85, started: true, onboarding: null, mastery: 0.7, units: [],
     proficiency: { achievedAt: null, days: null, estimatedDays: 2, projectedAt: null }, confidentErrors: [], weeks: [], reachedWeeks: null, sessionCounts: { week: 0, total: 0 },
   })
