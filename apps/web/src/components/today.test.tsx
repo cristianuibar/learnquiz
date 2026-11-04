@@ -44,7 +44,7 @@ async function renderToday(today: Today) {
   const stub = (path: string, text: string) => createRoute({ getParentRoute: () => rootRoute, path, component: () => <h1>{text}</h1> })
   const play = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId', component: () => <p>Playing</p> })
   const router = createRouter({
-    routeTree: rootRoute.addChildren([route, stub('/start', 'Start page'), stub('/me/profile', 'Profile page'), play]),
+    routeTree: rootRoute.addChildren([route, stub('/start', 'Start page'), stub('/me/profile', 'Profile page'), stub('/play/loading', 'Preparing'), play]),
     history: createMemoryHistory({ initialEntries: ['/today'] }),
   })
   const container = document.createElement('div')
@@ -182,15 +182,15 @@ describe('Today interactions', () => {
     }
   })
 
-  it('starts a session when Play is pressed', async () => {
-    vi.mocked(startSession).mockResolvedValue({ sessionId: 's1' })
+  it('opens the Loading screen to start a session when Play is pressed', async () => {
     const { router, buttons, cleanup } = await renderToday(todayFixtures.normal)
     try {
       await act(async () => {
         playButton(buttons())!.click()
-        await vi.waitFor(() => expect(router.state.location.pathname).toBe('/play/s1'))
+        await vi.waitFor(() => expect(router.state.location.pathname).toBe('/play/loading'))
       })
-      expect(startSession).toHaveBeenCalledWith({ data: { topicId: 'topic-warehouse' } })
+      expect(router.state.location.search).toEqual({ topicId: 'topic-warehouse', start: 'session' })
+      expect(startSession).not.toHaveBeenCalled()
     } finally {
       await cleanup()
     }

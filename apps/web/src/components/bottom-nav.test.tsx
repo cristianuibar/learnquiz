@@ -41,9 +41,10 @@ async function renderStart(initialEntry = '/start') {
   const today = createRoute({ getParentRoute: () => rootRoute, path: '/today', beforeLoad: todayRoute.options.beforeLoad, loader: todayRoute.options.loader, errorComponent: todayRoute.options.errorComponent, component: todayRoute.options.component })
   const index = createRoute({ getParentRoute: () => rootRoute, path: '/', beforeLoad: () => { throw redirect({ to: '/start' }) } })
   const play = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId', component: Outlet })
+  const loading = createRoute({ getParentRoute: () => rootRoute, path: '/play/loading', component: () => <h1>Preparing</h1> })
   const done = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId/done', component: () => <h1>Session done</h1> })
   const me = createRoute({ getParentRoute: () => rootRoute, path: '/me', component: () => <h1>Learner</h1> })
-  const router = createRouter({ routeTree: rootRoute.addChildren([index, start, today, play, done, me]), history: createMemoryHistory({ initialEntries: [initialEntry] }) })
+  const router = createRouter({ routeTree: rootRoute.addChildren([index, start, today, loading, play, done, me]), history: createMemoryHistory({ initialEntries: [initialEntry] }) })
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -74,7 +75,6 @@ it('names the company on Today while the role training is being prepared', async
 it('sends a learner with a ready topic to Today, where one tap starts the session', async () => {
   vi.mocked(getLatestTopicIdFn).mockResolvedValue('topic-1')
   vi.mocked(getToday).mockResolvedValue({ topic: { id: 'topic-1', title: 'Biology', placed: true, placeable: true, due: 2, xp: 40, streak: 1 }, role: null, plan: { state: 'normal', start: 'session', nextUnit: null, reviewsLeft: 2, reviewsCleared: 0, sessionDone: false, sessionSize: 20, playable: true, nextReviewAt: null } })
-  vi.mocked(startSession).mockResolvedValue({ sessionId: 's1' })
   const { container, router, cleanup } = await renderStart('/me')
   try {
     const today = [...container.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Main"] a')].find((link) => link.textContent?.trim() === 'Today')!
@@ -85,10 +85,10 @@ it('sends a learner with a ready topic to Today, where one tap starts the sessio
     const start = [...container.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Play · 5 min')!
     await act(async () => {
       start.click()
-      await vi.waitFor(() => expect(router.state.location.pathname).toBe('/play/s1'))
+      await vi.waitFor(() => expect(router.state.location.pathname).toBe('/play/loading'))
     })
-    expect(startSession).toHaveBeenCalledTimes(1)
-    expect(startSession).toHaveBeenCalledWith({ data: { topicId: 'topic-1' } })
+    expect(router.state.location.search).toEqual({ topicId: 'topic-1', start: 'session' })
+    expect(startSession).not.toHaveBeenCalled()
   } finally {
     await cleanup()
   }
