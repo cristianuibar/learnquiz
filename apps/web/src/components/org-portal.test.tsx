@@ -503,6 +503,23 @@ it('replaces an expired invite from its row menu: revoke the old one, then creat
   }
 })
 
+it('keeps the error when the only expired invite is revoked but its new link fails', async () => {
+  let people = fixture.filter((p) => p.name === 'Di')
+  vi.mocked(getPeople).mockImplementation(async () => ({ id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles, people, readOnly: false }) as never)
+  cancelInvitation.mockImplementation(async () => { people = []; return { data: {}, error: null } })
+  inviteMember.mockResolvedValueOnce({ data: null, error: { code: 'X', message: 'Server unavailable' } })
+  const { container, cleanup } = await renderAt('/org/x/people', peopleLeaf)
+  try {
+    await click(container.querySelector('button[aria-label="More actions for Di"]')!)
+    await click(named(document.body, '[role=menuitem]', 'Create new link'))
+    await vi.waitFor(() => expect(container.querySelector('[role=alert]')?.textContent).toBe('Server unavailable'))
+    expect(container.textContent).toContain('No one invited yet.')
+    expect(document.activeElement).toBe(container.querySelector('h1'))
+  } finally {
+    await cleanup()
+  }
+})
+
 it('shows an invited row\'s link, returns focus to its menu button on Done, and revokes it from the menu', async () => {
   let people = fixture
   vi.mocked(getPeople).mockImplementation(async () => ({ id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles, people, readOnly: false }) as never)
