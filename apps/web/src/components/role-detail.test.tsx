@@ -160,6 +160,17 @@ it('announces finding concepts while a build has none yet, then the first count'
   expect(status()).toBe('0 of 2 concepts ready')
 })
 
+it('counts only ready concepts when a build ends with a failed concept', async () => {
+  const build = (readyN: number, status: string, failedN = 0) => {
+    const list = Array.from({ length: 31 }, (_, i) => concept(`c${i}`, `Concept ${i}`, i < readyN ? 'ready' : i < readyN + failedN ? 'failed' : 'pending'))
+    return makeDetail({ status, documents: [pdf], units: unit(list) })
+  }
+  const { router, status } = await mount(build(30, 'generating'))
+  vi.mocked(getRoleDetail).mockResolvedValue(build(30, 'ready', 1) as never)
+  await act(() => router.invalidate())
+  expect(status()).toBe('30 of 31 concepts ready. Curriculum ready.')
+})
+
 it('retries a failed concept', async () => {
   vi.mocked(retryConceptGeneration).mockResolvedValue({ ok: true } as never)
   const { button } = await mount(makeDetail({ status: 'ready', documents: [pdf], units: unit([concept('c9', 'Safe drop', 'failed', { genError: 'No draft passed' })]) }))

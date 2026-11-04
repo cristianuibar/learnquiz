@@ -44,7 +44,7 @@ export function Curriculum({ detail, readOnly, controls, error, announce }: {
       wasRunning.current = false
       bucket.current = null
       if (total > 0) {
-        announceRef.current(`${total} of ${total} concepts ready. Curriculum ready.`)
+        announceRef.current(`${ready} of ${total} concepts ready. Curriculum ready.`)
         setFinished(true)
       }
     }
