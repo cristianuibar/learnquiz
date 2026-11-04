@@ -23,6 +23,7 @@ import { Route as AdminJobsRouteImport } from './routes/admin.jobs'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as JoinInvitationIdRouteImport } from './routes/join.$invitationId'
 import { Route as MeIndexRouteImport } from './routes/me.index'
+import { Route as MeFlagRouteImport } from './routes/me.flag'
 import { Route as MeProfileRouteImport } from './routes/me.profile'
 import { Route as OrgSlugRouteImport } from './routes/org.$slug'
 import { Route as OrgNewRouteImport } from './routes/org.new'
@@ -115,6 +116,11 @@ const JoinInvitationIdRoute = JoinInvitationIdRouteImport.update({
 const MeIndexRoute = MeIndexRouteImport.update({
   id: '/me/',
   path: '/me/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MeFlagRoute = MeFlagRouteImport.update({
+  id: '/me/flag',
+  path: '/me/flag',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MeProfileRoute = MeProfileRouteImport.update({
@@ -247,6 +253,7 @@ export interface FileRoutesByFullPath {
   '/admin/jobs': typeof AdminJobsRoute
   '/admin/users': typeof AdminUsersRoute
   '/join/$invitationId': typeof JoinInvitationIdRoute
+  '/me/flag': typeof MeFlagRoute
   '/me/profile': typeof MeProfileRoute
   '/org/$slug': typeof OrgSlugRouteWithChildren
   '/org/new': typeof OrgNewRoute
@@ -285,6 +292,7 @@ export interface FileRoutesByTo {
   '/admin/jobs': typeof AdminJobsRoute
   '/admin/users': typeof AdminUsersRoute
   '/join/$invitationId': typeof JoinInvitationIdRoute
+  '/me/flag': typeof MeFlagRoute
   '/me/profile': typeof MeProfileRoute
   '/org/new': typeof OrgNewRoute
   '/play/$sessionId': typeof PlaySessionIdRoute
@@ -324,6 +332,7 @@ export interface FileRoutesById {
   '/admin/jobs': typeof AdminJobsRoute
   '/admin/users': typeof AdminUsersRoute
   '/join/$invitationId': typeof JoinInvitationIdRoute
+  '/me/flag': typeof MeFlagRoute
   '/me/profile': typeof MeProfileRoute
   '/org/$slug': typeof OrgSlugRouteWithChildren
   '/org/new': typeof OrgNewRoute
@@ -365,6 +374,7 @@ export interface FileRouteTypes {
     | '/admin/jobs'
     | '/admin/users'
     | '/join/$invitationId'
+    | '/me/flag'
     | '/me/profile'
     | '/org/$slug'
     | '/org/new'
@@ -403,6 +413,7 @@ export interface FileRouteTypes {
     | '/admin/jobs'
     | '/admin/users'
     | '/join/$invitationId'
+    | '/me/flag'
     | '/me/profile'
     | '/org/new'
     | '/play/$sessionId'
@@ -441,6 +452,7 @@ export interface FileRouteTypes {
     | '/admin/jobs'
     | '/admin/users'
     | '/join/$invitationId'
+    | '/me/flag'
     | '/me/profile'
     | '/org/$slug'
     | '/org/new'
@@ -477,6 +489,7 @@ export interface RootRouteChildren {
   TodayRoute: typeof TodayRoute
   WelcomeRoute: typeof WelcomeRoute
   JoinInvitationIdRoute: typeof JoinInvitationIdRoute
+  MeFlagRoute: typeof MeFlagRoute
   MeProfileRoute: typeof MeProfileRoute
   OrgSlugRoute: typeof OrgSlugRouteWithChildren
   OrgNewRoute: typeof OrgNewRoute
@@ -593,6 +606,13 @@ declare module '@tanstack/react-router' {
       path: '/me'
       fullPath: '/me/'
       preLoaderRoute: typeof MeIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/me/flag': {
+      id: '/me/flag'
+      path: '/me/flag'
+      fullPath: '/me/flag'
+      preLoaderRoute: typeof MeFlagRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/me/profile': {
@@ -811,6 +831,7 @@ const rootRouteChildren: RootRouteChildren = {
   TodayRoute: TodayRoute,
   WelcomeRoute: WelcomeRoute,
   JoinInvitationIdRoute: JoinInvitationIdRoute,
+  MeFlagRoute: MeFlagRoute,
   MeProfileRoute: MeProfileRoute,
   OrgSlugRoute: OrgSlugRouteWithChildren,
   OrgNewRoute: OrgNewRoute,
