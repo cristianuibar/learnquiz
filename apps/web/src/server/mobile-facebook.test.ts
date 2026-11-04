@@ -45,7 +45,7 @@ async function browserStart() {
 async function callback() {
   const pending = await browserStart()
   // Simulate the successful OAuth after-hook; /start alone cannot authorize a handoff.
-  await bindMobileFacebookSession(`https://app.learnquiz.com/api/v1/auth/facebook/callback?state=${pending.state}`, 'private-bearer')
+  await bindMobileFacebookSession(`https://app.learnquiz.com/api/v1/auth/facebook/callback?state=${pending.state}`, 'provider-state', 'private-bearer')
   const response = await call(`/facebook/callback?state=${pending.state}`, undefined, pending.cookie)
   const url = new URL(response.headers.get('Location')!)
   return { ...pending, code: url.searchParams.get('facebookCode'), response, url }
@@ -86,6 +86,30 @@ it('keeps provider cookies and binds the callback to this browser, once', async 
   expect((await call(`/facebook/callback?state=${flow.state}`, undefined, flow.cookie)).status).toBe(302)
   expect((await call(`/facebook/callback?state=${flow.state}`, undefined, flow.cookie)).headers.get('Location')).toContain('facebookError=expired')
 })
+it('atomically claims one concurrent start and binds only its OAuth nonce', async () => {
+  const pending = await prepare()
+  let nonce = 0
+  boundary.social.mockImplementation(async () => Response.json({ url: `https://www.facebook.com/dialog/oauth?state=nonce-${++nonce}` }))
+  const responses = await Promise.all([call(`/facebook/start?state=${pending.state}`), call(`/facebook/start?state=${pending.state}`)])
+  const winner = responses.find((response) => response.headers.get('Location')!.startsWith('https://www.facebook.com/'))!
+  expect(winner).toBeDefined()
+  expect(responses.filter((response) => response.headers.get('Location')!.includes('facebookError=expired'))).toHaveLength(1)
+  const oauthState = new URL(winner.headers.get('Location')!).searchParams.get('state')!
+  const callbackURL = `https://app.learnquiz.com/api/v1/auth/facebook/callback?state=${pending.state}`
+  expect(await bindMobileFacebookSession(callbackURL, oauthState === 'nonce-1' ? 'nonce-2' : 'nonce-1', 'attacker-token')).toBe(false)
+  expect(await bindMobileFacebookSession(callbackURL, oauthState, 'private-bearer')).toBe(true)
+  const browserCookie = winner.headers.getSetCookie().find((value) => value.startsWith('lq-facebook-'))!.split(';')[0]
+  const callback = await call(`/facebook/callback?state=${pending.state}`, undefined, browserCookie)
+  const code = new URL(callback.headers.get('Location')!).searchParams.get('facebookCode')
+  expect((await call('/facebook/exchange', { code, verifier: pending.verifier, redirectUri: MOBILE_AUTH_REDIRECT })).status).toBe(200)
+})
+it('fails closed when Better Auth returns no OAuth nonce', async () => {
+  const pending = await prepare()
+  boundary.social.mockResolvedValue(Response.json({ url: 'https://www.facebook.com/dialog/oauth' }))
+  const response = await call(`/facebook/start?state=${pending.state}`)
+  expect(response.headers.get('Location')).toContain('facebookError=failed')
+  expect(await bindMobileFacebookSession(`https://app.learnquiz.com/api/v1/auth/facebook/callback?state=${pending.state}`, '', 'attacker-token')).toBe(false)
+})
 it('allows exactly one concurrent exchange', async () => {
   const flow = await callback()
   const responses = await Promise.all([exchange(flow), exchange(flow)])
@@ -103,7 +127,7 @@ it.each([299_000, 301_000])('enforces the five-minute flow TTL at %i ms', async 
   vi.useFakeTimers()
   vi.setSystemTime(new Date('2026-11-04T10:00:00Z'))
   const flow = await browserStart()
-  await bindMobileFacebookSession(`https://app.learnquiz.com/api/v1/auth/facebook/callback?state=${flow.state}`, 'private-bearer')
+  await bindMobileFacebookSession(`https://app.learnquiz.com/api/v1/auth/facebook/callback?state=${flow.state}`, 'provider-state', 'private-bearer')
   vi.setSystemTime(Date.now() + elapsed)
   const response = await call(`/facebook/callback?state=${flow.state}`, undefined, flow.cookie)
   const link = new URL(response.headers.get('Location')!)

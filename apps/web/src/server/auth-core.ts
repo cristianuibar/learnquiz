@@ -76,9 +76,9 @@ export function createAuth(transportPlugins: BetterAuthPlugin[] = []) {
       after: createAuthMiddleware(async (ctx) => {
         if (ctx.path !== '/callback/:id' || ctx.params?.id !== 'facebook' || !ctx.context.newSession) return
         const state = await getOAuthState()
-        if (!state?.callbackURL) return
+        if (!state?.callbackURL || typeof state.oauthState !== 'string') return
         // Only mobile handoffs clear browser cookies; ordinary web sign-in keeps them.
-        if (await bindMobileFacebookSession(state.callbackURL, ctx.context.newSession.session.token)) deleteSessionCookie(ctx)
+        if (await bindMobileFacebookSession(state.callbackURL, state.oauthState, ctx.context.newSession.session.token)) deleteSessionCookie(ctx)
       }),
     },
     plugins: [

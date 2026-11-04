@@ -52,12 +52,22 @@ async function start(jar: ReturnType<typeof browser>) {
   jar.collect(response)
   return { ...pending, response }
 }
-function mockFacebook() {
-  const fetch = vi.fn(async (input: RequestInfo | URL) => {
-    const url = String(input instanceof Request ? input.url : input)
-    if (url.startsWith('https://graph.facebook.com/v24.0/oauth/access_token')) return Response.json({ access_token: 'mock-provider-token', token_type: 'bearer', expires_in: 3600 })
-    if (url.startsWith('https://graph.facebook.com/debug_token')) return Response.json({ data: { is_valid: true, app_id: 'mock-facebook-app', user_id: 'fb-123' } })
-    if (url.startsWith('https://graph.facebook.com/me?')) return Response.json({ id: 'fb-123', name: 'Test Learner', email: 'learner@example.com', picture: { data: { url: 'https://example.com/avatar.png' } } })
+function mockFacebook(users: Record<string, { id: string; name: string; email: string }> = {
+  'mock-code': { id: 'fb-123', name: 'Test Learner', email: 'learner@example.com' },
+}) {
+  const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const request = new Request(input, init)
+    const url = new URL(request.url)
+    if (url.pathname === '/v24.0/oauth/access_token') {
+      const code = new URLSearchParams(await request.text()).get('code')!
+      expect(users[code]).toBeDefined()
+      return Response.json({ access_token: code, token_type: 'bearer', expires_in: 3600 })
+    }
+    if (url.pathname === '/debug_token') return Response.json({ data: { is_valid: true, app_id: 'mock-facebook-app', user_id: users[url.searchParams.get('input_token')!].id } })
+    if (url.pathname === '/me') {
+      const user = users[request.headers.get('Authorization')!.slice('Bearer '.length)]
+      return Response.json({ ...user, picture: { data: { url: 'https://example.com/avatar.png' } } })
+    }
     throw new Error('Unexpected provider request')
   })
   vi.stubGlobal('fetch', fetch)
@@ -79,9 +89,7 @@ async function successfulOAuth(jar: ReturnType<typeof browser>, unrelatedCookie?
   expect(callback.status).toBe(302)
   jar.collect(callback)
   expect(jar.headers().Cookie).not.toContain('better-auth.session_token')
-  for (const name of ['session_token', 'session_data']) {
-    expect(callback.headers.getSetCookie()).toEqual(expect.arrayContaining([expect.stringContaining(`__Secure-better-auth.${name}=; Max-Age=0; Path=/; Domain=learnquiz.com`)]))
-  }
+  expect(callback.headers.getSetCookie().filter((value) => /better-auth\.session_(token|data)=/.test(value))).toEqual([])
   const deepLink = new URL(callback.headers.get('Location')!)
   const exchange = await call('/facebook/exchange', post({ code: deepLink.searchParams.get('facebookCode'), verifier: pending.verifier, redirectUri: MOBILE_AUTH_REDIRECT }))
   expect(exchange.status).toBe(200)
@@ -100,6 +108,75 @@ async function successfulOAuth(jar: ReturnType<typeof browser>, unrelatedCookie?
 
 it('completes real Better Auth OAuth and clears browser cookies while preserving the app bearer', async () => {
   await successfulOAuth(browser())
+})
+
+it.each([false, true])('rejects an attacker OAuth leg naming the victim callback (forged additionalData: %s), then hands off the victim account', async (forgeNonce) => {
+  mockFacebook({
+    attacker: { id: 'fb-attacker', name: 'Attacker', email: 'attacker@example.com' },
+    victim: { id: 'fb-victim', name: 'Victim', email: 'victim@example.com' },
+  })
+  const victim = browser()
+  const pending = await start(victim)
+  const victimProvider = new URL(pending.response.headers.get('Location')!)
+  const callbackURL = `https://app.learnquiz.com/api/v1/auth/facebook/callback?state=${pending.state}`
+  // This public endpoint accepts a trusted-origin callbackURL without cookies.
+  const attacker = browser()
+  const signIn = await createAuth().handler(new Request('https://app.learnquiz.com/api/auth/sign-in/social', post({
+    provider: 'facebook', callbackURL, disableRedirect: true,
+    ...(forgeNonce ? { additionalData: { oauthState: victimProvider.searchParams.get('state') } } : {}),
+  })))
+  expect(signIn.status).toBe(200)
+  attacker.collect(signIn)
+  const attackerProvider = new URL((await signIn.json() as { url: string }).url)
+  expect(attackerProvider.searchParams.get('state')).not.toBe(victimProvider.searchParams.get('state'))
+  const finish = (provider: URL, code: string, jar: ReturnType<typeof browser>) => createAuth().handler(new Request(
+    `https://app.learnquiz.com/api/auth/callback/facebook?code=${code}&state=${provider.searchParams.get('state')}`,
+    { headers: jar.headers() },
+  ))
+  const attackerOAuth = await finish(attackerProvider, 'attacker', attacker)
+  expect(attackerOAuth.status).toBe(302)
+  expect(attackerOAuth.headers.get('Location')).toBe(callbackURL)
+  attacker.collect(attackerOAuth)
+  const flow = () => JSON.parse((raw.prepare('SELECT value FROM verification WHERE id = ?').get(`mobile-facebook:flow:${pending.state}`) as { value: string }).value)
+  expect(flow().token).toBeUndefined()
+  expect((await createAuth().api.getSession({ headers: new Headers(attacker.headers()) }))?.user.email).toBe('attacker@example.com')
+
+  const victimOAuth = await finish(victimProvider, 'victim', victim)
+  expect(victimOAuth.status).toBe(302)
+  expect(victimOAuth.headers.get('Location')).toBe(callbackURL)
+  expect(flow().token).toBeTruthy()
+  victim.collect(victimOAuth)
+  const callback = await call(`/facebook/callback?state=${pending.state}`, { headers: victim.headers() })
+  const link = new URL(callback.headers.get('Location')!)
+  expect(link.searchParams.get('facebookError')).toBeNull()
+  const exchange = await call('/facebook/exchange', post({ code: link.searchParams.get('facebookCode'), verifier: pending.verifier, redirectUri: MOBILE_AUTH_REDIRECT }))
+  expect(exchange.status).toBe(200)
+  const { token } = await exchange.json() as { token: string }
+  expect((await createAuth().api.getSession({ headers: new Headers({ Authorization: `Bearer ${token}` }) }))?.user.email).toBe('victim@example.com')
+})
+
+it.each([
+  '/facebook/start?state=x', '/facebook/callback?state=x',
+  `/facebook/start?state=${'a'.repeat(64)}`, `/facebook/callback?state=${'a'.repeat(64)}`,
+  'missing-browser-cookie', 'bad-browser-cookie', 'expired-flow',
+])('preserves an existing web session on the unauthenticated error path %s', async (path) => {
+  const jar = browser()
+  const signup = await createAuth().api.signUpEmail({ body: { email: 'web@example.com', password: 'password123', name: 'Web Learner' }, asResponse: true })
+  expect(signup.status).toBe(200)
+  jar.collect(signup)
+  let headers = jar.headers()
+  if (!path.startsWith('/')) {
+    const pending = await start(browser())
+    if (path === 'expired-flow') raw.prepare('UPDATE verification SET expires_at = 0 WHERE id = ?').run(`mobile-facebook:flow:${pending.state}`)
+    if (path === 'bad-browser-cookie') headers = { Cookie: `${headers.Cookie}; lq-facebook-${pending.state}=${'b'.repeat(64)}` }
+    path = `/facebook/callback?state=${pending.state}`
+  }
+  const response = await call(path, { headers: { ...headers, 'Sec-Fetch-Site': 'cross-site' } })
+  expect(response.status).toBe(302)
+  expect(response.headers.get('Location')).toContain('facebookError=expired')
+  expect(response.headers.getSetCookie().filter((value) => /better-auth\.session_(token|data)=/.test(value))).toEqual([])
+  jar.collect(response)
+  expect((await createAuth().api.getSession({ headers: new Headers(jar.headers()) }))?.user.email).toBe('web@example.com')
 })
 
 it('cannot hand off a pre-existing email session without an OAuth leg', async () => {

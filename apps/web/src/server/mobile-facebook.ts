@@ -1,5 +1,4 @@
 import { and, eq, gt } from 'drizzle-orm'
-import { getCookies } from 'better-auth/cookies'
 import { MOBILE_AUTH_REDIRECT } from '@learnquiz/api/mobile-auth'
 import { getDb } from '@/db'
 import { verification } from '@/db/auth-schema'
@@ -15,7 +14,7 @@ const validSecret = (value: unknown): value is string => typeof value === 'strin
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' } })
 const invalid = () => json({ error: 'This Facebook sign-in has expired. Please try again.' }, 400)
 const key = (kind: string, value: string) => `mobile-facebook:${kind}:${value}`
-type Flow = { redirectUri: string; proofHash: string; browserHash?: string; token?: string }
+type Flow = { redirectUri: string; proofHash: string; browserHash?: string; oauthState?: string; token?: string }
 type Code = Flow & { token: string }
 
 async function save(id: string, value: Flow | Code, expiresAt: number) {
@@ -39,10 +38,6 @@ function returnToApp(state: string, result: { code: string } | { error: string }
   if ('code' in result) target.searchParams.set('facebookCode', result.code)
   else target.searchParams.set('facebookError', result.error)
   const headers = new Headers({ Location: target.href, 'Set-Cookie': cookie(state, '', 0), 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' })
-  const cookies = getCookies(createAuth().options)
-  for (const { name, attributes } of [cookies.sessionToken, cookies.sessionData]) {
-    headers.append('Set-Cookie', `${name}=; Max-Age=0; Path=${attributes.path ?? '/'}${attributes.domain ? `; Domain=${attributes.domain}` : ''}; HttpOnly; SameSite=Lax${attributes.secure ? '; Secure' : ''}`)
-  }
   return new Response(null, { status: 302, headers })
 }
 
@@ -79,9 +74,6 @@ export async function handleMobileFacebook(request: Request): Promise<Response> 
       const flow: Flow = JSON.parse(row.value)
       if (flow.browserHash || flow.redirectUri !== MOBILE_AUTH_REDIRECT) return returnToApp(state, { error: 'expired' })
       const browser = secret()
-      const claimed = await getDb().update(verification).set({ value: JSON.stringify({ ...flow, browserHash: await digest(browser) }) })
-        .where(and(eq(verification.id, row.id), eq(verification.value, row.value), gt(verification.expiresAt, new Date()))).returning()
-      if (!claimed.length) return returnToApp(state, { error: 'expired' })
       const callbackURL = `${new URL(getEnv().BETTER_AUTH_URL).origin}${PREFIX}/facebook/callback?state=${state}`
       const response = await createAuth().api.signInSocial({
         body: { provider: 'facebook', callbackURL, errorCallbackURL: `${callbackURL}&failed=1`, disableRedirect: true },
@@ -89,6 +81,13 @@ export async function handleMobileFacebook(request: Request): Promise<Response> 
       })
       const data = await response.json() as { url?: string }
       if (!response.ok || !data.url) return returnToApp(state, { error: 'failed' })
+      const oauthState = new URL(data.url).searchParams.get('state')
+      if (!oauthState) return returnToApp(state, { error: 'failed' })
+      // Claim the browser and this exact server-minted OAuth leg together.
+      // A different /sign-in/social request can copy callbackURL, but not this nonce.
+      const claimed = await getDb().update(verification).set({ value: JSON.stringify({ ...flow, browserHash: await digest(browser), oauthState }) })
+        .where(and(eq(verification.id, row.id), eq(verification.value, row.value), gt(verification.expiresAt, new Date()))).returning()
+      if (!claimed.length) return returnToApp(state, { error: 'expired' })
       const headers = new Headers(response.headers)
       headers.delete('content-type')
       headers.set('Location', data.url)
