@@ -139,7 +139,7 @@ export async function loadFrontier(db: Db, learnerId: string, topicId: string) {
 async function unitMastery(db: Db, learnerId: string, topicId: string) {
   const [unitRows, conceptRows, known] = await Promise.all([
     db.select({ id: units.id, name: units.name }).from(units).where(eq(units.topicId, topicId)).orderBy(asc(units.order)),
-    db.select({ id: concepts.id, unitId: concepts.unitId }).from(concepts).where(eq(concepts.topicId, topicId)),
+    db.select({ id: concepts.id, unitId: concepts.unitId }).from(concepts).where(and(eq(concepts.topicId, topicId), liveConcept())),
     loadPKnown(db, learnerId, topicId),
   ])
   return unitRows.map((u) => ({
