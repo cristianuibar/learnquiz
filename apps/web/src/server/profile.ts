@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { getDb } from '@/db'
 import { member, user } from '@/db/auth-schema'
 import { attempts, concepts, jobRoles, learnerConcept, memberRoleAssignments, sessions, topics, units } from '@/db/schema'
-import { benchmarkMet } from '@/lib/learning/profile'
+import { benchmarkMet, onboardingDay } from '@/lib/learning/profile'
 import { requireOrgAdmin } from '@/server/authz'
 import { httpError, mean } from '@/server/helpers'
 import { liveConcept } from '@/server/live-concept'
@@ -37,7 +37,7 @@ export const getProfile = createServerFn({ method: 'GET' })
       db.select({ id: topics.id, title: topics.title, createdAt: topics.createdAt }).from(topics)
         .where(and(eq(topics.learnerId, learnerId), eq(topics.status, 'ready')))
         .orderBy(desc(topics.createdAt)).limit(1).get(),
-      db.select({ name: jobRoles.name, benchmark: jobRoles.benchmark, assignedAt: memberRoleAssignments.assignedAt, proficientAt: memberRoleAssignments.proficientAt, topic: { id: topics.id, title: topics.title, createdAt: topics.createdAt } })
+      db.select({ name: jobRoles.name, benchmark: jobRoles.benchmark, onboardingDays: jobRoles.onboardingDays, assignedAt: memberRoleAssignments.assignedAt, proficientAt: memberRoleAssignments.proficientAt, topic: { id: topics.id, title: topics.title, createdAt: topics.createdAt } })
         .from(memberRoleAssignments)
         .innerJoin(member, and(eq(member.userId, memberRoleAssignments.userId), eq(member.organizationId, memberRoleAssignments.orgId)))
         .innerJoin(jobRoles, and(eq(jobRoles.id, memberRoleAssignments.jobRoleId), eq(jobRoles.orgId, memberRoleAssignments.orgId)))
@@ -115,6 +115,8 @@ export const getProfile = createServerFn({ method: 'GET' })
       topic: topic ? { id: topic.id, title: topic.title } : null,
       role: role?.name ?? null,
       benchmark,
+      started: history.length > 0,
+      onboarding: role ? { day: onboardingDay(role.assignedAt, now, role.onboardingDays), days: role.onboardingDays } : null,
       units: unitRows.map((unit) => ({ ...unit, concepts: conceptRows.filter((c) => c.unitId === unit.id).map((c) => ({ ...c, pKnown: c.pKnown ?? 0 })) })),
       proficiency: {
         achievedAt,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { benchmarkMet, confidentErrors, masterySeries, projectBenchmarkAt, WEEK, type ProgressAttempt, type RoleConcept } from './profile'
+import { benchmarkMet, confidentErrors, masterySeries, onboardingDay, projectBenchmarkAt, WEEK, type ProgressAttempt, type RoleConcept } from './profile'
 
 const at = (itemId: string, conceptId: string, t: number, correct: boolean, confidence: ProgressAttempt['confidence'] = 'sure', pKnownAfter = 0): ProgressAttempt => ({
   itemId,
@@ -77,4 +77,8 @@ describe('projectBenchmarkAt', () => {
   it('returns the last end when already met', () => {
     expect(projectBenchmarkAt(s(0.5, 0.95), 0.9)).toBe(2 * WEEK)
   })
+})
+
+it.each([[0, 1], [15 * 86_400_000, 16], [45 * 86_400_000, 30], [-86_400_000, 1]])('onboardingDay counts %i ms since assignment as day %i of 30', (elapsed, day) => {
+  expect(onboardingDay(1_000_000, 1_000_000 + elapsed, 30)).toBe(day)
 })
