@@ -1,8 +1,8 @@
-import { and, count, eq, inArray, isNull, ne } from 'drizzle-orm'
+import { and, count, eq, getTableColumns, inArray, isNull, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '@/db'
 import { invitation, member, organization, user } from '@/db/auth-schema'
-import { attempts, concepts, consents, items, jobRoles, learnerConcept, learnerItem, learnerTopic, learnerUnit, memberRoleAssignments, sessions, topics, units } from '@/db/schema'
+import { attempts, concepts, consents, items, jobRoles, learnerConcept, learnerItem, learnerTopic, learnerUnit, memberRoleAssignments, sessions, sources, topics, units } from '@/db/schema'
 import { BKT, MASTERY, guessFor, update } from '@/lib/learning/bkt'
 import { review } from '@/lib/learning/fsrs'
 import { gradeAnswer } from '@/lib/learning/grade'
@@ -30,6 +30,13 @@ const Input = z.object({
   ownerPassword: z.string().min(8).max(128), learnerPassword: z.string().min(8).max(128),
   now: z.number().int().positive().optional(),
 })
+// The SOP's own critical steps: a numbered step opening with **Critical — label:**, up to the next step or heading.
+// Whitespace is collapsed because the SOP is hard-wrapped and model quotes are not.
+const collapse = (text: string) => text.replace(/\s+/g, ' ').trim()
+const criticalSteps = (sop: string) => [...sop.matchAll(/^\d+\.\s+\*\*Critical — ([^:*]+):\*\*[\s\S]*?(?=^\d+\.\s|^#|(?![\s\S]))/gm)]
+  .map((match) => ({ label: collapse(match[1]).toLowerCase(), text: collapse(match[0]) }))
+const quotedIn = (quote: string | null, step: { text: string }) => !!quote && !!collapse(quote) && step.text.includes(collapse(quote))
+
 const Metadata = z.object({
   seed: z.literal(marker), accounts: z.object({ owner: z.string(), onboarding: z.string().optional(), proficient: z.string().optional() }),
   fixtureAt: z.number(), complete: z.boolean(),
@@ -74,6 +81,44 @@ export async function seedNorthwind(input: z.input<typeof Input>) {
     }
   }
 
+  async function sopVersion() {
+    const source = await db.select({ version: sources.version }).from(sources).where(eq(sources.id, NORTHWIND.sourceId)).get()
+    if (!source) throw httpError('The demo SOP was not stored.', 503)
+    return source.version
+  }
+  // One correct practice attempt per concept with a gradable question, so progress counts every practiced concept as measured.
+  async function practiceBackfill(progress: { learnerId: string; conceptId: string; pKnown: number }[], practiced: { learnerId: string; conceptId: string }[] = []) {
+    const learners = [
+      { key: 'onboarding', id: metadata.accounts.onboarding!, at: metadata.fixtureAt - DAY - 60_000 },
+      { key: 'proficient', id: metadata.accounts.proficient!, at: metadata.fixtureAt - 4 * DAY - 60_000 },
+    ]
+    const [itemRows, attempted] = await Promise.all([
+      db.select({ id: items.id, conceptId: items.conceptId, format: items.format, payloadJson: items.payloadJson }).from(items)
+        .where(and(eq(items.topicId, NORTHWIND.topicId), eq(items.status, 'active'), inArray(items.format, ['mcq', 'cloze'])))
+        .orderBy(sql`${items.format} <> 'mcq'`, items.createdAt, items.id),
+      db.select({ learnerId: attempts.learnerId, conceptId: attempts.conceptId }).from(attempts).where(inArray(attempts.learnerId, learners.map((l) => l.id))),
+    ])
+    const answers = new Map<string, { itemId: string; answer: { optionId: string } | { text: string } }>()
+    for (const item of itemRows) {
+      if (answers.has(item.conceptId)) continue
+      const payload = JSON.parse(item.payloadJson) as import('@/lib/llm/schemas').ItemPayload
+      const option = payload.options.find((o) => o.is_correct)
+      const text = payload.accepted_answers[0]
+      if (item.format === 'mcq' ? option : text) answers.set(item.conceptId, { itemId: item.id, answer: item.format === 'mcq' ? { optionId: option!.id } : { text } })
+    }
+    const done = new Set([...attempted, ...practiced].map((a) => `${a.learnerId}:${a.conceptId}`))
+    const rows = learners.flatMap((learner) => progress.flatMap((p) => {
+      const chosen = answers.get(p.conceptId)
+      if (p.learnerId !== learner.id || !chosen || done.has(`${p.learnerId}:${p.conceptId}`)) return []
+      return [{
+        id: `northwind-demo-v1:backfill-${learner.key}-${p.conceptId}`, learnerId: learner.id, sessionId: null, itemId: chosen.itemId, conceptId: p.conceptId,
+        at: learner.at, answerJson: JSON.stringify(chosen.answer), correct: true, score: 1, confidence: 'sure' as const, responseMs: 4000, rating: 3,
+        pKnownBefore: p.pKnown, pKnownAfter: p.pKnown, retrievabilityBefore: 0,
+      }]
+    }))
+    return chunks(rows, 6).map((r) => db.insert(attempts).values(r).onConflictDoNothing())
+  }
+
   let ownerHeaders: Headers
   if (org) {
     let stored: unknown
@@ -92,6 +137,13 @@ export async function seedNorthwind(input: z.input<typeof Input>) {
       inArray(topics.jobRoleId, db.select({ id: jobRoles.id }).from(jobRoles).where(eq(jobRoles.orgId, org.id)))))
     if (metadata.complete) {
       await addRoleDocument({ orgId: org.id, roleId: NORTHWIND.roleId, id: NORTHWIND.sourceId, title: 'Warehouse picker SOP', bodyText: data.sopText })
+      // Earlier seeds stored the label question without its document, so retiring the SOP left it live.
+      await db.update(items).set({ sourceId: NORTHWIND.sourceId, sourceVersion: await sopVersion() })
+        .where(and(eq(items.id, LABEL_ITEM_ID), isNull(items.sourceId), isNull(items.sourceVersion)))
+      const progress = await db.select().from(learnerConcept)
+        .where(inArray(learnerConcept.learnerId, [metadata.accounts.onboarding!, metadata.accounts.proficient!]))
+      const backfill = await practiceBackfill(progress)
+      if (backfill.length) await db.batch(backfill as [typeof backfill[number], ...typeof backfill])
       return summary()
     }
     ownerHeaders = await signin(NORTHWIND.emails.owner, data.ownerPassword)
@@ -123,9 +175,20 @@ export async function seedNorthwind(input: z.input<typeof Input>) {
 
   await addRoleDocument({ orgId: org.id, roleId: NORTHWIND.roleId, id: NORTHWIND.sourceId, title: 'Warehouse picker SOP', bodyText: data.sopText })
   if (topic?.status !== 'ready') await buildRoleCurriculum({ orgId: org.id, ownerId: metadata.accounts.owner, roleId: NORTHWIND.roleId })
+  // The SOP's markers decide which steps are critical, whatever the curriculum model flagged; the role page can still change them.
+  const steps = criticalSteps(data.sopText)
+  const quoted = await db.select({ id: concepts.id, sourceQuote: concepts.sourceQuote }).from(concepts).where(eq(concepts.topicId, NORTHWIND.topicId))
+  const criticalIds = quoted.filter((c) => steps.some((step) => quotedIn(c.sourceQuote, step))).map((c) => c.id)
+  await db.batch([
+    db.update(concepts).set({ critical: false }).where(eq(concepts.topicId, NORTHWIND.topicId)),
+    ...chunks(criticalIds, 90).map((ids) => db.update(concepts).set({ critical: true }).where(and(eq(concepts.topicId, NORTHWIND.topicId), inArray(concepts.id, ids)))),
+  ])
   const readyTopic = await db.select().from(topics).where(eq(topics.id, NORTHWIND.topicId)).get()
-  const conceptRows = await db.select().from(concepts).where(eq(concepts.topicId, NORTHWIND.topicId)).orderBy(concepts.unitId, concepts.order)
-  const critical = conceptRows.find((c) => c.critical && c.grounded && /scan|mismatch/i.test(`${c.name} ${c.summary} ${c.sourceQuote}`))
+  const conceptRows = await db.select(getTableColumns(concepts)).from(concepts).innerJoin(units, eq(units.id, concepts.unitId))
+    .where(eq(concepts.topicId, NORTHWIND.topicId)).orderBy(units.order, concepts.order)
+  const mismatchStep = steps.find((step) => step.label === 'resolve a scan mismatch')
+  const critical = (mismatchStep && conceptRows.find((c) => c.grounded && quotedIn(c.sourceQuote, mismatchStep)))
+    ?? conceptRows.find((c) => c.critical && c.grounded && /scan/i.test(c.name) && /mismatch/i.test(c.name))
   if (!readyTopic || !critical) throw httpError('The generated SOP curriculum needs a grounded critical scanning step before this demo can be seeded.', 422)
 
   // Three representative concepts keep generation within the normal daily cap.
@@ -160,7 +223,7 @@ export async function seedNorthwind(input: z.input<typeof Input>) {
   await getEnv().MEDIA.put(`items/${LABEL_ITEM_ID}/label.svg`, LOCATION_LABEL_SVG, { httpMetadata: { contentType: 'image/svg+xml' } })
   await db.insert(items).values({
     id: LABEL_ITEM_ID, conceptId: critical.id, topicId: NORTHWIND.topicId, format: 'mcq', payloadJson: JSON.stringify(labelPayload),
-    difficultyPrior: 2, status: 'active', createdAt: now - 10 * DAY,
+    difficultyPrior: 2, sourceId: NORTHWIND.sourceId, sourceVersion: await sopVersion(), status: 'active', createdAt: now - 10 * DAY,
   }).onConflictDoNothing()
 
   async function invite(email: string, name: string) {
@@ -203,6 +266,7 @@ export async function seedNorthwind(input: z.input<typeof Input>) {
     { learnerId: onboardingId, conceptId: concept.id, pKnown: concept.id === critical.id ? errorAfter : index < Math.ceil(conceptRows.length / 2) ? 0.9 : 0.35, nAttempts: 3, masteredAt: null, updatedAt: errorAt },
     { learnerId: proficientId, conceptId: concept.id, pKnown: concept.id === critical.id ? proficientAfter : MASTERY, nAttempts: 8, masteredAt: proficientAt, updatedAt: proficientAt },
   ])
+  const backfill = await practiceBackfill(mastery, [onboardingId, proficientId].map((learnerId) => ({ learnerId, conceptId: critical.id })))
   const errorSession = 'northwind-demo-v1:onboarding-session'
   const proficientSession = 'northwind-demo-v1:proficient-session'
   await db.batch([
@@ -221,6 +285,7 @@ export async function seedNorthwind(input: z.input<typeof Input>) {
       { id: 'northwind-demo-v1:proficient-answer', learnerId: proficientId, sessionId: proficientSession, itemId: criticalItem.id, conceptId: critical.id, at: proficientAt, answerJson: JSON.stringify(correctAnswer), correct: true, score: 1, confidence: 'sure', responseMs: 3800, rating: 3, pKnownBefore: proficientBefore, pKnownAfter: proficientAfter, retrievabilityBefore: 0 },
     ]).onConflictDoNothing(),
     db.insert(learnerItem).values({ learnerId: onboardingId, itemId: criticalItem.id, ...scheduled.next, lastWrongConfidentAt: errorAt }).onConflictDoNothing(),
+    ...backfill,
   ])
   metadata.complete = true
   await saveMetadata()
