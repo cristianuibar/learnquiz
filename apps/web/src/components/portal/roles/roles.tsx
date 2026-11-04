@@ -17,9 +17,9 @@ type Role = Org['roles'][number]
 
 const sub = 'text-[13px]/[18px] text-ink-muted'
 
-// Failed topic, or documents that failed with none ready to fall back on.
+// Failed topic, or documents that failed with none ready to fall back on, even if the topic was built before.
 const failed = (r: Role) =>
-  r.topicStatus === 'failed' || (r.failedDocuments > 0 && r.topicStatus !== 'ready' && r.documentCount - r.failedDocuments === 0)
+  r.topicStatus === 'failed' || (r.failedDocuments > 0 && r.documentCount === r.failedDocuments)
 
 export function Roles({ org }: { org: Org }) {
   const links = usePortalLinks()

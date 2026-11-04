@@ -139,8 +139,10 @@ it('opens the create dialog on Name and returns focus to its button on Cancel', 
   expect(document.activeElement).toBe(field('Name'))
   const cancel = [...dialogForm().querySelectorAll('button')].find((b) => b.textContent === 'Cancel')!
   await act(async () => { cancel.click() })
-  expect(document.querySelector('[role="dialog"]')).toBeNull()
-  expect(document.activeElement).toBe(button)
+  await vi.waitFor(() => {
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(document.activeElement).toBe(button)
+  })
 })
 
 it('sends the entered whole percentage and opens the new role', async () => {
@@ -183,6 +185,7 @@ it.each([
   ['ready', role({ topicStatus: 'ready', documentCount: 1 }), ['Ready']],
   ['failed topic', role({ topicStatus: 'failed', documentCount: 1 }), ['Training failed']],
   ['failed documents', role({ failedDocuments: 2, documentCount: 2 }), ['Training failed']],
+  ['ready topic with only failed documents left', role({ topicStatus: 'ready', failedDocuments: 1, documentCount: 1 }), ['Training failed']],
   ['documents added', role({ documentCount: 1 }), ['Documents added']],
 ])('words the training state: %s', async (_name, r, words) => {
   const container = await mountRoles([r])
@@ -190,8 +193,11 @@ it.each([
   expect(container.textContent).not.toContain(' · draft')
 })
 
-it('links the failed banner to the role detail', async () => {
-  const container = await mountRoles([role({ failedDocuments: 2, documentCount: 2 })])
+it.each([
+  ['draft', role({ failedDocuments: 2, documentCount: 2 })],
+  ['ready', role({ topicStatus: 'ready', failedDocuments: 2, documentCount: 2 })],
+])('links the failed banner to the role detail for a %s topic', async (_status, r) => {
+  const container = await mountRoles([r])
   const alert = container.querySelector('[role="alert"]')!
   expect(alert.textContent).toContain('2 documents have no selectable text')
   expect(alert.querySelector('a')!.textContent).toBe('Fix documents')
