@@ -41,8 +41,8 @@ export async function reserveModelCall(
   const learnerId = row.learnerId ?? null
   const orgId = row.orgId ?? null
   const rows = await db.all(sql`
-    INSERT INTO model_calls (id, learner_id, session_id, topic_id, purpose, model, latency_ms, prompt_tokens, completion_tokens, reasoning_tokens, cost_usd, ok, error, created_at)
-    SELECT ${row.id}, ${learnerId}, ${row.sessionId ?? null}, ${row.topicId ?? null}, ${row.purpose}, ${row.model}, 0, 0, 0, 0, NULL, 0, 'pending', ${now}
+    INSERT INTO model_calls (id, learner_id, session_id, topic_id, purpose, model, latency_ms, prompt_tokens, completion_tokens, reasoning_tokens, cost_usd, ok, error, created_at, org_id)
+    SELECT ${row.id}, ${learnerId}, ${row.sessionId ?? null}, ${row.topicId ?? null}, ${row.purpose}, ${row.model}, 0, 0, 0, 0, NULL, 0, 'pending', ${now}, ${orgId}
     WHERE (${learnerId} IS NULL OR (
       SELECT count(*) FROM model_calls WHERE learner_id = ${learnerId} AND created_at >= ${dayStart}
     ) < CASE WHEN (SELECT is_anonymous FROM "user" WHERE id = ${learnerId}) = 0 THEN ${ACCOUNT_DAILY_MODEL_CALL_CAP} ELSE ${GUEST_DAILY_MODEL_CALL_CAP} END)
@@ -55,7 +55,7 @@ export async function reserveModelCall(
 
 export const COMPANY_CAP_MESSAGE = 'This company has reached the daily limit for generating new content. Try again tomorrow.'
 
-// model_calls has no org column; company calls are attributed through their topic.
+// The cap still counts company calls through their topic.
 export async function companyCallsToday(db: Db, orgId: string): Promise<number> {
   const [row] = await db
     .select({ n: count() })

@@ -117,7 +117,7 @@ function PreparingCard({ role, readOnly }: { role: RoleRow; readOnly: boolean })
       <p className="text-body text-ink-muted">{text}</p>
       {!readOnly && (
         <div className="flex flex-wrap gap-3">
-          <Button variant="accent" asChild><Link {...links.people}><Plus aria-hidden />Invite people</Link></Button>
+          <Button variant="accent" asChild><Link {...links.people} search={{ invite: 1 }}><Plus aria-hidden />Invite people</Link></Button>
           <Button variant="ghost" asChild><Link {...links.role(role.id)}>Watch the build</Link></Button>
         </div>
       )}

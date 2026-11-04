@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
-import { getProfile } from './profile'
+import { getMemberFlags, getProfile } from './profile'
 
 // Fake only the transport, request auth and Cloudflare database binding. Both
 // authorization helpers, the profile handler and its SQL run for real.
@@ -96,6 +96,37 @@ it.each([
 ])('isolates profiles: %s requesting %j is refused with %s', async (actor, data, status) => {
   holder.user = actor ? { id: actor, name: actor, isAnonymous: false } : null
   await expect(getProfile({ data })).rejects.toMatchObject({ status })
+})
+
+it.each([
+  ['admin-a', { org: 'company-a', learnerId: 'learner-b' }, 404],
+  ['learner-a', { org: 'company-a', learnerId: 'learner-a' }, 403],
+  ['admin-a', { org: 'company-b', learnerId: 'learner-b' }, 403],
+])('refuses member flags: %s requesting %j with %s', async (actor, data, status) => {
+  holder.user = { id: actor, name: actor, isAnonymous: false }
+  await expect(getMemberFlags({ data })).rejects.toMatchObject({ status })
+})
+
+it('lists the person’s flags on this company’s questions only, newest first', async () => {
+  for (const [org, role] of [['a', 'role-a'], ['b', 'role-b']]) {
+    raw.prepare('INSERT INTO job_roles (id, org_id, name, created_at) VALUES (?, ?, ?, ?)').run(role, `org-${org}`, role, start)
+    raw.prepare('INSERT INTO topics (id, org_id, job_role_id, title, status, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(`t-${org}`, `org-${org}`, role, 'T', 'ready', start)
+    raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run(`u-${org}`, `t-${org}`, 0, `Unit ${org}`)
+    raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)').run(`c-${org}`, `t-${org}`, `u-${org}`, 0, `Concept ${org}`, '')
+    raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(`item-${org}`, `c-${org}`, `t-${org}`, 'short', JSON.stringify({ stem: `Stem ${org}` }), start)
+  }
+  const flag = raw.prepare('INSERT INTO item_flags (id, item_id, user_id, reason, note, created_at, resolved_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+  flag.run('f-old', 'item-a', 'learner-a', 'unfair-result', 'Too hard', start + 1, start + 5)
+  flag.run('f-new', 'item-a', 'learner-a', 'custom-reason', null, start + 2, null)
+  flag.run('f-b', 'item-b', 'learner-a', 'unfair-result', null, start + 3, null)
+  flag.run('f-other', 'item-a', 'colleague-a', 'unfair-result', null, start + 4, null)
+  holder.user = { id: 'admin-a', name: 'Admin', isAnonymous: false }
+  const base = { concept: 'Concept a', unit: 'Unit a', stem: 'Stem a', roleId: 'role-a', itemId: 'item-a' }
+  expect(await getMemberFlags({ data: { org: 'company-a', learnerId: 'learner-a' } })).toEqual([
+    { ...base, id: 'f-new', label: 'custom-reason', note: null, createdAt: start + 2, resolvedAt: null },
+    { ...base, id: 'f-old', label: 'The result seems unfair', note: 'Too hard', createdAt: start + 1, resolvedAt: start + 5 },
+  ])
 })
 
 it('returns the latest ready topic and a week of the caller’s own mastery, corrections and completed sessions', async () => {

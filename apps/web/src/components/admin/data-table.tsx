@@ -81,7 +81,7 @@ function Frame({ band, toolbar, footer, scrollRef, region, children }: {
 
 const TABLE = 'w-full border-separate border-spacing-0 text-[14px]/[20px] tabular-nums'
 
-export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSort, selection, actions, band, toolbar, footer, empty, loading }: {
+export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSort, selection, actions, band, toolbar, footer, empty, loading, total }: {
   caption: string
   columns: Column<T>[]
   rows: T[]
@@ -97,6 +97,8 @@ export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSo
   empty?: ReactNode
   /** Placeholder rows in the real frame and header; sorting is disabled. */
   loading?: { rows: number; status: string }
+  /** Totals row: label spans the first `span` columns, the remaining columns render from `row`. */
+  total?: { label: string; span?: number; row: T }
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [scrolls, setScrolls] = useState(false)
@@ -113,7 +115,7 @@ export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSo
   }, [rows.length, columns.length])
 
   const sortCol = columns.find((c) => c.key === sort?.key)
-  const sortedNote = !loading && sort && sortCol
+  const sortedNote = !loading && sort && sortCol?.sortable
     ? `, sorted by ${labelOf(sortCol).toLowerCase()}, ${(sortCol.sortOrder ?? DEFAULT_ORDER)[sort.direction]}`
     : ''
   const grouped = columns.some((c) => c.group)
@@ -134,7 +136,7 @@ export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSo
         className={cn(c.hideBelowLg && 'dt-hide-lg max-xl:hidden', c.className)}
       />
     ) : (
-      <th key={c.key} scope="col" role="columnheader" rowSpan={span} className={cn(TH, pos(c.align), c.hideBelowLg && 'dt-hide-lg max-xl:hidden', c.className)}>
+      <th key={c.key} scope="col" role="columnheader" aria-sort={sort?.key === c.key ? sort.direction : undefined} rowSpan={span} className={cn(TH, pos(c.align), c.hideBelowLg && 'dt-hide-lg max-xl:hidden', c.className)}>
         {c.header}
       </th>
     )
@@ -264,6 +266,23 @@ export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSo
             )
           })}
         </tbody>
+        )}
+        {total && !loading && (
+          <tfoot role="rowgroup">
+            <tr role="row">
+              <th scope="row" role="rowheader" colSpan={total.span ?? 1} className={cn(td, 'border-t border-border-strong border-b-0 text-left font-bold text-ink')}>{total.label}</th>
+              {columns.slice(total.span ?? 1).map((c) => (
+                <td
+                  key={c.key}
+                  role="cell"
+                  data-label={labelOf(c)}
+                  className={cn(td, 'border-t border-border-strong border-b-0 font-bold text-ink', c.align === 'end' && 'text-right', c.hideBelowLg && 'dt-hide-lg max-xl:hidden', c.className)}
+                >
+                  {c.cell(total.row)}
+                </td>
+              ))}
+            </tr>
+          </tfoot>
         )}
       </table>
       {loading && <p role="status" className="sr-only">{loading.status}</p>}

@@ -15,7 +15,7 @@ import { getSessionFn } from '@/server/session-fn'
 import { getToday } from '@/server/today'
 import { authClient } from '@/lib/auth-client'
 
-vi.mock('@/server/profile', () => ({ getProfile: vi.fn() }))
+vi.mock('@/server/profile', () => ({ getProfile: vi.fn(), getMemberFlags: vi.fn(async () => []) }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => null }))
@@ -98,9 +98,9 @@ it('shows a company admin the member’s Training progress read-only and refuses
     expect(container.querySelector('h1')?.textContent).toBe('Training progress')
     expect(container.querySelector('h1')?.classList.contains('text-title-1')).toBe(true)
     expect(container.textContent).toContain('Dana Learner')
-    expect([...container.querySelectorAll('h2')].map((h) => h.textContent)).toEqual(['Role mastery', 'Weekly trend', 'By unit', 'Critical steps to recheck'])
+    expect([...container.querySelectorAll('h2')].map((h) => h.textContent)).toEqual(['Role mastery', 'Weekly trend', 'By unit', 'Confident errors on critical steps'])
     expect(container.querySelector('form, input, button:not([aria-expanded])')).toBeNull()
-    expect([...container.querySelectorAll('a')].find((a) => a.textContent === 'Back to people')?.getAttribute('href')).toBe('/org/acme/people')
+    expect([...container.querySelectorAll('a')].find((a) => a.textContent === 'People')?.getAttribute('href')).toBe('/org/acme/people')
 
     vi.mocked(getProfile).mockRejectedValue(Object.assign(new Error('Only company admins can do this'), { status: 403 }))
     await act(async () => { await router.invalidate() })

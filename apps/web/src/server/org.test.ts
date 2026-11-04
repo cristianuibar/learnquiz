@@ -124,6 +124,10 @@ it.each(['owner', 'admin'])('%s creates and lists roles with defaults or custom 
   expect(() => sqlite.prepare('INSERT INTO topics (id, job_role_id, title, status, created_at) VALUES (?, ?, ?, ?, ?)').run('duplicate', role.id, 'Duplicate', 'draft', 1)).toThrow(/UNIQUE/)
 })
 
+it('builds invite links from BETTER_AUTH_URL', async () => {
+  expect((await getPeople({ data: { slug: 'alpha' } })).baseUrl).toBe('http://127.0.0.1:8800')
+})
+
 it.each([
   ['member', 403],
   ['other-owner', 403],

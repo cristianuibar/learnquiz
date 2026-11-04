@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button'
 import { RetryIcon } from '@/components/ui/icons'
 import { Text } from '@/components/ui/Text'
 import { getToken } from '@/lib/auth'
+import { pathAttribution } from '@/lib/model-attribution'
 import { isPreparing, pathError, preparingText, unitHref, unitRows } from '@/lib/path'
 import { useToday } from '@/lib/today'
 import { useTopicPath } from '@/lib/topic-path'
@@ -49,6 +50,7 @@ export default function PathScreen() {
   }, [path, owner, router])
 
   const rows = path && !isPreparing(path) ? unitRows(path) : []
+  const attribution = path && !isPreparing(path) ? pathAttribution(path) : null
   const failed = status === 'offline' || status === 'error'
 
   return (
@@ -92,6 +94,7 @@ export default function PathScreen() {
             ))}
           </View>
         )}
+        {attribution ? <Text variant="caption" muted>{attribution}</Text> : null}
       </ScrollView>
     </View>
   )

@@ -15,8 +15,8 @@ import { getSessionFn } from '@/server/session-fn'
 
 vi.mock('@/server/org', () => ({ getOrgOverview: vi.fn() }))
 vi.mock('@/server/people', () => ({ getPeople: vi.fn() }))
-const { inviteMember } = vi.hoisted(() => ({ inviteMember: vi.fn() }))
-vi.mock('@/lib/auth-client', () => ({ authClient: { organization: { inviteMember } } }))
+const { inviteMember, cancelInvitation } = vi.hoisted(() => ({ inviteMember: vi.fn(), cancelInvitation: vi.fn() }))
+vi.mock('@/lib/auth-client', () => ({ authClient: { organization: { inviteMember, cancelInvitation } } }))
 vi.mock('@/server/org-shell', () => ({ getPortalShell: vi.fn() }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => null }))
@@ -118,6 +118,7 @@ async function renderAt(path: string, leaf: { path: string; loader: (ctx: { para
   await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
   return {
     container,
+    router,
     cleanup: async () => {
       await act(async () => root.unmount())
       container.remove()
@@ -126,7 +127,7 @@ async function renderAt(path: string, leaf: { path: string; loader: (ctx: { para
   }
 }
 
-const peopleLeaf = { path: '/people', loader: peopleRoute.options.loader as (ctx: { params: { slug: string } }) => ReturnType<typeof getPeople>, component: peopleRoute.options.component }
+const peopleLeaf = { path: '/people', loader: peopleRoute.options.loader as (ctx: { params: { slug: string } }) => ReturnType<typeof getPeople>, component: peopleRoute.options.component, validateSearch: peopleRoute.options.validateSearch }
 
 const member = (userId: string, name: string, jobRole: string, status: 'active' | 'proficient', mastery: number, extra = {}) =>
   ({ kind: 'member', userId, name, email: `${name.toLowerCase()}@acme.test`, jobRole, status, day: 9, onboardingDays: 30, proficientInDays: null, lastActiveAt: null, mastery, benchmark: 85, openCriticalErrors: 2, ...extra })
@@ -284,7 +285,7 @@ it('announces build progress politely in steps of five, and the end', async () =
     expect(container.querySelector('[role="progressbar"]')!.getAttribute('aria-valuetext')).toBe('12 of 31 concepts ready')
     expect(status()).toBe('')
     const hrefsNow = hrefs(container)
-    expect(hrefsNow['Invite people']).toBe('/org/x/people')
+    expect(hrefsNow['Invite people']).toBe('/org/x/people?invite=1')
     expect(hrefsNow['Watch the build']).toBe('/org/x/roles/r2')
     for (const [next, said] of [[14, ''], [15, '15 of 31 concepts ready'], [19, '15 of 31 concepts ready'], [31, '31 of 31 concepts ready.']] as const) {
       ready = next
@@ -313,58 +314,226 @@ it.each([
   }
 })
 
-it('focuses the invalid field on the invite form and ties its message to it', async () => {
+const expiresAt = new Date(Date.UTC(2026, 10, 9)).toISOString()
+const dialog = () => document.querySelector<HTMLElement>('[role="dialog"]')!
+const heading = () => dialog().querySelector('h2')!
+const inField = (label: string, n = 0) => {
+  const l = [...dialog().querySelectorAll('label')].filter((x) => x.textContent!.trim() === label)[n]
+  return document.getElementById(l.getAttribute('for')!) as HTMLInputElement
+}
+const typeInto = (el: HTMLInputElement, value: string) => act(async () => {
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(el, value)
+  el.dispatchEvent(new Event('input', { bubbles: true }))
+})
+const fillPerson = async (n: number, name: string, email: string) => { await typeInto(inField('Name', n), name); await typeInto(inField('Email', n), email) }
+const submitInvites = () => act(async () => { dialog().querySelector('form')!.requestSubmit() })
+const inDialog = (tag: string, text: string) => named(dialog(), tag, text)
+const status = () => [...dialog().querySelectorAll('[role=status]')].map((e) => e.textContent).join('|')
+const clipboard = vi.fn(async (_text: string) => {})
+const inviteReply = (id: string) => ({ data: { id, expiresAt }, error: null })
+
+async function openInvite() {
   load(fixture)
-  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
-  vi.mocked(getSessionFn).mockImplementation(async () => ({ user: { id: 'u', name: 'U', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] }))
-  const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
-  const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, loader: orgRoute.options.loader as (ctx: { params: { slug: string } }) => unknown, errorComponent: orgRoute.options.errorComponent, component: orgRoute.options.component })
-  const people = createRoute({ getParentRoute: () => org, path: '/people', loader: peopleRoute.options.loader as (ctx: { params: { slug: string } }) => ReturnType<typeof getPeople>, component: peopleRoute.options.component })
-  const router = createRouter({ routeTree: rootRoute.addChildren([org.addChildren([people])]), history: createMemoryHistory({ initialEntries: ['/org/x/people'] }) })
-  const container = document.createElement('div')
-  document.body.appendChild(container)
-  const root = createRoot(container)
-  const field = (id: string) => document.querySelector<HTMLInputElement>('#' + id)!
-  const type = (id: string, value: string) => act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field(id), value)
-    field(id).dispatchEvent(new Event('input', { bubbles: true }))
-  })
-  const submit = () => act(async () => { document.querySelector('form')!.requestSubmit() })
-  const message = (id: string) => document.getElementById(field(id).getAttribute('aria-describedby')!)?.textContent
+  const r = await renderAt('/org/x/people', peopleLeaf)
+  await click(named(r.container, 'button', 'Invite people'))
+  return r
+}
+// Two people filled in and created, landing on the first link dialog.
+async function createTwoLinks() {
+  inviteMember.mockResolvedValueOnce(inviteReply('new1')).mockResolvedValueOnce(inviteReply('new2'))
+  const r = await openInvite()
+  await click(inDialog('button', 'Add another person'))
+  await fillPerson(0, 'Eve', 'eve@acme.test')
+  await fillPerson(1, 'Fay', 'fay@acme.test')
+  await submitInvites()
+  await vi.waitFor(() => expect(heading().textContent).toBe('Invite link for Eve'))
+  return r
+}
+
+beforeEach(() => {
+  inviteMember.mockReset()
+  cancelInvitation.mockReset().mockResolvedValue({ data: {}, error: null })
+  clipboard.mockClear()
+  Object.defineProperty(navigator, 'clipboard', { value: { writeText: clipboard }, configurable: true })
+})
+
+it('focuses the first invalid field on the invite form and ties its message to it', async () => {
+  const { cleanup } = await openInvite()
   try {
-    await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
-    await click(named(container, 'button', 'Invite people'))
-    expect(document.querySelector('[role=dialog]')!.textContent).toContain('Invite people')
-    inviteMember.mockResolvedValueOnce({ error: { message: 'Could not create the invite' } } as never)
-    await type('name', 'Sam')
-    await type('email', 'a@b.co')
-    await submit()
-    expect(document.body.textContent).toContain('Could not create the invite')
-    inviteMember.mockClear()
-    await type('name', '   ')
-    await submit()
-    expect(document.body.textContent).not.toContain('Could not create the invite')
-    expect(field('name').getAttribute('aria-invalid')).toBe('true')
-    expect(message('name')).toBe('Enter a name')
-    expect(document.activeElement).toBe(field('name'))
+    expect(heading().textContent).toBe('Invite people')
+    await fillPerson(0, '   ', '')
+    await submitInvites()
+    const message = (el: HTMLElement) => document.getElementById(el.getAttribute('aria-describedby')!)?.textContent
+    expect(inField('Name').getAttribute('aria-invalid')).toBe('true')
+    expect(message(inField('Name'))).toBe('Enter a name')
+    expect(message(inField('Email'))).toBe('Enter an email')
+    expect(document.activeElement).toBe(inField('Name'))
     expect(inviteMember).not.toHaveBeenCalled()
 
-    inviteMember.mockResolvedValue({ error: { code: 'USER_IS_ALREADY_INVITED_TO_THIS_ORGANIZATION', message: 'User is already invited to this organization' } } as never)
-    await type('name', 'Sam')
-    await submit()
-    expect(inviteMember).toHaveBeenCalledTimes(1)
-    expect(field('name').getAttribute('aria-invalid')).toBeNull()
-    expect(field('email').getAttribute('aria-invalid')).toBe('true')
-    expect(message('email')).toBe('User is already invited to this organization')
-    expect(document.activeElement).toBe(field('email'))
-
-    inviteMember.mockResolvedValue({ data: { id: 'i9' }, error: null } as never)
-    await type('email', 'new@b.co')
-    await submit()
-    await vi.waitFor(() => expect(document.querySelector('[role=dialog]')).toBeNull())
+    await typeInto(inField('Name'), 'Sam')
+    await submitInvites()
+    expect(document.activeElement).toBe(inField('Email'))
+    expect(inviteMember).not.toHaveBeenCalled()
   } finally {
-    await act(async () => root.unmount())
-    container.remove()
-    delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT
+    await cleanup()
+  }
+})
+
+it('adds a person with a numbered fieldset and focuses their Name', async () => {
+  const { cleanup } = await openInvite()
+  try {
+    await click(inDialog('button', 'Add another person'))
+    expect([...dialog().querySelectorAll('fieldset legend')].map((l) => l.textContent)).toEqual(['Person 1', 'Person 2'])
+    expect(document.activeElement).toBe(inField('Name', 1))
+  } finally {
+    await cleanup()
+  }
+})
+
+it('creates one invite per person in order and steps through their links', async () => {
+  const { cleanup } = await createTwoLinks()
+  try {
+    expect(inviteMember.mock.calls).toEqual([
+      [{ organizationId: 'org', email: 'eve@acme.test', role: 'member', inviteeName: 'Eve', jobRoleId: 'r1' }],
+      [{ organizationId: 'org', email: 'fay@acme.test', role: 'member', inviteeName: 'Fay', jobRoleId: 'r1' }],
+    ])
+    expect(dialog().textContent).toContain('1 of 2')
+    expect(inField('Invite link').value).toBe('http://localhost/join/new1')
+    expect(inField('Invite link').readOnly).toBe(true)
+    expect(dialog().querySelector('img')!.getAttribute('alt')).toBe('QR code for the invite link of Eve')
+    await click(inDialog('button', 'Next'))
+    await vi.waitFor(() => expect(document.activeElement).toBe(heading()))
+    expect(heading().textContent).toBe('Invite link for Fay')
+    expect(dialog().textContent).toContain('2 of 2')
+    expect(inField('Invite link').value).toBe('http://localhost/join/new2')
+    expect(dialog().querySelector('img')!.getAttribute('alt')).toBe('QR code for the invite link of Fay')
+  } finally {
+    await cleanup()
+  }
+})
+
+it('keeps only the person whose email is already invited, with the error, and opens no link yet', async () => {
+  inviteMember
+    .mockResolvedValueOnce({ data: null, error: { code: 'USER_IS_ALREADY_INVITED_TO_THIS_ORGANIZATION', message: 'User is already invited to this organization' } })
+    .mockResolvedValueOnce(inviteReply('new2'))
+  const { cleanup } = await openInvite()
+  try {
+    await click(inDialog('button', 'Add another person'))
+    await fillPerson(0, 'Eve', 'eve@acme.test')
+    await fillPerson(1, 'Fay', 'fay@acme.test')
+    await submitInvites()
+    await vi.waitFor(() => expect(dialog().querySelectorAll('fieldset')).toHaveLength(1))
+    expect(inviteMember).toHaveBeenCalledTimes(2)
+    expect(inField('Email').value).toBe('eve@acme.test')
+    expect(inField('Email').getAttribute('aria-invalid')).toBe('true')
+    expect(dialog().textContent).toContain('User is already invited to this organization')
+    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1)
+    expect(heading().textContent).toBe('Invite people')
+  } finally {
+    await cleanup()
+  }
+})
+
+it('copies the invite link and says so', async () => {
+  const { cleanup } = await createTwoLinks()
+  try {
+    await click(inDialog('button', 'Copy link'))
+    expect(clipboard).toHaveBeenCalledWith('http://localhost/join/new1')
+    await vi.waitFor(() => expect(dialog().querySelector('p[role=status]')!.textContent).toContain('Link copied'))
+  } finally {
+    await cleanup()
+  }
+})
+
+it('revokes a link, blocks copying it, and brings a fresh link back on Undo', async () => {
+  const { cleanup } = await createTwoLinks()
+  try {
+    await click(inDialog('button', 'Revoke link'))
+    expect(cancelInvitation).toHaveBeenCalledWith({ invitationId: 'new1' })
+    expect(inDialog('button', 'Copy link').getAttribute('aria-disabled')).toBe('true')
+    await click(inDialog('button', 'Copy link'))
+    expect(clipboard).not.toHaveBeenCalled()
+    expect(status()).toContain('Link revoked')
+
+    inviteMember.mockResolvedValueOnce(inviteReply('new3'))
+    await click(inDialog('button', 'Undo'))
+    await vi.waitFor(() => expect(inField('Invite link').value).toBe('http://localhost/join/new3'))
+    expect(inviteMember).toHaveBeenCalledTimes(3)
+    expect(inviteMember.mock.calls[2][0]).toEqual({ organizationId: 'org', email: 'eve@acme.test', role: 'member', inviteeName: 'Eve', jobRoleId: 'r1' })
+    expect(status()).not.toContain('Link revoked')
+  } finally {
+    await cleanup()
+  }
+})
+
+it('replaces an expired invite from its row menu: revoke the old one, then create and show the new link', async () => {
+  inviteMember.mockResolvedValueOnce(inviteReply('new1'))
+  load(fixture)
+  const { container, cleanup } = await renderAt('/org/x/people', peopleLeaf)
+  try {
+    await click(container.querySelector('button[aria-label="More actions for Di"]')!)
+    await click(named(document.body, '[role=menuitem]', 'Create new link'))
+    await vi.waitFor(() => expect(heading().textContent).toBe('Invite link for Di'))
+    expect(cancelInvitation).toHaveBeenCalledWith({ invitationId: 'i2' })
+    expect(inviteMember).toHaveBeenCalledWith({ organizationId: 'org', email: 'di@acme.test', role: 'member', inviteeName: 'Di', jobRoleId: 'r2' })
+    expect(cancelInvitation.mock.invocationCallOrder[0]).toBeLessThan(inviteMember.mock.invocationCallOrder[0])
+  } finally {
+    await cleanup()
+  }
+})
+
+it('shows an invited row\'s link, returns focus to its menu button on Done, and revokes it from the menu', async () => {
+  let people = fixture
+  vi.mocked(getPeople).mockImplementation(async () => ({ id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles, people, readOnly: false }) as never)
+  cancelInvitation.mockImplementation(async () => { people = fixture.filter((p) => p.name !== 'Cy'); return { data: {}, error: null } })
+  const { container, cleanup } = await renderAt('/org/x/people', peopleLeaf)
+  try {
+    const button = () => container.querySelector<HTMLButtonElement>('button[aria-label="More actions for Cy"]')
+    await click(button()!)
+    await click(named(document.body, '[role=menuitem]', 'Show invite link'))
+    expect(heading().textContent).toBe('Invite link for Cy')
+    expect(inField('Invite link').value).toBe('http://localhost/join/i1')
+    await click(inDialog('button', 'Done'))
+    // Radix hands focus back on a timer after the dialog unmounts.
+    await vi.waitFor(() => expect(document.activeElement).toBe(button()))
+
+    await click(button()!)
+    await click(named(document.body, '[role=menuitem]', 'Revoke'))
+    await vi.waitFor(() => expect(button()).toBeNull())
+    expect(cancelInvitation).toHaveBeenCalledWith({ invitationId: 'i1' })
+    expect(document.activeElement).toBe(container.querySelector('h1'))
+  } finally {
+    await cleanup()
+  }
+})
+
+it('returns focus to the row menu button when Escape closes the menu', async () => {
+  load(fixture)
+  const { container, cleanup } = await renderAt('/org/x/people', peopleLeaf)
+  try {
+    const button = container.querySelector<HTMLButtonElement>('button[aria-label="More actions for Cy"]')!
+    await click(button)
+    const items = () => document.querySelectorAll('[role=menuitem]')
+    expect(items().length).toBeGreaterThan(0)
+    const target = (document.activeElement?.getAttribute('role') === 'menuitem' ? document.activeElement : items()[0]) as HTMLElement
+    await act(async () => { target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
+    expect(items()).toHaveLength(0)
+    expect(document.activeElement).toBe(button)
+  } finally {
+    await cleanup()
+  }
+})
+
+it('opens the invite dialog from ?invite=1 and drops the param when it closes', async () => {
+  load(fixture)
+  const { router, cleanup } = await renderAt('/org/x/people?invite=1', peopleLeaf)
+  try {
+    expect(heading().textContent).toBe('Invite people')
+    expect((router.state.location.search as { invite?: unknown }).invite).toBeTruthy()
+    await click(inDialog('button', 'Cancel'))
+    await vi.waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull())
+    expect((router.state.location.search as { invite?: unknown }).invite).toBeUndefined()
+  } finally {
+    await cleanup()
   }
 })

@@ -5,10 +5,11 @@ import { trendLabels } from '@learnquiz/api/trend-labels'
 const font = 11
 const text = 'text-[11px]'
 
-export function WeeklyTrend({ profile }: { profile: Profile }) {
+// `card` is the company admin's view: heading and caption inside the card, legend at the top right, wider chart.
+export function WeeklyTrend({ profile, card = false }: { profile: Profile; card?: boolean }) {
   const id = useId()
   const { benchmark, proficiency } = profile
-  const chart = trendGeometry(profile.weeks, benchmark, proficiency.achievedAt === null ? proficiency.projectedAt : null, 294)
+  const chart = trendGeometry(profile.weeks, benchmark, proficiency.achievedAt === null ? proficiency.projectedAt : null, card ? 560 : 294)
   // Labels that would overlap are thinned: the newest week and the projection date win.
   const labels = trendLabels(chart.points, chart.projection, chart.width, font)
   const last = chart.points[chart.points.length - 1]
@@ -20,19 +21,44 @@ export function WeeklyTrend({ profile }: { profile: Profile }) {
     { value: 0, y: chart.bottom },
   ]
   const legend = [
-    { label: 'Measured', cls: 'stroke-brand', dash: undefined },
+    { label: card ? 'Mastery' : 'Measured', cls: 'stroke-brand', dash: undefined },
     ...(chart.projection ? [{ label: 'Projected', cls: 'stroke-brand', dash: '6 6' }] : []),
-    { label: `Benchmark ${percentText(benchmark)}`, cls: 'stroke-ink-muted', dash: '4 4' },
+    { label: card ? 'Benchmark' : `Benchmark ${percentText(benchmark)}`, cls: 'stroke-ink-muted', dash: '4 4' },
   ]
+  const legendList = (
+    <ul aria-hidden className="m-0 flex list-none flex-wrap gap-3 p-0">
+      {legend.map(({ label, cls, dash }) => (
+        <li key={label} className="flex items-center gap-1">
+          <svg width="24" height="12" aria-hidden>
+            <line x1="0" x2="24" y1="6" y2="6" strokeWidth={2} strokeDasharray={dash} className={cls} />
+          </svg>
+          <span className="text-caption text-ink-muted">{label}</span>
+        </li>
+      ))}
+    </ul>
+  )
+  const heading = card ? (
+    <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
+      <div className="flex flex-col gap-1">
+        <h2 id={id} className="text-title-2">
+          Weekly trend
+        </h2>
+        {profile.weeks[0] && <p className="text-caption text-ink-muted tabular-nums">Since {formatShortDate(profile.weeks[0].start)}</p>}
+      </div>
+      {profile.weeks.length > 0 && legendList}
+    </div>
+  ) : (
+    <h2 id={id} className="text-title-3">
+      Weekly trend
+    </h2>
+  )
   return (
-    <section aria-labelledby={id} className="flex flex-col gap-3">
-      <h2 id={id} className="text-title-3">
-        Weekly trend
-      </h2>
+    <section aria-labelledby={id} className={card ? 'flex flex-col gap-4 rounded-md border border-border bg-surface-card p-4' : 'flex flex-col gap-3'}>
+      {heading}
       {profile.weeks.length === 0 ? (
         <p className="text-body text-ink-muted">No weekly mastery recorded yet.</p>
       ) : (
-        <figure className="m-0 flex flex-col gap-3 rounded-md border border-border bg-surface-card p-4">
+        <figure className={card ? 'm-0 flex flex-col gap-3' : 'm-0 flex flex-col gap-3 rounded-md border border-border bg-surface-card p-4'}>
           <svg viewBox={`0 0 ${chart.width} 188`} className="h-auto w-full" role="img" aria-label={chart.description}>
             {[chart.top, mid, chart.bottom].map((y) => (
               <line key={y} x1={chart.left} x2={chart.width} y1={y} y2={y} strokeWidth={1} className="stroke-border" />
@@ -89,16 +115,7 @@ export function WeeklyTrend({ profile }: { profile: Profile }) {
               </text>
             ))}
           </svg>
-          <ul aria-hidden className="m-0 flex list-none flex-wrap gap-3 p-0">
-            {legend.map(({ label, cls, dash }) => (
-              <li key={label} className="flex items-center gap-1">
-                <svg width="24" height="12" aria-hidden>
-                  <line x1="0" x2="24" y1="6" y2="6" strokeWidth={2} strokeDasharray={dash} className={cls} />
-                </svg>
-                <span className="text-caption text-ink-muted">{label}</span>
-              </li>
-            ))}
-          </ul>
+          {!card && legendList}
           <table className="sr-only">
             <caption>Role mastery by week</caption>
             <thead>
@@ -123,7 +140,7 @@ export function WeeklyTrend({ profile }: { profile: Profile }) {
                 <tr>
                   <td>{formatShortDate(chart.projection.at)} (projected)</td>
                   <td>{percentText(benchmark)}</td>
-                  <td />
+                  <td>{card ? 'Not applicable' : null}</td>
                 </tr>
               )}
             </tbody>

@@ -75,7 +75,8 @@ describe('dialogs and form controls', () => {
     expect(onConfirm).not.toHaveBeenCalled()
     expect(document.activeElement).toBe(area)
     expect(area.getAttribute('aria-invalid')).toBe('true')
-    const err = document.getElementById(area.getAttribute('aria-describedby')!)!
+    const ids = area.getAttribute('aria-describedby')!.split(' ')
+    const err = ids.map((i) => document.getElementById(i)!).find((e) => e.getAttribute('role') === 'alert')!
     expect(err.getAttribute('role')).toBe('alert')
     expect(err.textContent).toContain('Enter a reason. Other staff see it in the user list.')
     await act(async () => {

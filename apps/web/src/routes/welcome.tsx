@@ -99,7 +99,7 @@ function Welcome() {
       <div className="sticky bottom-0 -mx-4 flex flex-col gap-3 bg-surface-page px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {error && <ErrorRow message={SAVE_ERROR} />}
         <Button size="lg" className="w-full" onClick={submit} disabled={busy}>
-          Start learning
+          Got it
         </Button>
       </div>
     </main>

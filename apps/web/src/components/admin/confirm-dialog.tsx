@@ -1,15 +1,16 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Banner } from './banner'
-import { FieldError, fieldProps } from './field-error'
+import { FieldError } from './field-error'
 
 const REASON_ERROR = 'Enter a reason. Other staff see it in the user list.'
 
-export function ConfirmDialog({ open, onOpenChange, title, consequences, verb, object, onConfirm, reason: askReason }: {
+export function ConfirmDialog({ open, onOpenChange, title, consequences, verb, object, onConfirm, reason: askReason, description, returnFocus }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   title: string
@@ -18,9 +19,13 @@ export function ConfirmDialog({ open, onOpenChange, title, consequences, verb, o
   object: string
   onConfirm: (reason?: string) => void | Promise<void>
   reason?: boolean
+  description?: ReactNode
+  /** Element to focus on close instead of the opener (e.g. after a successful action); return null for the opener. */
+  returnFocus?: () => HTMLElement | null | undefined
 }) {
   const id = useId()
   const reasonId = `${id}-reason`
+  const descId = `${id}-desc`
   const cancelRef = useRef<HTMLButtonElement>(null)
   const reasonRef = useRef<HTMLTextAreaElement>(null)
   const pendingRef = useRef(false)
@@ -66,26 +71,21 @@ export function ConfirmDialog({ open, onOpenChange, title, consequences, verb, o
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent initialFocus={cancelRef} aria-describedby={undefined}
+      <DialogContent initialFocus={askReason ? reasonRef : cancelRef} aria-describedby={description ? descId : undefined}
         onCloseAutoFocus={(event) => {
           event.preventDefault()
-          if (openerRef.current?.isConnected) openerRef.current.focus()
+          const target = returnFocus?.()
+          if (target?.isConnected) target.focus()
+          else if (openerRef.current?.isConnected) openerRef.current.focus()
         }}
       >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
+          {description && <p id={descId} className="text-body text-ink-muted">{description}</p>}
         </DialogHeader>
-        <ul className="flex flex-col gap-3">
-          {consequences.map(({ icon: Icon, text }, i) => (
-            <li key={i} className="flex items-start gap-3 text-body text-ink">
-              <Icon aria-hidden className="mt-px size-5 shrink-0 text-ink-muted" />
-              <span>{text}</span>
-            </li>
-          ))}
-        </ul>
         {askReason && (
           <div className="flex flex-col gap-2">
-            <Label htmlFor={reasonId}>Reason · required</Label>
+            <Label htmlFor={reasonId}>Reason</Label>
             <Textarea
               id={reasonId}
               ref={reasonRef}
@@ -94,11 +94,21 @@ export function ConfirmDialog({ open, onOpenChange, title, consequences, verb, o
               aria-required="true"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              {...fieldProps(reasonId, error)}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? `${reasonId}-hint ${reasonId}-error` : `${reasonId}-hint`}
             />
+            <p id={`${reasonId}-hint`} className="text-caption text-ink-muted">Only Learn Quiz staff see this.</p>
             {error && <FieldError id={reasonId}>{error}</FieldError>}
           </div>
         )}
+        <ul className="flex flex-col gap-3">
+          {consequences.map(({ icon: Icon, text }, i) => (
+            <li key={i} className="flex items-start gap-3 text-body text-ink">
+              <Icon aria-hidden className="mt-px size-5 shrink-0 text-ink-muted" />
+              <span>{text}</span>
+            </li>
+          ))}
+        </ul>
         {failure && <Banner kind="alert">{failure}</Banner>}
         <DialogFooter>
           <DialogClose asChild>

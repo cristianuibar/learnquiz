@@ -231,6 +231,22 @@ requests to the app hostname, 10 per minute per IP, block. The Worker also caps 
 learner at 20 model calls per UTC day, including retries, voice transcriptions and
 image generations.
 
+### Apex domain cutover
+
+`learnquiz.com` is served by the marketing site Worker (`learnquiz-site`, `apps/site`);
+the web app Worker (`learnquiz`) serves only `app.learnquiz.com`. To move the apex
+from the web app to the site, in this order:
+
+1. In the Cloudflare dashboard, detach the `learnquiz.com` custom domain from Worker `learnquiz`.
+2. `pnpm deploy:web`
+3. `pnpm deploy:site`
+4. Check that an old app link follows the site's redirect to the app host; the final
+   URL must be `https://app.learnquiz.com/join/x`, not only a success status:
+
+```sh
+curl -sIL -o /dev/null -w '%{url_effective}\n' https://learnquiz.com/join/x
+```
+
 `apps/web/src/worker.ts` delegates HTTP requests to TanStack Start. Queue and scheduled
 handlers are empty; background processing and scheduled reminders are not shipped.
 

@@ -2,14 +2,16 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, asc, desc, eq } from 'drizzle-orm'
 import type { Profile } from '@learnquiz/api/progress'
 import { z } from 'zod'
-import { getDb } from '@/db'
+import { getDb, type Db } from '@/db'
 import { member, user } from '@/db/auth-schema'
-import { attempts, concepts, jobRoles, learnerConcept, learnerUnit, memberRoleAssignments, placements, sessions, topics, units } from '@/db/schema'
+import { attempts, concepts, itemFlags, items, jobRoles, learnerConcept, learnerUnit, memberRoleAssignments, placements, sessions, topics, units } from '@/db/schema'
 import { conceptStatus, roleMastery, unitState } from '@/lib/learning/path'
+import type { ItemPayload } from '@/lib/llm/schemas'
 import { benchmarkMet, masterySeries, onboardingDay, WEEK } from '@/lib/learning/profile'
 import { requireOrgAdmin } from '@/server/authz'
 import { httpError, mean } from '@/server/helpers'
 import { liveConcept } from '@/server/live-concept'
+import { reasonLabels } from '@/server/question-review'
 import { requireLearnerId } from '@/server/session'
 
 const DAY = 86_400_000
@@ -18,6 +20,36 @@ const mondayOf = (at: number) => Math.floor((at - 4 * DAY) / WEEK) * WEEK + 4 * 
 const id = z.string().min(1).max(100)
 // A target always requires a company; the empty input can only read the caller.
 const ProfileInput = z.union([z.object({ org: id, learnerId: id }).strict(), z.object({}).strict()])
+
+const requireMember = async (db: Db, orgId: string, learnerId: string) => {
+  const target = await db.select({ id: member.id }).from(member)
+    .where(and(eq(member.organizationId, orgId), eq(member.userId, learnerId))).get()
+  if (!target) throw httpError('Person not found', 404)
+}
+
+export type MemberFlag = { id: string; label: string; note: string | null; concept: string; unit: string; stem: string; roleId: string; itemId: string; createdAt: number; resolvedAt: number | null }
+
+// A person's question reports, scoped to this company's role topics.
+export const getMemberFlags = createServerFn({ method: 'GET' })
+  .validator(z.object({ org: id, learnerId: id }).strict())
+  .handler(async ({ data }): Promise<MemberFlag[]> => {
+    const { org } = await requireOrgAdmin(data.org)
+    const db = getDb()
+    await requireMember(db, org.id, data.learnerId)
+    const rows = await db.select({ f: itemFlags, payloadJson: items.payloadJson, roleId: topics.jobRoleId, concept: concepts.name, unit: units.name })
+      .from(itemFlags)
+      .innerJoin(items, eq(items.id, itemFlags.itemId))
+      .innerJoin(topics, eq(topics.id, items.topicId))
+      .innerJoin(jobRoles, and(eq(jobRoles.id, topics.jobRoleId), eq(jobRoles.orgId, org.id)))
+      .innerJoin(concepts, eq(concepts.id, items.conceptId))
+      .innerJoin(units, eq(units.id, concepts.unitId))
+      .where(eq(itemFlags.userId, data.learnerId))
+      .orderBy(desc(itemFlags.createdAt))
+    return rows.map((r) => ({
+      id: r.f.id, label: reasonLabels[r.f.reason] ?? r.f.reason, note: r.f.note, concept: r.concept, unit: r.unit,
+      stem: (JSON.parse(r.payloadJson) as ItemPayload).stem, roleId: r.roleId!, itemId: r.f.itemId, createdAt: r.f.createdAt, resolvedAt: r.f.resolvedAt,
+    }))
+  })
 
 export const getProfile = createServerFn({ method: 'GET' })
   .validator(ProfileInput)
@@ -29,9 +61,7 @@ export const getProfile = createServerFn({ method: 'GET' })
       const { org } = await requireOrgAdmin(data.org)
       orgId = org.id
       learnerId = data.learnerId
-      const target = await db.select({ id: member.id }).from(member)
-        .where(and(eq(member.organizationId, org.id), eq(member.userId, learnerId))).get()
-      if (!target) throw httpError('Person not found', 404)
+      await requireMember(db, org.id, learnerId)
     } else {
       learnerId = await requireLearnerId()
     }

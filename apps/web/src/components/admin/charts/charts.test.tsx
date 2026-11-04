@@ -18,7 +18,7 @@ async function render(node: ReactNode) {
   return container
 }
 
-const cells = (row: Element) => [...row.querySelectorAll('td')].map((td) => td.textContent)
+const cells = (row: Element) => [...row.querySelectorAll('th, td')].map((td) => td.textContent)
 
 describe('BarChart', () => {
   it('names the svg with the summary and totals the same numbers in its table, marking today as partial', async () => {
@@ -48,7 +48,42 @@ describe('BarChart', () => {
   })
 })
 
+describe('BarChart with a strip and many days', () => {
+  it('draws every day as a bar, thins the x labels and uses the supplied table', async () => {
+    const points = Array.from({ length: 40 }, (_, i) => ({ label: String(i + 1), value: i % 7 === 0 ? 0 : 100 + i }))
+    const el = await render(
+      <BarChart
+        title="Calls by day"
+        summary="Calls"
+        unit="Calls"
+        legend="Calls"
+        points={points}
+        strip={{ legend: 'Failure rate', values: points.map((_, i) => i / 10), format: (n) => `${n}%` }}
+        table={{ caption: 'Calls and failures', columns: ['Day', 'Calls'], rows: [{ key: 'a', cells: ['1', '0'] }], total: ['30 days', '5'] }}
+      />,
+    )
+    const svg = el.querySelector('svg[role="img"]')!
+    expect(svg.querySelectorAll('rect')).toHaveLength(80)
+    const labels = [...svg.querySelectorAll('text')].map((t) => t.textContent)
+    expect(labels.filter((l) => /^\d+$/.test(l ?? '')).length).toBeLessThan(40)
+    expect(el.querySelector('table caption')!.textContent).toBe('Calls and failures')
+    expect(el.querySelector('table tfoot th[scope="row"]')!.textContent).toBe('30 days')
+  })
+})
+
 describe('LineChart', () => {
+  it('keeps a day with no data in the table and draws no dot for it', async () => {
+    const el = await render(
+      <LineChart
+        title="Latency"
+        summary="Latency"
+        series={[{ name: 'p50', style: 'solid', points: [{ x: 'Nov 1', y: 10 }, { x: 'Nov 2', y: null }, { x: 'Nov 3', y: 12 }] }]}
+      />,
+    )
+    expect(el.querySelectorAll('svg[role="img"] circle')).toHaveLength(2)
+    expect([...el.querySelectorAll('table tbody tr')].map(cells)).toEqual([['Nov 1', '10'], ['Nov 2', ''], ['Nov 3', '12']])
+  })
+
   it('lists every point in its table with no total row', async () => {
     const el = await render(
       <LineChart
@@ -62,7 +97,7 @@ describe('LineChart', () => {
       />,
     )
     expect(el.querySelector('svg[role="img"]')!.getAttribute('aria-label')).toBe('Latency p50 stayed near 1.2 s while p95 rose to 4.1 s.')
-    expect([...el.querySelectorAll('table th')].map((th) => th.textContent)).toEqual(['Day', 'p50', 'p95'])
+    expect([...el.querySelectorAll('table th[scope="col"]')].map((th) => th.textContent)).toEqual(['Day', 'p50', 'p95'])
     expect([...el.querySelectorAll('table tbody tr')].map(cells)).toEqual([['Nov 1', '1,200', '3,800'], ['Nov 2', '1,250', '4,100']])
     expect(el.querySelector('table tfoot')).toBeNull()
   })

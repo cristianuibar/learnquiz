@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import type { ExpoConfig } from 'expo/config'
 
 export default function config(): ExpoConfig {
+  const projectId = process.env.EAS_PROJECT_ID || '580a4fa9-148e-4503-a37e-1e630a9e249a'
   return {
     name: 'Learn Quiz',
     slug: 'learnquiz',
@@ -26,7 +27,7 @@ export default function config(): ExpoConfig {
       ...(existsSync(join(__dirname, 'assets/adaptive-icon.png')) && {
         adaptiveIcon: {
           foregroundImage: './assets/adaptive-icon.png',
-          backgroundColor: '#F7F6F2',
+          backgroundColor: '#0E5A73',
         },
       }),
     },
@@ -44,6 +45,8 @@ export default function config(): ExpoConfig {
       // The microphone, only while a learner records a voice answer; no background audio service.
       ['expo-audio', { recordAudioAndroid: true, enableBackgroundPlayback: false }],
     ],
-    ...(process.env.EAS_PROJECT_ID && { extra: { eas: { projectId: process.env.EAS_PROJECT_ID } } }),
+    runtimeVersion: { policy: 'fingerprint' },
+    extra: { eas: { projectId } },
+    updates: { url: `https://u.expo.dev/${projectId}` },
   }
 }
