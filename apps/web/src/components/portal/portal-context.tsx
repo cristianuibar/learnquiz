@@ -24,7 +24,7 @@ export function usePortalLinks() {
     overview: linkOptions({ to: '/org/$slug', params: { slug }, activeOptions: { exact: true } }),
     roles: linkOptions({ to: '/org/$slug/roles', params: { slug } }),
     role: (roleId: string) => linkOptions({ to: '/org/$slug/roles/$roleId', params: { slug, roleId } }),
-    questions: ({ topicId }: { topicId?: string } = {}) => linkOptions({ to: '/org/$slug/questions', params: { slug }, search: { topicId }, activeOptions: { includeSearch: false } }),
+    questions: ({ role, item }: { role?: string; item?: string } = {}) => linkOptions({ to: '/org/$slug/questions', params: { slug }, search: { role, item }, activeOptions: { includeSearch: false } }),
     people: linkOptions({ to: '/org/$slug/people', params: { slug } }),
     person: (id: string) => linkOptions({ to: '/org/$slug/people/$id', params: { slug, id } }),
     settings: linkOptions({ to: '/org/$slug/settings', params: { slug } }),
