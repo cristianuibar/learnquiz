@@ -8,13 +8,15 @@ import { Route as orgRoute } from '@/routes/org.$slug'
 import { Route as indexRoute } from '@/routes/org.$slug.index'
 import { Route as peopleRoute } from '@/routes/org.$slug.people'
 import { Route as signInRoute } from '@/routes/sign-in'
-import { getOrgOverview, getPeople } from '@/server/org'
+import { getOrgOverview } from '@/server/org'
+import { getPeople } from '@/server/people'
 import { getPortalShell } from '@/server/org-shell'
 import { getSessionFn } from '@/server/session-fn'
 
-vi.mock('@/server/org', () => ({ getPeople: vi.fn(), getOrgOverview: vi.fn() }))
-const { cancelInvitation, inviteMember } = vi.hoisted(() => ({ cancelInvitation: vi.fn(), inviteMember: vi.fn() }))
-vi.mock('@/lib/auth-client', () => ({ authClient: { organization: { cancelInvitation, inviteMember } } }))
+vi.mock('@/server/org', () => ({ getOrgOverview: vi.fn() }))
+vi.mock('@/server/people', () => ({ getPeople: vi.fn() }))
+const { inviteMember } = vi.hoisted(() => ({ inviteMember: vi.fn() }))
+vi.mock('@/lib/auth-client', () => ({ authClient: { organization: { inviteMember } } }))
 vi.mock('@/server/org-shell', () => ({ getPortalShell: vi.fn() }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => null }))
@@ -25,7 +27,7 @@ const shell = { orgId: 'org', name: 'Acme', slug: 'x', logoUrl: null, userName: 
 beforeEach(() => { vi.mocked(getPortalShell).mockResolvedValue(shell) })
 
 it('sends signed-out visitors on a portal page to sign-in and back after login', async () => {
-  vi.mocked(getPeople).mockResolvedValue({ id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles: [], members: [], readOnly: false, invites: [] } as never)
+  vi.mocked(getPeople).mockResolvedValue({ id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles: [], people: [], readOnly: false } as never)
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   let user: { id: string; name: string; isAnonymous: boolean; role: string } | null = null
   vi.mocked(getSessionFn).mockImplementation(async () => ({ user, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] }))
@@ -54,7 +56,7 @@ it('sends signed-out visitors on a portal page to sign-in and back after login',
 })
 
 it('shows the portal nav on portal pages, trimmed for Learn Quiz staff, with a working mobile menu', async () => {
-  vi.mocked(getPeople).mockResolvedValue({ id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles: [], members: [], readOnly: false, invites: [] } as never)
+  vi.mocked(getPeople).mockResolvedValue({ id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles: [], people: [], readOnly: false } as never)
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'u', name: 'U', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] } as never)
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
@@ -101,43 +103,6 @@ it('shows the portal nav on portal pages, trimmed for Learn Quiz staff, with a w
   }
 })
 
-it('asks before revoking an invite and keeps it pending when dismissed', async () => {
-  const invite = { id: 'inv1', name: 'Ana', email: 'ana@acme.test', jobRole: 'Cashier', expired: false }
-  let invites = [invite]
-  vi.mocked(getPeople).mockImplementation(async () => ({ id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles: [], members: [], readOnly: false, invites }) as never)
-  cancelInvitation.mockImplementation(async () => { invites = []; return { error: null } })
-  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
-  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'u', name: 'U', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] } as never)
-  const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
-  const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, loader: orgRoute.options.loader as (ctx: { params: { slug: string } }) => unknown, errorComponent: orgRoute.options.errorComponent, component: orgRoute.options.component })
-  const people = createRoute({ getParentRoute: () => org, path: '/people', loader: peopleRoute.options.loader as (ctx: { params: { slug: string } }) => ReturnType<typeof getPeople>, component: peopleRoute.options.component })
-  const router = createRouter({ routeTree: rootRoute.addChildren([org.addChildren([people])]), history: createMemoryHistory({ initialEntries: ['/org/x/people'] }) })
-  const container = document.createElement('div')
-  document.body.appendChild(container)
-  const root = createRoot(container)
-  const button = (scope: Element, name: string) => [...scope.querySelectorAll('button')].find((b) => b.textContent === name)
-  const dialog = () => document.querySelector('[role="dialog"]')
-  try {
-    await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
-    await act(async () => { button(container, 'Revoke invite')!.click() })
-    expect(dialog()!.textContent).toContain('The link stops working for ana@acme.test.')
-    await act(async () => { button(dialog()!, 'Keep invite')!.click() })
-    expect(dialog()).toBeNull()
-    expect(cancelInvitation).not.toHaveBeenCalled()
-    expect(container.textContent).toContain('ana@acme.test')
-
-    await act(async () => { button(container, 'Revoke invite')!.click() })
-    await act(async () => { button(dialog()!, 'Revoke invite')!.click() })
-    await vi.waitFor(() => expect(container.textContent).not.toContain('ana@acme.test'))
-    expect(cancelInvitation).toHaveBeenCalledTimes(1)
-    expect(cancelInvitation).toHaveBeenCalledWith({ invitationId: 'inv1' })
-  } finally {
-    await act(async () => root.unmount())
-    container.remove()
-    delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT
-  }
-})
-
 async function renderAt(path: string, leaf: { path: string; loader: (ctx: { params: { slug: string } }) => unknown; component: typeof peopleRoute.options.component }) {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'u', name: 'U', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] } as never)
@@ -160,56 +125,87 @@ async function renderAt(path: string, leaf: { path: string; loader: (ctx: { para
 
 const peopleLeaf = { path: '/people', loader: peopleRoute.options.loader as (ctx: { params: { slug: string } }) => ReturnType<typeof getPeople>, component: peopleRoute.options.component }
 
-it('shows status chip, mastery bar and last active for each person', async () => {
-  const training = { stage: 'onboarding', progress: 0.5, daysToProficiency: null, criticalConfidentErrors: 0, benchmark: 85 }
-  vi.mocked(getPeople).mockResolvedValue({
-    id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles: [], readOnly: false,
-    invites: [{ id: 'inv1', name: 'Ana', email: 'ana@acme.test', jobRole: 'Cashier', expiresAt: 0, expired: false }],
-    members: [
-      { id: 'm1', userId: 'u1', name: 'Ben', email: 'ben@acme.test', role: 'member', jobRole: 'Cashier', lastActiveAt: Date.UTC(2026, 2, 5), training: { ...training, stage: 'proficient', mastery: 100 } },
-      // Above the benchmark on average but a critical concept is still below it: not yet proficient.
-      { id: 'm4', userId: 'u4', name: 'Eve', email: 'eve@acme.test', role: 'member', jobRole: 'Cashier', lastActiveAt: null, training: { ...training, mastery: 90 } },
-      { id: 'm5', userId: 'u5', name: 'Flo', email: 'flo@acme.test', role: 'owner', jobRole: null, lastActiveAt: null, training: null },
-      { id: 'm2', userId: 'u2', name: 'Cy', email: 'cy@acme.test', role: 'member', jobRole: 'Cashier', lastActiveAt: null, training: { ...training, mastery: 62 } },
-      { id: 'm3', userId: 'u3', name: 'Di', email: 'di@acme.test', role: 'member', jobRole: 'Cashier', lastActiveAt: null, training: { ...training, mastery: 0 } },
-    ],
-  } as never)
+const member = (userId: string, name: string, jobRole: string, status: 'active' | 'proficient', mastery: number, extra = {}) =>
+  ({ kind: 'member', userId, name, email: `${name.toLowerCase()}@acme.test`, jobRole, status, day: 9, onboardingDays: 30, proficientInDays: null, lastActiveAt: null, mastery, benchmark: 85, openCriticalErrors: 2, ...extra })
+const invite = (id: string, name: string, status: 'invited' | 'expired', jobRoleId: string, jobRole: string) =>
+  ({ kind: 'invite', invitationId: id, name, email: `${name.toLowerCase()}@acme.test`, jobRole, jobRoleId, status, invitedAt: Date.UTC(2026, 10, 2), expiresAt: Date.UTC(2026, 10, 9) })
+const roles = [{ id: 'r1', name: 'Cashier', benchmark: 85, onboardingDays: 30, topicId: 't1', topicStatus: 'ready' }, { id: 'r2', name: 'Cook', benchmark: 85, onboardingDays: 30, topicId: 't2', topicStatus: 'ready' }]
+const fixture = [
+  member('u1', 'Ana', 'Cashier', 'active', 42),
+  member('u2', 'Ben', 'Cook', 'proficient', 90, { proficientInDays: 21 }),
+  invite('i1', 'Cy', 'invited', 'r1', 'Cashier'),
+  invite('i2', 'Di', 'expired', 'r2', 'Cook'),
+]
+const load = (people: unknown[], extra = {}) => vi.mocked(getPeople).mockResolvedValue({ id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles, people, readOnly: false, ...extra } as never)
+const click = (el: Element) => act(async () => { (el as HTMLElement).click() })
+const named = (scope: { querySelectorAll(s: string): Iterable<Element> }, tag: string, text: string) => [...scope.querySelectorAll(tag)].find((e) => e.textContent!.trim() === text)!
+
+it('combines search, role and status filters and reports the narrowed count', async () => {
+  load(fixture)
   const { container, cleanup } = await renderAt('/org/x/people', peopleLeaf)
   try {
-    const items = [...container.querySelectorAll('li')].map((li) => li.textContent)
-    expect(items.some((t) => t!.includes('Ana') && t!.includes('Invited'))).toBe(true)
-    const row = (name: string) => [...container.querySelectorAll('li')].find((li) => li.textContent!.includes(name))!
-    for (const [name, status, value] of [['Ben', 'Mastered', 100], ['Cy', 'Still learning', 62], ['Di', 'Not started', 0], ['Eve', 'Still learning', 90]] as const) {
-      const li = row(name)
-      const chip = [...li.querySelectorAll('span')].find((s) => s.textContent === status)
-      expect(chip, `${name} shows ${status}`).toBeDefined()
-      expect(chip!.querySelector('svg')).not.toBeNull()
-      const bar = li.querySelector('[role=progressbar]')!
-      expect(bar.getAttribute('aria-valuenow')).toBe(String(value))
-      expect(bar.getAttribute('aria-label')).toBe(`${name} mastery`)
-      expect(li.textContent).toContain(`${value}%`)
-    }
-    expect(row('Ben').textContent).toContain('Last active: 5 Mar 2026')
-    expect(row('Cy').textContent).toContain('Last active: -')
-    expect(row('Eve').textContent).not.toContain('Mastered')
-    expect(row('Flo').textContent).toContain('No job role')
-    expect(row('Flo').textContent).not.toMatch(/Active|Proficient|Mastered/)
+    const footer = () => container.querySelector('[role=status]')!.textContent
+    const names = () => [...container.querySelectorAll('tbody tr')].map((r) => r.querySelector('td')!.firstElementChild!.firstElementChild!.textContent)
+    expect(footer()).toBe('4 people')
+    const search = container.querySelector('input[type=search]') as HTMLInputElement
+    const role = container.querySelector('select') as HTMLSelectElement
+    const set = (el: HTMLInputElement | HTMLSelectElement, value: string) => act(async () => {
+      const proto = el instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype
+      Object.getOwnPropertyDescriptor(proto, 'value')!.set!.call(el, value)
+      el.dispatchEvent(new Event(el instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true }))
+    })
+    await set(role, 'r1')
+    expect(names()).toEqual(['Ana', 'Cy'])
+    expect(footer()).toBe('2 of 4 people')
+    await set(search, 'CY@ACME')
+    expect(names()).toEqual(['Cy'])
+    expect(footer()).toBe('1 of 4 people')
+    // Counts follow search and role, not the chip.
+    expect(named(container, 'button', 'Invited 1')).toBeDefined()
+    await click(named(container, 'button', 'Expired 0'))
+    expect(names()).toEqual([])
+    await set(search, '')
+    await set(role, '')
+    expect(names()).toEqual(['Di'])
+    expect(footer()).toBe('1 of 4 people')
   } finally {
     await cleanup()
   }
 })
 
-it('invites the first employee when nobody has a job role yet', async () => {
-  vi.mocked(getPeople).mockResolvedValue({
-    id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles: [{ id: 'r1', name: 'Cashier' }], readOnly: false, invites: [],
-    members: [{ id: 'm1', userId: 'u1', name: 'Ben', email: 'ben@acme.test', role: 'owner', jobRole: null, lastActiveAt: null, training: null }],
-  } as never)
+it('toggles a status chip, links members, and shows progress and invites as text', async () => {
+  load(fixture)
   const { container, cleanup } = await renderAt('/org/x/people', peopleLeaf)
   try {
-    expect(container.textContent).toContain('Invite your first employee.')
-    const button = [...container.querySelectorAll('button')].find((b) => b.textContent === 'Invite an employee')!
-    await act(async () => { button.click() })
-    expect(document.activeElement).toBe(container.querySelector('#name'))
+    const chip = named(container, 'button', 'Active 1')
+    expect(chip.getAttribute('aria-pressed')).toBe('false')
+    await click(chip)
+    expect(chip.getAttribute('aria-pressed')).toBe('true')
+    await click(chip)
+    expect(chip.getAttribute('aria-pressed')).toBe('false')
+
+    const row = (name: string) => [...container.querySelectorAll('tbody tr')].find((r) => r.textContent!.includes(name))!
+    expect(row('Ana').querySelector('a')!.getAttribute('href')).toBe('/org/x/people/u1')
+    expect(row('Ana').textContent).toContain('42% of 85% benchmark')
+    expect(row('Ana').textContent).toContain('Day 9 of 30')
+    expect(row('Ben').textContent).toContain('Proficient in 21 days')
+    expect(row('Cy').querySelector('a')).toBeNull()
+    expect(row('Cy').textContent).toContain('Not joined')
+    expect(row('Cy').textContent).toContain('Link expires Nov 9')
+    expect(row('Di').textContent).toContain('Link expired Nov 9')
+    expect(container.querySelectorAll('th button, [aria-sort]')).toHaveLength(0)
+  } finally {
+    await cleanup()
+  }
+})
+
+it('shows only a card with an Invite people button when nobody is invited', async () => {
+  load([])
+  const { container, cleanup } = await renderAt('/org/x/people', peopleLeaf)
+  try {
+    expect(container.textContent).toContain('No one invited yet.')
+    expect(named(container, 'button', 'Invite people')).toBeDefined()
+    expect(container.querySelector('table')).toBeNull()
   } finally {
     await cleanup()
   }
@@ -246,7 +242,7 @@ it('links an empty job role list on the overview to the roles page', async () =>
 })
 
 it('focuses the invalid field on the invite form and ties its message to it', async () => {
-  vi.mocked(getPeople).mockResolvedValue({ id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles: [{ id: 'r1', name: 'Cashier' }], members: [], readOnly: false, invites: [] } as never)
+  load(fixture)
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   vi.mocked(getSessionFn).mockImplementation(async () => ({ user: { id: 'u', name: 'U', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] }))
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
@@ -256,24 +252,26 @@ it('focuses the invalid field on the invite form and ties its message to it', as
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
-  const field = (id: string) => container.querySelector<HTMLInputElement>('#' + id)!
+  const field = (id: string) => document.querySelector<HTMLInputElement>('#' + id)!
   const type = (id: string, value: string) => act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field(id), value)
     field(id).dispatchEvent(new Event('input', { bubbles: true }))
   })
-  const submit = () => act(async () => { container.querySelector('form')!.requestSubmit() })
+  const submit = () => act(async () => { document.querySelector('form')!.requestSubmit() })
   const message = (id: string) => document.getElementById(field(id).getAttribute('aria-describedby')!)?.textContent
   try {
     await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
+    await click(named(container, 'button', 'Invite people'))
+    expect(document.querySelector('[role=dialog]')!.textContent).toContain('Invite people')
     inviteMember.mockResolvedValueOnce({ error: { message: 'Could not create the invite' } } as never)
     await type('name', 'Sam')
     await type('email', 'a@b.co')
     await submit()
-    expect(container.textContent).toContain('Could not create the invite')
+    expect(document.body.textContent).toContain('Could not create the invite')
     inviteMember.mockClear()
     await type('name', '   ')
     await submit()
-    expect(container.textContent).not.toContain('Could not create the invite')
+    expect(document.body.textContent).not.toContain('Could not create the invite')
     expect(field('name').getAttribute('aria-invalid')).toBe('true')
     expect(message('name')).toBe('Enter a name')
     expect(document.activeElement).toBe(field('name'))
@@ -287,49 +285,12 @@ it('focuses the invalid field on the invite form and ties its message to it', as
     expect(field('email').getAttribute('aria-invalid')).toBe('true')
     expect(message('email')).toBe('User is already invited to this organization')
     expect(document.activeElement).toBe(field('email'))
-  } finally {
-    await act(async () => root.unmount())
-    container.remove()
-    delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT
-  }
-})
 
-it('brings a new invite\'s Copy link and its expanded QR code into view', async () => {
-  const old = { id: 'inv0', name: 'Bo', email: 'bo@acme.test', jobRole: 'Cashier', expired: false }
-  let invites = [old]
-  vi.mocked(getPeople).mockImplementation(async () => ({ id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles: [{ id: 'r1', name: 'Cashier' }], members: [], readOnly: false, invites }) as never)
-  inviteMember.mockReset().mockImplementation(async () => { invites = [{ id: 'inv1', name: 'Sam', email: 'sam@acme.test', jobRole: 'Cashier', expired: false }, old]; return { data: { id: 'inv1' }, error: null } })
-  const scrolled: Element[] = []
-  const scroll = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(function (this: Element) { scrolled.push(this) })
-  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
-  vi.mocked(getSessionFn).mockImplementation(async () => ({ user: { id: 'u', name: 'U', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] }))
-  const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
-  const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, loader: orgRoute.options.loader as (ctx: { params: { slug: string } }) => unknown, errorComponent: orgRoute.options.errorComponent, component: orgRoute.options.component })
-  const people = createRoute({ getParentRoute: () => org, path: '/people', loader: peopleRoute.options.loader as (ctx: { params: { slug: string } }) => ReturnType<typeof getPeople>, component: peopleRoute.options.component })
-  const router = createRouter({ routeTree: rootRoute.addChildren([org.addChildren([people])]), history: createMemoryHistory({ initialEntries: ['/org/x/people'] }) })
-  const container = document.createElement('div')
-  document.body.appendChild(container)
-  const root = createRoot(container)
-  const field = (id: string) => container.querySelector<HTMLInputElement>('#' + id)!
-  const type = (id: string, value: string) => act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field(id), value)
-    field(id).dispatchEvent(new Event('input', { bubbles: true }))
-  })
-  const row = (email: string) => [...container.querySelectorAll('li')].find((li) => li.textContent?.includes(email))!
-  const button = (scope: Element, name: string) => [...scope.querySelectorAll('button')].find((b) => b.textContent === name)!
-  try {
-    await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
-    expect(scrolled).toEqual([])
-    await type('name', 'Sam')
-    await type('email', 'sam@acme.test')
-    await act(async () => { container.querySelector('form')!.requestSubmit() })
-    await vi.waitFor(() => expect(document.activeElement).toBe(button(row('sam@acme.test'), 'Copy link')))
-    expect(scrolled).toEqual([row('sam@acme.test')])
-
-    await act(async () => { button(row('sam@acme.test'), 'QR code').click() })
-    expect(scrolled.at(-1)).toBe(row('sam@acme.test').querySelector('img[alt="QR code for the invite link of Sam"]'))
+    inviteMember.mockResolvedValue({ data: { id: 'i9' }, error: null } as never)
+    await type('email', 'new@b.co')
+    await submit()
+    await vi.waitFor(() => expect(document.querySelector('[role=dialog]')).toBeNull())
   } finally {
-    scroll.mockRestore()
     await act(async () => root.unmount())
     container.remove()
     delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT

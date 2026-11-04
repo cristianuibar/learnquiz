@@ -4,12 +4,14 @@ import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { errorMessage, fieldErrors } from '@/components/inline-error'
 import { getSessionUser } from '@/server/session'
-import { createCompany, createRole, getOrgOverview, getPeople, listRoles } from './org'
+import { createCompany, createRole, getOrgOverview, listRoles } from './org'
+import { getPeople } from '@/server/people'
 
 const holder = vi.hoisted(() => ({ db: null as unknown, createOrganization: vi.fn() }))
 
 // Fake the request/auth boundaries; keep validation, authorization and SQL real.
 vi.mock('@tanstack/react-start', () => ({
+  createServerOnlyFn: (fn: unknown) => fn,
   createServerFn: () => ({
     validator: (schema: { parse: (data: unknown) => unknown }) => ({
       handler: (fn: (input: { data: unknown }) => unknown) => (input: { data: unknown }) => fn({ data: schema.parse(input.data) }),
@@ -155,8 +157,8 @@ it('reports assigned training stages, unresolved critical errors and company pro
   for (const id of ['scan', 'pick']) known.run('admin', id, 0.95, start + 4 * day)
   known.run('admin', 'extra', 0.8, start + 4 * day) // below benchmark, but mean and critical concepts meet it
   known.run('other-owner', 'foreign', 0.99, start + day)
-  sqlite.prepare('INSERT INTO invitation (id, organization_id, email, expires_at, inviter_id, job_role_id, invitee_name) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .run('waiting', 'org-a', 'waiting@x.test', Date.now() + day, 'owner', 'legacy-role', 'Waiting')
+  sqlite.prepare('INSERT INTO invitation (id, organization_id, email, expires_at, created_at, inviter_id, job_role_id, invitee_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .run('waiting', 'org-a', 'waiting@x.test', start + 20 * day, start + 5 * day, 'owner', 'legacy-role', 'Waiting')
   const attempt = sqlite.prepare('INSERT INTO attempts (id, learner_id, item_id, concept_id, at, answer_json, correct, score, confidence, response_ms, rating, p_known_before, p_known_after) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1000, 1, 0.5, 0.4)')
   attempt.run('critical-error', 'member', 'scan-item', 'scan', start + day, '"skip scan"', 0, 0, 'sure')
   attempt.run('ordinary-error', 'member', 'pick-item', 'pick', start + day, '"skip ticket"', 0, 0, 'sure')
@@ -170,13 +172,12 @@ it('reports assigned training stages, unresolved critical errors and company pro
   attempt.run('week-critical', 'member', 'scan-item-2', 'scan', now - day, '"x"', 0, 0, 'unsure')
   attempt.run('week-ordinary', 'member', 'pick-item-2', 'pick', now - day, '"x"', 0, 0, 'sure')
   attempt.run('old-critical', 'member', 'scan-item-3', 'scan', now - 8 * day, '"x"', 0, 0, 'sure')
-  const people = await getPeople({ data: { slug: 'alpha' } })
-  expect(people.members).toEqual([
-    expect.objectContaining({ name: 'owner', training: null, lastActiveAt: null }),
-    expect.objectContaining({ name: 'admin', training: { stage: 'proficient', progress: 1, daysToProficiency: 4, criticalConfidentErrors: 0, mastery: 90, benchmark: 85 }, lastActiveAt: null }),
-    expect.objectContaining({ name: 'member', training: { stage: 'onboarding', progress: expect.closeTo(0.4 / 3 / 0.85, 10), daysToProficiency: null, criticalConfidentErrors: 2, mastery: 13, benchmark: 85 }, lastActiveAt: now - day }),
+  const waiting = { kind: 'invite', invitationId: 'waiting', name: 'Waiting', email: 'waiting@x.test', jobRole: 'Original role', jobRoleId: 'legacy-role', status: 'invited', invitedAt: start + 5 * day, expiresAt: start + 20 * day }
+  expect((await getPeople({ data: { slug: 'alpha' } })).people).toEqual([
+    { kind: 'member', userId: 'admin', name: 'admin', email: 'admin@x.test', jobRole: 'Original role', status: 'proficient', day: 11, onboardingDays: 30, proficientInDays: 4, lastActiveAt: null, mastery: 90, benchmark: 85, openCriticalErrors: 0 },
+    { kind: 'member', userId: 'member', name: 'member', email: 'member@x.test', jobRole: 'Original role', status: 'active', day: 11, onboardingDays: 30, proficientInDays: null, lastActiveAt: now - day, mastery: 13, benchmark: 85, openCriticalErrors: 2 },
+    waiting,
   ])
-  expect(people.invites).toEqual([expect.objectContaining({ name: 'Waiting', expired: false })])
   expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { employees: 3, proficientEmployees: 1, daysToProficiency: 4, criticalErrorsThisWeek: 1, documentsToReview: null } })
 
   // Expired and accepted invitations are not employees waiting to join.
@@ -187,11 +188,16 @@ it('reports assigned training stages, unresolved critical errors and company pro
   attempt.run('corrected', 'member', 'scan-item', 'scan', start + 2 * day, '"scan"', 1, 1, 'sure')
   // Mean 0.86 clears the 0.85 benchmark, but the critical concept at 0.60 does not, so progress stays at 0.60 / 0.85.
   sqlite.prepare("UPDATE learner_concept SET p_known = CASE concept_id WHEN 'scan' THEN 0.6 ELSE 0.99 END WHERE learner_id = ?").run('admin')
-  expect((await getPeople({ data: { slug: 'alpha' } })).members).toEqual([
-    expect.objectContaining({ name: 'owner', training: null }),
-    expect.objectContaining({ name: 'admin', training: { stage: 'onboarding', progress: expect.closeTo(0.6 / 0.85, 10), daysToProficiency: null, criticalConfidentErrors: 0, mastery: 86, benchmark: 85 } }),
-    expect.objectContaining({ name: 'member', training: { stage: 'onboarding', progress: expect.closeTo(0.4 / 3 / 0.85, 10), daysToProficiency: null, criticalConfidentErrors: 1, mastery: 13, benchmark: 85 } }),
+  const people = (await getPeople({ data: { slug: 'alpha' } })).people
+  expect(people).toEqual([
+    expect.objectContaining({ kind: 'member', name: 'admin', status: 'active', day: 11, proficientInDays: null, mastery: 86, benchmark: 85, openCriticalErrors: 0 }),
+    expect.objectContaining({ kind: 'invite', invitationId: 'lapsed', name: 'Lapsed', status: 'expired', expiresAt: expect.any(Number) }),
+    expect.objectContaining({ kind: 'member', name: 'member', status: 'active', day: 11, proficientInDays: null, mastery: 13, benchmark: 85, openCriticalErrors: 1 }),
+    expect.objectContaining({ kind: 'invite', invitationId: 'waiting', status: 'invited' }),
   ])
+  expect(people.some((p) => p.name === 'owner' || p.name === 'Joined')).toBe(false)
+  sqlite.prepare('UPDATE job_roles SET onboarding_days = 5 WHERE id = ?').run('legacy-role')
+  expect((await getPeople({ data: { slug: 'alpha' } })).people.filter((p) => p.kind === 'member').map((p) => [p.name, p.day, p.onboardingDays])).toEqual([['admin', 5, 5], ['member', 5, 5]])
   expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { employees: 3, proficientEmployees: 0, daysToProficiency: null, criticalErrorsThisWeek: 1, documentsToReview: null } })
 })
 
@@ -213,7 +219,7 @@ it('ignores concepts of a retired document when deciding an employee is proficie
   const attempt = sqlite.prepare('INSERT INTO attempts (id, learner_id, item_id, concept_id, at, answer_json, correct, score, confidence, response_ms, rating, p_known_before, p_known_after) VALUES (?, ?, ?, ?, 1, ?, 0, 0, ?, 1000, 1, 0.5, 0.4)')
   attempt.run('dead-error', 'member', 'dead-item', 'dead-critical', '"skip forklift check"', 'sure')
   const people = await getPeople({ data: { slug: 'alpha' } })
-  expect(people.members.find((m) => m.name === 'member')!.training).toEqual({ stage: 'proficient', progress: 1, daysToProficiency: null, criticalConfidentErrors: 0, mastery: 93, benchmark: 85 })
+  expect(people.people).toEqual([expect.objectContaining({ kind: 'member', name: 'member', status: 'proficient', proficientInDays: null, openCriticalErrors: 0, mastery: 93, benchmark: 85 })])
   expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { employees: 1, proficientEmployees: 1 } })
 })
 
@@ -232,8 +238,8 @@ it("returns each member's mastery against their job role benchmark", async () =>
   for (const id of ['c1', 'c2', 'c3', 'c4', 'c5']) known.run('admin', id, 1)
   known.run('admin', 'dead', 0) // would pull the mean to 83 if retired concepts counted
   ;[1, 1, 0.5, 0.4, 0.2].forEach((p, i) => known.run('member', `c${i + 1}`, p)) // mean 0.62
-  const { members } = await getPeople({ data: { slug: 'alpha' } })
-  expect(members.map((m) => [m.name, m.training?.mastery, m.training?.benchmark])).toEqual([['owner', 0, 85], ['admin', 100, 85], ['member', 62, 85]])
+  const { people } = await getPeople({ data: { slug: 'alpha' } })
+  expect(people.map((p) => p.kind === 'member' ? [p.name, p.mastery, p.benchmark] : null)).toEqual([['admin', 100, 85], ['member', 62, 85], ['owner', 0, 85]])
 })
 
 it('rolls back the role when its draft topic cannot be stored', async () => {
