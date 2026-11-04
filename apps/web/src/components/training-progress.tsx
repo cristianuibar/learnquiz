@@ -12,7 +12,9 @@ const date = (at: number) => new Date(at).toLocaleDateString('en-GB', { day: 'nu
 
 // The employee's own screen and the partner's read-only view of a member render the same content.
 export function TrainingProgress({ profile, back }: { profile: Profile; back: ReactNode }) {
-  const { topic, role, benchmark, units, proficiency, confidentErrors, weekly, sessionCounts } = profile
+  const { topic, role, benchmark, units, proficiency, confidentErrors, weeks, sessionCounts } = profile
+  // Spread the weeks evenly across the chart; a lone week sits in the middle.
+  const weekX = (i: number) => (weeks.length > 1 ? 12 + (i * 264) / (weeks.length - 1) : 144)
   return (
     <main className="mx-auto w-full max-w-xl space-y-8 px-4 pt-6 pb-8">
       <header>
@@ -80,22 +82,24 @@ export function TrainingProgress({ profile, back }: { profile: Profile; back: Re
       <section aria-labelledby="week-heading" className="space-y-3">
         <h2 id="week-heading" className="text-xl font-semibold">This week</h2>
         <p className="text-sm">{plural(sessionCounts.week, 'completed session', 'completed sessions')} this week · {sessionCounts.total} total</p>
-        <figure className="rounded-lg border p-4">
-          <svg viewBox="0 0 288 112" role="img" aria-label="Daily average concept mastery over the last seven days" className="w-full text-primary">
-            <line x1="12" y1="100" x2="276" y2="100" className="stroke-border" />
-            <line x1="12" y1={100 - benchmark * 88} x2="276" y2={100 - benchmark * 88} className="stroke-muted-foreground" strokeDasharray="4 4" />
-            <polyline points={weekly.map((d, i) => `${12 + i * 44},${100 - d.mastery * 88}`).join(' ')} fill="none" stroke="currentColor" strokeWidth="2" />
-            {weekly.map((d, i) => <circle key={d.date} cx={12 + i * 44} cy={100 - d.mastery * 88} r="3" fill="currentColor" />)}
-          </svg>
-          <figcaption className="text-xs text-muted-foreground">{date(weekly[0].date)} – {date(weekly[6].date)} (UTC). Dashed line: {percent(benchmark)} benchmark.</figcaption>
-          <div className="sr-only">
-            <table>
-              <caption>Daily training activity</caption>
-              <thead><tr><th>Date (UTC)</th><th>Average mastery</th><th>Attempts</th><th>Completed sessions</th></tr></thead>
-              <tbody>{weekly.map((d) => <tr key={d.date}><th scope="row">{date(d.date)}</th><td>{percent(d.mastery)}</td><td>{d.attempts}</td><td>{d.sessions}</td></tr>)}</tbody>
-            </table>
-          </div>
-        </figure>
+        {weeks.length ? (
+          <figure className="rounded-lg border p-4">
+            <svg viewBox="0 0 288 112" role="img" aria-label="Average concept mastery for each of the last weeks" className="w-full text-primary">
+              <line x1="12" y1="100" x2="276" y2="100" className="stroke-border" />
+              <line x1="12" y1={100 - benchmark * 88} x2="276" y2={100 - benchmark * 88} className="stroke-muted-foreground" strokeDasharray="4 4" />
+              <polyline points={weeks.map((w, i) => `${weekX(i)},${100 - w.mastery * 88}`).join(' ')} fill="none" stroke="currentColor" strokeWidth="2" />
+              {weeks.map((w, i) => <circle key={w.start} cx={weekX(i)} cy={100 - w.mastery * 88} r="3" fill="currentColor" />)}
+            </svg>
+            <figcaption className="text-xs text-muted-foreground">Weeks of {date(weeks[0].start)} – {date(weeks[weeks.length - 1].start)} (UTC). Dashed line: {percent(benchmark)} benchmark.</figcaption>
+            <div className="sr-only">
+              <table>
+                <caption>Weekly training activity</caption>
+                <thead><tr><th>Week of (UTC)</th><th>Average mastery</th><th>Completed sessions</th></tr></thead>
+                <tbody>{weeks.map((w) => <tr key={w.start}><th scope="row">{date(w.start)}</th><td>{percent(w.mastery)}</td><td>{w.sessions}</td></tr>)}</tbody>
+              </table>
+            </div>
+          </figure>
+        ) : <p className="text-sm text-muted-foreground">No weekly mastery recorded yet.</p>}
       </section>
     </main>
   )
