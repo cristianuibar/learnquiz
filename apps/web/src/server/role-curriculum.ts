@@ -5,7 +5,8 @@ import { conceptEdges, concepts, jobRoles, sources, topics, units } from '@/db/s
 import { validateSkeleton, type ValidatedSkeleton } from '@/lib/curriculum/validate'
 import { chatJson, jobModel, LlmError } from '@/lib/llm/client'
 import { curriculumPrompt } from '@/lib/llm/prompts'
-import { CurriculumSkeleton } from '@/lib/llm/schemas'
+import { curriculumSkeletonSchema, type CurriculumSkeleton } from '@/lib/llm/schemas'
+import { curriculumSize } from '@/lib/curriculum/size'
 import { MAX_SOURCE_TEXT_CHARS } from '@/lib/limits'
 import { drainConceptQueue, STALE_CLAIM_MS } from '@/server/concept-gen'
 import { drainsOnRequest, runInBackground } from '@/server/env'
@@ -94,10 +95,11 @@ export async function claimRoleBuild({ orgId, ownerId, roleId }: { orgId: string
       // Read after the claim: a replacement committed before it is seen here, and one after it is refused while generating.
       const documents = await liveDocuments()
       if (unusable(documents)) throw missingDocuments()
+      const size = curriculumSize(documents)
       let skeleton: CurriculumSkeleton
       try {
         skeleton = await chatJson({
-          purpose: 'curriculum', schema: CurriculumSkeleton, schemaName: 'curriculum_skeleton',
+          purpose: 'curriculum', schema: curriculumSkeletonSchema({ minUnits: size.units[0], minConcepts: size.conceptsPerUnit[0] }), schemaName: 'curriculum_skeleton',
           ...curriculumPrompt({ topic: row.topic.title, goal: row.topic.goal, levelHint: 3, sourceDocuments: documents }),
           maxTokens: 16000, learnerId: ownerId, orgId, topicId,
         })

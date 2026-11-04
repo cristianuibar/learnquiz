@@ -3,31 +3,34 @@ import { z } from 'zod'
 // Strict json_schema mode: every property required, no optional. Use .nullable().
 
 // Job 7.1: curriculum skeleton. Prerequisites are concept names; code resolves them to ids.
-export const CurriculumSkeleton = z.object({
-  units: z
-    .array(
-      z.object({
-        name: z.string().max(80),
-        summary: z.string().max(300),
-        concepts: z
-          .array(
-            z.object({
-              name: z.string().max(80),
-              summary: z.string().max(400),
-              visual: z.boolean(),
-              prerequisites: z.array(z.string().max(80)).max(4),
-              source_quote: z.string().max(300).nullable(),
-              critical: z.boolean(),
-              misconceptions: z.array(z.string().max(200)).max(3),
-            }),
-          )
-          .min(4)
-          .max(8),
-      }),
-    )
-    .min(4)
-    .max(10),
-})
+export function curriculumSkeletonSchema({ minUnits, minConcepts }: { minUnits: number; minConcepts: number }) {
+  return z.object({
+    units: z
+      .array(
+        z.object({
+          name: z.string().max(80),
+          summary: z.string().max(300),
+          concepts: z
+            .array(
+              z.object({
+                name: z.string().max(80),
+                summary: z.string().max(400),
+                visual: z.boolean(),
+                prerequisites: z.array(z.string().max(80)).max(4),
+                source_quote: z.string().max(300).nullable(),
+                critical: z.boolean(),
+                misconceptions: z.array(z.string().max(200)).max(3),
+              }),
+            )
+            .min(Math.max(1, minConcepts))
+            .max(8),
+        }),
+      )
+      .min(Math.max(1, minUnits))
+      .max(10),
+  })
+}
+export const CurriculumSkeleton = curriculumSkeletonSchema({ minUnits: 4, minConcepts: 4 })
 export type CurriculumSkeleton = z.infer<typeof CurriculumSkeleton>
 
 // Job 7.2: one item. The shape alone goes to the model; ItemPayload adds the cross-field rules.
