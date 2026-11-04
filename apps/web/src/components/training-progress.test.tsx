@@ -37,6 +37,7 @@ function profile(over: Partial<Profile> = {}): Profile {
     mastery: 0.66, units: [], confidentErrors: [],
     proficiency: { achievedAt: null, days: null, estimatedDays: 2, projectedAt: start + 8 * day },
     weeks: [{ start: start - 7 * day, mastery: 0.4, sessions: 3, partial: false }, { start, mastery: 0.66, sessions: 4, partial: true }],
+    reachedWeeks: null,
     sessionCounts: { week: 7, total: 7 },
     ...over,
   }
@@ -229,12 +230,16 @@ describe('Training progress', () => {
     expect(panel.textContent).not.toContain('Not started')
   })
 
-  it('keeps a partner the weekly trend when proficiency was reached before the shown weeks', async () => {
-    vi.mocked(getProfile).mockResolvedValue(profile({ proficiency: { achievedAt: start - 60 * day, days: 21, estimatedDays: null, projectedAt: null } }))
+  it.each([
+    ['ends at the week reached', [{ start: start - 63 * day, mastery: 0.9, sessions: 5, partial: false }], 'Since Aug 31', 'Since Oct 26'],
+    ['keeps the recent weeks with no practice before the date reached', [], 'Since Oct 26', 'Since Aug 31'],
+  ])('a partner’s proficient trend %s', async (_name, reachedWeeks, shown, hidden) => {
+    vi.mocked(getProfile).mockResolvedValue(profile({ proficiency: { achievedAt: start - 60 * day, days: 21, estimatedDays: null, projectedAt: null }, reachedWeeks }))
     await mount('/org/acme/people/learner')
     expect(text()).toContain('Reached Sep 3 · in 21 days')
     expect(container.querySelector('[role="img"]')).not.toBeNull()
-    expect(text()).not.toContain('No weekly mastery recorded yet.')
+    expect(text()).toContain(shown)
+    expect(text()).not.toContain(hidden)
   })
 
   it('toggles a unit panel from its button and keeps focus on it', async () => {

@@ -33,7 +33,7 @@ vi.mock('@/server/session-fn', () => ({
 beforeEach(() => {
   vi.mocked(getProfile).mockResolvedValue({
     name: 'Learner', topic: { id: 'training', title: 'Workplace safety' }, role: null, benchmark: 0.85, started: true, onboarding: null, mastery: 0.7, units: [],
-    proficiency: { achievedAt: null, days: null, estimatedDays: 2, projectedAt: null }, confidentErrors: [], weeks: [], sessionCounts: { week: 0, total: 0 },
+    proficiency: { achievedAt: null, days: null, estimatedDays: 2, projectedAt: null }, confidentErrors: [], weeks: [], reachedWeeks: null, sessionCounts: { week: 0, total: 0 },
   })
   vi.mocked(getPushSettings).mockResolvedValue({ publicKey: '', isStaff: false, endpoints: [], prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC', days: [1, 2, 3, 4, 5] }, company: null, canPrompt: false, schedule: { window: { startMinute: 540, endMinute: 1020, days: [1, 2, 3, 4, 5], timezone: 'UTC', source: 'default' }, dailyCap: 3, steadyCap: 3, phase: 'steady', preview: null } } as Awaited<ReturnType<typeof getPushSettings>>)
   vi.mocked(getLatestTopicIdFn).mockResolvedValue(null)
