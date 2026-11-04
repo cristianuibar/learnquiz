@@ -58,7 +58,7 @@ async function trainingOf(orgId: string) {
       .where(eq(memberRoleAssignments.orgId, orgId)),
     db.selectDistinct({ userId: attempts.learnerId, itemId: attempts.itemId })
       .from(attempts)
-      .innerJoin(concepts, and(eq(concepts.id, attempts.conceptId), eq(concepts.critical, true)))
+      .innerJoin(concepts, and(eq(concepts.id, attempts.conceptId), eq(concepts.critical, true), liveConcept()))
       .innerJoin(topics, and(eq(topics.id, concepts.topicId), eq(topics.status, 'ready')))
       .innerJoin(memberRoleAssignments, and(eq(memberRoleAssignments.userId, attempts.learnerId), eq(memberRoleAssignments.jobRoleId, topics.jobRoleId)))
       .where(and(eq(memberRoleAssignments.orgId, orgId), eq(attempts.correct, false), eq(attempts.confidence, 'sure'), lte(attempts.at, now), notExists(
