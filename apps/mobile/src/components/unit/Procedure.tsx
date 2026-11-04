@@ -53,7 +53,7 @@ export function Procedure({ graph, source }: Props) {
                   const stroke = node.critical ? colors.ink : colors.borderStrong
                   const fill = node.critical ? colors.surfaceSunken : colors.surfaceCard
                   const shieldInset = node.kind === 'decision' ? node.width * 0.15 - space[2] : 0
-                  const labelX = node.x + (node.critical ? (space[4] + space[2]) / 2 : 0)
+                  const labelX = node.x + (node.critical ? (space[4] + space[1]) / 2 : 0)
                   return (
                     <G key={node.id}>
                       {node.kind === 'decision' ? (

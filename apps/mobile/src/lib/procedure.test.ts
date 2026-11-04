@@ -1,5 +1,5 @@
 import { describeProcedure, layoutProcedure, type ProcedureGraph } from '@learnquiz/api/procedure'
-import { procedureCaption, procedurePresentation, procedureViewModel, visibleProcedure } from './procedure'
+import { CHAR_EM, MAX_PROCEDURE_SVG_HEIGHT, procedureCaption, procedurePresentation, procedureViewModel, visibleProcedure } from './procedure'
 
 const graph: ProcedureGraph = {
   nodes: [
@@ -83,21 +83,90 @@ test('decision branches leave the side vertices with labels beside the diamond',
   }
 })
 
-test('a last-layer back edge has padding below its path', () => {
+test('a loop uses ordered native text with an explicit return instruction', () => {
   const loop = { ...receiving, edges: [...receiving.edges, { from: 'away', to: 'dock', label: null }] }
-  const model = procedureViewModel(layoutProcedure(loop, 326), metrics)
-  const back = model.edges.find((e) => e.back)!
-  expect(Math.max(...back.points.map((p) => p.y))).toBeLessThan(model.height - 2)
+  const presentation = procedurePresentation(loop, 326, 1, 740, metrics)!
+  expect(presentation.kind).toBe('text')
+  if (presentation.kind === 'text') {
+    expect(presentation.steps).toHaveLength(receiving.nodes.length)
+    expect(presentation.steps.at(-1)).toContain('Then go back to: Dock door.')
+    expect(presentation.steps[0]).toContain('1. Dock door.')
+  }
 })
 
-test('a critical decision keeps usable whole-word lines', () => {
+test('a decision loop names its condition and target in the existing step order', () => {
+  const loop: ProcedureGraph = {
+    nodes: [
+      { id: 'scan', kind: 'step', label: 'Scan', critical: false },
+      { id: 'seal', kind: 'decision', label: 'Seal intact?', critical: false },
+      { id: 'pack', kind: 'step', label: 'Pack', critical: false },
+    ],
+    edges: [{ from: 'scan', to: 'seal', label: null }, { from: 'seal', to: 'pack', label: 'yes' }, { from: 'seal', to: 'scan', label: 'no' }],
+  }
+  const presentation = procedurePresentation(loop, 326, 1, 740, metrics)!
+  expect(presentation.kind).toBe('text')
+  if (presentation.kind === 'text') {
+    expect(presentation.steps[1]).toContain('If no, go back to: Scan.')
+    expect(presentation.steps[2]).toBe('3. Pack.')
+  }
+})
+
+test('a critical Receiving diamond remains a readable SVG', () => {
   const critical = { ...receiving, nodes: receiving.nodes.map((n) => n.id === 'damage' ? { ...n, critical: true } : n) }
-  const model = procedureViewModel(layoutProcedure(critical, 326), metrics)
-  expect(model.nodes.find((n) => n.id === 'damage')!.lines).toEqual(['Damage?'])
+  const presentation = procedurePresentation(critical, 326, 1, 740, metrics)!
+  expect(presentation.kind).toBe('svg')
+  if (presentation.kind === 'svg') {
+    const diamond = presentation.model.nodes.find((n) => n.id === 'damage')!
+    expect(diamond.fits).toBe(true)
+    expect(diamond.lines).toEqual(['Damage?'])
+    // Twelve caption characters must fit alongside the shield, not just the
+    // seven in Damage?: both former half-width formulas lose that space.
+    expect(diamond.textWidth).toBeGreaterThanOrEqual(12 * 13 * 0.55)
+  }
+})
+
+test('a plain Seal intact? diamond stays on one line', () => {
+  const seal = { ...receiving, nodes: receiving.nodes.map((n) => n.id === 'damage' ? { ...n, label: 'Seal intact?' } : n) }
+  const presentation = procedurePresentation(seal, 326, 1, 740, metrics)!
+  expect(presentation.kind).toBe('svg')
+  if (presentation.kind === 'svg') {
+    const diamond = presentation.model.nodes.find((n) => n.id === 'damage')!
+    expect(diamond.fits).toBe(true)
+    expect(diamond.lines).toEqual(['Seal intact?'])
+  }
+})
+
+test.each([[286, 1], [326, 1], [377, 1], [326, 1.3]])('Receiving stays SVG at %s dp and %sx with whole words unless a word exceeds its line', (width, scale) => {
+  const presentation = procedurePresentation(receiving, width!, scale!, 740, metrics)!
+  expect(presentation.kind).toBe('svg')
+  if (presentation.kind === 'svg') {
+    expect(presentation.fontScale).toBe(scale)
+    for (const node of presentation.model.nodes) {
+      expect(node.fits).toBe(true)
+      if (scale === 1) expect(node.lines.join(' ')).toBe(node.label)
+      else {
+        expect(node.lines.join('\n').replaceAll('-\n', '').replaceAll('\n', ' ')).toBe(node.label)
+        for (const word of node.label.split(' ')) {
+          if (word.length * presentation.fontSize * 0.55 <= node.textWidth) {
+            expect(node.lines.join(' ').split(' ')).toContain(word)
+          }
+        }
+      }
+    }
+  }
+})
+
+test('Inter estimation and the absolute bitmap budget stay pinned', () => {
+  expect(CHAR_EM).toBe(0.55)
+  expect(MAX_PROCEDURE_SVG_HEIGHT).toBe(1200)
+})
+
+test.each([0, -1])('a nonpositive width %s produces no presentation', (width) => {
+  expect(procedurePresentation(receiving, width, 1, 740, metrics)).toBeNull()
 })
 
 test('2x font scaling stays within the viewport bitmap budget or uses native text', () => {
-  const presentation = procedurePresentation(receiving, 326, 2, 740, metrics)
+  const presentation = procedurePresentation(receiving, 326, 2, 740, metrics)!
   if (presentation.kind === 'svg') {
     expect(presentation.model.height).toBeLessThanOrEqual(740 * 1.5)
     expect(presentation.model.nodes.every((node) => node.fits)).toBe(true)
@@ -111,7 +180,7 @@ test('oversize SVG retries with capped font scaling before drawing', () => {
     nodes: Array.from({ length: 8 }, (_, i) => ({ id: String(i), label: 'Record the receipt', kind: 'step', critical: false })),
     edges: Array.from({ length: 7 }, (_, i) => ({ from: String(i), to: String(i + 1), label: null })),
   }
-  const presentation = procedurePresentation(linear, 326, 2, 500, metrics)
+  const presentation = procedurePresentation(linear, 326, 2, 500, metrics)!
   expect(presentation.kind).toBe('svg')
   if (presentation.kind === 'svg') {
     expect(presentation.fontScale).toBe(1.5)
@@ -124,7 +193,7 @@ test('a tall graph uses complete ordered native descriptions instead of any SVG'
     nodes: Array.from({ length: 12 }, (_, i) => ({ id: String(i), label: 'Photograph the delivery receipt and confirm the damage before moving the pallet', kind: 'step', critical: true })),
     edges: Array.from({ length: 11 }, (_, i) => ({ from: String(i), to: String(i + 1), label: null })),
   }
-  const presentation = procedurePresentation(tall, 326, 2, 740, metrics)
+  const presentation = procedurePresentation(tall, 326, 2, 740, metrics)!
   expect(presentation).toEqual({ kind: 'text', steps: describeProcedure(tall).split('\n') })
 })
 
@@ -135,4 +204,17 @@ test('only a single word longer than the entire line is hyphenated', () => {
   expect(lines.some((line) => line.endsWith('-'))).toBe(true)
   expect(lines.join('\n').replaceAll('-\n', '').replaceAll('\n', ' ')).toBe(long.nodes[0]!.label)
   expect(lines.filter((line) => !line.includes('Check') && !line.includes('first')).every((line) => line.length >= 3)).toBe(true)
+})
+
+test('a tall window still applies the 1200 dp bitmap ceiling', () => {
+  const linear: ProcedureGraph = {
+    nodes: Array.from({ length: 12 }, (_, i) => ({ id: String(i), label: 'Record the receipt', kind: 'step', critical: false })),
+    edges: Array.from({ length: 11 }, (_, i) => ({ from: String(i), to: String(i + 1), label: null })),
+  }
+  const presentation = procedurePresentation(linear, 326, 2, 2000, metrics)!
+  expect(presentation.kind).toBe('svg')
+  if (presentation.kind === 'svg') {
+    expect(presentation.fontScale).toBe(1.5)
+    expect(presentation.model.height).toBeLessThanOrEqual(1200)
+  }
 })

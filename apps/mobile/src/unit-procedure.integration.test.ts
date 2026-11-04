@@ -4,6 +4,7 @@ import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-librar
 import { describeProcedure, type ProcedureGraph } from '@learnquiz/api/procedure'
 import { ThemeProvider } from './theme/ThemeProvider'
 import { isHiddenFromAccessibility } from '@testing-library/react-native'
+import * as procedureModule from './lib/procedure'
 import { useUnitProcedure } from './lib/unit-procedure'
 import UnitScreen from './app/unit/[unitId]'
 
@@ -77,6 +78,8 @@ test('Unit shows the procedure as one accessible image with its source caption',
   const image = screen.getByRole('image', { name: describeProcedure(graph) })
   const descendants = image.queryAll(() => true)
   expect(descendants.length).toBeGreaterThan(0)
+  // Check the Android contract separately: the iOS hiding prop must not mask it.
+  expect(descendants.some((node) => node.props.importantForAccessibility === 'no-hide-descendants')).toBe(true)
   expect(descendants.every((node) => isHiddenFromAccessibility(node))).toBe(true)
   expect(screen.getByRole('image', { name: describeProcedure(graph) })).toBeOnTheScreen()
   expect(screen.getByText('Procedure source · v4')).toBeOnTheScreen()
@@ -129,8 +132,14 @@ test.each([undefined, { title: 'Zero version', version: 0 }])('ready graphs hand
 test('no SVG is allocated until the inner card has a positive measured width', async () => {
   await openUnit()
   const diagram = screen.getByTestId('procedure-width')
-  await fireEvent(diagram, 'layout', { nativeEvent: { layout: { width: 0, height: 0, x: 0, y: 0 } } })
-  expect(screen.queryByTestId('procedure-svg', { includeHiddenElements: true })).toBeNull()
+  const present = jest.spyOn(procedureModule, 'procedurePresentation')
+  try {
+    await fireEvent(diagram, 'layout', { nativeEvent: { layout: { width: 0, height: 0, x: 0, y: 0 } } })
+    expect(diagram.children).toHaveLength(0)
+    expect(screen.queryByRole('image')).toBeNull()
+    expect(screen.queryByText(describeProcedure(graph))).toBeNull()
+    expect(present).not.toHaveBeenCalled()
+  } finally { present.mockRestore() }
   await fireEvent(diagram, 'layout', { nativeEvent: { layout: { width: 326, height: 0, x: 0, y: 0 } } })
   expect(screen.getByTestId('procedure-svg', { includeHiddenElements: true }).props.vbWidth).toBe(326)
 })
@@ -173,4 +182,17 @@ test('the previous learner stays hidden in every render while B waits, including
   const diagram = screen.getByTestId('procedure-width')
   await fireEvent(diagram, 'layout', { nativeEvent: { layout: { width: 326, height: 0, x: 0, y: 0 } } })
   expect(screen.getByText('Learner B source · v2')).toBeOnTheScreen()
+})
+
+test('a loop is native text with its return instruction and never allocates an SVG', async () => {
+  const loop: ProcedureGraph = {
+    nodes: [{ id: 'dock', kind: 'step', label: 'Dock check', critical: false }, { id: 'scan', kind: 'step', label: 'Scan', critical: false }],
+    edges: [{ from: 'dock', to: 'scan', label: null }, { from: 'scan', to: 'dock', label: null }],
+  }
+  procedureReply = async () => response({ ...ready, graph: loop })
+  await openUnit()
+  expect(screen.queryByTestId('procedure-svg', { includeHiddenElements: true })).toBeNull()
+  expect(screen.queryByRole('image')).toBeNull()
+  expect(screen.getByText('2. Scan. Then go back to: Dock check.')).toBeOnTheScreen()
+  expect(screen.getByRole('button', { name: 'Practice Receiving · 5 min' })).toBeOnTheScreen()
 })

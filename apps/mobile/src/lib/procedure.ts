@@ -13,8 +13,8 @@ export function visibleProcedure(result: ProcedureResult) {
 
 type TextMetrics = { fontSize: number; lineHeight: number; padding: number; shieldSize: number }
 
-// Inter caption averages about .58 em; .6 leaves a small safety margin.
-const CHAR_EM = 0.6
+// Inter 500 caption averages .48–.54 em; .55 leaves a small safety margin.
+export const CHAR_EM = 0.55
 export const MAX_PROCEDURE_FONT_SCALE = 1.5
 export const MAX_PROCEDURE_WINDOW_HEIGHT = 1.5
 export const MAX_PROCEDURE_SVG_HEIGHT = 1200
@@ -53,9 +53,9 @@ export function procedureViewModel(layout: ProcedureLayout, metrics: TextMetrics
   const { padding, shieldSize, fontSize, lineHeight } = metrics
   const sizes = layout.nodes.map((node) => {
     const peers = layout.nodes.filter((n) => n.layer === node.layer && n.id !== node.id)
-    const available = Math.min(node.x * 2, (layout.width - node.x) * 2, ...peers.map((n) => Math.abs(n.x - node.x))) - padding
+    const available = Math.min(node.x * 2, (layout.width - node.x) * 2, ...peers.map((n) => Math.abs(n.x - node.x))) - padding / 2
     const width = Math.max(node.width, Math.min(NODE_WIDTH, available))
-    const shield = node.critical ? shieldSize + padding : 0
+    const shield = node.critical ? shieldSize + padding / 2 : 0
     const textWidth = node.kind === 'decision' ? width * 0.7 - shield : width - padding * 2 - shield
     const lines = wrapLabel(node.label, textWidth, fontSize)
     const textHeight = lines.length * lineHeight
@@ -76,36 +76,35 @@ export function procedureViewModel(layout: ProcedureLayout, metrics: TextMetrics
   }
   const nodes = sizes.map((node) => ({ ...node, y: tops.get(node.layer)! + node.height / 2 }))
   const byId = new Map(nodes.map((node) => [node.id, node]))
-  const edges = layout.edges.map((edge) => {
+  const edges = layout.edges.filter((edge) => !edge.back).map((edge) => {
     const from = byId.get(edge.from)!
     const to = byId.get(edge.to)!
     const side = from.kind === 'decision' && edge.label !== null ? (edge.label === 'yes' ? -1 : 1) : 0
     const start = side ? { x: from.x + side * from.width / 2, y: from.y } : { x: from.x, y: from.y + from.height / 2 }
     const end = { x: to.x, y: to.y - to.height / 2 }
     const middle = (start.y + end.y) / 2
-    const points = edge.back
-      ? [start, { x: start.x, y: start.y + padding }, { x: padding / 2, y: start.y + padding }, { x: padding / 2, y: end.y - padding }, { x: end.x, y: end.y - padding }, end]
-      : side ? [start, { x: end.x, y: start.y }, end]
-        : [start, { x: start.x, y: middle }, { x: end.x, y: middle }, end]
+    const points = side ? [start, { x: end.x, y: start.y }, end]
+      : [start, { x: start.x, y: middle }, { x: end.x, y: middle }, end]
     return { ...edge, points, path: points.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${p.y}`).join(' '),
       labelX: side ? start.x + side * padding : (start.x + end.x) / 2,
-      labelY: side ? start.y : edge.back ? start.y + padding : middle,
+      labelY: side ? start.y : middle,
       labelAnchor: side === -1 ? 'end' as const : side === 1 ? 'start' as const : 'middle' as const }
   })
-  // Back-edge bends need space beyond the last node, plus a stroke margin.
-  const pathBottom = Math.max(bottom, ...edges.flatMap((e) => e.points.map((p) => p.y)))
-  return { width: layout.width, height: pathBottom + padding, nodes, edges }
+  return { width: layout.width, height: bottom + padding, nodes, edges }
 }
 
 // Never mount an SVG whose bitmap could exceed this viewport budget. Retry
 // with Profile's 1.5x text cap, then use native scalable text if it still fails.
 export function procedurePresentation(graph: ProcedureGraph, width: number, fontScale: number, windowHeight: number, metrics: TextMetrics) {
+  if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(windowHeight) || windowHeight <= 0) return null
   const steps = describeProcedure(graph).split('\n')
   const text = { kind: 'text' as const, steps }
-  if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(windowHeight) || windowHeight <= 0) return text
   const maxHeight = Math.min(windowHeight * MAX_PROCEDURE_WINDOW_HEIGHT, MAX_PROCEDURE_SVG_HEIGHT)
   const scale = Number.isFinite(fontScale) ? Math.max(1, fontScale) : 1
   const layout = layoutProcedure(graph, width)
+  // Loops cannot be routed safely around phone-width nodes. Describe them
+  // explicitly in native text instead of risking a false visual connection.
+  if (layout.edges.some((edge) => edge.back)) return text
   for (const nextScale of [...new Set([scale, Math.min(scale, MAX_PROCEDURE_FONT_SCALE)])]) {
     const fontSize = metrics.fontSize * nextScale
     const lineHeight = metrics.lineHeight * nextScale
