@@ -219,7 +219,8 @@ it('shows the employee company logo and returns to the default brand after sign-
       await router.invalidate()
     })
     expect(container.querySelector('header img')).toBeNull()
-    expect(container.querySelector('header a')?.textContent).toBe('Learn Quiz')
+    expect(container.querySelector('header a')?.textContent?.trim()).toBe('Learn Quiz')
+    expect(container.querySelector('header a svg[aria-hidden="true"]')).not.toBeNull()
   } finally {
     await cleanup()
   }

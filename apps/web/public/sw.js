@@ -1,6 +1,6 @@
 // Learn Quiz service worker: app shell and offline page only. Answering needs the network,
 // so /api/* and server-function requests are never intercepted or cached.
-const CACHE = 'lq-shell-v2'
+const CACHE = 'lq-shell-v3'
 const SHELL = ['/offline.html', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png']
 
 self.addEventListener('install', (event) => {
@@ -56,7 +56,7 @@ self.addEventListener('push', (event) => {
   const titled = typeof payload?.title === 'string' && payload.title.length > 0
   const options = {
     icon: '/icons/icon-192.png',
-    badge: '/icons/icon-192.png',
+    badge: '/brand/learnquiz-notification.svg',
     data: { url: payload?.url || '/me' },
   }
   if (payload?.body || !titled) options.body = payload?.body || 'Ready for a little learning?'
