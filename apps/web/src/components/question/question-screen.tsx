@@ -1,6 +1,7 @@
 import type { ComponentType, Ref } from 'react'
 import { ChoiceGroup } from '@/components/choice-group'
 import { ClozeQuestion } from '@/components/question/cloze-question'
+import { DiagramImage } from '@/components/question/diagram-image'
 import { ErrorRow } from '@/components/question/error-row'
 import { MultiQuestion } from '@/components/question/multi-question'
 import { OrderQuestion } from '@/components/question/order-question'
@@ -23,15 +24,18 @@ export type QuestionProps = {
 
 function McqQuestion({ item, choice, onChoice }: QuestionProps) {
   return (
-    <ChoiceGroup
-      name="answer"
-      legend={item.stem}
-      legendClassName="sr-only"
-      options={item.options}
-      value={choice}
-      onChange={onChoice}
-      className="flex flex-col gap-3"
-    />
+    <div className="flex flex-col gap-3">
+      {item.image && <DiagramImage key={item.image.src} image={item.image} />}
+      <ChoiceGroup
+        name="answer"
+        legend={item.stem}
+        legendClassName="sr-only"
+        options={item.options}
+        value={choice}
+        onChange={onChoice}
+        className="flex flex-col gap-3"
+      />
+    </div>
   )
 }
 
