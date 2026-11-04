@@ -84,3 +84,17 @@ it('sends a learner outside any company back to Training progress without the fo
   expect(container.querySelector('form')).toBeNull()
   expect(flagResult).not.toHaveBeenCalled()
 })
+
+it('ignores a late send success after the learner went Back and started a new note', async () => {
+  let finishA!: (v: { ok: true }) => void
+  vi.mocked(flagResult).mockReturnValueOnce(new Promise((r) => { finishA = r }))
+  const { container, router } = await mount()
+  await type(container.querySelector('textarea')!, 'Note A')
+  await act(async () => { container.querySelector('form')!.requestSubmit() })
+  await act(async () => { await router.navigate({ to: '/me/profile' }) })
+  await act(async () => { await router.navigate({ to: '/me/flag', search: { conceptId: 'c-1' } }) })
+  await type(container.querySelector('textarea')!, 'Note B')
+  await act(async () => { finishA({ ok: true }) })
+  expect(router.state.location.pathname).toBe('/me/flag')
+  expect(container.querySelector('textarea')!.value).toBe('Note B')
+})

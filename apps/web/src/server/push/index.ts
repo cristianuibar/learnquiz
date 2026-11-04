@@ -71,13 +71,8 @@ export const getPushSettings = createServerFn({ method: 'GET' }).handler(async (
   return {
     publicKey: env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_SUBJECT ? env.VAPID_PUBLIC_KEY : null,
     isStaff: user.role === 'admin', endpoints: subscriptions.map((s) => s.endpoint), canPrompt: finished.length === 1,
-    prefs: {
-      paused: prefs?.paused ?? false,
-      startMinute: prefs?.startMinute ?? base?.startMinute ?? 540,
-      endMinute: prefs?.endMinute ?? base?.endMinute ?? 1020,
-      timezone: prefs?.timezone ?? base?.timezone ?? 'UTC',
-      days: window.days,
-    },
+    // The effective window, so a member's saved hours come back clamped to company hours that have since narrowed.
+    prefs: { paused: prefs?.paused ?? false, startMinute: window.startMinute, endMinute: window.endMinute, timezone: window.timezone, days: window.days },
     company: base && { name: context.company!.name, startMinute: base.startMinute, endMinute: base.endMinute, days: base.days, timezone: base.timezone },
     schedule,
   }

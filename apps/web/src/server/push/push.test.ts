@@ -409,6 +409,22 @@ it('lets company members pick hours and days inside the company window and rejec
   expect(rows('SELECT days_json FROM push_prefs')).toEqual([{ days_json: null }])
 })
 
+it('lets a member resave their hours after the company narrows its window', async () => {
+  vi.mocked(getSessionUser).mockResolvedValue(learner as never)
+  const now = Date.now()
+  raw.prepare('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, ?)').run('o1', 'Acme', 'acme', now)
+  raw.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, ?)').run('m-learner', 'o1', 'learner', 'member', now)
+  raw.prepare('INSERT INTO org_settings (org_id, company_name, timezone, working_hours_json) VALUES (?, ?, ?, ?)')
+    .run('o1', 'Acme', 'UTC', JSON.stringify({ days: [1, 2, 3, 4, 5], start: '09:00', end: '17:00' }))
+  await savePushPreferences({ data: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' } })
+  raw.prepare('UPDATE org_settings SET working_hours_json = ? WHERE org_id = ?').run(JSON.stringify({ days: [1, 2, 3, 4, 5], start: '10:00', end: '16:00' }), 'o1')
+
+  const { prefs } = await getPushSettings()
+  expect(prefs).toEqual({ paused: false, startMinute: 600, endMinute: 960, timezone: 'UTC', days: [1, 2, 3, 4, 5] })
+  await savePushPreferences({ data: { ...prefs, paused: true } })
+  expect(rows('SELECT paused, start_minute, end_minute FROM push_prefs')).toEqual([{ paused: 1, start_minute: 600, end_minute: 960 }])
+})
+
 it('keeps personal accounts free of any company window', async () => {
   vi.mocked(getSessionUser).mockResolvedValue(learner as never)
   const initial = await getPushSettings()

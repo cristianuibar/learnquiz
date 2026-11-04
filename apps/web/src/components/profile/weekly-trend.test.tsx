@@ -9,7 +9,7 @@ import { WeeklyTrend } from './weekly-trend'
 const day = 86_400_000
 const date = (d: string) => Date.parse(`${d}T00:00:00Z`)
 
-async function renderTrend(weeks: WeekPoint[], projectedAt: number) {
+async function renderTrend(weeks: WeekPoint[], projectedAt: number | null) {
   const profile = { benchmark: 0.85, weeks, proficiency: { achievedAt: null, days: null, estimatedDays: 1, projectedAt } } as unknown as Profile
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   const container = document.createElement('div')
@@ -52,5 +52,19 @@ it('keeps the partial count under its date and thins crowded weeks so dates and 
   const partial = counts.findIndex((c) => c.text === '15')
   expect(counts[partial].x).toBe(dates.at(-2)!.x)
   expect(counts[partial + 1]).toMatchObject({ text: 'so far', anchor: 'start' })
+  await unmount()
+})
+
+it('keeps the partial count under its date at the right edge without a projection', async () => {
+  const weeks = Array.from({ length: 6 }, (_, i) => ({ start: date('2026-09-28') + i * 7 * day, mastery: 0.3 + i * 0.08, sessions: 10 + i, partial: i === 5 }))
+  const { container, dates, counts, unmount } = await renderTrend(weeks, null)
+  const width = Number(container.querySelector('svg[role="img"]')!.getAttribute('viewBox')!.split(' ')[2])
+  expect(dates.at(-1)!.text).toBe('Nov 2')
+  const partial = counts.findIndex((c) => c.text === '15')
+  expect(counts[partial].x).toBe(dates.at(-1)!.x)
+  expect(counts[partial + 1]).toMatchObject({ text: 'so far', anchor: 'start' })
+  expect(span(counts[partial + 1]).right).toBeLessThanOrEqual(width)
+  expect(overlaps(dates)).toBe(false)
+  expect(overlaps(counts)).toBe(false)
   await unmount()
 })

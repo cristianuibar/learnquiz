@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createFileRoute, Link, redirect, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { ChevronLeft } from 'lucide-react'
@@ -29,6 +29,12 @@ function FlagResult() {
   const [note, setNote] = useState('')
   const [error, setError] = useState(false)
   const [busy, setBusy] = useState(false)
+  // A send that settles after the learner left this page must not act on a later visit.
+  const mounted = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -38,10 +44,12 @@ function FlagResult() {
     try {
       await flag({ data: { conceptId, note: note.trim() } })
     } catch {
+      if (!mounted.current) return
       setError(true)
       setBusy(false)
       return
     }
+    if (!mounted.current) return
     await router.navigate({ to: '/me/profile', search: { status: 'flag-sent' } })
   }
 
