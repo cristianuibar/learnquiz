@@ -16,6 +16,8 @@ export const listUsers = createServerFn({ method: 'GET' })
     search: z.string().trim().max(200).default(''),
     role: z.enum(['all', 'admin', 'user']).default('all'),
     status: z.enum(['all', 'active', 'banned']).default('all'),
+    sort: z.enum(['joined', 'name']).default('joined'),
+    dir: z.enum(['ascending', 'descending']).default('descending'),
     offset: z.number().int().min(0).default(0),
   }))
   .handler(async ({ data }) => {
@@ -27,9 +29,11 @@ export const listUsers = createServerFn({ method: 'GET' })
       data.role === 'admin' ? eq(user.role, 'admin') : data.role === 'user' ? or(isNull(user.role), ne(user.role, 'admin')) : undefined,
       data.status === 'banned' ? eq(user.banned, true) : data.status === 'active' ? or(isNull(user.banned), eq(user.banned, false)) : undefined,
     )
+    const by = data.dir === 'ascending' ? asc : desc
+    const order = data.sort === 'name' ? [by(sql`lower(${user.name})`), by(user.createdAt)] : [by(user.createdAt)]
     const [rows, [total]] = await Promise.all([
       db.select({ id: user.id, name: user.name, email: user.email, role: user.role, banned: user.banned, banReason: user.banReason, createdAt: user.createdAt })
-        .from(user).where(where).orderBy(desc(user.createdAt), asc(user.id)).limit(PAGE_SIZE).offset(data.offset),
+        .from(user).where(where).orderBy(...order, asc(user.id)).limit(PAGE_SIZE).offset(data.offset),
       db.select({ n: count() }).from(user).where(where),
     ])
     const companies = new Map<string, { name: string; role: string }>()
