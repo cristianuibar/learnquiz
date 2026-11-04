@@ -23,7 +23,7 @@ export function SettingsSwitch({ checked, disabled, onChange }: { checked: boole
       <Text variant="bodyLg" style={{ flex: 1 }} importantForAccessibility="no">Send me questions</Text>
       <View importantForAccessibility="no-hide-descendants" style={{ width: 52, minHeight: 32, padding: space[1], borderWidth: 2,
         borderRadius: 32, borderColor: checked ? colors.brand : colors.borderStrong, backgroundColor: checked ? colors.brand : colors.surfaceSunken }}>
-        <Animated.View style={{ width: 20, minHeight: 20, borderRadius: 20, backgroundColor: checked ? colors.onBrand : colors.inkMuted, transform: [{ translateX: offset }] }} />
+        <Animated.View style={{ width: 20, minHeight: 20, borderRadius: 20, backgroundColor: checked ? colors.onBrand : colors.borderStrong, transform: [{ translateX: offset }] }} />
       </View>
     </Pressable>
   )

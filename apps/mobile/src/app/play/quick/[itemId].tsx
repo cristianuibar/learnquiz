@@ -185,7 +185,14 @@ function QuickSession({ itemId, pushId }: { itemId: string; pushId?: string }) {
             </QuickDock>
           ) : undefined}
         >
-          {state.status === 'loading' ? <SessionSkeleton /> : null}
+          {state.status === 'loading' ? (
+            <>
+              <SessionSkeleton />
+              <View accessible role="status" accessibilityLiveRegion="polite">
+                <Text variant="label" muted>Loading your question</Text>
+              </View>
+            </>
+          ) : null}
           {item && question ? (
             <QuickQuestion
               item={item}

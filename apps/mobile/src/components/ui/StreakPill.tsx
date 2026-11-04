@@ -10,9 +10,10 @@ export type StreakPillProps = ViewProps & {
   count: number
   variant?: 'quiet' | 'reward'
   popIn?: boolean
+  iconSize?: number
 }
 
-export function StreakPill({ count, variant = 'quiet', popIn = false, style, ...props }: StreakPillProps) {
+export function StreakPill({ count, variant = 'quiet', popIn = false, iconSize, style, ...props }: StreakPillProps) {
   const { colors, space, radius } = useTheme()
   const reducedMotion = useReducedMotion()
   const [animate] = useState(popIn && !reducedMotion)
@@ -47,7 +48,7 @@ export function StreakPill({ count, variant = 'quiet', popIn = false, style, ...
         backgroundColor: variant === 'reward' ? colors.accent : colors.surfaceCard,
       }, style, animatedStyle]}
     >
-      <StreakIcon size={space[4]} color={color} accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" />
+      <StreakIcon size={iconSize ?? space[4]} color={color} accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" />
       <Text accessible={false} variant="label" num style={{ color }}>{label}</Text>
     </Animated.View>
   )
