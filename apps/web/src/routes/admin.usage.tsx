@@ -22,6 +22,7 @@ type Range = (typeof RANGES)[number]
 type Company = ModelUsage['companies'][number]
 type Failure = ModelUsage['failures'][number]
 type Job = ModelUsage['jobs'][number]
+type Showing = { purpose: string; latency: ModelUsage['latency'] } | null
 
 const MAX_DAYS = 365
 const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10)
@@ -103,7 +104,8 @@ function Usage() {
   const navigate = Route.useNavigate()
   const jobId = useId()
   // The job filter only refetches the latency series; it belongs to the loaded range and resets with it.
-  const [job, setJob] = useState<{ data: ModelUsage; purpose: string; latency: ModelUsage['latency']; error?: string } | null>(null)
+  // `purpose` is the selected job; `showing` is the job whose series is on screen, so a pending or failed request never relabels old data.
+  const [job, setJob] = useState<{ data: ModelUsage; purpose: string; showing: Showing; error?: string } | null>(null)
   const jobRequest = useRef(0)
   const [sort, setSort] = useState<{ key: string; direction: SortDirection }>({ key: 'cost', direction: 'descending' })
   // The failures page also belongs to the loaded range, so any range change (presets, picker, Back/Forward) starts on page 1.
@@ -123,15 +125,16 @@ function Usage() {
   const partialClause = isPartial ? `; ${monthDay(toMs)} is partial, through ${hhmm(data.asOf)}` : ''
 
   const current = job?.data === data ? job : null
-  const series = current?.latency ?? data.latency
+  const showing = current?.showing ?? null
+  const series = showing?.latency ?? data.latency
   const purposes = [...new Set(data.jobs.map((j) => j.purpose))]
   const loadJob = (purpose: string) => {
     const id = ++jobRequest.current
     if (!purpose) return setJob(null)
-    setJob({ data, purpose, latency: series })
+    setJob({ data, purpose, showing })
     getModelUsage({ data: { from: data.from, to: data.to, job: purpose } }).then(
-      (r) => { if (id === jobRequest.current) setJob({ data, purpose, latency: r.latency }) },
-      (err: unknown) => { if (id === jobRequest.current) setJob({ data, purpose, latency: series, error: errorMessage(err) }) },
+      (r) => { if (id === jobRequest.current) setJob({ data, purpose, showing: { purpose, latency: r.latency } }) },
+      (err: unknown) => { if (id === jobRequest.current) setJob({ data, purpose, showing, error: errorMessage(err) }) },
     )
   }
 
@@ -155,7 +158,7 @@ function Usage() {
     : `Bar chart of model cost per day from ${spanWords}: ${rangeOf(data.days.map((d) => d.cost ?? 0), money)} a day`
       + (costPeak >= 0 ? `, highest on ${monthDay(dayMs(data.days[costPeak].day))} at ${money(data.days[costPeak].cost ?? 0)}` : '')
       + (isPartial && last ? `${partialClause}, at ${money(last.cost ?? 0)}.` : '.')
-  const jobName = current?.purpose ? jobLabel(current.purpose) : 'all jobs'
+  const jobName = showing ? jobLabel(showing.purpose) : 'all jobs'
   const between = (key: 'p50' | 'p95') => {
     const v = series.days.flatMap((d) => (d[key] === null ? [] : [d[key] / 1000]))
     return `${Number(Math.min(...v).toFixed(1))} and ${Number(Math.max(...v).toFixed(1))} seconds`
@@ -309,7 +312,7 @@ function Usage() {
           { name: 'p95', style: 'dashed', points: series.days.map((d) => ({ x: monthDay(dayMs(d.day)), y: d.p95 === null ? null : d.p95 / 1000 })) },
         ]}
         table={{
-          caption: `Latency by day in seconds, ${current?.purpose ? `${jobLabel(current.purpose)}, ` : ''}${spanWords}.${partial && ` ${partial}`}`,
+          caption: `Latency by day in seconds, ${showing ? `${jobLabel(showing.purpose)}, ` : ''}${spanWords}.${partial && ` ${partial}`}`,
           columns: ['Day', 'p50', 'p95'],
           rows: series.days.map((d) => ({ key: d.day, cells: [dayLabel(d), latencyText(d.p50), latencyText(d.p95)] })),
           total: [dayCount, latencyText(series.total.p50), latencyText(series.total.p95)],
