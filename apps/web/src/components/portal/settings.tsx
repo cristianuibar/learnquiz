@@ -1,4 +1,4 @@
-import { colors, contrast, brandProblem, deriveBrand } from '@learnquiz/tokens'
+import { colors, contrast, brandProblem } from '@learnquiz/tokens'
 import { RotateCw, Upload, ImageIcon } from 'lucide-react'
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Banner } from '@/components/admin/banner'
@@ -402,17 +402,20 @@ function CompanyForm({ settings, onSaved }: FormProps) {
                   value={accentValid ? accent.toLowerCase() : colors.brand[0].toLowerCase()}
                   onChange={(e) => { edit(); setAccent(e.target.value.toUpperCase()) }}
                 />
-                {accentOk && acc.ratio !== null && (
+                {accentValid && acc.ratio !== null && (
                   <figure className="m-0 flex flex-wrap items-center gap-3">
                     <span
                       className="inline-flex min-h-11 items-center rounded-md px-4 text-label"
-                      style={{ backgroundColor: accent, color: deriveBrand(accent).light.onBrand }}
+                      style={{
+                        backgroundColor: accent,
+                        color: acc.ratio >= contrast(accent, colors.ink[0]) ? colors['on-brand'][0] : colors.ink[0],
+                      }}
                     >
                       Start quiz
                     </span>
-                    <figcaption className="text-caption text-ink-muted tabular-nums">
-                      <span className="sr-only">Learner app button preview: </span>
-                      {acc.ratio.toFixed(1)}:1 on white · passes AA
+                    <figcaption className={accentOk ? 'text-caption text-ink-muted tabular-nums' : 'sr-only'}>
+                      <span className="sr-only">Learner app button preview{accentOk ? ': ' : ''}</span>
+                      {accentOk && <>{acc.ratio.toFixed(1)}:1 on white · passes AA</>}
                     </figcaption>
                   </figure>
                 )}
