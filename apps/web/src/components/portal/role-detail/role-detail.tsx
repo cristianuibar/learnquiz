@@ -115,7 +115,7 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
         }
         title={role.name}
         meta={`Benchmark ${Math.round(role.benchmark * 100)}% · Onboarding ${plural(role.onboardingDays, 'day', 'days')} · ${plural(role.people, 'person', 'people')}`}
-        actions={!readOnly && role.topicStatus === 'ready' ? (
+        actions={!readOnly && role.topicStatus === 'ready' && !running ? (
           <Button asChild variant={pasteOpen ? 'secondary' : 'accent'}>
             <Link {...links.questions({ role: role.id })}>Review questions</Link>
           </Button>

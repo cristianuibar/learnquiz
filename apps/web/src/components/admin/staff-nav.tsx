@@ -34,7 +34,7 @@ function Header() {
 }
 
 function Foot({ name }: { name: string }) {
-  const { busy, error, signOut } = useSignOut()
+  const { busy, error, signOut } = useSignOut({ keepPlace: false })
   return (
     <>
       <div className="flex items-center gap-2 px-2">

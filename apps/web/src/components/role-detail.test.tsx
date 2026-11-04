@@ -546,3 +546,17 @@ it('links Review questions to the questions of this role', async () => {
   const link = [...container.querySelectorAll('a')].find((a) => a.textContent === 'Review questions')!
   expect(link.getAttribute('href')).toBe('/org/x/questions?role=r1')
 })
+
+it.each(['pending', 'generating'])('hides the header Review questions while a concept is %s', async (genStatus) => {
+  const { container } = await mount(makeDetail({ status: 'ready', documents: [pdf], units: unit([concept('c1', 'Cash float', 'ready'), concept('c2', 'Card reader', genStatus)]) }))
+  expect([...container.querySelectorAll('a')].filter((a) => a.textContent === 'Review questions')).toHaveLength(0)
+  expect(container.querySelector('[data-variant="accent"]')).toBeNull()
+})
+
+it('shows the header Review questions once every concept is ready or failed', async () => {
+  const { container } = await mount(makeDetail({ status: 'ready', documents: [pdf], units: unit([concept('c1', 'Cash float', 'ready'), concept('c2', 'Card reader', 'failed')]) }))
+  const links = [...container.querySelectorAll('a')].filter((a) => a.textContent === 'Review questions')
+  expect(links).toHaveLength(1)
+  expect(links[0]!.getAttribute('href')).toBe('/org/x/questions?role=r1')
+  expect(container.querySelectorAll('[data-variant="accent"]')).toHaveLength(1)
+})

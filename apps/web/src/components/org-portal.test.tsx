@@ -15,8 +15,8 @@ import { getSessionFn } from '@/server/session-fn'
 
 vi.mock('@/server/org', () => ({ getOrgOverview: vi.fn() }))
 vi.mock('@/server/people', () => ({ getPeople: vi.fn() }))
-const { inviteMember, cancelInvitation } = vi.hoisted(() => ({ inviteMember: vi.fn(), cancelInvitation: vi.fn() }))
-vi.mock('@/lib/auth-client', () => ({ authClient: { organization: { inviteMember, cancelInvitation } } }))
+const { inviteMember, cancelInvitation, signOut } = vi.hoisted(() => ({ inviteMember: vi.fn(), cancelInvitation: vi.fn(), signOut: vi.fn() }))
+vi.mock('@/lib/auth-client', () => ({ authClient: { signOut, organization: { inviteMember, cancelInvitation } } }))
 vi.mock('@/server/org-shell', () => ({ getPortalShell: vi.fn() }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => null }))
@@ -96,6 +96,33 @@ it('shows the portal nav on portal pages, trimmed for Learn Quiz staff, with a w
     expect(container.textContent).toContain('Read only')
     expect(container.textContent).toContain('Staff view')
     expect(signOut()).toBeNull()
+  } finally {
+    await act(async () => root.unmount())
+    container.remove()
+    delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT
+  }
+})
+
+it('signs out of the portal nav to plain sign-in, without a redirect back to the portal', async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+  let user: { id: string; name: string; isAnonymous: boolean; role: string } | null = { id: 'u', name: 'U', isAnonymous: false, role: 'user' }
+  vi.mocked(getSessionFn).mockImplementation(async () => ({ user, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] }))
+  signOut.mockImplementation(async () => { user = null; return { data: { success: true }, error: null } })
+  const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
+  const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, loader: orgRoute.options.loader as (ctx: { params: { slug: string } }) => unknown, errorComponent: orgRoute.options.errorComponent, component: orgRoute.options.component })
+  const index = createRoute({ getParentRoute: () => org, path: '/', component: () => <p>Overview page</p> })
+  const signIn = createRoute({ getParentRoute: () => rootRoute, path: '/sign-in', validateSearch: signInRoute.options.validateSearch, beforeLoad: signInRoute.options.beforeLoad, component: signInRoute.options.component })
+  const router = createRouter({ routeTree: rootRoute.addChildren([org.addChildren([index]), signIn]), history: createMemoryHistory({ initialEntries: ['/org/x'] }) })
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  try {
+    await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
+    await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="Sign out"]')!.click() })
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe('/sign-in'))
+    expect(signOut).toHaveBeenCalledTimes(1)
+    expect(router.state.location.href).toBe('/sign-in')
+    expect((router.state.location.search as { redirect?: string }).redirect).toBeUndefined()
   } finally {
     await act(async () => root.unmount())
     container.remove()
