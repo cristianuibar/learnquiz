@@ -93,6 +93,17 @@ it('saves the Critical switch, named by its column header and concept', async ()
   await vi.waitFor(() => expect(vi.mocked(getRoleDetail).mock.calls.length).toBeGreaterThan(before))
 })
 
+it('saves the edit form with a Critical value toggled before the page reloaded', async () => {
+  vi.mocked(updateRoleConcept).mockResolvedValue({ ok: true })
+  const { container, button } = await mount(makeDetail({ status: 'ready', documents: [pdf], units: unit([concept('c1', 'Cash float', 'ready')]) }))
+  await act(async () => { (container.querySelector('[role="switch"]') as HTMLElement).click() })
+  await act(async () => { button('Edit concept: Cash float')!.click() })
+  const form = container.querySelector<HTMLFormElement>('form[aria-label="Edit concept: Cash float"]')!
+  expect(form.querySelector('[role="switch"]')!.getAttribute('aria-checked')).toBe('true')
+  await act(async () => { form.requestSubmit() })
+  expect(updateRoleConcept).toHaveBeenLastCalledWith({ data: { slug: 'x', conceptId: 'c1', name: 'Cash float', summary: 'About Cash float', critical: true } })
+})
+
 it('disables Edit while a concept is queued, and moves focus into and out of the edit form', async () => {
   const { container, button } = await mount(makeDetail({ status: 'generating', documents: [pdf], units: unit([concept('c1', 'Cash float', 'ready'), concept('c2', 'Card reader', 'pending')]) }))
   expect(button('Edit concept: Card reader')!.hasAttribute('disabled')).toBe(true)

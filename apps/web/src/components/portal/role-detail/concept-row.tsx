@@ -60,7 +60,7 @@ export function ConceptRow({ concept, slug, readOnly, critHeaderId }: { concept:
   if (editing) {
     return (
       <li className="grid border-t border-border">
-        <ConceptEditForm concept={concept} slug={slug} onDone={() => setEditing(false)} />
+        <ConceptEditForm concept={{ ...concept, critical }} slug={slug} onDone={() => setEditing(false)} />
       </li>
     )
   }
