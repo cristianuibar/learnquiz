@@ -59,7 +59,7 @@ it.each([
   vi.mocked(endSession).mockResolvedValue({ sessionId: 's1', kind: 'session', topicId: 't1', durationMs: 1000, correct: total, total, ungraded: 0, xp: 0,
     streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], benchmark: null, reviewsLeft: 0, nextLine: 'Come back soon.', endedEarly: false } satisfies SummaryView)
   vi.mocked(getPushSettings).mockResolvedValue({ publicKey: 'public-key', isStaff: false, endpoints, canPrompt,
-    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' }, schedule })
+    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC', days: [1, 2, 3, 4, 5] }, company: null, schedule })
   const requestPermission = vi.fn()
   vi.stubGlobal('Notification', { requestPermission })
   const { container, router, cleanup } = await renderApp('/play/s1/done')
@@ -81,7 +81,7 @@ it('opens the iPhone Home Screen steps straight away on an iPhone Safari tab and
   vi.mocked(endSession).mockResolvedValue({ sessionId: 's1', kind: 'session', topicId: 't1', durationMs: 1000, correct: 1, total: 1, ungraded: 0, xp: 0,
     streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], benchmark: null, reviewsLeft: 0, nextLine: 'Come back soon.', endedEarly: false } satisfies SummaryView)
   vi.mocked(getPushSettings).mockResolvedValue({ publicKey: 'public-key', isStaff: false, endpoints: [], canPrompt: true,
-    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' }, schedule })
+    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC', days: [1, 2, 3, 4, 5] }, company: null, schedule })
   vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('iPhone')
   vi.spyOn(window, 'matchMedia').mockImplementation(() => ({ matches: false }) as MediaQueryList)
   const { container, router, cleanup } = await renderApp('/play/s1/done')
@@ -102,7 +102,7 @@ it.each([0, 3])('shows the not-graded count on the summary only when answers wer
   vi.mocked(endSession).mockResolvedValue({ sessionId: 's1', kind: 'session', topicId: 't1', durationMs: 1000, correct: 9, total: 10, ungraded, xp: 0,
     streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], benchmark: null, reviewsLeft: 0, nextLine: 'Come back soon.', endedEarly: false } satisfies SummaryView)
   vi.mocked(getPushSettings).mockResolvedValue({ publicKey: 'public-key', isStaff: false, endpoints: [], canPrompt: false,
-    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' }, schedule })
+    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC', days: [1, 2, 3, 4, 5] }, company: null, schedule })
   const { container, cleanup } = await renderApp('/play/s1/done')
   try {
     const score = [...container.querySelectorAll('p')].find((p) => p.textContent?.startsWith('9 of 10 correct'))
@@ -114,7 +114,7 @@ it.each([true, false])('explains a placement that ended early only when it did (
   vi.mocked(endSession).mockResolvedValue({ sessionId: 's1', kind: 'placement', topicId: 't1', durationMs: 1000, correct: 6, total: 8, ungraded: 0, xp: 0,
     streak: 0, level: 3, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], benchmark: null, reviewsLeft: 0, nextLine: 'Come back soon.', endedEarly } satisfies SummaryView)
   vi.mocked(getPushSettings).mockResolvedValue({ publicKey: 'public-key', isStaff: false, endpoints: [], canPrompt: false,
-    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' }, schedule })
+    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC', days: [1, 2, 3, 4, 5] }, company: null, schedule })
   const { container, cleanup } = await renderApp('/play/s1/done')
   try {
     expect(container.querySelector('h1')?.textContent).toBe("You're at level 3 of 5")
@@ -167,8 +167,8 @@ it('preserves the notification link through sign-in without opening a session wh
 
 it('keeps staff navigation and working push controls together on Profile', async () => {
   vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'u1', name: 'Learner', isAnonymous: false, role: 'admin' }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })
-  const prefs = { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' }
-  vi.mocked(getPushSettings).mockResolvedValue({ publicKey: null, isStaff: true, endpoints: [], canPrompt: false, prefs, schedule })
+  const prefs = { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC', days: [1, 2, 3, 4, 5] }
+  vi.mocked(getPushSettings).mockResolvedValue({ publicKey: null, isStaff: true, endpoints: [], canPrompt: false, prefs, company: null, schedule })
   const { container, cleanup } = await renderApp('/me')
   try {
     expect(container.querySelector('h1')?.textContent).toBe('Learner')

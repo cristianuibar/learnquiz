@@ -16,7 +16,7 @@ vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => null }))
 vi.mock('@/server/today', () => ({ getToday: vi.fn() }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
-const prefs = { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC' }
+const prefs = { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC', days: [1, 2, 3, 4, 5] }
 const schedule = { window: { startMinute: 540, endMinute: 1020, days: [1, 2, 3, 4, 5], timezone: 'UTC', source: 'default' as const }, dailyCap: 3, steadyCap: 3, phase: 'steady' as const, preview: null }
 
 afterEach(() => {
@@ -38,7 +38,7 @@ it('keeps staff navigation while enabling, testing and disabling notifications f
   vi.stubGlobal('Notification', { requestPermission })
   Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: { register: vi.fn(async () => registration), ready: Promise.resolve(registration) } })
   const publicKey = btoa('public-key').replace(/=+$/, '')
-  vi.mocked(getPushSettings).mockResolvedValue({ publicKey, isStaff: true, endpoints: [], prefs, canPrompt: false, schedule })
+  vi.mocked(getPushSettings).mockResolvedValue({ publicKey, isStaff: true, endpoints: [], prefs, company: null, canPrompt: false, schedule })
   vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'staff', name: 'Staff', role: 'admin', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [{ name: 'Acme', slug: 'acme' }] })
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader })
   const me = createRoute({ getParentRoute: () => rootRoute, path: '/me/', beforeLoad: meRoute.options.beforeLoad, loader: meRoute.options.loader, component: meRoute.options.component })
@@ -111,7 +111,7 @@ it("replaces another account's leftover browser subscription when enabling notif
   vi.stubGlobal('PushManager', class {})
   vi.stubGlobal('Notification', { requestPermission: vi.fn(async () => 'granted') })
   Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: { register: vi.fn(async () => registration), ready: Promise.resolve(registration) } })
-  vi.mocked(getPushSettings).mockResolvedValue({ publicKey: btoa('public-key').replace(/=+$/, ''), isStaff: false, endpoints: [], prefs, canPrompt: false, schedule })
+  vi.mocked(getPushSettings).mockResolvedValue({ publicKey: btoa('public-key').replace(/=+$/, ''), isStaff: false, endpoints: [], prefs, company: null, canPrompt: false, schedule })
   vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'b', name: 'B', role: 'learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader })
   const me = createRoute({ getParentRoute: () => rootRoute, path: '/me/', beforeLoad: meRoute.options.beforeLoad, loader: meRoute.options.loader, component: meRoute.options.component })

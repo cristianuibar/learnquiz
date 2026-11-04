@@ -7,7 +7,7 @@ import { capPolicy, effectiveWindow, inWindow, pushContext } from './window'
 
 const company = { timezone: 'Europe/London', workingHours: { days: [1, 2, 3, 4, 5], start: '09:00', end: '17:00' } }
 const weekdays = [1, 2, 3, 4, 5]
-const prefs = (startMinute: number, endMinute: number) => ({ startMinute, endMinute, timezone: 'Asia/Tokyo' })
+const prefs = (startMinute: number, endMinute: number, days: number[] | null = null) => ({ startMinute, endMinute, timezone: 'Asia/Tokyo', days })
 const win = (startMinute: number, endMinute: number, source: 'learner' | 'company') => ({ startMinute, endMinute, days: weekdays, timezone: 'Europe/London', source })
 
 describe('effectiveWindow', () => {
@@ -17,6 +17,9 @@ describe('effectiveWindow', () => {
     ['wider prefs are clamped', company, prefs(420, 1140), win(540, 1020, 'company')],
     ['partial overlap', company, prefs(480, 720), win(540, 720, 'learner')],
     ['disjoint falls back to the company', company, prefs(1100, 1200), win(540, 1020, 'company')],
+    ['own days narrow the company days', company, prefs(540, 1020, [5, 3, 6]), { ...win(540, 1020, 'learner'), days: [3, 5] }],
+    ['days outside the company fall back to its days', company, prefs(540, 1020, [6, 7]), win(540, 1020, 'company')],
+    ['non-member own days', null, prefs(480, 600, [6, 7]), { startMinute: 480, endMinute: 600, days: [6, 7], timezone: 'Asia/Tokyo', source: 'learner' }],
     ['non-member with prefs', null, prefs(480, 600), { startMinute: 480, endMinute: 600, days: weekdays, timezone: 'Asia/Tokyo', source: 'learner' }],
     ['non-member default', null, null, { startMinute: 540, endMinute: 1020, days: weekdays, timezone: 'UTC', source: 'default' }],
   ] as const)('%s', (_name, c, p, expected) => {
@@ -97,7 +100,7 @@ describe('pushContext', () => {
   it('defaults a member without org_settings to UTC office hours', async () => {
     addOrg('o1', 1)
     expect(await pushContext(db, 'u1')).toEqual({
-      company: { timezone: 'UTC', workingHours: { days: [1, 2, 3, 4, 5], start: '09:00', end: '17:00' } },
+      company: { name: 'o1', timezone: 'UTC', workingHours: { days: [1, 2, 3, 4, 5], start: '09:00', end: '17:00' } },
       role: null,
     })
   })
@@ -107,7 +110,7 @@ describe('pushContext', () => {
     addSettings('o1')
     addRole('r1', 'o1', 'active', 1000)
     expect(await pushContext(db, 'u1')).toEqual({
-      company: { timezone: 'Asia/Tokyo', workingHours: { days: [1, 2, 3], start: '08:00', end: '16:00' } },
+      company: { name: 'o1', timezone: 'Asia/Tokyo', workingHours: { days: [1, 2, 3], start: '08:00', end: '16:00' } },
       role: { assignedAt: 1000, onboardingDays: 14, proficientAt: 99 },
     })
   })
