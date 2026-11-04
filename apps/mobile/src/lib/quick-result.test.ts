@@ -186,7 +186,6 @@ test('load sends the push id when the session comes from a notification', async 
 test.each([
   { name: 'a missing question on create', failAt: '/sessions/quick', error: new ApiError(404, 'Question not found'), status: 'unavailable' },
   { name: 'a missing session on read', failAt: '/sessions/session-1', error: new ApiError(404, 'Not found'), status: 'unavailable' },
-  { name: 'a conflict on read', failAt: '/sessions/session-1', error: new ApiError(409, 'This session has ended'), status: 'answered' },
   { name: 'a network failure', failAt: '/sessions/session-1', error: new ApiError(null, 'Network request failed'), status: 'error' },
 ] as const)('load maps $name to $status', async ({ failAt, error, status }) => {
   const { handle, states, request , onRequest} = setup()
@@ -206,11 +205,31 @@ test.each([
   const { handle, states, request , onRequest} = setup()
   onRequest(async (path: string) => {
     if (path === '/sessions/quick') return { sessionId: 'session-1' }
-    if (path.endsWith('/end')) return { total: 1 }
+    if (path.endsWith('/end')) return { total: 1, ungraded: 0 }
     return view
   })
   await handle.load()
   expect(last(states, 'answered').status).toBe('answered')
+})
+
+// GET /sessions/:id never answers 409: a reload after the answer runs advance,
+// which finalises the one-question session and returns it ended with no item.
+// An ungraded short answer (grading failed or the daily cap) records no
+// attempt, so the summary has total 0 and ungraded 1, and it was still answered.
+test.each([
+  { name: 'a graded answer', summary: { total: 1, ungraded: 0 }, status: 'answered' },
+  { name: 'only an ungraded answer', summary: { total: 0, ungraded: 1 }, status: 'answered' },
+  { name: 'no answer (a retired or flagged item)', summary: { total: 0, ungraded: 0 }, status: 'unavailable' },
+] as const)('a session auto-ended on read with $name loads as $status', async ({ summary, status }) => {
+  const { handle, calls, onRequest } = setup()
+  onRequest(async (path: string) => {
+    if (path === '/sessions/quick') return { sessionId: 'session-1' }
+    if (path.endsWith('/end')) return { ...summary, reviewsLeft: 0 }
+    return sessionWith(null, true)
+  })
+  await handle.load()
+  expect(calls.map(({ path }) => path)).toEqual(['/sessions/quick', '/sessions/session-1', '/sessions/session-1/end'])
+  expect(handle.getState()).toEqual({ status })
 })
 
 test('concurrent loads create a single quick session', async () => {
@@ -497,7 +516,7 @@ test.each([
   const { handle, calls, onRequest } = await loadQuestion(setup())
   onRequest(async (path) => {
     if (path.endsWith('/answer')) throw new ApiError(409, 'Already answered')
-    if (path.endsWith('/end')) return { total: 1 }
+    if (path.endsWith('/end')) return { total: 1, ungraded: 0 }
     return view
   })
   handle.changeDraft({ answer: { optionId: 'a' }, confidence: 'sure' })
@@ -601,14 +620,15 @@ test.each<[string, number, string]>([
 })
 
 test.each([
-  ['retired', 'This question has been retired', 0, 'unavailable'],
-  ['answered', 'Already answered. Continue to the next question.', 1, 'answered'],
-])('check distinguishes a %s auto-ended session using its answer count', async (_reason, message, total, status) => {
+  ['retired', 'This question has been retired', 0, 0, 'unavailable'],
+  ['answered', 'Already answered. Continue to the next question.', 1, 0, 'answered'],
+  ['ungraded-answered', 'Already answered. Continue to the next question.', 0, 1, 'answered'],
+])('check distinguishes a %s auto-ended session using its answer count', async (_reason, message, total, ungraded, status) => {
   const { handle, calls, onRequest } = await loadQuestion(setup())
   const ended = sessionWith(null, true)
   onRequest(async (path) => {
     if (path.endsWith('/answer')) throw new ApiError(409, message)
-    if (path.endsWith('/end')) return { total, reviewsLeft: 0 }
+    if (path.endsWith('/end')) return { total, ungraded, reviewsLeft: 0 }
     return ended
   })
   handle.changeDraft({ answer: { optionId: 'a' }, confidence: 'sure' })
@@ -621,7 +641,7 @@ test.each(['retired', 'flagged'])('a %s question auto-ended on GET before load i
   const { handle, onRequest } = setup()
   onRequest(async (path) => {
     if (path === '/sessions/quick') return { sessionId: 'session-1' }
-    if (path.endsWith('/end')) return { total: 0 }
+    if (path.endsWith('/end')) return { total: 0, ungraded: 0 }
     return sessionWith(null, true)
   })
   await handle.load()
@@ -635,7 +655,7 @@ test('flagging an already open quick question does not invent an answer conflict
   // answered. Flags prevent creation or the next GET from selecting the item.
   onRequest(async (path) => {
     if (path.endsWith('/answer')) return revealWith('A', true)
-    if (path.endsWith('/end')) return { total: 1, reviewsLeft: 0 }
+    if (path.endsWith('/end')) return { total: 1, ungraded: 0, reviewsLeft: 0 }
     throw new Error(`unexpected ${path}`)
   })
   handle.changeDraft({ answer: { optionId: 'a' }, confidence: 'sure' })
