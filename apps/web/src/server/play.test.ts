@@ -869,6 +869,21 @@ describe('learner practice and unit unlocks', () => {
     expect(chatJson).not.toHaveBeenCalled()
   })
 
+  it('refuses Start at the daily cap with 429 instead of joining a stale generation claim', async () => {
+    seedFrontier(raw, 6, false)
+    const log = raw.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    for (let i = 0; i < 20; i++) log.run(`call-${i}`, 'u1', 'items', 'muse-spark-1.3', 0, 1, Date.now())
+    vi.useFakeTimers({ toFake: ['setTimeout', 'Date'] })
+    onTestFinished(() => { vi.useRealTimers() })
+    raw.prepare("UPDATE concepts SET gen_status = 'generating', gen_started_at = ? WHERE id = 'c1'").run(Date.now() - 11 * 60 * 1000)
+
+    const refused = expect(startSession({ data: { topicId: 't1' } })).rejects.toMatchObject({ status: 429 })
+    await vi.advanceTimersByTimeAsync(121_000)
+    await refused
+    expect(scalar(raw, 'SELECT COUNT(*) AS n FROM sessions').n).toBe(0)
+    expect(chatJson).not.toHaveBeenCalled()
+  })
+
   it('joins a preparation that reserved the final cap slot instead of refusing Start', async () => {
     seedFrontier(raw, 1, false)
     const log = raw.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, error, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
