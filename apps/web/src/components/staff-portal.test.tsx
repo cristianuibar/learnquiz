@@ -52,6 +52,12 @@ const detail = {
 const session = (role: string, adminCompanies: { slug: string }[] = []) =>
   vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'u', name: 'U', email: 'u@x.test', isAnonymous: false, role }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies } as never)
 
+const overview = {
+  name: 'Northwind', slug: 'northwind', readOnly: true, nextStep: null,
+  roles: [{ ...detail.role, documents: 1, failedDocuments: 0, conceptsReady: 3, conceptsTotal: 12, preparing: true, topicStatus: 'generating' }],
+  training: { employees: 0, proficientEmployees: 0, daysToProficiency: null, criticalErrorsThisWeek: 0, documentsToReview: 0, firstProficientUserId: null, openErrorUserId: null },
+}
+
 beforeEach(() => {
   vi.mocked(getPortalShell).mockResolvedValue(shell)
   vi.mocked(getStaffSession).mockResolvedValue({ name: 'Sam', failedJobs: 0 } as never)
@@ -61,11 +67,7 @@ beforeEach(() => {
   vi.mocked(getProfile).mockResolvedValue(profile as never)
   vi.mocked(getMemberFlags).mockResolvedValue({ readOnly: true, flags: [] })
   vi.mocked(getCompanySettings).mockResolvedValue(settings)
-  vi.mocked(getOrgOverview).mockResolvedValue({
-    name: 'Northwind', slug: 'northwind', readOnly: true, nextStep: null,
-    roles: [{ ...detail.role, documents: 1, failedDocuments: 0, conceptsReady: 3, conceptsTotal: 12, preparing: true, topicStatus: 'generating' }],
-    training: { employees: 0, proficientEmployees: 0, daysToProficiency: null, criticalErrorsThisWeek: 0, documentsToReview: 0, firstProficientUserId: null, openErrorUserId: null },
-  } as never)
+  vi.mocked(getOrgOverview).mockResolvedValue(overview as never)
   vi.mocked(listRoles).mockResolvedValue({
     name: 'Northwind', slug: 'northwind', readOnly: true,
     roles: [{ ...detail.role, topicStatus: 'ready', documentCount: 1, failedDocuments: 0, conceptsReady: 12, conceptsTotal: 12, preparing: false, peopleCount: 3 }],
@@ -112,10 +114,19 @@ async function renderAt(path: string) {
 }
 
 it.each([
-  ['Picker', '/roles/picker', 'Picker'],
-  ['All roles', '/roles', 'Roles'],
-  ['Watch the build', '/roles/picker', 'Picker'],
-])('opens %s from the read-only staff Overview', async (label, destination, heading) => {
+  ['normal', 'Picker', '/roles/picker', 'Picker'],
+  ['normal', 'All roles', '/roles', 'Roles'],
+  ['preparing', 'Picker', '/roles/picker', 'Picker'],
+  ['preparing', 'All roles', '/roles', 'Roles'],
+  ['preparing', 'Watch the build', '/roles/picker', 'Picker'],
+])('opens %s Overview link %s in the read-only staff portal', async (state, label, destination, heading) => {
+  if (state === 'normal') {
+    vi.mocked(getOrgOverview).mockResolvedValue({
+      ...overview,
+      roles: [{ ...overview.roles[0], preparing: false, topicStatus: 'ready', conceptsReady: 12 }],
+      training: { ...overview.training, employees: 3 },
+    } as never)
+  }
   const { container, router } = await renderAt('/admin/companies/northwind/portal')
   expect(container.querySelector('h1')?.textContent).toBe('Overview')
   const link = [...container.querySelectorAll<HTMLAnchorElement>('main a')].find((a) => a.textContent === label)
