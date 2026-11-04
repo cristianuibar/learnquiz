@@ -105,7 +105,8 @@ export const uploadRoleDocument = createServerFn({ method: 'POST' })
         // retired, after the checks above. Only the first statement can insert the new source (fresh id), and the
         // rest run only if it did.
         const inserted = exists(db.select({ one: sql`1` }).from(sources).where(eq(sources.id, id)))
-        const requeue = { sourceId: id, genStatus: 'pending' as const, genStartedAt: null, genError: null }
+        // Misconceptions were drawn from the old text and may contradict the new one (reveals show them as mix-ups).
+        const requeue = { sourceId: id, misconceptionsJson: '[]', genStatus: 'pending' as const, genStartedAt: null, genError: null }
         const [created] = await db.batch([
           db.insert(sources).select(
             db.select({
