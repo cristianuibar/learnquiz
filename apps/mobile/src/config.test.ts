@@ -21,10 +21,10 @@ afterEach(() => {
   else process.env.EAS_PROJECT_ID = easProjectId
 })
 
-test('can prebuild without Firebase, EAS or supplied icons', () => {
+test('can prebuild without Firebase, environment overrides or supplied icons', () => {
   const result = config()
   expect(result.android?.googleServicesFile).toBeUndefined()
-  expect(result.extra).toBeUndefined()
+  expect(result.extra).toEqual({ eas: { projectId: '580a4fa9-148e-4503-a37e-1e630a9e249a' } })
   expect(result.icon).toBeUndefined()
   expect(result.android?.adaptiveIcon).toBeUndefined()
   expect(result.plugins).toContainEqual(['expo-notifications', { color: expect.any(String) }])
@@ -81,7 +81,24 @@ test('uses environment Firebase configuration before the local fallback', () => 
   expect(config().android?.googleServicesFile).toBe('/tmp/learnquiz-test-services.json')
 })
 
-test('includes the EAS project only when supplied by the environment', () => {
+test('lets the environment override the default EAS project and update URL', () => {
   process.env.EAS_PROJECT_ID = 'test-project-id'
-  expect(config().extra).toEqual({ eas: { projectId: 'test-project-id' } })
+  const result = config()
+  expect(result.extra).toEqual({ eas: { projectId: 'test-project-id' } })
+  expect(result.updates).toEqual({ url: 'https://u.expo.dev/test-project-id' })
+})
+
+test('routes updates to the configured EAS project with a fingerprint runtime', () => {
+  process.env.EAS_PROJECT_ID = '580a4fa9-148e-4503-a37e-1e630a9e249a'
+  const result = config()
+  expect(result.updates).toEqual({ url: 'https://u.expo.dev/580a4fa9-148e-4503-a37e-1e630a9e249a' })
+  expect(result.runtimeVersion).toEqual({ policy: 'fingerprint' })
+})
+
+test.each([undefined, ''])('defaults the EAS project before environment download (%s)', (projectId) => {
+  if (projectId !== undefined) process.env.EAS_PROJECT_ID = projectId
+  const result = config()
+  expect(result.extra).toEqual({ eas: { projectId: '580a4fa9-148e-4503-a37e-1e630a9e249a' } })
+  expect(result.updates).toEqual({ url: 'https://u.expo.dev/580a4fa9-148e-4503-a37e-1e630a9e249a' })
+  expect(result.runtimeVersion).toEqual({ policy: 'fingerprint' })
 })
