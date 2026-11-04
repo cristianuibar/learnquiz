@@ -165,10 +165,12 @@ it('counts only ready concepts when a build ends with a failed concept', async (
     const list = Array.from({ length: 31 }, (_, i) => concept(`c${i}`, `Concept ${i}`, i < readyN ? 'ready' : i < readyN + failedN ? 'failed' : 'pending'))
     return makeDetail({ status, documents: [pdf], units: unit(list) })
   }
-  const { router, status } = await mount(build(30, 'generating'))
-  vi.mocked(getRoleDetail).mockResolvedValue(build(30, 'ready', 1) as never)
+  const { container, router, status } = await mount(build(29, 'generating'))
+  vi.mocked(getRoleDetail).mockResolvedValue(build(29, 'ready', 2) as never)
   await act(() => router.invalidate())
-  expect(status()).toBe('30 of 31 concepts ready. Curriculum ready.')
+  expect(status()).toBe('29 of 31 concepts ready. 2 concepts failed.')
+  expect(container.textContent).toContain('Curriculum built · 29 of 31 concepts ready · 2 failed')
+  expect(container.textContent).not.toContain('Curriculum ready')
 })
 
 it('retries a failed concept', async () => {
