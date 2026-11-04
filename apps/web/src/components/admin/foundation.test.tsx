@@ -27,6 +27,15 @@ describe('admin foundation', () => {
     expect(el.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true')
   })
 
+  it('still learning draws the half-disc; unreviewed draws a dashed ring with an exclamation, unlike estimate', async () => {
+    const learning = await render(<Status word="Still learning" />)
+    expect(learning.querySelector('svg path[d="M12 3a9 9 0 0 0 0 18z"]')).not.toBeNull()
+    const unreviewed = (await render(<Status word="Unreviewed" />)).querySelector('svg')!
+    const estimate = (await render(<Status word="Estimate" />)).querySelector('svg')!
+    expect(unreviewed.querySelector('path[d="M12 16h.01"]')).not.toBeNull()
+    expect(unreviewed.innerHTML).not.toBe(estimate.innerHTML)
+  })
+
   it('banner alert has role alert; info does not', async () => {
     const alert = await render(<Banner kind="alert"><strong>Failed.</strong> Retry.</Banner>)
     expect(alert.querySelector('[role="alert"]')).not.toBeNull()
