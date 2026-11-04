@@ -77,3 +77,14 @@ it('filters by name or slug and clears the search', async () => {
     await cleanup()
   }
 })
+
+it('keeps the company link target off the row height so loaded rows match the 56px skeleton', async () => {
+  const { container, cleanup } = await mount()
+  try {
+    const link = container.querySelector('tbody a') as HTMLAnchorElement
+    const cls = [...link.classList]
+    expect([cls.some((c) => c.startsWith('min-h-')), link.classList.contains('relative'), link.classList.contains('before:-inset-y-3')]).toEqual([false, true, true])
+  } finally {
+    await cleanup()
+  }
+})

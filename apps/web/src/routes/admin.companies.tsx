@@ -38,17 +38,18 @@ function buildColumns(): Column<Company>[] {
       header: 'Company',
       sortable: true,
       sortOrder: { ascending: 'A to Z', descending: 'Z to A' },
+      // Name and slug fit the 56px row the skeleton draws: the link's 44px target is a pseudo-element, not min-height.
       cell: (c) => (
-        <>
+        <div className="-my-0.5">
           <Link
             to="/admin/companies/$slug"
             params={{ slug: c.slug }}
-            className="inline-flex min-h-11 max-w-[320px] items-center rounded-sm font-medium text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+            className="relative inline-flex max-w-[320px] items-center rounded-sm font-medium before:absolute before:inset-x-0 before:-inset-y-3 before:content-[''] text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
           >
             <span className="truncate">{c.name}</span>
           </Link>
           <div className="text-caption text-ink-muted max-xl:hidden">/org/{c.slug}</div>
-        </>
+        </div>
       ),
     },
     num('members', 'Members'),
