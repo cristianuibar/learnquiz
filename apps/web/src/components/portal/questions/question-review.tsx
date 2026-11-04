@@ -82,7 +82,7 @@ function Body({ data, slug, search, onClear }: { data: Review; slug: string; sea
   const units = useMemo(() => filterUnits(data.units, search), [data.units, search.q, search.unreviewed, search.flagged, search.critical, search.status])
   const flat = useMemo(() => units.flatMap((u) => u.concepts.flatMap((c) => c.questions.map((q, i) => ({ q, conceptId: c.id, index: i })))), [units])
 
-  // Once the refreshed data shows the question settled, Approve moves on to the next open one in the pre-action order; Retire stays on it.
+  // Once the refreshed data shows the question settled, Approve moves on to the next open one in the pre-action order, skipping retired and rejected flagged rows; Retire stays on it.
   useEffect(() => {
     if (!acted) return
     const { id: actedId, action } = acted
@@ -93,7 +93,7 @@ function Body({ data, slug, search, onClear }: { data: Review; slug: string; sea
     if (action === 'approve') setMessage(`Approved. ${data.unreviewed} unreviewed.`)
     const at = acted.order.indexOf(actedId)
     const order = acted.order.slice(at + 1).concat(acted.order.slice(0, Math.max(at, 0)))
-    const next = action === 'approve' ? order.map((id) => byId.get(id)).find((e) => e !== undefined && (isUnreviewed(e.q) || isFlagged(e.q))) : undefined
+    const next = action === 'approve' ? order.map((id) => byId.get(id)).find((e) => e !== undefined && isOpen(e.q) && (isUnreviewed(e.q) || isFlagged(e.q))) : undefined
     // With no open question left, stay on the acted-on row; if a filter removed it, the nearest remaining row, else Clear filters.
     const target = next ?? settled ?? order.map((id) => byId.get(id)).find((e) => e !== undefined)
     if (action === 'approve') {
