@@ -272,12 +272,16 @@ export const startSession = createServerFn({ method: 'POST' })
       }))
 
     // Seen items come back through the due list, not as fresh frontier questions.
-    const top = frontier.filter((f) => !unitId || f.concept.unitId === unitId).slice(0, 4)
+    const unitFrontier = frontier.filter((f) => !unitId || f.concept.unitId === unitId)
+    // A role topic plays only stored questions, so it skips frontier concepts that hold none it may serve.
+    const role = topic.jobRoleId !== null
+    const candidates = role ? unitFrontier : unitFrontier.slice(0, 4)
     // Anything practisable stored starts the session at once (a shorter one is fine); prepareNextSession tops up during play.
-    const storedRows = top.length
-      ? await db.select().from(items).where(and(eq(items.topicId, topic.id), inArray(items.conceptId, top.map((f) => f.concept.id)), eq(items.status, 'active'), notFlaggedBy(db, learnerId),
-        topic.jobRoleId !== null ? ne(items.format, 'short') : undefined))
+    const storedRows = candidates.length
+      ? await db.select().from(items).where(and(eq(items.topicId, topic.id), role ? undefined : inArray(items.conceptId, candidates.map((f) => f.concept.id)),
+        eq(items.status, 'active'), notFlaggedBy(db, learnerId), role ? ne(items.format, 'short') : undefined))
       : []
+    const top = role ? candidates.filter((f) => storedRows.some((r) => r.conceptId === f.concept.id)).slice(0, 4) : candidates
     const stored = top.map((f) => storedRows.filter((r) => r.conceptId === f.concept.id).map(asItem))
     const storedFresh = stored.flat().filter((it) => !seen.has(it.id)).length
     // Role questions are built once per concept by the company queue; a role session only plays what is stored (#40).
