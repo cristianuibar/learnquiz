@@ -35,13 +35,13 @@ export function RoleCard({ role, onPress }: RoleCardProps) {
     >
       <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden style={{ gap: space[3] }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
-          <Text variant="label" numberOfLines={2} style={{ flex: 1 }}>{role.name}</Text>
+          <Text variant="label" style={{ flex: 1 }}>{role.name}</Text>
           <ChevronRight size={space[6] - space[1]} color={colors.inkMuted} strokeWidth={2} accessible={false} />
         </View>
         <Bar accessible={false} value={role.started ? role.pct ?? 0 : 0} benchmark={role.benchmarkPct} />
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: space[6] + space[1], gap: space[2] }}>
-          {role.chip ? <Chip variant="none" accessible={false}>{role.chip}</Chip> : <Text variant="label" num>{role.progressLabel}</Text>}
-          <Text variant="caption" muted num>{role.dayLabel}</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', minHeight: space[6] + space[1], gap: space[2] }}>
+          {role.chip ? <Chip variant="none" accessible={false} style={{ maxWidth: '100%' }}>{role.chip}</Chip> : <Text variant="label" num style={{ maxWidth: '100%', flexShrink: 1 }}>{role.progressLabel}</Text>}
+          <Text variant="caption" muted num style={{ maxWidth: '100%', flexShrink: 1 }}>{role.dayLabel}</Text>
         </View>
       </View>
     </Pressable>

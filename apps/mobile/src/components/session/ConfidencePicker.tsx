@@ -76,7 +76,7 @@ export function ConfidencePicker({ value, onChange, disabled = false, compact = 
               })}
             >
               {selected && <Check size={space[4]} color={colors.brand} strokeWidth={2} accessible={false} />}
-              <Text variant="label" numberOfLines={1} style={{ color: disabled ? colors.inkMuted : colors.ink, flexShrink: 1 }}>{choice.label}</Text>
+              <Text variant="label" style={{ color: disabled ? colors.inkMuted : colors.ink, flexShrink: 1, textAlign: 'center' }}>{choice.label}</Text>
             </Pressable>
           )
         })}
