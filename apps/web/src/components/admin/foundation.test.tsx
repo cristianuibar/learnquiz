@@ -41,6 +41,13 @@ describe('admin foundation', () => {
     expect(el.textContent).not.toContain('0')
   })
 
+  it('stat without a link does not underline its label on hover', async () => {
+    const el = await render(<Stat label="Learners" value={12} />)
+    expect(el.querySelector('a')).toBeNull()
+    expect(el.querySelector('[class~="group/stat"]')).toBeNull()
+    expect(el.querySelector('[class*="hover/stat:underline"]')).toBeNull()
+  })
+
   it('meter exposes progress semantics', async () => {
     const el = await render(<Meter value={12} max={31} valueText="12 of 31 concepts ready" />)
     const bar = el.querySelector('[role="progressbar"]')!
