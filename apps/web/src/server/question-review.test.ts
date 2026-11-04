@@ -148,7 +148,7 @@ it('rejects invalid payloads, invented quotes and removing grounding with a mess
     { ...payload, source_quote: null, grounded: false },
   ]) {
     await expect(reviewQuestion({ data: { slug: 'alpha', itemId: 'a-invalid', action: 'edit', payload: invalid } }))
-      .rejects.toMatchObject({ status: 400, message: expect.stringMatching(/Invalid question|source quote/) })
+      .rejects.toMatchObject({ status: 400, message: expect.stringMatching(/Invalid question|source quote|This quote isn't in/) })
     expect(row('SELECT * FROM items WHERE id = ?', 'a-invalid')).toEqual(original)
   }
 })
@@ -195,7 +195,7 @@ it.each([null, 'member-a', 'owner-b'])('refuses review reads and writes for %s',
 it('scopes role reads and every review action to the admin company, excluding personal topics', async () => {
   holder.userId = 'admin-a'
   const late = await getQuestionReview({ data: { slug: 'alpha', roleId: 'role-a-late' } })
-  expect(late).toEqual({ name: 'alpha', roles: expect.any(Array), role: { id: 'role-a-late', name: 'late' }, unreviewed: 0, units: [] })
+  expect(late).toEqual({ name: 'alpha', roles: expect.any(Array), role: { id: 'role-a-late', name: 'late' }, unreviewed: 0, units: [], sources: [] })
   for (const roleId of ['role-a-old', 'role-b']) await expect(getQuestionReview({ data: { slug: 'alpha', roleId } })).rejects.toMatchObject({ status: 404 })
   for (const topicId of ['b', 'personal']) {
     const original = row('SELECT * FROM items WHERE id = ?', `${topicId}-live`)
@@ -204,4 +204,28 @@ it('scopes role reads and every review action to the admin company, excluding pe
       expect(row('SELECT * FROM items WHERE id = ?', `${topicId}-live`)).toEqual(original)
     }
   }
+})
+
+it('moves a question to another live document of the role and refuses other, retired or non-matching documents', async () => {
+  holder.userId = 'admin-a'
+  const ins = (id: string, topic: string, title: string, version: number, retired: number | null) => raw.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, version, retired_at, created_at) VALUES (?, ?, 'text', ?, ?, ?, ?, ?)")
+    .run(id, topic, title, 'Step two: Subtract 1 from both sides.', version, retired, Date.now())
+  ins('source-a2', 'a', 'Zeta handbook', 3, null)
+  ins('source-a-old', 'a', 'Old notes', 1, Date.now())
+  raw.prepare("INSERT INTO items (id, concept_id, topic_id, format, payload_json, created_at) VALUES ('a-move', 'concept-a', 'a', 'cloze', ?, ?)").run(JSON.stringify(payload), Date.now())
+  const edit = (sourceId: string, p: ItemPayload = payload) => reviewQuestion({ data: { slug: 'alpha', itemId: 'a-move', action: 'edit', payload: p, sourceId } })
+  const before = row('SELECT * FROM items WHERE id = ?', 'a-move')
+
+  const review = await getQuestionReview({ data: { slug: 'alpha' } })
+  expect(review.sources).toEqual([{ id: 'source-a', title: 'Algebra', version: 1 }, { id: 'source-a2', title: 'Zeta handbook', version: 3 }])
+  expect(review.units[1].concepts[1].questions.map((q) => [q.id, q.sourceId])).toContainEqual(['a-move', 'source-a'])
+
+  await expect(edit('source-a2', { ...payload, source_quote: 'Add 1 to both sides.' })).rejects.toMatchObject({ status: 400, message: "This quote isn't in Zeta handbook v3. Copy it exactly from the document." })
+  for (const id of ['source-b', 'source-a-old', 'nope']) await expect(edit(id)).rejects.toMatchObject({ status: 400, message: 'Choose a document from this role' })
+  expect(row('SELECT * FROM items WHERE id = ?', 'a-move')).toEqual(before)
+
+  await edit('source-a2')
+  expect(row('SELECT source_id, source_version FROM items WHERE id = ?', 'a-move')).toEqual({ source_id: 'source-a2', source_version: 3 })
+  const moved = await getQuestionReview({ data: { slug: 'alpha' } })
+  expect(moved.units[1].concepts[1].questions.find((q) => q.id === 'a-move')).toMatchObject({ sourceId: 'source-a2', source: { title: 'Zeta handbook', version: 3 } })
 })
