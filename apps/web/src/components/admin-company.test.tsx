@@ -4,9 +4,9 @@ import { createRoot } from 'react-dom/client'
 import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet, RouterProvider } from '@tanstack/react-router'
 import { expect, it, vi } from 'vitest'
 import { Route as companyRoute } from '@/routes/admin.companies_.$slug'
-import { getCompany } from '@/server/admin'
+import { getCompany } from '@/server/admin-companies'
 
-vi.mock('@/server/admin', () => ({ getCompany: vi.fn() }))
+vi.mock('@/server/admin-companies', () => ({ getCompany: vi.fn() }))
 
 it('uses the singular for a one-day onboarding period on the company page', async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })

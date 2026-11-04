@@ -124,7 +124,13 @@ it('stores an uploaded PDF in R2 and records its extracted text against the role
   expect(state.bucket.put.mock.calls[0][1].byteLength).toBe((await textPdf().arrayBuffer()).byteLength)
   expect(sqlite.prepare('SELECT * FROM sources WHERE id = ?').get(result.sourceId)).toMatchObject({
     topic_id: 'topic-role-a', kind: 'pdf', version: 1, uploaded_by: 'owner-a', r2_key: key, title: 'Forklift Safety', body_text: SENTENCE,
+    size_bytes: textPdf().size, page_count: 1,
   })
+})
+
+it('leaves size and page count empty for pasted text', async () => {
+  const result = await uploadRoleDocument({ data: form({ title: 'Dock rules', text: 'Always wear a vest on the dock.' }) })
+  expect(sqlite.prepare('SELECT size_bytes, page_count FROM sources WHERE id = ?').get(result.sourceId)).toEqual({ size_bytes: null, page_count: null })
 })
 
 it.each([
@@ -180,6 +186,12 @@ it('replaces a document with version 2, retires its items and requeues the conce
     .toEqual({ source_id: result.sourceId, source_quote: 'wear a vest', gen_status: 'pending', gen_started_at: null, gen_error: null })
   expect(drain).toHaveBeenCalledTimes(1)
   expect(state.background).toHaveLength(1)
+})
+
+it('records the size and page count of a replacement PDF', async () => {
+  seedV1()
+  const result = await uploadRoleDocument({ data: form({ replacesId: 'src-1', file: textPdf() }) })
+  expect(sqlite.prepare('SELECT version, size_bytes, page_count FROM sources WHERE id = ?').get(result.sourceId)).toEqual({ version: 2, size_bytes: textPdf().size, page_count: 1 })
 })
 
 it('drops the misconceptions drawn from the old version, so reveals stop correcting what V2 now requires', async () => {

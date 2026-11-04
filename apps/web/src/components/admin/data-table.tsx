@@ -32,11 +32,12 @@ const HEAD = 'sticky top-(--dt-top) z-[1]'
 const pos = (align?: 'start' | 'end') => (align === 'end' ? 'text-right' : 'text-left')
 
 /** Sortable column header: th with aria-sort (only when sorted) and a 44px button. */
-export function SortHeader({ label, direction, onSort, align, className, ...thProps }: {
+export function SortHeader({ label, direction, onSort, align, disabled, className, ...thProps }: {
   label: ReactNode
   direction?: SortDirection
   onSort: () => void
   align?: 'start' | 'end'
+  disabled?: boolean
 } & Omit<ComponentProps<'th'>, 'children' | 'onClick' | 'align'>) {
   const Icon = direction === 'ascending' ? ArrowUp : direction === 'descending' ? ArrowDown : ArrowUpDown
   return (
@@ -44,6 +45,7 @@ export function SortHeader({ label, direction, onSort, align, className, ...thPr
       <button
         type="button"
         onClick={onSort}
+        disabled={disabled}
         className={cn('-my-3 inline-flex min-h-11 items-center gap-1 font-[inherit] hover:text-ink', direction && 'text-ink')}
       >
         {label}
@@ -79,7 +81,7 @@ function Frame({ band, toolbar, footer, scrollRef, region, children }: {
 
 const TABLE = 'w-full border-separate border-spacing-0 text-[14px]/[20px] tabular-nums'
 
-export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSort, selection, actions, band, toolbar, footer, empty }: {
+export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSort, selection, actions, band, toolbar, footer, empty, loading }: {
   caption: string
   columns: Column<T>[]
   rows: T[]
@@ -93,6 +95,8 @@ export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSo
   toolbar?: ReactNode
   footer?: ReactNode
   empty?: ReactNode
+  /** Placeholder rows in the real frame and header; sorting is disabled. */
+  loading?: { rows: number; status: string }
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [scrolls, setScrolls] = useState(false)
@@ -109,7 +113,7 @@ export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSo
   }, [rows.length, columns.length])
 
   const sortCol = columns.find((c) => c.key === sort?.key)
-  const sortedNote = sort && sortCol
+  const sortedNote = !loading && sort && sortCol
     ? `, sorted by ${labelOf(sortCol).toLowerCase()}, ${(sortCol.sortOrder ?? DEFAULT_ORDER)[sort.direction]}`
     : ''
   const grouped = columns.some((c) => c.group)
@@ -124,6 +128,7 @@ export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSo
         align={c.align}
         direction={sort?.key === c.key ? sort.direction : undefined}
         onSort={() => onSort?.(c.key)}
+        disabled={!!loading}
         rowSpan={span}
         className={cn(c.hideBelowLg && 'dt-hide-lg max-xl:hidden', c.className)}
       />
@@ -172,7 +177,7 @@ export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSo
 
   return (
     <Frame band={band} toolbar={toolbar} footer={footer} scrollRef={scrollRef} region={{ scrolls, label: caption }}>
-      <table role="table" className={cn(TABLE, stack && 'max-md:block')}>
+      <table role="table" aria-busy={loading ? 'true' : undefined} className={cn(TABLE, stack && 'max-md:block')}>
         <caption className="sr-only">{caption + sortedNote}</caption>
         <thead role="rowgroup" className={cn(HEAD, stack && 'max-md:sr-only')}>
           <tr role="row">
@@ -186,6 +191,27 @@ export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSo
             </tr>
           )}
         </thead>
+        {loading ? (
+          <tbody role="rowgroup" aria-hidden="true">
+            {Array.from({ length: loading.rows }, (_, i) => (
+              <tr key={i} role="row" className="group/row">
+                {columns.map((c, j) => (
+                  <td key={c.key} role="cell" className={cn(td, c.align === 'end' && 'text-right', c.hideBelowLg && 'dt-hide-lg max-xl:hidden', c.className)}>
+                    {j === 0 ? (
+                      <div className="flex flex-col gap-1.5">
+                        <Skel className={cn('h-3.5', ['w-40', 'w-32', 'w-48', 'w-36'][i % 4])} />
+                        <SkelLine className="max-xl:hidden w-1/3" />
+                      </div>
+                    ) : (
+                      <Skel className={cn('h-3 w-10', c.align === 'end' && 'ml-auto')} />
+                    )}
+                  </td>
+                ))}
+                {actions && <td role="cell" className={td} />}
+              </tr>
+            ))}
+          </tbody>
+        ) : (
         <tbody role="rowgroup" className={cn(stack && 'max-md:block')}>
           {rows.length === 0 && empty}
           {rows.map((row) => {
@@ -234,7 +260,9 @@ export function DataTable<T>({ caption, columns, rows, rowKey, stack, sort, onSo
             )
           })}
         </tbody>
+        )}
       </table>
+      {loading && <p role="status" className="sr-only">{loading.status}</p>}
     </Frame>
   )
 }
@@ -276,9 +304,10 @@ export function TableSkeleton({ caption, columns, rows = 3, status, band }: {
 }
 
 /** Empty result row: message plus a Clear filters action that returns focus to the search field. */
-export function NoResults({ colSpan, children, onClear, searchRef }: {
+export function NoResults({ colSpan, children, clearLabel = 'Clear filters', onClear, searchRef }: {
   colSpan: number
   children: ReactNode
+  clearLabel?: string
   onClear: () => void
   searchRef: RefObject<HTMLInputElement | null>
 }) {
@@ -287,7 +316,7 @@ export function NoResults({ colSpan, children, onClear, searchRef }: {
       <td role="cell" colSpan={colSpan} className="px-4 py-12 text-center">
         <div role="status" className="flex flex-col items-center gap-4">
           <p className="text-ink">{children}</p>
-          <Button variant="secondary" onClick={() => { onClear(); searchRef.current?.focus() }}>Clear filters</Button>
+          <Button variant="secondary" onClick={() => { onClear(); searchRef.current?.focus() }}>{clearLabel}</Button>
         </div>
       </td>
     </tr>
