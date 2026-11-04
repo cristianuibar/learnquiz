@@ -70,3 +70,14 @@ test('includes the EAS project only when supplied by the environment', () => {
   process.env.EAS_PROJECT_ID = 'test-project-id'
   expect(config().extra).toEqual({ eas: { projectId: 'test-project-id' } })
 })
+
+test('routes updates to the configured EAS project with a fingerprint runtime', () => {
+  process.env.EAS_PROJECT_ID = '580a4fa9-148e-4503-a37e-1e630a9e249a'
+  const result = config()
+  expect(result.updates).toEqual({ url: 'https://u.expo.dev/580a4fa9-148e-4503-a37e-1e630a9e249a' })
+  expect(result.runtimeVersion).toEqual({ policy: 'fingerprint' })
+})
+
+test('leaves updates unset without an EAS project', () => {
+  expect(config().updates).toBeUndefined()
+})
