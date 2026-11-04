@@ -382,7 +382,7 @@ it.each([false, true])('submits a short answer and shows its reveal (ungraded=%s
     vi.mocked(answerItem).mockResolvedValueOnce({
       attemptId: ungraded ? null : 'a1', diagramConceptId: 'c1', state: ungraded ? 'ungraded' : 'D', correct: false,
       xp: 0, critical: false, correctOptionIds: null, sourceVersion: null, detail: null,
-      score: ungraded ? null : 0.5, feedback: ungraded ? 'Compare your answer with the model answer.' : 'Explain why both sides stay equal.',
+      score: ungraded ? null : 0.5, feedback: ungraded ? 'Daily grading limit reached; back tomorrow. Compare your answer with the model answer. Your learning progress has not changed.' : 'Explain why both sides stay equal.',
       missingPoints: ungraded ? [] : ['Subtract the same amount from both sides.'],
       correctAnswer: 'Equal changes preserve equality.', explanation: 'Both sides change by the same amount.',
       chosenFeedback: null, sourceQuote: 'Subtract equal quantities.', sourceTitle: 'Algebra notes', mixUps: [], returnsThisSession: false, pKnownBefore: 0.6, pKnownAfter: 0.6,
@@ -399,6 +399,7 @@ it.each([false, true])('submits a short answer and shows its reveal (ungraded=%s
       expect(dialog.querySelector('h2')?.textContent).toBe('Couldn’t grade this answer')
       expect(dialog.textContent).toMatch(/Your answerBoth sides get smaller\.The answerEqual changes preserve equality\./)
       expect(dialog.textContent).toContain('Subtract equal quantities.')
+      expect(dialog.textContent).toContain('Daily grading limit reached; back tomorrow. Compare your answer with the model answer. Your learning progress has not changed.')
       expect(dialog.querySelector('input')).toBeNull()
     } else {
       expect(dialog.querySelector('h2')?.textContent).toBe('Not quite')
