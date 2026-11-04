@@ -34,7 +34,7 @@ export function RewardChips({ xp, streak }: { xp: number; streak: number }) {
   return (
     <div className="flex flex-wrap gap-2">
       <span className="inline-flex min-h-8 items-center rounded-full bg-accent px-3 py-1 text-label font-bold tabular-nums text-on-accent">+{xp} XP</span>
-      {streak > 0 && <StreakPill popIn streak={{ text: streak === 1 ? '1 day' : `${streak} days`, label: '' }} />}
+      {streak > 0 && <StreakPill popIn spelledOut streak={{ text: streak === 1 ? '1 day' : `${streak} days`, label: '' }} />}
     </div>
   )
 }

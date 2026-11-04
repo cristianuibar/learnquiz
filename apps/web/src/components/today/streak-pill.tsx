@@ -1,7 +1,7 @@
 import type { TodayStreak } from '@learnquiz/api/today'
 import { cn } from '@/lib/utils'
 
-export function StreakPill({ streak, variant = 'quiet', popIn = false }: { streak: TodayStreak; variant?: 'quiet' | 'reward'; popIn?: boolean }) {
+export function StreakPill({ streak, variant = 'quiet', popIn = false, spelledOut = false }: { streak: TodayStreak; variant?: 'quiet' | 'reward'; popIn?: boolean; spelledOut?: boolean }) {
   return (
     <span
       className={cn(
@@ -14,7 +14,7 @@ export function StreakPill({ streak, variant = 'quiet', popIn = false }: { strea
       </svg>
       <span>
         {streak.text}
-        <span className="sr-only"> in a row</span>
+        <span className={spelledOut ? undefined : 'sr-only'}> in a row</span>
       </span>
     </span>
   )
