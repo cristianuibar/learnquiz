@@ -240,10 +240,9 @@ it('signs in a learner with a ready topic and lands on Today', async () => {
       container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
       await vi.waitFor(() => expect(router.state.location.pathname).toBe('/today'))
     })
-    expect(container.querySelector('h1')?.textContent).toBe('Spanish verbs')
-    expect(container.querySelector('main')?.textContent).toContain('1 item due')
-    expect(container.querySelector('main')?.textContent).toContain('Streak 4 · 120 XP')
-    expect([...container.querySelectorAll('main button')].map((b) => b.textContent)).toEqual(['Start session'])
+    expect(container.querySelector('h1')?.textContent).toBe('Today')
+    expect(container.querySelector('main h2')?.textContent).toBe('Your first session')
+    expect([...container.querySelectorAll('main button')].map((b) => b.textContent)).toEqual(['Play · 5 min'])
     expect(container.querySelector('a[href="/start"]')?.textContent).toBe('Learn something new')
   } finally { await cleanup() }
 })
@@ -261,7 +260,8 @@ it('sends a guest who creates an account to Today with their topic', async () =>
       container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
       await vi.waitFor(() => expect(router.state.location.pathname).toBe('/today'))
     })
-    expect(container.querySelector('h1')?.textContent).toBe('Spanish verbs')
+    expect(container.querySelector('h1')?.textContent).toBe('Today')
+    expect(container.querySelector('main h2')?.textContent).toBe('Your first session')
   } finally { await cleanup() }
 })
 

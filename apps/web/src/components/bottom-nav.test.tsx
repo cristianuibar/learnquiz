@@ -65,7 +65,7 @@ it('names the company on Today while the role training is being prepared', async
   const { container, cleanup } = await renderStart('/today')
   try {
     expect(container.textContent).toContain('Northwind')
-    expect(container.querySelector('[role="status"]')?.textContent).toBe('Your training at Northwind is being prepared')
+    expect(container.textContent).toContain('Building your questions')
   } finally {
     await cleanup()
   }
@@ -73,7 +73,7 @@ it('names the company on Today while the role training is being prepared', async
 
 it('sends a learner with a ready topic to Today, where one tap starts the session', async () => {
   vi.mocked(getLatestTopicIdFn).mockResolvedValue('topic-1')
-  vi.mocked(getToday).mockResolvedValue({ topic: { id: 'topic-1', title: 'Biology', placed: true, placeable: true, due: 2, xp: 40, streak: 1 }, role: null, plan: null })
+  vi.mocked(getToday).mockResolvedValue({ topic: { id: 'topic-1', title: 'Biology', placed: true, placeable: true, due: 2, xp: 40, streak: 1 }, role: null, plan: { state: 'normal', start: 'session', nextUnit: null, reviewsLeft: 2, reviewsCleared: 0, sessionDone: false, sessionSize: 20, playable: true, nextReviewAt: null } })
   vi.mocked(startSession).mockResolvedValue({ sessionId: 's1' })
   const { container, router, cleanup } = await renderStart('/me')
   try {
@@ -81,8 +81,8 @@ it('sends a learner with a ready topic to Today, where one tap starts the sessio
     expect(today.getAttribute('href')).toBe('/today')
     await act(async () => { today.click(); await router.load() })
     expect(router.state.location.pathname).toBe('/today')
-    expect(container.querySelector('h1')?.textContent).toBe('Biology')
-    const start = [...container.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Start session')!
+    expect(container.querySelector('h1')?.textContent).toBe('Today')
+    const start = [...container.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Play · 5 min')!
     await act(async () => {
       start.click()
       await vi.waitFor(() => expect(router.state.location.pathname).toBe('/play/s1'))
@@ -137,7 +137,7 @@ it.each([
 
 it('shows the three tabs on Today and moves focus to the page heading on Profile', async () => {
   vi.mocked(getLatestTopicIdFn).mockResolvedValue('topic-1')
-  vi.mocked(getToday).mockResolvedValue({ topic: { id: 'topic-1', title: 'Biology', placed: true, placeable: true, due: 2, xp: 40, streak: 1 }, role: null, plan: null })
+  vi.mocked(getToday).mockResolvedValue({ topic: { id: 'topic-1', title: 'Biology', placed: true, placeable: true, due: 2, xp: 40, streak: 1 }, role: null, plan: { state: 'normal', start: 'session', nextUnit: null, reviewsLeft: 2, reviewsCleared: 0, sessionDone: false, sessionSize: 20, playable: true, nextReviewAt: null } })
   const { container, router, cleanup } = await renderStart('/today')
   try {
     const links = () => [...container.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Main"] a')]
