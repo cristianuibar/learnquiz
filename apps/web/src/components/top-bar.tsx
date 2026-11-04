@@ -7,7 +7,7 @@ function LogoMark() {
   const maskId = `lq-mark-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
   return (
     <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false" className="size-7 shrink-0">
-      <mask id={maskId}>
+      <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
         <rect width="64" height="64" fill="white" />
         <circle cx="48" cy="48" r="13" fill="black" />
       </mask>
