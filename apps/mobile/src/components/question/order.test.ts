@@ -1,12 +1,15 @@
 import { createElement as h } from 'react'
 import { StyleSheet } from 'react-native'
-import { fireEvent, render, screen } from '@testing-library/react-native'
+import { act, fireEvent, render, screen } from '@testing-library/react-native'
 import type { ItemView } from '@learnquiz/api'
 import { ThemeProvider } from '../../theme/ThemeProvider'
 import { OrderBody } from './order'
 
 // The item has no image; the diagram loader pulls in native modules.
 jest.mock('./diagram-image', () => ({ DiagramImage: () => null }))
+
+beforeEach(() => jest.useFakeTimers())
+afterEach(() => jest.useRealTimers())
 
 const item: ItemView = {
   id: 'i', conceptId: 'c', conceptName: 'Returns', format: 'order', blank: null, image: null, difficulty: 1,
@@ -43,5 +46,8 @@ test('hidden Clear stays out of reach and shown Clear clears the steps', async (
   expect(hidden.clear).toBeDisabled()
   const shown = await clearBox(['inspect'])
   await fireEvent.press(screen.getByRole('button', { name: 'Clear' }))
+  // Clear returns accessibility focus on the next frame. Exercise that frame
+  // while the view is mounted instead of leaving it past Jest teardown.
+  await act(async () => { await jest.runOnlyPendingTimersAsync() })
   expect(shown.onAnswer).toHaveBeenCalledWith({ order: [] })
 })

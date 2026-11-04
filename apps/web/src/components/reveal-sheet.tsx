@@ -6,18 +6,10 @@ import { SourceQuote } from '@/components/source-quote'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { HalfDisc } from '@/components/status-icons'
 import { cn } from '@/lib/utils'
 import { revealCopy, revealModel } from '@learnquiz/api/reveal'
 import type { Answer, ItemView, Reveal } from '@learnquiz/api'
-
-function HalfDisc({ className }: { className?: string }) {
-  return (
-    <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
-      <path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none" />
-      <circle cx="12" cy="12" r="9" />
-    </svg>
-  )
-}
 
 const TONE = {
   correct: { ground: 'bg-feedback-correct-tint', disc: 'bg-feedback-correct text-on-feedback', text: 'text-feedback-correct', Icon: Check },
@@ -162,6 +154,7 @@ export function RevealSheet({
       <>
         {mine && <Row label={label}>{mine}</Row>}
         <Row label={revealCopy.theAnswer}>{correct}</Row>
+        {reveal.feedback && <p className="text-body">{reveal.feedback}</p>}
         {explanation}
         {quote}
       </>
@@ -206,6 +199,7 @@ export function RevealSheet({
               : <ul className="list-disc pl-6 text-body">{mixUps.map((m) => <li key={m}>{m}</li>)}</ul>}
           </div>
         )}
+        {mixUps.length === 0 && reveal.chosenFeedback && <p className="text-body">{reveal.chosenFeedback}</p>}
         <div className="flex flex-col gap-1">
           <h3 className="text-label">{revealCopy.whatActuallyMatters}</h3>
           {explanation}

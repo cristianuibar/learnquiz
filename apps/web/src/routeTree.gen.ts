@@ -26,6 +26,7 @@ import { Route as MeProfileRouteImport } from './routes/me.profile'
 import { Route as OrgSlugRouteImport } from './routes/org.$slug'
 import { Route as OrgNewRouteImport } from './routes/org.new'
 import { Route as PlaySessionIdRouteImport } from './routes/play.$sessionId'
+import { Route as PlayLoadingRouteImport } from './routes/play.loading'
 import { Route as AdminCompaniesSlugRouteImport } from './routes/admin.companies_.$slug'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
@@ -127,6 +128,11 @@ const OrgNewRoute = OrgNewRouteImport.update({
 const PlaySessionIdRoute = PlaySessionIdRouteImport.update({
   id: '/play/$sessionId',
   path: '/play/$sessionId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlayLoadingRoute = PlayLoadingRouteImport.update({
+  id: '/play/loading',
+  path: '/play/loading',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminCompaniesSlugRoute = AdminCompaniesSlugRouteImport.update({
@@ -232,6 +238,7 @@ export interface FileRoutesByFullPath {
   '/org/$slug': typeof OrgSlugRouteWithChildren
   '/org/new': typeof OrgNewRoute
   '/play/$sessionId': typeof PlaySessionIdRoute
+  '/play/loading': typeof PlayLoadingRoute
   '/admin/': typeof AdminIndexRoute
   '/me/': typeof MeIndexRoute
   '/admin/companies/$slug': typeof AdminCompaniesSlugRoute
@@ -266,6 +273,7 @@ export interface FileRoutesByTo {
   '/me/profile': typeof MeProfileRoute
   '/org/new': typeof OrgNewRoute
   '/play/$sessionId': typeof PlaySessionIdRoute
+  '/play/loading': typeof PlayLoadingRoute
   '/admin': typeof AdminIndexRoute
   '/me': typeof MeIndexRoute
   '/admin/companies/$slug': typeof AdminCompaniesSlugRoute
@@ -303,6 +311,7 @@ export interface FileRoutesById {
   '/org/$slug': typeof OrgSlugRouteWithChildren
   '/org/new': typeof OrgNewRoute
   '/play/$sessionId': typeof PlaySessionIdRoute
+  '/play/loading': typeof PlayLoadingRoute
   '/admin/': typeof AdminIndexRoute
   '/me/': typeof MeIndexRoute
   '/admin/companies_/$slug': typeof AdminCompaniesSlugRoute
@@ -341,6 +350,7 @@ export interface FileRouteTypes {
     | '/org/$slug'
     | '/org/new'
     | '/play/$sessionId'
+    | '/play/loading'
     | '/admin/'
     | '/me/'
     | '/admin/companies/$slug'
@@ -375,6 +385,7 @@ export interface FileRouteTypes {
     | '/me/profile'
     | '/org/new'
     | '/play/$sessionId'
+    | '/play/loading'
     | '/admin'
     | '/me'
     | '/admin/companies/$slug'
@@ -411,6 +422,7 @@ export interface FileRouteTypes {
     | '/org/$slug'
     | '/org/new'
     | '/play/$sessionId'
+    | '/play/loading'
     | '/admin/'
     | '/me/'
     | '/admin/companies_/$slug'
@@ -444,6 +456,7 @@ export interface RootRouteChildren {
   OrgSlugRoute: typeof OrgSlugRouteWithChildren
   OrgNewRoute: typeof OrgNewRoute
   PlaySessionIdRoute: typeof PlaySessionIdRoute
+  PlayLoadingRoute: typeof PlayLoadingRoute
   MeIndexRoute: typeof MeIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiV1SplatRoute: typeof ApiV1SplatRoute
@@ -575,6 +588,13 @@ declare module '@tanstack/react-router' {
       path: '/play/$sessionId'
       fullPath: '/play/$sessionId'
       preLoaderRoute: typeof PlaySessionIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/play/loading': {
+      id: '/play/loading'
+      path: '/play/loading'
+      fullPath: '/play/loading'
+      preLoaderRoute: typeof PlayLoadingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/companies_/$slug': {
@@ -754,6 +774,7 @@ const rootRouteChildren: RootRouteChildren = {
   OrgSlugRoute: OrgSlugRouteWithChildren,
   OrgNewRoute: OrgNewRoute,
   PlaySessionIdRoute: PlaySessionIdRoute,
+  PlayLoadingRoute: PlayLoadingRoute,
   MeIndexRoute: MeIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiV1SplatRoute: ApiV1SplatRoute,

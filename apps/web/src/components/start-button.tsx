@@ -1,14 +1,8 @@
-import { useState } from 'react'
-import { useRouter } from '@tanstack/react-router'
-import { useServerFn } from '@tanstack/react-start'
-import { InlineError, errorMessage } from '@/components/inline-error'
+import { useNavigate } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { Working } from '@/components/working'
-import { startPlacement, startSession } from '@/server/play'
 
-// Starts a placement or a session, then opens it. Placement writes questions (~45 s); a session usually
-// starts in seconds, since the next concepts' questions are written ahead during the previous session.
+// Opens the Loading screen, which starts the placement or session and then opens it.
 export function StartButton({
   topicId,
   placement,
@@ -30,32 +24,12 @@ export function StartButton({
   className?: string
   children: React.ReactNode
 }) {
-  const router = useRouter()
-  const start = useServerFn(placement ? startPlacement : startSession)
-  const [working, setWorking] = useState(false)
-  const [error, setError] = useState('')
+  const navigate = useNavigate()
 
-  async function go() {
-    setWorking(true)
-    setError('')
-    try {
-      const { sessionId } = await start({ data: { topicId } })
-      await router.navigate({ to: '/play/$sessionId', params: { sessionId } })
-    } catch (err) {
-      setError(errorMessage(err))
-      setWorking(false)
-    }
+  function go() {
+    void navigate({ to: '/play/loading', search: { topicId, start: placement ? 'placement' : 'session' } })
   }
 
-  if (working) {
-    return (
-      <Working
-        label={placement ? 'Writing your first questions' : 'Picking your questions'}
-        seconds={placement ? 45 : 15}
-      />
-    )
-  }
-  if (error) return <InlineError message={error} onRetry={go} />
   return (
     <Button
       variant={variant}

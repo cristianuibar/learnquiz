@@ -1,10 +1,13 @@
 import { useSyncExternalStore } from 'react'
+import { todayFixtures } from '@learnquiz/api/today'
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 import { router } from 'expo-router'
 import { api } from './lib/api'
-import { acceptInvitation, signIn, signUp } from './lib/auth'
+import { acceptInvitation, getToken, signIn, signUp } from './lib/auth'
 import { useSession } from './lib/session-store'
 import { holdTarget, peekHeldTarget, releaseReplayHolds, takeHeldTarget, takeReplayTarget } from './lib/held-target'
+
+const Native: typeof import('react-native') = require('react-native')
 
 jest.mock('./app/play/[sessionId]/index', () => ({ __esModule: true, default: () => null }))
 jest.mock('@expo-google-fonts/inter', () => ({ useFonts: () => [true, null] }))
@@ -18,16 +21,26 @@ jest.mock('./lib/session-store', () => ({
   SessionProvider: ({ children }: { children: unknown }) => children,
   useSession: jest.fn(),
 }))
-jest.mock('./lib/api', () => ({ api: jest.fn() }))
+jest.mock('./lib/api', () => ({ ...jest.requireActual('./lib/api'), api: jest.fn() }))
 // Authentication and Profile's sign-out need the native secure store.
 jest.mock('./lib/auth', () => ({
   signIn: jest.fn(), signUp: jest.fn(), signOut: jest.fn(), acceptInvitation: jest.fn(),
   subscribeAuth: jest.fn(() => () => {}),
+  getToken: jest.fn(() => null),
 }))
 // The real Today screen loads /today; this file only checks that the route is reachable.
 jest.mock('./app/(tabs)/today', () => ({
   __esModule: true,
   default: () => require('react').createElement(require('react-native').Text, null, 'Today screen'),
+}))
+// The tab bar reads Today to enable Path. This file checks routing and counts
+// api calls, so the tab bar sees a fixed Today with no topic and never fetches.
+jest.mock('expo-sqlite/kv-store', () => ({ AsyncStorage: {
+  getItemAsync: async () => null, setItemAsync: async () => {}, removeItemAsync: async () => {}, getAllKeysAsync: async () => [],
+} }))
+jest.mock('./lib/today', () => ({
+  ...jest.requireActual('./lib/today'),
+  useToday: () => ({ today: null, view: null, status: 'loading', refreshing: false, refresh: async () => {} }),
 }))
 jest.mock('react-native-gesture-handler', () => ({ GestureHandlerRootView: 'View' }))
 jest.mock('react-native-keyboard-controller', () => ({
@@ -57,6 +70,7 @@ beforeEach(() => {
   releaseReplayHolds()
   takeHeldTarget()
   jest.mocked(api).mockReset()
+  jest.mocked(getToken).mockReturnValue(null)
   jest.mocked(signIn).mockReset()
   jest.mocked(signUp).mockReset()
   jest.mocked(acceptInvitation).mockReset()
@@ -131,6 +145,9 @@ test('the actual router keeps sign-in closed for a signed-in learner', async () 
   expect(navigation.getPathname()).toBe('/today')
   expect(screen.getByText('Today screen')).toBeOnTheScreen()
   expect(screen.queryByText('Sign in')).toBeNull()
+  // The tab bar is on: Today is selected, and Path waits for a topic.
+  expect(screen.getByRole('tab', { name: 'Today', selected: true })).toBeOnTheScreen()
+  expect(screen.getByRole('tab', { name: 'Path', disabled: true })).toBeOnTheScreen()
 })
 
 test('the actual router replays a held target after startup, sign-in and disclosure', async () => {
@@ -202,7 +219,7 @@ async function signInThroughRoot(held: string | null, needsDisclosure = false) {
 test('real root sign-in opens a held unit once when refresh unlocks the private routes', async () => {
   const { navigation, replace } = await signInThroughRoot('/unit/u1')
   expect(navigation.getPathname()).toBe('/unit/u1')
-  expect(screen.getByText('Unit')).toBeOnTheScreen()
+  expect(screen.getByLabelText('Back to Path')).toBeOnTheScreen()
   expect(replace.mock.calls.map(([target]) => target)).toEqual(['/unit/u1'])
   expect(peekHeldTarget()).toBeNull()
 })
@@ -310,6 +327,9 @@ test('Got it sends one acknowledge while the first tap is pending', async () => 
 })
 
 test('review mode from Profile shows the branded copy and Got it returns without acknowledging', async () => {
+  jest.mocked(getToken).mockReturnValue('token-a')
+  jest.mocked(api).mockResolvedValue({ name: 'Learner', role: null, started: true, mastery: 0.66, benchmark: 0.85,
+    onboarding: { day: 16, days: 30 }, proficiency: { achievedAt: null, projectedAt: null }, weeks: [], units: [], confidentErrors: [] })
   jest.mocked(useSession).mockReturnValue({ ...ready, branding: { name: 'Northwind', accent: null, logoUrl: null } })
   const navigation = renderRouter('src/app', { initialUrl: '/profile' })
   await navigation
@@ -317,8 +337,64 @@ test('review mode from Profile shows the branded copy and Got it returns without
   expect(navigation.getPathname()).toBe('/welcome')
   expect(screen.getByText('You and Northwind’s training admins.')).toBeOnTheScreen()
   await fireEvent.press(screen.getByRole('button', { name: 'Got it' }))
-  expect(api).not.toHaveBeenCalled()
+  expect(api).toHaveBeenCalledWith('/me/profile', expect.objectContaining({ signal: expect.any(AbortSignal) }))
+  expect(jest.mocked(api).mock.calls.every(([path]) => path === '/me/profile')).toBe(true)
   expect(navigation.getPathname()).toBe('/profile')
+  expect(screen.getByRole('header', { name: 'Training progress' })).toBeOnTheScreen()
+})
+
+test('Profile keeps loaded mastery visible during a return-from-Settings refetch', async () => {
+  const profile = { name: 'Learner', role: null, started: true, mastery: 0.66, benchmark: 0.85,
+    onboarding: { day: 16, days: 30 }, proficiency: { achievedAt: null, projectedAt: null }, weeks: [], units: [], confidentErrors: [] }
+  let resolve!: (value: unknown) => void
+  const pending = new Promise((done) => { resolve = done })
+  jest.mocked(getToken).mockReturnValue('token-a')
+  jest.mocked(useSession).mockReturnValue(ready)
+  jest.mocked(api).mockResolvedValueOnce(profile).mockReturnValueOnce(pending)
+  const navigation = renderRouter('src/app', { initialUrl: '/profile' })
+  await navigation
+  expect(await screen.findByLabelText('66% of 85% benchmark')).toBeOnTheScreen()
+  expect(screen.queryByText('Projected')).toBeNull()
+  await fireEvent.press(screen.getByRole('button', { name: 'Settings' }))
+  await act(async () => { router.back() })
+  expect(api).toHaveBeenCalledTimes(2)
+  expect(screen.getByLabelText('66% of 85% benchmark')).toBeOnTheScreen()
+  await act(async () => { resolve({ ...profile, mastery: 0.72 }) })
+  expect(await screen.findByLabelText('72% of 85% benchmark')).toBeOnTheScreen()
+})
+
+test('Profile keeps its empty state when Today fails, retries, and returns accessibility focus to its heading', async () => {
+  jest.useFakeTimers()
+  jest.spyOn(Native, 'findNodeHandle').mockReturnValue(42)
+  const focus = jest.spyOn(Native.AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => {})
+  const profile = { name: 'Learner', role: null, started: false, benchmark: 0.85, onboarding: { day: 1, days: 30 } }
+  const first = todayFixtures.first
+  const building = { ...first, role: { ...first.role!, preparing: false, building: { ready: 2, total: 10 } } }
+  let resolve!: (value: unknown) => void
+  const pending = new Promise((done) => { resolve = done })
+  let todayCalls = 0
+  jest.mocked(getToken).mockReturnValue('token-a')
+  jest.mocked(useSession).mockReturnValue(ready)
+  jest.mocked(api).mockImplementation((path) => {
+    if (path === '/me/profile') return Promise.resolve(profile)
+    if (path === '/today') return ++todayCalls === 1 ? Promise.reject(new Error('Network unavailable')) : pending
+    throw new Error(`Unexpected request: ${path}`)
+  })
+  await renderRouter('src/app', { initialUrl: '/profile' })
+  expect(await screen.findByText('Could not load the first session.')).toBeOnTheScreen()
+  expect(screen.getByText('Your progress shows up after your first session.')).toBeOnTheScreen()
+  expect(screen.queryByText('Could not load training progress.')).toBeNull()
+  await act(async () => { await jest.advanceTimersByTimeAsync(100) })
+  focus.mockClear()
+  await fireEvent.press(screen.getByRole('button', { name: 'Try again' }))
+  expect(screen.getByRole('button', { name: 'Try again', busy: true })).toBeDisabled()
+  expect(screen.getByText('Your progress shows up after your first session.')).toBeOnTheScreen()
+  await act(async () => { resolve(building) })
+  expect(screen.getByRole('button', { name: 'Play first session' })).toBeEnabled()
+  expect(screen.queryByText('Could not load the first session.')).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
+  expect(jest.mocked(api).mock.calls.map(([path]) => path)).toEqual(['/me/profile', '/today', '/me/profile', '/today'])
+  expect(focus).toHaveBeenCalledWith(42)
   expect(screen.getByRole('header', { name: 'Training progress' })).toBeOnTheScreen()
 })
 

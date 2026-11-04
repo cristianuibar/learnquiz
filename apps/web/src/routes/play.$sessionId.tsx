@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
-import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
+import { createFileRoute, getRouteApi, redirect, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { InlineError, RouteError, errorMessage } from '@/components/inline-error'
 import { ProgressHeader } from '@/components/progress-header'
@@ -91,8 +91,11 @@ function openedFromHistory() {
   return nav?.type === 'back_forward'
 }
 
+const rootApi = getRouteApi('__root__')
+
 function Play({ initial }: { initial: SessionView }) {
   const router = useRouter()
+  const { branding } = rootApi.useLoaderData()
   const check = useServerFn(answerItem)
   const next = useServerFn(nextItem)
   const end = useServerFn(endSession)
@@ -107,12 +110,15 @@ function Play({ initial }: { initial: SessionView }) {
   const [voiceBusy, setVoiceBusy] = useState(false)
   // Answer controls stay disabled until the current position is known; the server HTML renders them disabled too.
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<{ message: string; retry: () => void } | null>(null)
+  // `ending` marks a failed End session, which keeps Check for the answer on screen.
+  const [error, setError] = useState<{ message: string; retry: () => void; ending?: boolean } | null>(null)
   const shownAt = useRef(Date.now())
   const questionHeading = useRef<HTMLHeadingElement>(null)
   // Read by the pageshow handler, which is registered once.
   const revealShowing = useRef(false)
   revealShowing.current = Boolean(reveal)
+  // A sent report waits for the dialog to close: while it is open the live region is aria-hidden.
+  const reportPending = useRef(false)
 
   const { item, progress } = view
   const placement = view.kind === 'placement'
@@ -166,13 +172,13 @@ function Play({ initial }: { initial: SessionView }) {
     if (item && !reveal) writeDraft(draftKey(view.id, item.id), choice, confidence)
   }, [view.id, item, reveal, choice, confidence])
 
-  async function run(fn: () => Promise<void>, message: (err: unknown) => string = errorMessage) {
+  async function run(fn: () => Promise<void>, message: (err: unknown) => string = errorMessage, ending = false) {
     setBusy(true)
     setError(null)
     try {
       await fn()
     } catch (err) {
-      setError({ message: message(err), retry: () => run(fn, message) })
+      setError({ message: message(err), retry: () => run(fn, message, ending), ending })
     }
     setBusy(false)
   }
@@ -180,16 +186,20 @@ function Play({ initial }: { initial: SessionView }) {
   const finish = () =>
     run(async () => {
       await end({ data: { sessionId: view.id } })
-      await router.navigate({ to: '/play/$sessionId/done', params: { sessionId: view.id } })
+      await router.navigate({ to: '/play/$sessionId/done', params: { sessionId: view.id }, state: { reportSent: reportPending.current } })
     })
 
   // Answered items stay recorded; the learner returns to Today.
   const leave = () =>
-    run(async () => {
-      stopSpeaking()
-      await end({ data: { sessionId: view.id } })
-      await router.navigate({ to: '/today' })
-    })
+    run(
+      async () => {
+        stopSpeaking()
+        await end({ data: { sessionId: view.id } })
+        await router.navigate({ to: '/today' })
+      },
+      errorMessage,
+      true,
+    )
 
   async function resync() {
     const v = await sync({ data: { sessionId: view.id } })
@@ -244,9 +254,16 @@ function Play({ initial }: { initial: SessionView }) {
   }
 
   function reportSent(why: string) {
-    setAnnouncement('Report sent')
+    reportPending.current = true
     submitNext(why)
   }
+
+  // Runs after the closed dialog has dropped aria-hidden from the page.
+  useEffect(() => {
+    if (reveal || !reportPending.current) return
+    reportPending.current = false
+    setAnnouncement('Report sent')
+  }, [reveal])
 
   const revealed = !view.ended && item && reveal ? { item, reveal } : null
   const answer = revealed ? toAnswer(revealed.item.format, choice) : null
@@ -302,8 +319,8 @@ function Play({ initial }: { initial: SessionView }) {
           reveal={revealed.reveal}
           item={revealed.item}
           answer={answer}
-          hasCompany={false}
-          company={null}
+          hasCompany={Boolean(branding)}
+          company={branding?.name ?? null}
           busy={busy}
           error={error?.message ?? null}
           onContinue={submitNext}

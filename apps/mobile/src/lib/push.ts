@@ -103,9 +103,15 @@ async function forget(deps: PushDeps, hadToken: boolean, keepForUnregister = fal
   })
 }
 // Called for a confirmed session and before publishing a sign-in bearer. An
-// endpoint survives token renewal only for the same learner; an unknown owner
-// is cleared rather than attributed to a newly signed-in learner.
+// endpoint survives token renewal only for the same learner. One retained by a
+// cold 401 before any session was saved has no known owner (no lq:session, so no
+// token fingerprint either). Dropping it would leave its server subscription
+// forever, so the next confirmed learner takes it and unregisters it at sign-out.
+// That DELETE is scoped to the bearer's own user on the server, so it cannot
+// remove another learner's subscription. A sign-in with no confirmed learner
+// still drops it.
 export function setPushUser(userId: string | null): void {
+  if (unregisterToken && unregisterToken.userId === null && userId !== null) unregisterToken = { ...unregisterToken, userId }
   if (unregisterToken && (userId === null || unregisterToken.userId !== userId)) unregisterToken = null
   if (pushUserId !== null && pushUserId !== userId) {
     generation++

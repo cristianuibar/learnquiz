@@ -1,5 +1,6 @@
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 import * as SecureStore from 'expo-secure-store'
+import { todayFixtures } from '@learnquiz/api/today'
 import { getToken, signIn } from './lib/auth'
 
 // The real root layout, session store, auth and Profile screen; only native
@@ -53,7 +54,11 @@ jest.mock('expo-constants', () => ({
 const replies: Record<string, { data: unknown; token?: string }> = {
   '/api/auth/sign-in/email': { data: {}, token: 'token-a' },
   '/api/v1/session': { data: { user: { id: 'user-a', name: 'Ana', isAnonymous: false }, needsDisclosure: false } },
+  // The tab bar loads Today to decide whether Path is open.
+  '/api/v1/today': { data: todayFixtures.normal },
   '/api/v1/branding': { data: null },
+  '/api/v1/me/profile': { data: { name: 'Ana', role: null, started: true, mastery: 0.66, benchmark: 0.85,
+    onboarding: { day: 16, days: 30 }, proficiency: { achievedAt: null, projectedAt: null }, weeks: [], units: [], confidentErrors: [] } },
   '/api/auth/sign-out': { data: {} },
 }
 globalThis.fetch = jest.fn(async (input: RequestInfo | URL) => {

@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
-import { Link, createFileRoute, redirect } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
+import { Link, createFileRoute, redirect, useLocation } from '@tanstack/react-router'
 import { RouteError } from '@/components/inline-error'
 import { MasteryBar } from '@/components/mastery-bar'
 import { ModelLabel } from '@/components/model-label'
@@ -30,12 +30,19 @@ const pct = (v: number) => `${Math.round(v * 100)}%`
 function Done() {
   const s = Route.useLoaderData()
   const placed = s.kind === 'placement' && s.level !== null
+  const reportSent = useLocation({ select: (l) => Boolean(l.state.reportSent) })
+  const [announcement, setAnnouncement] = useState('')
+  // Filled after mount so the live region exists first and the report sent on the last question is read out.
+  useEffect(() => setAnnouncement(reportSent ? 'Report sent' : ''), [reportSent])
   useEffect(() => {
     // The frontier is known only once placement ends, so the first session's questions are written here.
     if (placed) prepareNextSession({ data: { sessionId: s.sessionId } }).catch(() => {})
   }, [placed, s.sessionId])
   return (
     <main className="mx-auto w-full max-w-xl px-4 pt-8 pb-8">
+      <p role="status" className="sr-only">
+        {announcement}
+      </p>
       <h1 className="text-title-1 text-ink">
         {placed ? `You're at level ${s.level} of 5` : `Session done, ${clock(s.durationMs)}`}
       </h1>

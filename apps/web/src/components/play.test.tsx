@@ -5,18 +5,22 @@ import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Route as playRoute } from '@/routes/play.$sessionId'
 import { Route as appRootRoute } from '@/routes/__root'
+import { Route as doneRoute } from '@/routes/play.$sessionId_.done'
 import { answerItem, endSession, getSession, nextItem, prepareNextSession, reportItem, transcribeAnswer } from '@/server/play'
 import { getModelTrace } from '@/server/model-trace'
+import { getPushSettings } from '@/server/push'
 import { generateConceptDiagram } from '@/server/diagrams'
+import { getCompanyBranding } from '@/server/org-settings'
 import type { ItemView, Reveal, SessionView } from '@learnquiz/api'
 
 vi.mock('motion/react', async (original) => ({ ...(await original<typeof import('motion/react')>()), useReducedMotion: () => true }))
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
-vi.mock('@/server/play', () => ({ prepareNextSession: vi.fn(async () => ({ ok: true })), answerItem: vi.fn(), getSession: vi.fn(), transcribeAnswer: vi.fn(), nextItem: vi.fn(), endSession: vi.fn(), reportItem: vi.fn() }))
+vi.mock('@/server/play', () => ({ prepareNextSession: vi.fn(async () => ({ ok: true })), answerItem: vi.fn(), getSession: vi.fn(), transcribeAnswer: vi.fn(), nextItem: vi.fn(), endSession: vi.fn(), reportItem: vi.fn(), startSession: vi.fn() }))
 vi.mock('@/server/model-trace', () => ({ getModelTrace: vi.fn() }))
+vi.mock('@/server/push', () => ({ getPushSettings: vi.fn() }))
 vi.mock('@/server/diagrams', () => ({ generateConceptDiagram: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
-vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
+vi.mock('@/server/org-settings', () => ({ getCompanyBranding: vi.fn(async () => null) }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => 't1' }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: async () => ({ user: { id: 'u1', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] }) }))
 
@@ -76,8 +80,9 @@ async function renderPlay(voiceEnabled: boolean | null = true, permissionPending
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
   const play = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId', loader: playRoute.options.loader, gcTime: playRoute.options.gcTime, component: playRoute.options.component })
   const today = createRoute({ getParentRoute: () => rootRoute, path: '/today', component: () => <p>Today page</p> })
+  const done = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId/done', loader: doneRoute.options.loader, component: doneRoute.options.component })
   const router = createRouter({
-    routeTree: rootRoute.addChildren([play, today]),
+    routeTree: rootRoute.addChildren([play, today, done]),
     history: createMemoryHistory(fromToday ? { initialEntries: ['/today', '/play/s1'], initialIndex: 1 } : { initialEntries: ['/play/s1'] }),
   })
   const container = document.createElement('div')
@@ -382,7 +387,7 @@ it.each([false, true])('submits a short answer and shows its reveal (ungraded=%s
     vi.mocked(answerItem).mockResolvedValueOnce({
       attemptId: ungraded ? null : 'a1', diagramConceptId: 'c1', state: ungraded ? 'ungraded' : 'D', correct: false,
       xp: 0, critical: false, correctOptionIds: null, sourceVersion: null, detail: null,
-      score: ungraded ? null : 0.5, feedback: ungraded ? 'Compare your answer with the model answer.' : 'Explain why both sides stay equal.',
+      score: ungraded ? null : 0.5, feedback: ungraded ? 'Daily grading limit reached; back tomorrow. Compare your answer with the model answer. Your learning progress has not changed.' : 'Explain why both sides stay equal.',
       missingPoints: ungraded ? [] : ['Subtract the same amount from both sides.'],
       correctAnswer: 'Equal changes preserve equality.', explanation: 'Both sides change by the same amount.',
       chosenFeedback: null, sourceQuote: 'Subtract equal quantities.', sourceTitle: 'Algebra notes', mixUps: [], returnsThisSession: false, pKnownBefore: 0.6, pKnownAfter: 0.6,
@@ -399,6 +404,7 @@ it.each([false, true])('submits a short answer and shows its reveal (ungraded=%s
       expect(dialog.querySelector('h2')?.textContent).toBe('Couldn’t grade this answer')
       expect(dialog.textContent).toMatch(/Your answerBoth sides get smaller\.The answerEqual changes preserve equality\./)
       expect(dialog.textContent).toContain('Subtract equal quantities.')
+      expect(dialog.textContent).toContain('Daily grading limit reached; back tomorrow. Compare your answer with the model answer. Your learning progress has not changed.')
       expect(dialog.querySelector('input')).toBeNull()
     } else {
       expect(dialog.querySelector('h2')?.textContent).toBe('Not quite')
@@ -512,6 +518,38 @@ it('ends the session from the top bar and returns to Today', async () => {
   } finally { await cleanup() }
 })
 
+it('keeps Check for the answer on screen when ending the session fails, and retries the end on its own', async () => {
+  const { container, cleanup } = await renderPlay(false, false, 'mcq')
+  try {
+    vi.mocked(endSession).mockReset().mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValue({} as never)
+    await pick(container, 'answer', 'b')
+    await pick(container, 'confidence', 'sure')
+    await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="End session"]')!.click() })
+    expect(button(container, 'Check').disabled).toBe(false)
+    // The alert and its Try again share the sticky dock with Check, so a long question cannot push them below the fold.
+    expect(button(container, 'Check').parentElement!.contains(container.querySelector('[role="alert"]'))).toBe(true)
+    expect(button(container, 'Check').parentElement!.contains(button(container, 'Try again'))).toBe(true)
+    await act(async () => { button(container, 'Check').click() })
+    expect(answerItem).toHaveBeenCalledWith({ data: expect.objectContaining({ answer: { optionId: 'b' }, confidence: 'sure' }) })
+    expect(endSession).toHaveBeenCalledTimes(1)
+    expect(document.querySelector('[role="dialog"] h2')!.textContent).toBe('Correct')
+  } finally { await cleanup() }
+})
+
+it('retries ending the session from the error after End session fails', async () => {
+  const { container, cleanup } = await renderPlay(false, false, 'mcq')
+  try {
+    vi.mocked(endSession).mockReset().mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValue({} as never)
+    await pick(container, 'answer', 'b')
+    await pick(container, 'confidence', 'sure')
+    await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="End session"]')!.click() })
+    await act(async () => { button(container, 'Try again').click() })
+    expect(endSession).toHaveBeenCalledTimes(2)
+    expect(answerItem).not.toHaveBeenCalled()
+    expect(container.textContent).toContain('Today page')
+  } finally { await cleanup() }
+})
+
 it.each([
   new TypeError('Failed to fetch'),
   Object.assign(new Error('Internal error'), { status: 503 }),
@@ -607,6 +645,20 @@ describe('reveal overlay', () => {
     } finally { await cleanup() }
   })
 
+  it.each([
+    { branding: null, line: 'Not quoted from a source', team: null },
+    { branding: { name: 'Acme', logoUrl: null, accent: null }, line: 'Not quoted from your SOP', team: 'Goes to Acme’s training team.' },
+  ])('describes the source and report recipient for company branding $branding.name', async ({ branding, line, team }) => {
+    vi.mocked(getCompanyBranding).mockResolvedValueOnce(branding)
+    const { cleanup } = await check({ ...sureCorrect, sourceQuote: null })
+    try {
+      expect(dialog()!.textContent).toContain(line)
+      await click(linkByText('Report this question'))
+      expect(dialog()!.textContent?.includes('training team')).toBe(team !== null)
+      if (team) expect(dialog()!.textContent).toContain(team)
+    } finally { await cleanup() }
+  })
+
   it('keeps the reflection when Report is opened and cancelled, and returns focus to the Report link', async () => {
     const { cleanup } = await check(sureWrong)
     try {
@@ -631,21 +683,47 @@ describe('reveal overlay', () => {
     } finally { await cleanup() }
   })
 
+  // The modal dialog aria-hides the page, so the announcement must land in a region a screen reader can hear.
+  const heard = () => [...document.querySelectorAll('[role="status"]')].filter((n) => !n.closest('[aria-hidden="true"]')).map((n) => n.textContent)
+  async function sendReport() {
+    await act(async () => { type(dialog()!.querySelector('input')!, '  Because it matters  ') })
+    await click(linkByText('Report this question'))
+    await click(document.querySelector<HTMLElement>('[role="radiogroup"] [role="radio"]'))
+    await click(linkByText('Send report'))
+  }
+
   it('sends the report, then continues with the reflection, and announces it on the next question', async () => {
     const { container, initial, cleanup } = await check(sureWrong)
     try {
       vi.mocked(reportItem).mockReset().mockResolvedValue({} as never)
-      vi.mocked(nextItem).mockResolvedValueOnce({ ...initial, progress: { position: 2, total: 2 }, item: { ...initial.item!, id: 'i2', stem: 'Second question' } })
-      await act(async () => { type(dialog()!.querySelector('input')!, '  Because it matters  ') })
-      await click(linkByText('Report this question'))
-      await click(document.querySelector<HTMLElement>('[role="radiogroup"] [role="radio"]'))
-      await click(linkByText('Send report'))
+      let advance!: (view: SessionView) => void
+      vi.mocked(nextItem).mockReturnValueOnce(new Promise<SessionView>((resolve) => { advance = resolve }))
+      await sendReport()
       expect(reportItem).toHaveBeenCalledWith({ data: expect.objectContaining({ itemId: 'i1', reason: expect.any(String), attemptId: 'a1' }) })
       expect(nextItem).toHaveBeenCalledWith({ data: { sessionId: 's1', why: 'Because it matters' } })
       expect(vi.mocked(reportItem).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(nextItem).mock.invocationCallOrder[0])
+      // Not while the dialog still hides the live region.
+      expect([...document.querySelectorAll('[role="status"]')].map((n) => n.textContent)).not.toContain('Report sent')
+      await act(async () => { advance({ ...initial, progress: { position: 2, total: 2 }, item: { ...initial.item!, id: 'i2', stem: 'Second question' } }) })
       expect(dialog()).toBeNull()
       expect(container.querySelector('h1')!.textContent).toBe('Second question')
-      expect([...document.querySelectorAll('[role="status"]')].map((n) => n.textContent)).toContain('Report sent')
+      expect(heard()).toContain('Report sent')
+    } finally { await cleanup() }
+  })
+
+  it('announces a report sent on the last question on the session summary', async () => {
+    const { container, initial, router, cleanup } = await check(sureWrong)
+    try {
+      vi.mocked(reportItem).mockReset().mockResolvedValue({} as never)
+      vi.mocked(nextItem).mockResolvedValueOnce({ ...initial, ended: true, item: null })
+      vi.mocked(endSession).mockReset().mockResolvedValue({ sessionId: 's1', kind: 'session', topicId: 't1', durationMs: 1000, correct: 0, total: 1, ungraded: 0, xp: 0,
+        streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], mistakes: [], benchmark: null, reviewsLeft: 0, nextLine: 'Come back soon.', endedEarly: false })
+      vi.mocked(getPushSettings).mockResolvedValue({ canPrompt: false, endpoints: [] } as never)
+      await sendReport()
+      await act(async () => {})
+      expect(router.state.location.pathname).toBe('/play/s1/done')
+      expect(container.querySelector('h1')!.textContent).toContain('Session done')
+      expect(heard()).toContain('Report sent')
     } finally { await cleanup() }
   })
 
