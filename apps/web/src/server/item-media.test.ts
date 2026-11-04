@@ -78,6 +78,24 @@ it.each([
   expect((await serveItemImage('item')).status).toBe(status)
 })
 
+it.each([
+  ['owner', 'owner', 200],
+  ['admin', 'admin', 200],
+  ['combined admin role', 'member,admin', 200],
+  ['unassigned member', 'member', 404],
+  ['another company owner', 'owner', 404],
+])('serves portal images only to the owning company admins: %s', async (name, role, status) => {
+  raw.prepare('DELETE FROM member_role_assignments').run()
+  raw.prepare('UPDATE member SET role = ? WHERE id = ?').run(role, 'm1')
+  if (name === 'another company owner') {
+    raw.prepare('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, ?)').run('org-b', 'Beta', 'org-a', 1)
+    raw.prepare('UPDATE member SET organization_id = ? WHERE id = ?').run('org-b', 'm1')
+  }
+  const res = await serveItemImage('item')
+  expect(res.status).toBe(status)
+  if (status === 200) expect(new Uint8Array(await res.arrayBuffer())).toEqual(bytes)
+})
+
 it('points the item view at the served route', () => {
   const view = toItemView({ id: 'item', conceptId: 'c1', conceptName: 'Figures', format: 'cloze', difficultyPrior: 3, payload }, 'seed')
   expect(view.image).toEqual({ src: '/media/items/item', alt: 'A figure', width: 4, height: 3 })
