@@ -17,7 +17,7 @@ export function StaffDenied({ email, home }: { email: string; home: string }) {
       <main className="flex flex-1 flex-col items-center justify-center px-4 pt-6 pb-24">
         <section aria-labelledby="staff-denied-title" className="flex w-full max-w-[480px] flex-col gap-6 rounded-md border border-border bg-surface-card p-8">
           <div className="flex flex-col gap-3">
-            <h1 id="staff-denied-title" ref={heading} tabIndex={-1} className="text-title-1 text-ink outline-none">No access to the staff admin</h1>
+            <h1 id="staff-denied-title" ref={heading} tabIndex={-1} className="text-title-1 text-ink">No access to the staff admin</h1>
             <p className="text-body text-ink">Only Learn Quiz staff can open it. You're signed in as <strong>{email}</strong>.</p>
           </div>
           <Button asChild className="w-full">

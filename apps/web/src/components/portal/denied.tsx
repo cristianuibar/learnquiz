@@ -20,7 +20,7 @@ export function Denied({ email, company, owner }: { email?: string; company?: st
       </div>
       <main className="flex flex-1 items-start justify-center md:items-center">
         <section aria-labelledby="denied-heading" className="flex w-full max-w-[480px] flex-col gap-4 rounded-md border border-border bg-surface-card p-6 text-ink md:p-8">
-          <h1 id="denied-heading" ref={heading} tabIndex={-1} className="text-title-1 outline-none">No access to this portal</h1>
+          <h1 id="denied-heading" ref={heading} tabIndex={-1} className="text-title-1">No access to this portal</h1>
           {email && (
             <p className="text-body text-ink-muted">
               You're signed in as <strong className="font-semibold text-ink">{email}</strong>.{' '}

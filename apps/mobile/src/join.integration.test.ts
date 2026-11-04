@@ -1,5 +1,6 @@
 import { createElement, useSyncExternalStore } from 'react'
-import { Text } from 'react-native'
+import { Dimensions, Text } from 'react-native'
+import * as Native from 'react-native'
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 import { router, Stack } from 'expo-router'
 import JoinScreen from './app/join/[invitationId]'
@@ -96,6 +97,60 @@ test('Join keeps its prefilled read-only email and mode link with the default Ac
   expect(screen.queryByLabelText('Your name')).toBeNull()
   expect(screen.getByRole('button', { name: 'Sign in' })).toBeOnTheScreen()
   expect(screen.getByText('Create an account')).toBeOnTheScreen()
+})
+
+describe.each(['light', 'dark'] as const)('%s join form layout', (scheme) => {
+  describe.each([1, 2])('at font scale %s', (fontScale) => {
+    test.each([true, false, 'failed'] as const)('keeps the fields in place when Facebook capabilities are %s', async (facebook) => {
+      const capabilities = deferred<{ facebook: boolean }>()
+      jest.mocked(api).mockImplementation(async (path: string) => {
+        if (path.startsWith('/invites/')) return invite
+        if (path === '/auth/capabilities') return capabilities.promise
+        throw new Error(`unexpected ${path}`)
+      })
+      const colorScheme = jest.spyOn(Native, 'useColorScheme').mockReturnValue(scheme)
+      const windowSize = Dimensions.get('window')
+      Dimensions.set({ window: { ...windowSize, width: 320, fontScale } })
+      try {
+        await renderRouter(routes, { initialUrl: '/join/inv-1' })
+        const fields = [
+          await screen.findByLabelText(`Email, ${invite.email}`),
+          screen.getByLabelText('Your name'),
+          screen.getByLabelText('Create a password'),
+        ]
+        const submit = screen.getByRole('button', { name: 'Create account' })
+        // The renderer has no native coordinates. Compare every rendered node
+        // through the submit button: an inserted sibling above the form fails.
+        const nodes = screen.root!.queryAll(() => true)
+        const beforeFormEnd = nodes.slice(0, nodes.indexOf(submit) + 1)
+        expect(fields.map((field) => nodes.indexOf(field))).toEqual(
+          fields.map((field) => nodes.indexOf(field)).sort((a, b) => a - b),
+        )
+        expect(screen.queryByRole('button', { name: 'Continue with Facebook' })).toBeNull()
+
+        await act(async () => {
+          if (facebook === 'failed') capabilities.reject(new Error('offline'))
+          else capabilities.resolve({ facebook })
+        })
+
+        const after = screen.root!.queryAll(() => true)
+        const afterFormEnd = after.slice(0, after.indexOf(submit) + 1)
+        expect(afterFormEnd).toHaveLength(beforeFormEnd.length)
+        expect(afterFormEnd.every((node, index) => node === beforeFormEnd[index])).toBe(true)
+        if (facebook === true) {
+          const button = screen.getByRole('button', { name: 'Continue with Facebook' })
+          expect(after.indexOf(button)).toBeGreaterThan(after.indexOf(screen.getByText('I already have an account')))
+        } else {
+          expect(screen.queryByRole('button', { name: 'Continue with Facebook' })).toBeNull()
+          expect(after).toHaveLength(nodes.length)
+          expect(after.every((node, index) => node === nodes[index])).toBe(true)
+        }
+      } finally {
+        Dimensions.set({ window: windowSize })
+        colorScheme.mockRestore()
+      }
+    })
+  })
 })
 
 test('a join that finishes behind a pushed screen does not navigate until Join is back in front', async () => {

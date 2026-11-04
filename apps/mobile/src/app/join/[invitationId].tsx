@@ -242,7 +242,6 @@ function Invite({ invitationId, invite }: { invitationId: string; invite: Invite
         </View>
         <Heading title={view.title} body={view.body} />
       </View>
-      {!viewer && (formOpen || action.kind === 'signIn') && <FacebookSignIn disabled={busy} invitationId={action.kind === 'signIn' ? undefined : invitationId} />}
       {formOpen ? (
         <AccountForm
           mode={mode}
@@ -271,6 +270,8 @@ function Invite({ invitationId, invite }: { invitationId: string; invite: Invite
           </Button>
         </View>
       )}
+      {/* Capabilities load asynchronously; keep this option below the form so fields stay put. */}
+      {!viewer && (formOpen || action.kind === 'signIn') && <FacebookSignIn disabled={busy} invitationId={action.kind === 'signIn' ? undefined : invitationId} />}
     </>
   )
 }

@@ -70,7 +70,7 @@ beforeAll(async () => {
     sqlite.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES (?, ?, ?, ?)').run(id, org, org, NOW)
     sqlite.prepare('INSERT INTO topics (id, learner_id, title, created_at) VALUES (?, ?, ?, ?)').run(org, id, `${org} topic`, NOW)
     sqlite.prepare('INSERT INTO sources (id, topic_id, kind, title, body_text, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(org, org, 'text', `${org} document`, 'Private source text', NOW)
-    sqlite.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, cost_usd, ok, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(org, id, 'items', 'test', 1, org === 'alpha' ? 0.125 : 9, 1, NOW)
+    sqlite.prepare('INSERT INTO model_calls (id, learner_id, org_id, purpose, model, latency_ms, cost_usd, ok, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(org, id, org, 'items', 'muse-spark-1.3', 1, org === 'alpha' ? 0.125 : 9, 1, NOW)
   }
   // Role topics have no learner; only alpha's role has an SOP. Personal documents above are not company documents.
   sqlite.prepare('INSERT INTO sources (id, topic_id, kind, title, body_text, created_at) VALUES (?, ?, ?, ?, ?, ?)').run('alpha-sop', 'role-alpha', 'text', 'alpha SOP', 'Role source text', NOW)
@@ -109,7 +109,7 @@ it('returns company members, roles, documents, distinct active learners and scop
     { id: 'empty', name: 'empty', slug: 'empty', members: 0, roles: 0, documents: 0, activeLearners: 0, modelSpend: 0 },
   ])
   await expect(getCompany({ data: { slug: 'alpha' } })).resolves.toMatchObject({
-    members: [{ name: 'learner', role: 'owner', jobRole: 'alpha role' }],
+    members: [{ name: 'learner', role: 'owner' }],
     roles: [{ id: 'alpha', name: 'alpha role', status: 'active', topicStatus: 'draft' }],
     documents: [{ id: 'alpha-sop', title: 'alpha SOP', role: 'alpha role' }],
     activeLearners: 1, modelSpend: 0.125,
@@ -121,13 +121,65 @@ it('returns company members, roles, documents, distinct active learners and scop
   await expect(getCompany({ data: { slug: 'missing' } })).rejects.toMatchObject({ status: 404 })
 })
 
-it('counts only the last 30 days of spend in the company list, but lifetime spend on one company', async () => {
-  const call = sqlite.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, cost_usd, ok, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+it('uses company attribution and the same settled 30-day spend for the figure and job bars', async () => {
+  const call = sqlite.prepare('INSERT INTO model_calls (id, learner_id, org_id, purpose, model, latency_ms, cost_usd, ok, error, created_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)')
   const learner = accounts.get('learner')!.id
-  call.run('too-old', learner, 'items', 'test', 1, 5, 1, NOW - 31 * 86_400_000)
-  call.run('recent', learner, 'items', 'test', 1, 0.5, 1, NOW - 29 * 86_400_000)
-  const list = await getCompanies()
-  expect(list.find((c) => c.slug === 'alpha')!.modelSpend).toBe(0.625)
-  expect(list.find((c) => c.slug === 'beta')!.modelSpend).toBe(9)
-  await expect(getCompany({ data: { slug: 'alpha' } })).resolves.toMatchObject({ modelSpend: 5.625 })
+  const since = NOW - 30 * 86_400_000
+  call.run('too-old', learner, 'alpha', 'items', 'muse-spark-1.3', 5, 1, null, since - 1)
+  call.run('boundary', null, 'alpha', 'items', 'muse-spark-1.3', 0.5, 1, null, since)
+  call.run('fallback', null, 'alpha', 'items', 'muse-spark-open', 0.25, 1, null, NOW)
+  call.run('failed', null, 'alpha', 'grade', 'muse-spark-1.3', 0.0625, 0, null, NOW)
+  call.run('pending', learner, 'alpha', 'items', 'muse-spark-1.3', 100, 0, 'pending', NOW)
+  call.run('personal', learner, null, 'items', 'muse-spark-1.3', 50, 1, null, NOW)
+  call.run('other-company', learner, 'beta', 'items', 'muse-spark-1.3', 20, 1, null, NOW)
+  call.run('unpriced', null, 'alpha', 'voice', 'muse-voice-transcribe-1.0', null, 1, null, NOW)
+  // Attribution must survive the caller leaving the company.
+  sqlite.prepare('DELETE FROM member WHERE user_id = ?').run(learner)
+  const company = await getCompany({ data: { slug: 'alpha' } })
+  expect(company.modelSpend).toBe(0.9375)
+  expect(company.spendByJob).toEqual([
+    { purpose: 'items', models: ['muse-spark-1.3', 'muse-spark-open'], cost: 0.875 },
+    { purpose: 'grade', models: ['muse-spark-1.3'], cost: 0.0625 },
+    { purpose: 'voice', models: ['muse-voice-transcribe-1.0'], cost: null },
+  ])
+  const direct = sqlite.prepare("SELECT SUM(cost_usd) AS total FROM model_calls WHERE org_id = 'alpha' AND created_at >= ? AND created_at <= ? AND NOT (ok = 0 AND COALESCE(error, '') = 'pending')").get(since, NOW)
+  expect(company.modelSpend).toBe(direct!.total)
+  expect(company.spendByJob.reduce((total, job) => total + (job.cost ?? 0), 0)).toBe(company.modelSpend)
+  expect((await getCompanies()).find((c) => c.slug === 'alpha')!.modelSpend).toBe(company.modelSpend)
+  await expect(getCompany({ data: { slug: 'empty' } })).resolves.toMatchObject({ modelSpend: null, spendByJob: [] })
+})
+
+it('reads membership activity, pending invitations and live role documents without changing them', async () => {
+  const learner = accounts.get('learner')!.id
+  sqlite.prepare("UPDATE organization SET logo = '/logo.svg' WHERE id = 'alpha'").run()
+  sqlite.prepare("UPDATE topics SET status = 'generating' WHERE id = 'role-alpha'").run()
+  sqlite.prepare("UPDATE sources SET uploaded_by = ?, size_bytes = 1100000, page_count = 9, version = 3 WHERE id = 'alpha-sop'").run(learner)
+  sqlite.prepare('INSERT INTO units (id, topic_id, "order", name, summary) VALUES (?, ?, 0, ?, ?)').run('unit', 'role-alpha', 'Unit', '')
+  const concept = sqlite.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary, gen_status, source_id) VALUES (?, ?, ?, 0, ?, ?, ?, ?)')
+  concept.run('ready', 'role-alpha', 'unit', 'Ready', '', 'ready', 'alpha-sop')
+  concept.run('waiting', 'role-alpha', 'unit', 'Waiting', '', 'pending', 'alpha-sop')
+  const item = sqlite.prepare('INSERT INTO items (id, concept_id, topic_id, source_id, format, payload_json, status, reviewed_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+  item.run('live', 'ready', 'role-alpha', 'alpha-sop', 'short', '{}', 'active', null, NOW)
+  item.run('reported', 'ready', 'role-alpha', 'alpha-sop', 'short', '{}', 'reported', NOW, NOW)
+  item.run('retired', 'ready', 'role-alpha', 'alpha-sop', 'short', '{}', 'retired', null, NOW)
+  sqlite.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, started_at) VALUES (?, ?, ?, ?, ?)').run('newest', learner, 'alpha', 'session', NOW + 1)
+  for (const status of ['accepted', 'canceled']) {
+    sqlite.prepare('INSERT INTO invitation (id, organization_id, email, status, inviter_id, job_role_id, invitee_name, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(status, 'alpha', status + '@staff.test', status, learner, 'alpha', status, NOW + 86400000)
+  }
+  const source = sqlite.prepare('INSERT INTO sources (id, topic_id, kind, title, body_text, retired_at, deleted_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+  source.run('retired-doc', 'role-alpha', 'text', 'Retired', '', NOW, null, NOW)
+  source.run('deleted-doc', 'role-alpha', 'text', 'Deleted', '', null, NOW, NOW)
+  const changes = sqlite.prepare('SELECT total_changes() AS n').get()!.n
+  const company = await getCompany({ data: { slug: 'alpha' } })
+  expect(company).toMatchObject({ owner: 'learner', logo: '/logo.svg', createdAt: new Date(NOW),
+    members: [{ joinedAt: new Date(NOW), lastActive: NOW + 1 }],
+    invitations: [{ id: 'private-invite', name: 'Invitee', email: 'invitee@staff.test' }],
+    roles: [{ conceptsTotal: 2, conceptsReady: 1, preparing: true, liveQuestions: 2, people: 1 }],
+    documents: [{ id: 'alpha-sop', uploaderName: 'learner', chars: 16, sizeBytes: 1100000, pageCount: 9, version: 3, unreviewed: 1, generating: true }],
+  })
+  expect(sqlite.prepare('SELECT total_changes() AS n').get()!.n).toBe(changes)
+  // Publishing the curriculum marks the topic ready before its concept questions finish.
+  sqlite.prepare("UPDATE topics SET status = 'ready' WHERE id = 'role-alpha'").run()
+  await expect(getCompany({ data: { slug: 'alpha' } })).resolves.toMatchObject({ roles: [{ topicStatus: 'ready', preparing: true }] })
 })
