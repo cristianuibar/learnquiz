@@ -205,7 +205,7 @@ label.conf-btn:hover { background: var(--surface-sunken); }
   animation: lq-rise var(--duration-reveal) var(--ease-out) both;
 }
 .grabber { width: 36px; height: 4px; border-radius: var(--radius-full); background: var(--border-strong); margin: var(--space-2) auto 0; }
-.sheet-band { flex: none; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4) var(--space-4) var(--space-3); background: var(--t); color: var(--c); }
+.sheet-band { flex: none; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4) var(--space-4) var(--space-3); background: var(--t); color: var(--c); scroll-margin-top: calc(var(--header-h) + var(--space-4)); }
 .sheet-band:focus { outline: none; }
 .sheet-band:focus-visible { outline: 2px solid var(--brand); outline-offset: -4px; }
 .sheet-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-4); scrollbar-width: thin; }

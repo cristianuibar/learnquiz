@@ -132,8 +132,9 @@ export function AnswerMoment() {
     shownKey.current = key
     if (key && key !== prev) {
       const heading = resultRef.current
-      heading?.focus()
-      heading?.scrollIntoView?.({ block: 'nearest' })
+      heading?.focus({ preventScroll: true })
+      // Center the whole band so the sheet's 32px rise cannot tuck its label or XP under the sticky header.
+      heading?.closest('.sheet-band')?.scrollIntoView?.({ block: 'center' })
     }
     if (prev && !key && returnFocus.current) {
       returnFocus.current = false

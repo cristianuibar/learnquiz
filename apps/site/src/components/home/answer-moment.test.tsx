@@ -25,6 +25,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount())
   container.remove()
+  vi.restoreAllMocks()
   const proto = Element.prototype as unknown as Record<string, unknown>
   if (hadScroll) proto.scrollIntoView = originalScroll
   else delete proto.scrollIntoView
@@ -411,18 +412,25 @@ describe('AnswerMoment', () => {
     expect(answerRadios()[0].textContent!.trim()).toBe('Scan the item next to it')
   })
 
-  it('scrolls the new result into view with block: nearest', async () => {
+  it.each(['Check', ...OUTCOME_TITLES])('focuses without browser scrolling, then centers the full result band from %s', async (source) => {
+    const focusSpy = vi.spyOn(HTMLElement.prototype, 'focus')
     await mount()
-    await answer(1, 0)
-    expect(scrollSpy).toHaveBeenCalled()
-    expect(scrollSpy).toHaveBeenLastCalledWith({ block: 'nearest' })
-    let calls = scrollSpy.mock.calls.length
-    await click(outcomeBtns()[3])
-    expect(scrollSpy.mock.calls.length).toBeGreaterThan(calls)
-    expect(scrollSpy).toHaveBeenLastCalledWith({ block: 'nearest' })
-    calls = scrollSpy.mock.calls.length
-    await click(outcomeBtns()[2])
-    expect(scrollSpy.mock.calls.length).toBeGreaterThan(calls)
-    expect(scrollSpy).toHaveBeenLastCalledWith({ block: 'nearest' })
+    if (source === 'Check') await answer(1, 0)
+    else await click(outcomeBtns()[OUTCOME_TITLES.indexOf(source)])
+
+    expect(document.activeElement).toBe(heading())
+    expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true })
+    expect(scrollSpy).toHaveBeenCalledExactlyOnceWith({ block: 'center' })
+    expect(scrollSpy.mock.instances[0]).toBe(sheet()!.querySelector('.sheet-band'))
+    expect(focusSpy.mock.invocationCallOrder.at(-1)).toBeLessThan(scrollSpy.mock.invocationCallOrder[0])
+
+    // Switching an already revealed sheet must bring the new result back into view too.
+    const next = source === 'Sure and wrong' ? 0 : 3
+    await pointerClick(outcomeBtns()[next])
+    expect(document.activeElement).toBe(heading())
+    expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true })
+    expect(scrollSpy).toHaveBeenCalledTimes(2)
+    expect(scrollSpy.mock.instances[1]).toBe(sheet()!.querySelector('.sheet-band'))
+    expect(scrollSpy).toHaveBeenLastCalledWith({ block: 'center' })
   })
 })
