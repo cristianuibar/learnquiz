@@ -31,7 +31,11 @@ const click = (el: HTMLElement) => act(async () => { el.click() })
 const keydown = (el: Element, key: string) =>
   act(async () => { el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })) })
 
-function Harness({ onConfirm, reason }: { onConfirm: (r?: string) => void | Promise<void>; reason?: boolean }) {
+function Harness({ onConfirm, reason, consequences = [{ icon: Ban, text: 'Ana is signed out.' }] }: {
+  onConfirm: (r?: string) => void | Promise<void>
+  reason?: boolean
+  consequences?: { icon: typeof Ban; text: string }[]
+}) {
   const [open, setOpen] = useState(false)
   return (
     <>
@@ -40,7 +44,7 @@ function Harness({ onConfirm, reason }: { onConfirm: (r?: string) => void | Prom
         open={open}
         onOpenChange={setOpen}
         title="Ban Ana?"
-        consequences={[{ icon: Ban, text: 'Ana is signed out.' }]}
+        consequences={consequences}
         verb="Ban"
         object="user"
         reason={reason}
@@ -85,6 +89,24 @@ describe('dialogs and form controls', () => {
     })
     await click(button('Ban user'))
     expect(onConfirm).toHaveBeenCalledWith('Spam')
+  })
+
+  it('keeps a long consequence list in a keyboard-scrollable region apart from the confirm controls', async () => {
+    const many = Array.from({ length: 20 }, (_, i) => ({ icon: Ban, text: `Concept ${i + 1} is also in Site guide v2.` }))
+    await render(<Harness onConfirm={vi.fn()} consequences={many} />)
+    await click(button('Retire'))
+    const dialog = document.querySelector('[role="dialog"]')!
+    const region = dialog.querySelector<HTMLElement>('[role="region"][aria-label="Consequences"]')!
+    // The dialog is described by the consequences themselves, not by the region's label.
+    const description = document.getElementById(dialog.getAttribute('aria-describedby')!)!
+    expect(description.hasAttribute('aria-label')).toBe(false)
+    expect(description.querySelectorAll('li')).toHaveLength(20)
+    expect(description.textContent).toContain('Concept 20 is also in Site guide v2.')
+    expect(region.contains(description)).toBe(true)
+    expect(region.tabIndex).toBe(0)
+    await act(async () => { region.focus() })
+    expect(document.activeElement).toBe(region)
+    for (const name of ['Cancel', 'Ban user']) expect(region.contains(button(name))).toBe(false)
   })
 
   it('stays open and shows an alert when confirming fails', async () => {

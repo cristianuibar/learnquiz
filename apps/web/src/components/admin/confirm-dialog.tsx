@@ -72,7 +72,9 @@ export function ConfirmDialog({ open, onOpenChange, title, consequences, verb, o
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
+      {/* Long consequence lists scroll inside the dialog so the confirm controls stay on screen. */}
       <DialogContent initialFocus={askReason ? reasonRef : cancelRef} aria-describedby={description ? descId : listId}
+        className="flex flex-col md:max-h-[calc(100dvh-2rem)]"
         onCloseAutoFocus={(event) => {
           event.preventDefault()
           const target = returnFocus?.()
@@ -102,14 +104,17 @@ export function ConfirmDialog({ open, onOpenChange, title, consequences, verb, o
             {error && <FieldError id={reasonId}>{error}</FieldError>}
           </div>
         )}
-        <ul id={listId} className="flex flex-col gap-3">
-          {consequences.map(({ icon: Icon, text }, i) => (
-            <li key={i} className="flex items-start gap-3 text-body text-ink">
-              <Icon aria-hidden className="mt-px size-5 shrink-0 text-ink-muted" />
-              <span>{text}</span>
-            </li>
-          ))}
-        </ul>
+        {/* The region scrolls; the list inside stays unlabelled so it still describes the dialog by its own text. */}
+        <div role="region" aria-label="Consequences" tabIndex={0} className="-m-1 min-h-0 overflow-y-auto p-1 focus-visible:outline-2 focus-visible:outline-brand">
+          <ul id={listId} className="flex flex-col gap-3">
+            {consequences.map(({ icon: Icon, text }, i) => (
+              <li key={i} className="flex items-start gap-3 text-body text-ink">
+                <Icon aria-hidden className="mt-px size-5 shrink-0 text-ink-muted" />
+                <span>{text}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
         {failure && <Banner kind="alert">{failure}</Banner>}
         <DialogFooter>
           <DialogClose asChild>
