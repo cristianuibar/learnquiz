@@ -119,6 +119,28 @@ it('approves, moves focus to the next unreviewed question and announces the coun
   expect([...c.querySelectorAll('[role=status]')].map((s) => s.textContent)).toContain('Approved. 1 unreviewed.')
 })
 
+it('approving focuses the next question already in the editor and preserves its draft', async () => {
+  const q1 = { id: 'q1', status: 'active', payload: stemOf('1') }
+  const q2 = { id: 'q2', status: 'active', reviewedAt: null, payload: stemOf('2') }
+  const c = await mountAt(
+    review([concept('a', [{ ...q1, reviewedAt: null }]), concept('b', [q2])], 2), '/org/x/questions',
+    review([concept('a', [{ ...q1, reviewedAt: Date.UTC(2026, 9, 30) }]), concept('b', [q2])], 1),
+  )
+  const nextRow = [...c.querySelectorAll('h4')].find((h) => h.textContent === 'Stem 2')!.closest('li')!
+  await act(async () => button(nextRow, 'Edit').click())
+  const editorHeading = nextRow.querySelector('h4')!
+  const draft = nextRow.querySelector<HTMLTextAreaElement>('textarea[name="stem"]')!
+  await act(async () => { draft.value = 'Unsaved draft' })
+
+  const approve = button(c, 'Approve and next')
+  await act(async () => { approve.focus(); approve.click() })
+
+  expect(vi.mocked(reviewQuestion).mock.calls[0]![0].data).toMatchObject({ itemId: 'q1', action: 'approve' })
+  await vi.waitFor(() => expect(document.activeElement).toBe(editorHeading))
+  expect(draft.value).toBe('Unsaved draft')
+  expect(nextRow.querySelector('form')!.getAttribute('aria-labelledby')).toBe(editorHeading.id)
+})
+
 it('approving skips a retired flagged question and moves to the next unreviewed one', async () => {
   const a1 = { id: 'a1', status: 'active', payload: stemOf('A1') }
   const f = { id: 'f', status: 'retired', reviewedAt: Date.UTC(2026, 9, 29), payload: stemOf('F'), flags: [{ id: 'fl', reporterId: 'p1', reporterName: 'Ana', createdAt: Date.UTC(2026, 9, 29), reason: 'wrong', label: 'Wrong answer', note: null, attempt: null }] }
