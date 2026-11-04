@@ -185,4 +185,30 @@ describe('question review outline', () => {
     expect(nav.querySelectorAll('[aria-current=location]')).toHaveLength(1)
     expect(link.getAttribute('aria-current')).toBe('location')
   })
+
+  // 1440x800 desktop. `tops` places the Cells, Energy and Division headings in the viewport.
+  async function scrollTo(c: HTMLElement, y: number, height: number, tops: number[]) {
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 })
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: y })
+    Object.defineProperty(document.documentElement, 'scrollHeight', { configurable: true, value: height })
+    for (const h of c.querySelectorAll('h3')) {
+      const top = tops[['Cells', 'Energy', 'Division'].indexOf(h.textContent!)]
+      h.getBoundingClientRect = () => ({ top }) as DOMRect
+    }
+    await act(async () => window.dispatchEvent(new Event('scroll')))
+  }
+  const current = (c: HTMLElement) => c.querySelector('nav[aria-label="Question outline"] [aria-current=location] span')!.textContent
+
+  it('follows the scroll position, including concepts that cannot reach the top of a short page', async () => {
+    const { c } = await mountReview('/org/x/questions')
+    expect(current(c)).toBe('Cells')
+    await scrollTo(c, 600, 4000, [-400, 200, 900])
+    expect(current(c)).toBe('Energy')
+    await scrollTo(c, 183, 983, [117, 267, 417])
+    expect(current(c)).toBe('Division')
+    const link = [...c.querySelectorAll('nav[aria-label="Question outline"] a')].find((a) => a.textContent!.startsWith('Energy')) as HTMLElement
+    await act(async () => link.click())
+    await scrollTo(c, 183, 983, [117, 267, 417])
+    expect(current(c)).toBe('Energy')
+  })
 })

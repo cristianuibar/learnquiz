@@ -1,4 +1,4 @@
-import { type MouseEvent, type ReactNode, useEffect, useState } from 'react'
+import { type MouseEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 import type { Review } from './question-row'
 
 type Mode = 'all' | 'unreviewed' | 'flagged'
@@ -13,27 +13,33 @@ export function ReviewLayout({ units, mode, children }: { units: Review['units']
   const key = ids.join('|')
   const [active, setActive] = useState<string>()
   const current = active !== undefined && ids.includes(active) ? active : ids[0]
+  const clicked = useRef<string>(undefined)
 
+  // The current concept is the last one whose heading has passed the reading line (40% down the
+  // viewport). At the end of the page the last headings can never reach that line, so the last
+  // heading in view is current. A clicked concept stays current while its heading is in view,
+  // until the reader scrolls on their own.
   useEffect(() => {
-    if (typeof IntersectionObserver === 'undefined') return
-    const seen = new Set<string>()
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          const id = e.target.id.slice('concept-'.length)
-          if (e.isIntersecting) seen.add(id)
-          else seen.delete(id)
-        }
-        const first = key.split('|').find((id) => seen.has(id))
-        if (first) setActive(first)
-      },
-      { rootMargin: '0px 0px -60% 0px' },
-    )
-    for (const id of key ? key.split('|') : []) {
-      const el = document.getElementById(`concept-${id}`)
-      if (el) observer.observe(el)
+    const list = key ? key.split('|') : []
+    const top = (id: string) => document.getElementById(`concept-${id}`)?.getBoundingClientRect().top
+    const update = () => {
+      const h = window.innerHeight
+      const pin = clicked.current === undefined ? undefined : top(clicked.current)
+      if (pin !== undefined && pin >= 0 && pin < h) return
+      clicked.current = undefined
+      const end = window.scrollY > 0 && h + window.scrollY >= document.documentElement.scrollHeight - 1
+      const line = end ? h : h * 0.4
+      const next = [...list].reverse().find((id) => (top(id) ?? Infinity) < line)
+      if (next) setActive(next)
     }
-    return () => observer.disconnect()
+    const release = () => {
+      clicked.current = undefined
+    }
+    const events = [['scroll', update], ['resize', update], ['wheel', release], ['touchmove', release], ['keydown', release]] as const
+    for (const [type, fn] of events) window.addEventListener(type, fn, { passive: true })
+    return () => {
+      for (const [type, fn] of events) window.removeEventListener(type, fn)
+    }
   }, [key])
 
   const go = (id: string) => (e: MouseEvent) => {
@@ -42,6 +48,7 @@ export function ReviewLayout({ units, mode, children }: { units: Review['units']
     if (!el) return
     if (typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'start' })
     el.focus()
+    clicked.current = id
     setActive(id)
   }
 
