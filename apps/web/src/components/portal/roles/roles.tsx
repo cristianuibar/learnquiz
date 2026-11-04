@@ -88,18 +88,24 @@ export function Roles({ org }: { org: Org }) {
           </Button>
         }
       />
-      {failedRoles.map((r) => (
-        <Banner
-          key={r.id}
-          kind="alert"
-          action={<Button asChild variant="secondary"><Link {...links.role(r.id)}>Fix documents</Link></Button>}
-        >
-          <strong>{r.name} training failed.</strong>{' '}
-          {r.failedDocuments > 0
-            ? `${plural(r.failedDocuments, 'document', 'documents')} ${r.failedDocuments === 1 ? 'has' : 'have'} no selectable text. Replace them or paste the text.`
-            : 'Check its documents.'}
-        </Banner>
-      ))}
+      {failedRoles.map((r) => {
+        // A build that failed on readable documents is rebuilt from the role; only failed or missing documents need fixing.
+        const action = r.failedDocuments > 0 ? 'Fix documents' : r.documentCount > 0 ? 'Open role' : 'Upload SOP'
+        return (
+          <Banner
+            key={r.id}
+            kind="alert"
+            action={<Button asChild variant="secondary"><Link {...links.role(r.id)}>{action}</Link></Button>}
+          >
+            <strong>{r.name} training failed.</strong>{' '}
+            {r.failedDocuments > 0
+              ? `${plural(r.failedDocuments, 'document', 'documents')} ${r.failedDocuments === 1 ? 'has' : 'have'} no selectable text. Replace them or paste the text.`
+              : r.documentCount > 0
+                ? 'The curriculum build did not finish. Build the curriculum again.'
+                : 'Add a document to build the curriculum.'}
+          </Banner>
+        )
+      })}
       <DataTable
         stack
         caption="Job roles with training status, benchmark, onboarding period and people assigned"

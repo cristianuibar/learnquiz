@@ -203,3 +203,14 @@ it.each([
   expect(alert.querySelector('a')!.textContent).toBe('Fix documents')
   expect(alert.querySelector('a')!.getAttribute('href')).toBe('/org/x/roles/r1')
 })
+
+it.each([
+  ['readable documents', role({ topicStatus: 'failed', documentCount: 1 }), 'The curriculum build did not finish. Build the curriculum again.', 'Open role'],
+  ['no documents', role({ topicStatus: 'failed' }), 'Add a document to build the curriculum.', 'Upload SOP'],
+])('does not ask to fix documents when a build failed with %s', async (_name, r, text, link) => {
+  const container = await mountRoles([r])
+  const alert = container.querySelector('[role="alert"]')!
+  expect(alert.textContent).toContain(text)
+  expect(alert.querySelector('a')!.textContent).toBe(link)
+  expect(alert.querySelector('a')!.getAttribute('href')).toBe('/org/x/roles/r1')
+})
