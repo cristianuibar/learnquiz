@@ -1,12 +1,17 @@
-import { useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { Page, PageHeader } from '@/components/admin/page'
+import { BarChart } from '@/components/admin/charts/bar-chart'
+import { LineChart } from '@/components/admin/charts/line-chart'
+import { DateRange } from '@/components/admin/date-range'
 import { Pager } from '@/components/admin/pager'
 import { Stat, StatsCard } from '@/components/admin/stat-figure'
 import { DataTable, NullCell, type Column, type SortDirection } from '@/components/admin/data-table'
-import { RouteError } from '@/components/inline-error'
+import { InlineError, RouteError, errorMessage } from '@/components/inline-error'
+import { Label } from '@/components/ui/label'
 import { Segmented } from '@/components/ui/segmented'
+import { Select } from '@/components/ui/select'
 import { jobLabel, modelDisplayName } from '@/lib/llm/models'
 import { getModelUsage, type ModelUsage, type UsageStats } from '@/server/admin-usage'
 
@@ -18,13 +23,33 @@ type Company = ModelUsage['companies'][number]
 type Failure = ModelUsage['failures'][number]
 type Job = ModelUsage['jobs'][number]
 
+const MAX_DAYS = 365
+const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10)
+const today = () => isoDay(Date.now())
+const validDay = (v: string | undefined): v is string => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v) && isoDay(Date.parse(`${v}T00:00:00Z`) || 0) === v
+
+const searchSchema = z.object({
+  range: z.union([z.literal(7), z.literal(30), z.literal(90)]).catch(30),
+  from: z.string().optional().catch(undefined),
+  to: z.string().optional().catch(undefined),
+})
+type Search = { range: Range; from?: string; to?: string }
+
+// A custom range needs both ends as UTC days, in order, not after today and at most 365 days; anything else falls back to 30 days.
+function validateSearch(raw: Record<string, unknown>): Search {
+  const { range, from, to } = searchSchema.parse(raw)
+  if (from === undefined && to === undefined) return { range }
+  if (!validDay(from) || !validDay(to) || from > to || to > today() || (dayMs(to) - dayMs(from)) / DAY + 1 > MAX_DAYS) return { range: 30, from: undefined, to: undefined }
+  return { range, from, to }
+}
+
 export const Route = createFileRoute('/admin/usage')({
-  validateSearch: z.object({ range: z.union([z.literal(7), z.literal(30), z.literal(90)]).catch(30) }),
-  loaderDeps: ({ search }) => ({ range: search.range }),
+  validateSearch,
+  loaderDeps: ({ search }) => ({ range: search.range, from: search.from, to: search.to }),
   loader: ({ deps }) => {
-    const today = new Date().toISOString().slice(0, 10)
-    const from = new Date(Date.parse(`${today}T00:00:00Z`) - (deps.range - 1) * DAY).toISOString().slice(0, 10)
-    return getModelUsage({ data: { from, to: today } })
+    const to = deps.to ?? today()
+    const from = deps.from ?? isoDay(dayMs(to) - (deps.range - 1) * DAY)
+    return getModelUsage({ data: { from, to } })
   },
   errorComponent: RouteError,
   component: Usage,
@@ -38,6 +63,15 @@ const count = (n: number) => n.toLocaleString('en-US')
 const rate = (s: UsageStats) => (s.calls === 0 ? null : (s.failures / s.calls) * 100)
 const seconds = (ms: number) => `${(ms / 1000).toFixed(1)} s`
 const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+const rateText = (s: UsageStats) => {
+  const r = rate(s)
+  return r === null ? 'No calls' : `${r.toFixed(1)}%`
+}
+const percent = (n: number) => `${Number(n.toFixed(1))}%`
+const dollars = (n: number) => (Number.isInteger(n) ? `$${count(n)}` : money(n))
+const secs = (n: number) => `${Number(n.toFixed(1))} s`
+const latencyText = (v: number | null) => (v === null ? 'No calls' : seconds(v))
 
 const rateCell = (s: UsageStats) => {
   const r = rate(s)
@@ -65,8 +99,12 @@ const sortValue = (c: Company, key: string): number | string => {
 
 function Usage() {
   const data = Route.useLoaderData()
-  const { range } = Route.useSearch()
+  const { range, from: customFrom } = Route.useSearch()
   const navigate = Route.useNavigate()
+  const jobId = useId()
+  // The job filter only refetches the latency series; it belongs to the loaded range and resets with it.
+  const [job, setJob] = useState<{ data: ModelUsage; purpose: string; latency: ModelUsage['latency']; error?: string } | null>(null)
+  const jobRequest = useRef(0)
   const [sort, setSort] = useState<{ key: string; direction: SortDirection }>({ key: 'cost', direction: 'descending' })
   const [page, setPage] = useState(1)
 
@@ -75,8 +113,54 @@ function Usage() {
   const year = new Date(toMs).getUTCFullYear()
   const span = `${monthDay(fromMs)} – ${monthDay(toMs)}, ${year}`
   const spanWords = `${monthDay(fromMs)} to ${monthDay(toMs)}, ${year}`
-  const partial = `${monthDay(toMs)} counts up to ${hhmm(data.asOf)}.`
+  const isPartial = data.days.at(-1)?.partial === true
+  const partial = isPartial ? `${monthDay(toMs)} counts up to ${hhmm(data.asOf)}.` : ''
   const { totals } = data
+  const dayCount = `${data.days.length} ${data.days.length === 1 ? 'day' : 'days'}`
+  const dayLabel = (d: { day: string; partial: boolean }) => `${monthDay(dayMs(d.day))}${d.partial ? ` (to ${hhmm(data.asOf)})` : ''}`
+  const partialClause = isPartial ? `; ${monthDay(toMs)} is partial, through ${hhmm(data.asOf)}` : ''
+
+  const current = job?.data === data ? job : null
+  const series = current?.latency ?? data.latency
+  const purposes = [...new Set(data.jobs.map((j) => j.purpose))]
+  const loadJob = (purpose: string) => {
+    const id = ++jobRequest.current
+    if (!purpose) return setJob(null)
+    setJob({ data, purpose, latency: series })
+    getModelUsage({ data: { from: data.from, to: data.to, job: purpose } }).then(
+      (r) => { if (id === jobRequest.current) setJob({ data, purpose, latency: r.latency }) },
+      (err: unknown) => { if (id === jobRequest.current) setJob({ data, purpose, latency: series, error: errorMessage(err) }) },
+    )
+  }
+
+  // One sentence per chart; the hidden tables carry every number.
+  const busiest = (values: number[]) => values.reduce((best, v, i) => (!data.days[i].partial && (best < 0 || v > values[best]) ? i : best), -1)
+  const rangeOf = (values: number[], fmt: (n: number) => string) => {
+    const full = values.filter((_, i) => !data.days[i].partial)
+    return full.length === 0 ? '' : `${fmt(Math.min(...full))} to ${fmt(Math.max(...full))}`
+  }
+  const dayRate = (d: UsageStats) => rate(d) ?? 0
+  const callsPeak = busiest(data.days.map((d) => d.calls))
+  const costPeak = busiest(data.days.map((d) => d.cost ?? 0))
+  const last = data.days.at(-1)
+  const callsSummary = totals.calls === 0
+    ? `Bar chart of model calls per day from ${spanWords}: no calls in this range.`
+    : `Bar chart of model calls per day from ${spanWords}, with failure rate below: ${rangeOf(data.days.map((d) => d.calls), count)} calls a day`
+      + (callsPeak >= 0 ? `, highest on ${monthDay(dayMs(data.days[callsPeak].day))} with ${count(data.days[callsPeak].calls)} calls and a ${percent(dayRate(data.days[callsPeak]))} failure rate` : '')
+      + (isPartial && last ? `${partialClause}, at ${percent(dayRate(last))}.` : '.')
+  const costSummary = totals.calls === 0
+    ? `Bar chart of model cost per day from ${spanWords}: no calls in this range.`
+    : `Bar chart of model cost per day from ${spanWords}: ${rangeOf(data.days.map((d) => d.cost ?? 0), money)} a day`
+      + (costPeak >= 0 ? `, highest on ${monthDay(dayMs(data.days[costPeak].day))} at ${money(data.days[costPeak].cost ?? 0)}` : '')
+      + (isPartial && last ? `${partialClause}, at ${money(last.cost ?? 0)}.` : '.')
+  const jobName = current?.purpose ? jobLabel(current.purpose) : 'all jobs'
+  const between = (key: 'p50' | 'p95') => {
+    const v = series.days.flatMap((d) => (d[key] === null ? [] : [d[key] / 1000]))
+    return `${Number(Math.min(...v).toFixed(1))} and ${Number(Math.max(...v).toFixed(1))} seconds`
+  }
+  const latencySummary = series.days.every((d) => d.p50 === null)
+    ? `Line chart of daily model latency for ${jobName} from ${spanWords}: no calls in this range.`
+    : `Line chart of daily model latency for ${jobName} from ${spanWords}: p50 stayed between ${between('p50')} and p95 between ${between('p95')}${partialClause}.`
 
   const companies = [...data.companies].sort((a, b) => {
     const x = sortValue(a, sort.key)
@@ -132,20 +216,32 @@ function Usage() {
     <Page>
       <PageHeader
         title="Model usage"
-        meta={`${span} · ${monthDay(toMs)} to ${hhmm(data.asOf)} · times in UTC`}
+        meta={`${span} · ${isPartial ? `${monthDay(toMs)} to ${hhmm(data.asOf)} · ` : ''}times in UTC`}
         actions={
-          <Segmented
-            mode="toggle"
-            aria-label="Preset ranges"
-            options={RANGES.map((r) => ({ value: String(r), label: `${r} days` }))}
-            value={[String(range)]}
-            onValueChange={(next) => {
-              const added = next.find((v) => v !== String(range))
-              if (!added) return
-              setPage(1)
-              void navigate({ search: { range: Number(added) as Range } })
-            }}
-          />
+          <div role="group" aria-label="Date range" className="flex flex-wrap items-center gap-3">
+            <Segmented
+              mode="toggle"
+              aria-label="Preset ranges"
+              options={RANGES.map((r) => ({ value: String(r), label: `${r} days` }))}
+              value={customFrom ? [] : [String(range)]}
+              onValueChange={(next) => {
+                const added = customFrom ? next[0] : next.find((v) => v !== String(range))
+                if (!added) return
+                setPage(1)
+                void navigate({ search: { range: Number(added) as Range } })
+              }}
+            />
+            <DateRange
+              from={data.from}
+              to={data.to}
+              max={isoDay(data.asOf)}
+              maxDays={MAX_DAYS}
+              onApply={({ from, to }) => {
+                setPage(1)
+                void navigate({ search: { range, from, to } })
+              }}
+            />
+          </div>
         }
       />
 
@@ -163,10 +259,68 @@ function Usage() {
         </p>
       </section>
 
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
+        <BarChart
+          title="Calls by day"
+          summary={callsSummary}
+          unit="Calls"
+          legend="Calls"
+          points={data.days.map((d) => ({ label: String(new Date(dayMs(d.day)).getUTCDate()), group: monthDay(dayMs(d.day)).split(' ')[0], value: d.calls, partial: d.partial }))}
+          strip={{ legend: 'Failure rate', values: data.days.map(dayRate), format: percent }}
+          table={{
+            caption: `Calls, failures and failure rate by day, ${spanWords}.${partial && ` ${partial}`}`,
+            columns: ['Day', 'Calls', 'Failures', 'Failure rate'],
+            rows: data.days.map((d) => ({ key: d.day, cells: [dayLabel(d), count(d.calls), count(d.failures), rateText(d)] })),
+            total: [dayCount, count(totals.calls), count(totals.failures), rateText(totals)],
+          }}
+        />
+        <BarChart
+          title="Cost by day"
+          summary={costSummary}
+          unit="Cost"
+          legend="Cost (USD)"
+          format={dollars}
+          points={data.days.map((d) => ({ label: String(new Date(dayMs(d.day)).getUTCDate()), group: monthDay(dayMs(d.day)).split(' ')[0], value: d.cost ?? 0, partial: d.partial }))}
+          table={{
+            caption: `Cost by day in US dollars, ${spanWords}.${partial && ` ${partial}`}`,
+            columns: ['Day', 'Cost'],
+            rows: data.days.map((d) => ({ key: d.day, cells: [dayLabel(d), d.cost === null && d.calls > 0 ? 'No price yet' : money(d.cost ?? 0)] })),
+            total: [dayCount, totals.cost === null ? 'No price yet' : money(totals.cost)],
+          }}
+        />
+      </div>
+
+      <LineChart
+        title="Latency by day"
+        summary={latencySummary}
+        width={1080}
+        format={secs}
+        actions={
+          <div className="flex items-center gap-3">
+            <Label htmlFor={jobId}>Job</Label>
+            <Select id={jobId} className="w-[200px]" value={current?.purpose ?? ''} onChange={(e) => loadJob(e.target.value)}>
+              <option value="">All jobs</option>
+              {purposes.map((p) => <option key={p} value={p}>{jobLabel(p)}</option>)}
+            </Select>
+          </div>
+        }
+        series={[
+          { name: 'p50', label: 'p50 (median)', style: 'solid', points: series.days.map((d) => ({ x: monthDay(dayMs(d.day)), y: d.p50 === null ? null : d.p50 / 1000 })) },
+          { name: 'p95', style: 'dashed', points: series.days.map((d) => ({ x: monthDay(dayMs(d.day)), y: d.p95 === null ? null : d.p95 / 1000 })) },
+        ]}
+        table={{
+          caption: `Latency by day in seconds, ${current?.purpose ? `${jobLabel(current.purpose)}, ` : ''}${spanWords}.${partial && ` ${partial}`}`,
+          columns: ['Day', 'p50', 'p95'],
+          rows: series.days.map((d) => ({ key: d.day, cells: [dayLabel(d), latencyText(d.p50), latencyText(d.p95)] })),
+          total: [dayCount, latencyText(series.total.p50), latencyText(series.total.p95)],
+        }}
+      />
+      {current?.error && <InlineError message={current.error} onRetry={() => loadJob(current.purpose)} />}
+
       <section aria-labelledby="usage-jobs" className="flex flex-col gap-3">
         <h2 id="usage-jobs" className="text-title-2 text-ink">By job</h2>
         <DataTable
-          caption={`Model calls, failures, latency and cost by job, ${spanWords}. ${partial}`}
+          caption={`Model calls, failures, latency and cost by job, ${spanWords}.${partial && ` ${partial}`}`}
           columns={jobColumns}
           rows={data.jobs}
           rowKey={(r) => `${r.purpose}|${r.model}`}
@@ -178,7 +332,7 @@ function Usage() {
       <section aria-labelledby="usage-companies" className="flex flex-col gap-3">
         <h2 id="usage-companies" className="text-title-2 text-ink">By company</h2>
         <DataTable
-          caption={`Model calls, failures, p95 latency and cost by company, ${spanWords}. ${partial}`}
+          caption={`Model calls, failures, p95 latency and cost by company, ${spanWords}.${partial && ` ${partial}`}`}
           columns={companyColumns}
           rows={companies}
           rowKey={(c) => c.orgId ?? 'none'}

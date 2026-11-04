@@ -12,13 +12,14 @@ export type ModelUsage = {
   from: string; to: string; asOf: number
   totals: UsageStats
   days: (UsageStats & { day: string; partial: boolean })[]
+  latency: { total: { p50: number | null; p95: number | null }; days: { day: string; partial: boolean; p50: number | null; p95: number | null }[] }
   jobs: (UsageStats & { purpose: string; model: string })[]
   companies: (UsageStats & { orgId: string | null; name: string | null; slug: string | null })[]
   failures: { id: string; createdAt: number; purpose: string; model: string; orgId: string | null; name: string | null; slug: string | null; error: string | null }[]
 }
 
 const DAY = 86_400_000
-const dateOnly = z.object({ from: z.string(), to: z.string() })
+const dateOnly = z.object({ from: z.string(), to: z.string(), job: z.string().min(1).max(64).optional() })
 
 function parseDay(value: string, label: string) {
   const ms = /^\d{4}-\d{2}-\d{2}$/.test(value) ? Date.parse(`${value}T00:00:00Z`) : NaN
@@ -31,13 +32,13 @@ const settled = sql`not (${modelCalls.ok} = 0 and coalesce(${modelCalls.error}, 
 
 // Latency percentiles are nearest-rank, computed per group with window functions (portable to D1 and node:sqlite).
 // `keys` maps output names to constant SQL expressions over model_calls that define the group.
-async function usageBy<K extends string>(db: ReturnType<typeof getDb>, start: number, end: number, keys: Record<K, SQL>) {
+async function usageBy<K extends string>(db: ReturnType<typeof getDb>, start: number, end: number, keys: Record<K, SQL>, where?: SQL) {
   const names = Object.keys(keys) as K[]
   const partition = sql.join(Object.values(keys), sql`, `)
   const select = sql.join(names.map((name) => sql`${keys[name]} as ${sql.raw(name)}`), sql`, `)
   const inner = sql`select ${select}, ${modelCalls.latencyMs} as latency_ms, ${modelCalls.ok} as ok, ${modelCalls.costUsd} as cost_usd,
     row_number() over (partition by ${partition} order by ${modelCalls.latencyMs}) as rn, count(*) over (partition by ${partition}) as n
-    from ${modelCalls} where ${modelCalls.createdAt} >= ${start} and ${modelCalls.createdAt} < ${end} and ${settled}`
+    from ${modelCalls} where ${modelCalls.createdAt} >= ${start} and ${modelCalls.createdAt} < ${end} and ${settled}${where ? sql` and ${where}` : sql``}`
   const aggregates = sql`count(*) as calls, sum(case when ok = 0 then 1 else 0 end) as failures,
     min(case when rn * 100 >= 50 * n then latency_ms end) as p50, min(case when rn * 100 >= 95 * n then latency_ms end) as p95,
     sum(cost_usd) as cost, sum(case when cost_usd is null then 1 else 0 end) as unpriced`
@@ -67,7 +68,7 @@ export const getModelUsage = createServerFn({ method: 'GET' })
     const end = last + DAY
 
     const db = getDb()
-    const [totals, dayRows, jobs, companies, failures] = await Promise.all([
+    const [totals, dayRows, jobs, companies, failures, jobDayRows, jobTotal] = await Promise.all([
       usageBy(db, start, end, { k: sql`1` }),
       usageBy(db, start, end, { day: sql`strftime('%Y-%m-%d', ${modelCalls.createdAt} / 1000, 'unixepoch')` }),
       usageBy(db, start, end, { purpose: sql`${modelCalls.purpose}`, model: sql`${modelCalls.model}` }),
@@ -81,6 +82,8 @@ export const getModelUsage = createServerFn({ method: 'GET' })
         .from(modelCalls).leftJoin(organization, eq(organization.id, modelCalls.orgId))
         .where(and(gte(modelCalls.createdAt, start), lt(modelCalls.createdAt, end), eq(modelCalls.ok, false), sql`coalesce(${modelCalls.error}, '') <> 'pending'`))
         .orderBy(desc(modelCalls.createdAt), desc(modelCalls.id)).limit(50),
+      data.job ? usageBy(db, start, end, { day: sql`strftime('%Y-%m-%d', ${modelCalls.createdAt} / 1000, 'unixepoch')` }, sql`${modelCalls.purpose} = ${data.job}`) : null,
+      data.job ? usageBy(db, start, end, { k: sql`1` }, sql`${modelCalls.purpose} = ${data.job}`) : null,
     ])
 
     const byDay = new Map(dayRows.map((row) => [row.day as string, row]))
@@ -88,10 +91,15 @@ export const getModelUsage = createServerFn({ method: 'GET' })
       const day = new Date(start + i * DAY).toISOString().slice(0, 10)
       return { day, partial: start + i * DAY === today, ...stats(byDay.get(day) ?? empty) }
     })
+    const byJobDay = jobDayRows && new Map(jobDayRows.map((row) => [row.day as string, row]))
+    const latencyDays = days.map(({ day, partial, p50, p95 }) => ({ day, partial, ...(byJobDay ? { p50: byJobDay.get(day)?.p50 ?? null, p95: byJobDay.get(day)?.p95 ?? null } : { p50, p95 }) }))
+    const { p50, p95 } = jobTotal ? (jobTotal[0] ?? empty) : (totals[0] ?? empty)
+    const latency = { total: { p50, p95 }, days: latencyDays }
     return {
       from: data.from, to: data.to, asOf,
       totals: stats(totals[0] ?? empty),
       days,
+      latency,
       jobs: jobs.map((row) => ({ purpose: row.purpose as string, model: row.model as string, ...stats(row) })).sort((a, b) => b.calls - a.calls),
       companies: companies.map((row) => ({ orgId: row.org_id as string | null, name: row.name as string | null, slug: row.slug as string | null, ...stats(row) }))
         .sort((a, b) => (b.cost ?? -1) - (a.cost ?? -1)),
