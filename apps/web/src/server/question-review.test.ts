@@ -19,7 +19,7 @@ vi.mock('@tanstack/react-start', () => ({
 }))
 vi.mock('@/db', () => ({ getDb: () => holder.db }))
 vi.mock('@/server/session', () => ({
-  getSessionUser: async () => holder.userId ? { id: holder.userId, isAnonymous: false } : null,
+  getSessionUser: async () => holder.userId ? { id: holder.userId, isAnonymous: false, role: holder.userId === 'staff' ? 'admin' : 'user' } : null,
   requireLearnerId: async () => holder.userId,
 }))
 vi.mock('@/server/env', () => ({}))
@@ -195,7 +195,7 @@ it.each([null, 'member-a', 'owner-b'])('refuses review reads and writes for %s',
 it('scopes role reads and every review action to the admin company, excluding personal topics', async () => {
   holder.userId = 'admin-a'
   const late = await getQuestionReview({ data: { slug: 'alpha', roleId: 'role-a-late' } })
-  expect(late).toEqual({ name: 'alpha', roles: expect.any(Array), role: { id: 'role-a-late', name: 'late' }, unreviewed: 0, units: [], sources: [] })
+  expect(late).toEqual({ readOnly: false, name: 'alpha', roles: expect.any(Array), role: { id: 'role-a-late', name: 'late' }, unreviewed: 0, units: [], sources: [] })
   for (const roleId of ['role-a-old', 'role-b']) await expect(getQuestionReview({ data: { slug: 'alpha', roleId } })).rejects.toMatchObject({ status: 404 })
   for (const topicId of ['b', 'personal']) {
     const original = row('SELECT * FROM items WHERE id = ?', `${topicId}-live`)
@@ -228,4 +228,13 @@ it('moves a question to another live document of the role and refuses other, ret
   expect(row('SELECT source_id, source_version FROM items WHERE id = ?', 'a-move')).toEqual({ source_id: 'source-a2', source_version: 3 })
   const moved = await getQuestionReview({ data: { slug: 'alpha' } })
   expect(moved.units[1].concepts[1].questions.find((q) => q.id === 'a-move')).toMatchObject({ sourceId: 'source-a2', source: { title: 'Zeta handbook', version: 3 } })
+})
+
+
+it('lets staff read company questions but refuses every review write', async () => {
+  holder.userId = 'staff'
+  expect(await getQuestionReview({ data: { slug: 'alpha' } })).toMatchObject({ readOnly: true, name: 'alpha', role: { id: 'role-a' } })
+  for (const action of ['approve', 'edit', 'retire'] as const) {
+    await expect(reviewQuestion({ data: { slug: 'alpha', itemId: 'a-invalid', action, payload } })).rejects.toMatchObject({ status: 403 })
+  }
 })

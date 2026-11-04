@@ -8,7 +8,7 @@ import { attempts, concepts, itemFlags, items, jobRoles, sources, topics, units 
 import { findSourceQuote } from '@/lib/curriculum/validate'
 import { ENABLED_FORMATS } from '@/lib/llm/prompts'
 import { ItemPayload } from '@/lib/llm/schemas'
-import { requireOrgAdmin } from '@/server/authz'
+import { requireOrgAdmin, requireOrgReader } from '@/server/authz'
 import { httpError } from '@/server/helpers'
 
 export const reasonLabels: Record<string, string> = {
@@ -28,14 +28,14 @@ const answerText = (answerJson: string, payload: ItemPayload) => {
 export const getQuestionReview = createServerFn({ method: 'GET' })
   .validator(z.object({ slug: Slug, roleId: z.string().min(1).optional() }))
   .handler(async ({ data }) => {
-    const { org } = await requireOrgAdmin(data.slug)
+    const { org, readOnly } = await requireOrgReader(data.slug)
     const db = getDb()
     const roles = await db.select({ id: jobRoles.id, name: jobRoles.name }).from(jobRoles)
       .where(and(eq(jobRoles.orgId, org.id), eq(jobRoles.status, 'active'))).orderBy(asc(jobRoles.createdAt))
     const role = data.roleId ? roles.find((r) => r.id === data.roleId) : roles[0]
     if (data.roleId && !role) throw httpError('Role not found', 404)
     const topic = role && await db.select({ id: topics.id }).from(topics).where(eq(topics.jobRoleId, role.id)).get()
-    if (!role || !topic) return { name: org.name, roles, role: role ?? null, unreviewed: 0, units: [], sources: [] }
+    if (!role || !topic) return { readOnly, name: org.name, roles, role: role ?? null, unreviewed: 0, units: [], sources: [] }
     const itemScope = db.select({ id: items.id }).from(items).where(eq(items.topicId, topic.id))
     const openFlags = and(inArray(itemFlags.itemId, itemScope), isNull(itemFlags.resolvedAt))
     const [unitRows, conceptRows, itemRows, flagRows, sourceRows, attemptRows] = await Promise.all([
@@ -75,7 +75,7 @@ export const getQuestionReview = createServerFn({ method: 'GET' })
       } }
     })
     return {
-      name: org.name, roles, role,
+      readOnly, name: org.name, roles, role,
       unreviewed: questions.filter((q) => q.rank === 1).length,
       sources: sourceRows.filter((s) => !s.deletedAt && !s.retiredAt && s.status !== 'failed').map((s) => ({ id: s.id, title: s.title, version: s.version })),
       units: unitRows.map((u) => ({ ...u, concepts: conceptRows.filter((c) => c.unitId === u.id).map((c) => {

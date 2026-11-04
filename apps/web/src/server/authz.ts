@@ -48,7 +48,7 @@ export async function requireOrgReader(org: string) {
   })
   if (admin) return { user, ...admin, readOnly: false }
   await requireStaff()
-  const company = await getDb().select().from(organization).where(eq(organization.slug, org)).get()
+  const company = await getDb().select().from(organization).where(or(eq(organization.id, org), eq(organization.slug, org))).get()
   if (!company) throw httpError('Company not found', 404)
   return { user, org: company, readOnly: true }
 }

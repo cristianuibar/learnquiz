@@ -31,8 +31,9 @@ function PortalRoot() {
   return <PortalProvider slug={slug ?? ''} base="org" readOnly={false}><Outlet /></PortalProvider>
 }
 
-function profile(over: Partial<Profile> = {}): Profile {
+function profile(over: Partial<Profile> = {}): Profile & { readOnly: boolean } {
   return {
+    readOnly: false,
     name: 'Dana Learner', topic: { id: 't1', title: 'Workplace safety' }, role: 'Nurse', benchmark: 0.85, started: true, onboarding,
     mastery: 0.66, units: [], confidentErrors: [],
     proficiency: { achievedAt: null, days: null, estimatedDays: 2, projectedAt: start + 8 * day },
@@ -52,7 +53,7 @@ beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   vi.mocked(getProfile).mockReset()
   vi.mocked(getMemberFlags).mockReset()
-  vi.mocked(getMemberFlags).mockResolvedValue([])
+  vi.mocked(getMemberFlags).mockResolvedValue({ readOnly: false, flags: [] })
   vi.mocked(getToday).mockReset()
   vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'learner', name: 'Learner', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, companyMember: true, adminCompanies: [{ name: 'Acme', slug: 'acme' }] })
   container = document.createElement('div')
@@ -170,7 +171,7 @@ describe('Training progress', () => {
   it('lists the flags a person raised with a link into Questions', async () => {
     const flag: MemberFlag = { id: 'f1', label: 'The answer looks incorrect', note: 'See the manual', concept: 'Check the seal', unit: 'Receiving', stem: 'Which seal?', roleId: 'r1', itemId: 'i1', createdAt: start, resolvedAt: null }
     vi.mocked(getProfile).mockResolvedValue(profile())
-    vi.mocked(getMemberFlags).mockResolvedValue([flag])
+    vi.mocked(getMemberFlags).mockResolvedValue({ readOnly: false, flags: [flag] })
     await mount('/org/acme/people/learner')
     const card = section('Flags from Dana · progress unchanged')
     expect(card.textContent).toContain('Flagged a question · Nov 2')

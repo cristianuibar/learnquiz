@@ -21,19 +21,20 @@ function typeLine(q: Question) {
   return `${fmt} · Unreviewed · Generated ${shortDate(q.createdAt)}${q.source ? ` from ${q.source.title}` : ''}`
 }
 
-export function QuestionDetails({ question, slug, sources, stemId, editing, onEditingChange, onAct, onAnnounce }: {
+export function QuestionDetails({ question, slug, sources, stemId, editing, readOnly = false, onEditingChange, onAct, onAnnounce }: {
   question: Question
   slug: string
   sources: Review['sources']
   stemId: string
   editing: boolean
+  readOnly?: boolean
   onEditingChange: (editing: boolean) => void
   // Called when Approve or Retire is pressed; the returned callback runs once the action is saved and the data refreshed.
   onAct: (id: string, action: Action) => () => void
   onAnnounce: (message: string) => void
 }) {
   const router = useRouter()
-  const { readOnly } = usePortal()
+  const { readOnly: portalReadOnly } = usePortal()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const editButton = useRef<HTMLButtonElement>(null)
@@ -77,7 +78,7 @@ export function QuestionDetails({ question, slug, sources, stemId, editing, onEd
     }
   }
 
-  if (editing) {
+  if (editing && !readOnly && !portalReadOnly) {
     return (
       <QuestionEditor
         question={question}
@@ -90,7 +91,7 @@ export function QuestionDetails({ question, slug, sources, stemId, editing, onEd
     )
   }
 
-  const canEdit = !readOnly && question.status !== 'retired'
+  const canEdit = !readOnly && !portalReadOnly && question.status !== 'retired'
   const canReview = canEdit && question.status !== 'rejected'
   return (
     <div className="flex flex-col gap-4">

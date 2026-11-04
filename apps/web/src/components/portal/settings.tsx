@@ -84,14 +84,14 @@ function Section({ id, title, children }: { id: string; title: string; children:
 
 const Divider = () => <hr className="m-0 border-0 border-t border-border" />
 
-type FormProps = { settings: Settings; onSaved?: () => unknown }
+type FormProps = { settings: Settings; readOnly?: boolean; onSaved?: () => unknown }
 
 // Another company's settings start a fresh form, so no draft or in-flight save carries over.
 export function SettingsForm(props: FormProps) {
   return <CompanyForm key={props.settings.slug} {...props} />
 }
 
-function CompanyForm({ settings, onSaved }: FormProps) {
+function CompanyForm({ settings, readOnly = settings.readOnly, onSaved }: FormProps) {
   const uid = useId()
   const base = baselineOf(settings)
   const [baseline, setBaseline] = useState<Values>(base)
@@ -307,6 +307,172 @@ function CompanyForm({ settings, onSaved }: FormProps) {
   const daysLabelId = `${uid}-days-label`
   const accentValid = accent !== '' && /^#[0-9a-f]{6}$/i.test(accent)
 
+  const sections = (
+    <>
+      <Section id={nameId} title="Company">
+        <div className="flex flex-col gap-2">
+          {readOnly ? <span className="text-label text-ink">Company name</span> : <Label htmlFor="name">Company name</Label>}
+          {readOnly ? <p className="text-body text-ink">{settings.name}</p> : <Input
+            id="name"
+            name="name"
+            autoComplete="organization"
+            value={name}
+            onChange={(e) => { edit(); setName(e.target.value) }}
+            {...fieldProps('name', shownName)}
+          />}
+          {shownName && <FieldError id="name">{shownName}</FieldError>}
+        </div>
+        <div className="flex flex-col gap-2">
+          <span id={logoLabelId} className="text-label text-ink">Logo</span>
+          <div role="group" aria-labelledby={logoLabelId} className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-4">
+              {logo ? (
+                <img src={logo} alt="Current logo" className="size-16 rounded-md border border-border object-contain" />
+              ) : (
+                <div className="flex size-16 items-center justify-center rounded-md border border-border bg-surface-sunken text-ink-muted">
+                  <ImageIcon aria-hidden className="size-6" />
+                </div>
+              )}
+              {!readOnly && <>
+                <Button variant="secondary" type="button" aria-describedby={logoMetaId} onClick={() => fileRef.current?.click()}>
+                  <Upload aria-hidden />Replace logo
+                </Button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  name="logo"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="sr-only"
+                  tabIndex={-1}
+                  aria-hidden
+                  onChange={onFile}
+                />
+                {logo && <Button variant="ghost" type="button" onClick={onRemove}>Remove</Button>}
+              </>}
+            </div>
+            {!readOnly && <p id={logoMetaId} className="text-caption text-ink-muted">PNG, JPEG or WebP · up to 2 MB</p>}
+            {logoError && <FieldError id="logo">{logoError}</FieldError>}
+          </div>
+        </div>
+      </Section>
+      <Divider />
+      <Section id={learnerId} title="Learner app">
+        <div className="flex flex-col gap-2">
+          {readOnly ? <span className="text-label text-ink">Accent color</span> : <Label htmlFor="accent">Accent color</Label>}
+          <div className="flex flex-wrap items-center gap-3">
+            {readOnly ? (
+              <>
+                <p className="text-body text-ink tabular-nums">{settings.accent ?? 'Default'}</p>
+                <span aria-hidden className="size-11 shrink-0 rounded-md border-2 border-border-strong" style={{ backgroundColor: settings.accent ?? 'var(--brand)' }} />
+              </>
+            ) : <>
+              <Input
+                id="accent"
+                name="accent"
+                className="w-40 tabular-nums"
+                maxLength={7}
+                spellCheck={false}
+                autoComplete="off"
+                value={accent}
+                onChange={(e) => { edit(); setAccent(e.target.value) }}
+                {...fieldProps('accent', acc.error ? 'x' : undefined)}
+              />
+              <button
+                type="button"
+                aria-label="Choose accent color"
+                className="size-11 shrink-0 rounded-md border-2 border-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                style={{ backgroundColor: accentValid ? accent : 'var(--brand)' }}
+                onClick={() => colorRef.current?.click()}
+              />
+              <input
+                ref={colorRef}
+                type="color"
+                className="sr-only"
+                tabIndex={-1}
+                aria-hidden
+                value={accentValid ? accent.toLowerCase() : colors.brand[0].toLowerCase()}
+                onChange={(e) => { edit(); setAccent(e.target.value.toUpperCase()) }}
+              />
+            </>}
+            {((accentOk && acc.ratio !== null) || readOnly) && (
+              <figure className="m-0 flex flex-wrap items-center gap-3">
+                <span
+                  className="inline-flex min-h-11 items-center rounded-md px-4 text-label"
+                  style={{ backgroundColor: accent || 'var(--brand)', color: accent ? deriveBrand(accent).light.onBrand : 'var(--on-brand)' }}
+                >
+                  Start quiz
+                </span>
+                <figcaption className="text-caption text-ink-muted tabular-nums">
+                  <span className="sr-only">Learner app button preview: </span>
+                  {acc.ratio !== null ? `${acc.ratio.toFixed(1)}:1 on white · passes AA` : 'Default accent'}
+                </figcaption>
+              </figure>
+            )}
+          </div>
+          {acc.error && <FieldError id="accent">{acc.error}</FieldError>}
+        </div>
+      </Section>
+      <Divider />
+      <Section id={pushId} title="Learning pushes">
+        <div className="flex flex-col gap-2">
+          {readOnly ? <span className="text-label text-ink">Timezone</span> : <Label htmlFor="timezone">Timezone</Label>}
+          {readOnly ? <p className="text-body text-ink">{zoneLabel(settings.timezone)}</p> : <Select id="timezone" name="timezone" value={timezone} onChange={(e) => { edit(); setTimezone(e.target.value) }}>
+            {zones.map((z) => <option key={z.zone} value={z.zone}>{z.label}</option>)}
+          </Select>}
+        </div>
+        <div className="flex flex-col gap-2">
+          <span id={daysLabelId} className="text-label text-ink">Working days</span>
+          {readOnly ? <p className="text-body text-ink">{settings.workingHours.days.map((d) => DAYS[d - 1]).join(', ')}</p> : <>
+            <div ref={daysRef}>
+              <Segmented
+                mode="toggle"
+                className="max-w-full flex-wrap"
+                aria-labelledby={daysLabelId}
+                value={days}
+                onValueChange={(v) => { edit(); setDays(v) }}
+                options={DAYS.map((d, i) => ({
+                  value: String(i + 1),
+                  label: (
+                    <>
+                      <span aria-hidden>{d.slice(0, 3)}</span>
+                      <span className="sr-only">{d}</span>
+                    </>
+                  ),
+                }))}
+              />
+            </div>
+            {days.map((d) => <input key={d} type="hidden" name="days" value={d} tabIndex={-1} readOnly />)}
+          </>}
+          {shownDays && <FieldError id="days">{shownDays}</FieldError>}
+        </div>
+        {readOnly ? (
+          <div className="flex flex-col gap-2">
+            <span className="text-label text-ink">Working hours</span>
+            <p className="text-body text-ink">{timeLabel(settings.workingHours.start)} – {timeLabel(settings.workingHours.end)}</p>
+          </div>
+        ) : (
+          <fieldset className="m-0 flex min-w-0 flex-col gap-2 border-0 p-0">
+            <legend className="mb-2 p-0 text-label text-ink">Working hours</legend>
+            <div className="grid max-w-[420px] grid-cols-2 gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="start" className="text-caption text-ink-muted">From</Label>
+                <Select id="start" name="start" value={start} onChange={(e) => changeStart(e.target.value)}>
+                  {fromOptions.map((t) => <option key={t} value={t}>{timeLabel(t)}</option>)}
+                </Select>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="end" className="text-caption text-ink-muted">To</Label>
+                <Select id="end" name="end" value={end} onChange={(e) => { edit(); setEnd(e.target.value) }}>
+                  {toOptions.map((t) => <option key={t} value={t}>{timeLabel(t)}</option>)}
+                </Select>
+              </div>
+            </div>
+          </fieldset>
+        )}
+      </Section>
+    </>
+  )
+
   return (
     <Page capped>
       <PageHeader title="Settings" />
@@ -324,156 +490,14 @@ function CompanyForm({ settings, onSaved }: FormProps) {
         </Banner>
       )}
       <div className="rounded-md border border-border bg-surface-card">
-        <form ref={formRef} aria-label="Company settings" noValidate onSubmit={onSubmit}>
+        {readOnly ? sections : <form ref={formRef} aria-label="Company settings" noValidate onSubmit={onSubmit}>
           <input type="hidden" name="slug" value={settings.slug} tabIndex={-1} readOnly />
-          <Section id={nameId} title="Company">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="name">Company name</Label>
-              <Input
-                id="name"
-                name="name"
-                autoComplete="organization"
-                value={name}
-                onChange={(e) => { edit(); setName(e.target.value) }}
-                {...fieldProps('name', shownName)}
-              />
-              {shownName && <FieldError id="name">{shownName}</FieldError>}
-            </div>
-            <div className="flex flex-col gap-2">
-              <span id={logoLabelId} className="text-label text-ink">Logo</span>
-              <div role="group" aria-labelledby={logoLabelId} className="flex flex-col gap-3">
-                <div className="flex flex-wrap items-center gap-4">
-                  {logo ? (
-                    <img src={logo} alt="Current logo" className="size-16 rounded-md border border-border object-contain" />
-                  ) : (
-                    <div className="flex size-16 items-center justify-center rounded-md border border-border bg-surface-sunken text-ink-muted">
-                      <ImageIcon aria-hidden className="size-6" />
-                    </div>
-                  )}
-                  <Button variant="secondary" type="button" aria-describedby={logoMetaId} onClick={() => fileRef.current?.click()}>
-                    <Upload aria-hidden />Replace logo
-                  </Button>
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    name="logo"
-                    accept="image/png,image/jpeg,image/webp"
-                    className="sr-only"
-                    tabIndex={-1}
-                    aria-hidden
-                    onChange={onFile}
-                  />
-                  {logo && <Button variant="ghost" type="button" onClick={onRemove}>Remove</Button>}
-                </div>
-                <p id={logoMetaId} className="text-caption text-ink-muted">PNG, JPEG or WebP · up to 2 MB</p>
-                {logoError && <FieldError id="logo">{logoError}</FieldError>}
-              </div>
-            </div>
-          </Section>
-          <Divider />
-          <Section id={learnerId} title="Learner app">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="accent">Accent color</Label>
-              <div className="flex flex-wrap items-center gap-3">
-                <Input
-                  id="accent"
-                  name="accent"
-                  className="w-40 tabular-nums"
-                  maxLength={7}
-                  spellCheck={false}
-                  autoComplete="off"
-                  value={accent}
-                  onChange={(e) => { edit(); setAccent(e.target.value) }}
-                  {...fieldProps('accent', acc.error ? 'x' : undefined)}
-                />
-                <button
-                  type="button"
-                  aria-label="Choose accent color"
-                  className="size-11 shrink-0 rounded-md border-2 border-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                  style={{ backgroundColor: accentValid ? accent : 'var(--brand)' }}
-                  onClick={() => colorRef.current?.click()}
-                />
-                <input
-                  ref={colorRef}
-                  type="color"
-                  className="sr-only"
-                  tabIndex={-1}
-                  aria-hidden
-                  value={accentValid ? accent.toLowerCase() : colors.brand[0].toLowerCase()}
-                  onChange={(e) => { edit(); setAccent(e.target.value.toUpperCase()) }}
-                />
-                {accentOk && acc.ratio !== null && (
-                  <figure className="m-0 flex flex-wrap items-center gap-3">
-                    <span
-                      className="inline-flex min-h-11 items-center rounded-md px-4 text-label"
-                      style={{ backgroundColor: accent, color: deriveBrand(accent).light.onBrand }}
-                    >
-                      Start quiz
-                    </span>
-                    <figcaption className="text-caption text-ink-muted tabular-nums">
-                      <span className="sr-only">Learner app button preview: </span>
-                      {acc.ratio.toFixed(1)}:1 on white · passes AA
-                    </figcaption>
-                  </figure>
-                )}
-              </div>
-              {acc.error && <FieldError id="accent">{acc.error}</FieldError>}
-            </div>
-          </Section>
-          <Divider />
-          <Section id={pushId} title="Learning pushes">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="timezone">Timezone</Label>
-              <Select id="timezone" name="timezone" value={timezone} onChange={(e) => { edit(); setTimezone(e.target.value) }}>
-                {zones.map((z) => <option key={z.zone} value={z.zone}>{z.label}</option>)}
-              </Select>
-            </div>
-            <div className="flex flex-col gap-2">
-              <span id={daysLabelId} className="text-label text-ink">Working days</span>
-              <div ref={daysRef}>
-                <Segmented
-                  mode="toggle"
-                  className="max-w-full flex-wrap"
-                  aria-labelledby={daysLabelId}
-                  value={days}
-                  onValueChange={(v) => { edit(); setDays(v) }}
-                  options={DAYS.map((d, i) => ({
-                    value: String(i + 1),
-                    label: (
-                      <>
-                        <span aria-hidden>{d.slice(0, 3)}</span>
-                        <span className="sr-only">{d}</span>
-                      </>
-                    ),
-                  }))}
-                />
-              </div>
-              {days.map((d) => <input key={d} type="hidden" name="days" value={d} tabIndex={-1} readOnly />)}
-              {shownDays && <FieldError id="days">{shownDays}</FieldError>}
-            </div>
-            <fieldset className="m-0 flex min-w-0 flex-col gap-2 border-0 p-0">
-              <legend className="mb-2 p-0 text-label text-ink">Working hours</legend>
-              <div className="grid max-w-[420px] grid-cols-2 gap-4">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="start" className="text-caption text-ink-muted">From</Label>
-                  <Select id="start" name="start" value={start} onChange={(e) => changeStart(e.target.value)}>
-                    {fromOptions.map((t) => <option key={t} value={t}>{timeLabel(t)}</option>)}
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="end" className="text-caption text-ink-muted">To</Label>
-                  <Select id="end" name="end" value={end} onChange={(e) => { edit(); setEnd(e.target.value) }}>
-                    {toOptions.map((t) => <option key={t} value={t}>{timeLabel(t)}</option>)}
-                  </Select>
-                </div>
-              </div>
-            </fieldset>
-          </Section>
+          {sections}
           <div className="flex flex-wrap justify-end gap-3 border-t border-border px-6 py-4">
             <Button variant="ghost" type="button" disabled={saving} onClick={discard}>Discard</Button>
             <Button type="submit">{saving ? 'Saving…' : 'Save changes'}</Button>
           </div>
-        </form>
+        </form>}
       </div>
     </Page>
   )

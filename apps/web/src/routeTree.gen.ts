@@ -51,7 +51,11 @@ import { Route as OrgSlugPeopleIdRouteImport } from './routes/org.$slug.people_.
 import { Route as OrgSlugRolesRoleIdRouteImport } from './routes/org.$slug.roles_.$roleId'
 import { Route as TTopicIdUUnitIdRouteImport } from './routes/t.$topicId.u.$unitId'
 import { Route as AdminCompaniesSlugPortalIndexRouteImport } from './routes/admin_.companies.$slug.portal.index'
+import { Route as AdminCompaniesSlugPortalPeopleRouteImport } from './routes/admin_.companies.$slug.portal.people'
+import { Route as AdminCompaniesSlugPortalQuestionsRouteImport } from './routes/admin_.companies.$slug.portal.questions'
 import { Route as AdminCompaniesSlugPortalRolesRouteImport } from './routes/admin_.companies.$slug.portal.roles'
+import { Route as AdminCompaniesSlugPortalSettingsRouteImport } from './routes/admin_.companies.$slug.portal.settings'
+import { Route as AdminCompaniesSlugPortalPeopleIdRouteImport } from './routes/admin_.companies.$slug.portal.people_.$id'
 import { Route as AdminCompaniesSlugPortalRolesRoleIdRouteImport } from './routes/admin_.companies.$slug.portal.roles_.$roleId'
 import { Route as ApiOrgOrgIdRolesRoleIdDocumentsRouteImport } from './routes/api/org.$orgId.roles.$roleId.documents'
 
@@ -268,10 +272,34 @@ const AdminCompaniesSlugPortalIndexRoute =
     path: '/',
     getParentRoute: () => AdminCompaniesSlugPortalRoute,
   } as any)
+const AdminCompaniesSlugPortalPeopleRoute =
+  AdminCompaniesSlugPortalPeopleRouteImport.update({
+    id: '/people',
+    path: '/people',
+    getParentRoute: () => AdminCompaniesSlugPortalRoute,
+  } as any)
+const AdminCompaniesSlugPortalQuestionsRoute =
+  AdminCompaniesSlugPortalQuestionsRouteImport.update({
+    id: '/questions',
+    path: '/questions',
+    getParentRoute: () => AdminCompaniesSlugPortalRoute,
+  } as any)
 const AdminCompaniesSlugPortalRolesRoute =
   AdminCompaniesSlugPortalRolesRouteImport.update({
     id: '/roles',
     path: '/roles',
+    getParentRoute: () => AdminCompaniesSlugPortalRoute,
+  } as any)
+const AdminCompaniesSlugPortalSettingsRoute =
+  AdminCompaniesSlugPortalSettingsRouteImport.update({
+    id: '/settings',
+    path: '/settings',
+    getParentRoute: () => AdminCompaniesSlugPortalRoute,
+  } as any)
+const AdminCompaniesSlugPortalPeopleIdRoute =
+  AdminCompaniesSlugPortalPeopleIdRouteImport.update({
+    id: '/people_/$id',
+    path: '/people/$id',
     getParentRoute: () => AdminCompaniesSlugPortalRoute,
   } as any)
 const AdminCompaniesSlugPortalRolesRoleIdRoute =
@@ -329,8 +357,12 @@ export interface FileRoutesByFullPath {
   '/org/$slug/people/$id': typeof OrgSlugPeopleIdRoute
   '/org/$slug/roles/$roleId': typeof OrgSlugRolesRoleIdRoute
   '/t/$topicId/u/$unitId': typeof TTopicIdUUnitIdRoute
+  '/admin/companies/$slug/portal/people': typeof AdminCompaniesSlugPortalPeopleRoute
+  '/admin/companies/$slug/portal/questions': typeof AdminCompaniesSlugPortalQuestionsRoute
   '/admin/companies/$slug/portal/roles': typeof AdminCompaniesSlugPortalRolesRoute
+  '/admin/companies/$slug/portal/settings': typeof AdminCompaniesSlugPortalSettingsRoute
   '/admin/companies/$slug/portal/': typeof AdminCompaniesSlugPortalIndexRoute
+  '/admin/companies/$slug/portal/people/$id': typeof AdminCompaniesSlugPortalPeopleIdRoute
   '/admin/companies/$slug/portal/roles/$roleId': typeof AdminCompaniesSlugPortalRolesRoleIdRoute
   '/api/org/$orgId/roles/$roleId/documents': typeof ApiOrgOrgIdRolesRoleIdDocumentsRoute
 }
@@ -373,8 +405,12 @@ export interface FileRoutesByTo {
   '/org/$slug/people/$id': typeof OrgSlugPeopleIdRoute
   '/org/$slug/roles/$roleId': typeof OrgSlugRolesRoleIdRoute
   '/t/$topicId/u/$unitId': typeof TTopicIdUUnitIdRoute
+  '/admin/companies/$slug/portal/people': typeof AdminCompaniesSlugPortalPeopleRoute
+  '/admin/companies/$slug/portal/questions': typeof AdminCompaniesSlugPortalQuestionsRoute
   '/admin/companies/$slug/portal/roles': typeof AdminCompaniesSlugPortalRolesRoute
+  '/admin/companies/$slug/portal/settings': typeof AdminCompaniesSlugPortalSettingsRoute
   '/admin/companies/$slug/portal': typeof AdminCompaniesSlugPortalIndexRoute
+  '/admin/companies/$slug/portal/people/$id': typeof AdminCompaniesSlugPortalPeopleIdRoute
   '/admin/companies/$slug/portal/roles/$roleId': typeof AdminCompaniesSlugPortalRolesRoleIdRoute
   '/api/org/$orgId/roles/$roleId/documents': typeof ApiOrgOrgIdRolesRoleIdDocumentsRoute
 }
@@ -421,8 +457,12 @@ export interface FileRoutesById {
   '/org/$slug/people_/$id': typeof OrgSlugPeopleIdRoute
   '/org/$slug/roles_/$roleId': typeof OrgSlugRolesRoleIdRoute
   '/t/$topicId/u/$unitId': typeof TTopicIdUUnitIdRoute
+  '/admin_/companies/$slug/portal/people': typeof AdminCompaniesSlugPortalPeopleRoute
+  '/admin_/companies/$slug/portal/questions': typeof AdminCompaniesSlugPortalQuestionsRoute
   '/admin_/companies/$slug/portal/roles': typeof AdminCompaniesSlugPortalRolesRoute
+  '/admin_/companies/$slug/portal/settings': typeof AdminCompaniesSlugPortalSettingsRoute
   '/admin_/companies/$slug/portal/': typeof AdminCompaniesSlugPortalIndexRoute
+  '/admin_/companies/$slug/portal/people_/$id': typeof AdminCompaniesSlugPortalPeopleIdRoute
   '/admin_/companies/$slug/portal/roles_/$roleId': typeof AdminCompaniesSlugPortalRolesRoleIdRoute
   '/api/org/$orgId/roles/$roleId/documents': typeof ApiOrgOrgIdRolesRoleIdDocumentsRoute
 }
@@ -470,8 +510,12 @@ export interface FileRouteTypes {
     | '/org/$slug/people/$id'
     | '/org/$slug/roles/$roleId'
     | '/t/$topicId/u/$unitId'
+    | '/admin/companies/$slug/portal/people'
+    | '/admin/companies/$slug/portal/questions'
     | '/admin/companies/$slug/portal/roles'
+    | '/admin/companies/$slug/portal/settings'
     | '/admin/companies/$slug/portal/'
+    | '/admin/companies/$slug/portal/people/$id'
     | '/admin/companies/$slug/portal/roles/$roleId'
     | '/api/org/$orgId/roles/$roleId/documents'
   fileRoutesByTo: FileRoutesByTo
@@ -514,8 +558,12 @@ export interface FileRouteTypes {
     | '/org/$slug/people/$id'
     | '/org/$slug/roles/$roleId'
     | '/t/$topicId/u/$unitId'
+    | '/admin/companies/$slug/portal/people'
+    | '/admin/companies/$slug/portal/questions'
     | '/admin/companies/$slug/portal/roles'
+    | '/admin/companies/$slug/portal/settings'
     | '/admin/companies/$slug/portal'
+    | '/admin/companies/$slug/portal/people/$id'
     | '/admin/companies/$slug/portal/roles/$roleId'
     | '/api/org/$orgId/roles/$roleId/documents'
   id:
@@ -561,8 +609,12 @@ export interface FileRouteTypes {
     | '/org/$slug/people_/$id'
     | '/org/$slug/roles_/$roleId'
     | '/t/$topicId/u/$unitId'
+    | '/admin_/companies/$slug/portal/people'
+    | '/admin_/companies/$slug/portal/questions'
     | '/admin_/companies/$slug/portal/roles'
+    | '/admin_/companies/$slug/portal/settings'
     | '/admin_/companies/$slug/portal/'
+    | '/admin_/companies/$slug/portal/people_/$id'
     | '/admin_/companies/$slug/portal/roles_/$roleId'
     | '/api/org/$orgId/roles/$roleId/documents'
   fileRoutesById: FileRoutesById
@@ -894,11 +946,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCompaniesSlugPortalIndexRouteImport
       parentRoute: typeof AdminCompaniesSlugPortalRoute
     }
+    '/admin_/companies/$slug/portal/people': {
+      id: '/admin_/companies/$slug/portal/people'
+      path: '/people'
+      fullPath: '/admin/companies/$slug/portal/people'
+      preLoaderRoute: typeof AdminCompaniesSlugPortalPeopleRouteImport
+      parentRoute: typeof AdminCompaniesSlugPortalRoute
+    }
+    '/admin_/companies/$slug/portal/questions': {
+      id: '/admin_/companies/$slug/portal/questions'
+      path: '/questions'
+      fullPath: '/admin/companies/$slug/portal/questions'
+      preLoaderRoute: typeof AdminCompaniesSlugPortalQuestionsRouteImport
+      parentRoute: typeof AdminCompaniesSlugPortalRoute
+    }
     '/admin_/companies/$slug/portal/roles': {
       id: '/admin_/companies/$slug/portal/roles'
       path: '/roles'
       fullPath: '/admin/companies/$slug/portal/roles'
       preLoaderRoute: typeof AdminCompaniesSlugPortalRolesRouteImport
+      parentRoute: typeof AdminCompaniesSlugPortalRoute
+    }
+    '/admin_/companies/$slug/portal/settings': {
+      id: '/admin_/companies/$slug/portal/settings'
+      path: '/settings'
+      fullPath: '/admin/companies/$slug/portal/settings'
+      preLoaderRoute: typeof AdminCompaniesSlugPortalSettingsRouteImport
+      parentRoute: typeof AdminCompaniesSlugPortalRoute
+    }
+    '/admin_/companies/$slug/portal/people_/$id': {
+      id: '/admin_/companies/$slug/portal/people_/$id'
+      path: '/people/$id'
+      fullPath: '/admin/companies/$slug/portal/people/$id'
+      preLoaderRoute: typeof AdminCompaniesSlugPortalPeopleIdRouteImport
       parentRoute: typeof AdminCompaniesSlugPortalRoute
     }
     '/admin_/companies/$slug/portal/roles_/$roleId': {
@@ -964,15 +1044,26 @@ const OrgSlugRouteWithChildren =
   OrgSlugRoute._addFileChildren(OrgSlugRouteChildren)
 
 interface AdminCompaniesSlugPortalRouteChildren {
+  AdminCompaniesSlugPortalPeopleRoute: typeof AdminCompaniesSlugPortalPeopleRoute
+  AdminCompaniesSlugPortalQuestionsRoute: typeof AdminCompaniesSlugPortalQuestionsRoute
   AdminCompaniesSlugPortalRolesRoute: typeof AdminCompaniesSlugPortalRolesRoute
+  AdminCompaniesSlugPortalSettingsRoute: typeof AdminCompaniesSlugPortalSettingsRoute
   AdminCompaniesSlugPortalIndexRoute: typeof AdminCompaniesSlugPortalIndexRoute
+  AdminCompaniesSlugPortalPeopleIdRoute: typeof AdminCompaniesSlugPortalPeopleIdRoute
   AdminCompaniesSlugPortalRolesRoleIdRoute: typeof AdminCompaniesSlugPortalRolesRoleIdRoute
 }
 
 const AdminCompaniesSlugPortalRouteChildren: AdminCompaniesSlugPortalRouteChildren =
   {
+    AdminCompaniesSlugPortalPeopleRoute: AdminCompaniesSlugPortalPeopleRoute,
+    AdminCompaniesSlugPortalQuestionsRoute:
+      AdminCompaniesSlugPortalQuestionsRoute,
     AdminCompaniesSlugPortalRolesRoute: AdminCompaniesSlugPortalRolesRoute,
+    AdminCompaniesSlugPortalSettingsRoute:
+      AdminCompaniesSlugPortalSettingsRoute,
     AdminCompaniesSlugPortalIndexRoute: AdminCompaniesSlugPortalIndexRoute,
+    AdminCompaniesSlugPortalPeopleIdRoute:
+      AdminCompaniesSlugPortalPeopleIdRoute,
     AdminCompaniesSlugPortalRolesRoleIdRoute:
       AdminCompaniesSlugPortalRolesRoleIdRoute,
   }

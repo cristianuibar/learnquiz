@@ -60,7 +60,7 @@ function initialState(data: Review, item?: string) {
   return { expanded, showAll, focus }
 }
 
-function Body({ data, slug, search, onClear }: { data: Review; slug: string; search: ReviewSearch; onClear: () => void }) {
+function Body({ data, slug, search, readOnly, onClear }: { data: Review; slug: string; search: ReviewSearch; readOnly: boolean; onClear: () => void }) {
   const [init] = useState(() => initialState(data, search.item))
   const [expanded, setExpanded] = useState(init.expanded)
   const [showAll, setShowAll] = useState(init.showAll)
@@ -141,7 +141,7 @@ function Body({ data, slug, search, onClear }: { data: Review; slug: string; sea
                 <h2 id={hid} className="text-title-2 text-ink">{u.name}</h2>
                 <p className="text-caption text-ink-muted">{`${plural(u.concepts.length, 'concept')} · ${plural(total, 'question')}`}</p>
               </div>
-              {u.concepts.map((c) => <ConceptBlock key={c.id} concept={c} slug={slug} sources={data.sources} expanded={expanded} showAll={showAll.has(c.id)} onShowAll={() => setShowAll((s) => new Set(s).add(c.id))} onToggle={toggle} onAct={onAct} onAnnounce={setMessage} />)}
+              {u.concepts.map((c) => <ConceptBlock readOnly={readOnly} key={c.id} concept={c} slug={slug} sources={data.sources} expanded={expanded} showAll={showAll.has(c.id)} onShowAll={() => setShowAll((s) => new Set(s).add(c.id))} onToggle={toggle} onAct={onAct} onAnnounce={setMessage} />)}
             </section>
           )
         })}
@@ -150,10 +150,11 @@ function Body({ data, slug, search, onClear }: { data: Review; slug: string; sea
   )
 }
 
-function ConceptBlock({ concept: c, slug, sources, expanded, showAll, onShowAll, onToggle, onAct, onAnnounce }: {
+function ConceptBlock({ concept: c, slug, sources, readOnly, expanded, showAll, onShowAll, onToggle, onAct, onAnnounce }: {
   concept: Concept
   slug: string
   sources: Review['sources']
+  readOnly: boolean
   expanded: Set<string>
   showAll: boolean
   onShowAll: () => void
@@ -177,7 +178,7 @@ function ConceptBlock({ concept: c, slug, sources, expanded, showAll, onShowAll,
       <div className="rounded-md border border-border bg-surface-card">
         <ul aria-labelledby={hid} className="divide-y divide-border">
           {shown.map((q) => (
-            <QuestionRow key={q.id} question={q} critical={c.critical} slug={slug} sources={sources} expanded={expanded.has(q.id)} onToggle={() => onToggle(q.id)} onAct={onAct} onAnnounce={onAnnounce} />
+            <QuestionRow readOnly={readOnly} key={q.id} question={q} critical={c.critical} slug={slug} sources={sources} expanded={expanded.has(q.id)} onToggle={() => onToggle(q.id)} onAct={onAct} onAnnounce={onAnnounce} />
           ))}
         </ul>
         {hidden > 0 && (
@@ -190,11 +191,11 @@ function ConceptBlock({ concept: c, slug, sources, expanded, showAll, onShowAll,
   )
 }
 
-export function QuestionReview({ data, slug, search }: { data: Review; slug: string; search: ReviewSearch }) {
+export function QuestionReview({ data, slug, search, readOnly = data.readOnly }: { data: Review; slug: string; search: ReviewSearch; readOnly?: boolean }) {
   const links = usePortalLinks()
   const navigate = useNavigate()
   const searchRef = useRef<HTMLInputElement>(null)
-  const patchFilters = (patch: FilterPatch) => void navigate({ to: '/org/$slug/questions', params: { slug }, search: (prev) => ({ role: prev.role, q: prev.q, unreviewed: prev.unreviewed, flagged: prev.flagged, critical: prev.critical, status: prev.status as ReviewSearch['status'], ...patch, item: undefined }), replace: true })
+  const patchFilters = (patch: FilterPatch) => void navigate({ ...links.questions(), search: (prev) => ({ role: prev.role, q: prev.q, unreviewed: prev.unreviewed, flagged: prev.flagged, critical: prev.critical, status: prev.status as ReviewSearch['status'], ...patch, item: undefined }), replace: true })
   // Clear and a role change remount the toolbar at once, before the role's loader settles, so a search still in its
   // debounce is dropped; Clear focuses the new field after it mounts.
   const [resets, setResets] = useState(0)
@@ -206,7 +207,7 @@ export function QuestionReview({ data, slug, search }: { data: Review; slug: str
   }
   const pickRole = (role: string) => {
     setResets((n) => n + 1)
-    void navigate({ to: '/org/$slug/questions', params: { slug }, search: { role } })
+    void navigate({ ...links.questions(), search: { role } })
   }
   useEffect(() => {
     if (!focusSearch.current) return
@@ -237,7 +238,7 @@ export function QuestionReview({ data, slug, search }: { data: Review; slug: str
         <p className="rounded-md bg-surface-sunken px-4 py-3 text-body text-ink-muted">No roles yet. <Link {...links.roles} className="underline">Roles</Link></p>
       )}
       {data.role && <ReviewToolbar key={`${search.role ?? data.role.id}:${resets}`} search={search} counts={counts} shown={shown} inputRef={searchRef} onChange={patchFilters} onClear={clear} />}
-      <Body key={data.role?.id ?? 'none'} data={data} slug={slug} search={search} onClear={clear} />
+      <Body readOnly={readOnly} key={data.role?.id ?? 'none'} data={data} slug={slug} search={search} onClear={clear} />
     </Page>
   )
 }
