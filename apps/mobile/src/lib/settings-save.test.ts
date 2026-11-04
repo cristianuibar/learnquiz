@@ -34,8 +34,13 @@ test('a failed pending save discards queued changes, reverts to confirmed and re
   second.reject(new Error('offline'))
   await jest.runAllTimersAsync()
   expect(onChange).toHaveBeenLastCalledWith(1)
+  expect(queue.value()).toBe(1)
   expect(onError).toHaveBeenCalledTimes(1)
   expect(save.mock.calls).toEqual([[1], [2]])
+  save.mockResolvedValue(undefined)
+  queue.change(queue.value() + 10)
+  await jest.runAllTimersAsync()
+  expect(save).toHaveBeenLastCalledWith(11)
 })
 
 test.each(['resolve', 'reject'] as const)('token replacement ignores late %s and never sends the queued change', async (result) => {

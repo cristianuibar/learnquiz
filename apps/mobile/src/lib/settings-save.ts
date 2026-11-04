@@ -1,4 +1,5 @@
-// A screen owns one queue. Only the last confirmed snapshot survives failure;
+// A queue drains submitted edits even after its screen closes. Its owner
+// predicate ends writes when the token changes. Only the last confirmed snapshot survives failure;
 // intermediate edits coalesce while the single request is in flight.
 export function createSettingsSave<T>({ initial, save, onChange, onError, isCurrent = () => true }: {
   initial: T

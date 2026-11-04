@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pressable, View } from 'react-native'
+import { Pressable, useWindowDimensions, View } from 'react-native'
 import { Check } from 'lucide-react-native'
 import { Text } from '../ui/Text'
 import { useTheme } from '@/theme/ThemeProvider'
@@ -7,19 +7,20 @@ import { useTheme } from '@/theme/ThemeProvider'
 export function Segment({ label, accessibilityLabel = label, selected, radio, onPress }: {
   label: string; accessibilityLabel?: string; selected: boolean; radio?: boolean; onPress(): void
 }) {
-  const { colors, space, radius, sizes } = useTheme()
+  const { colors, space, radius, sizes, typography } = useTheme()
+  const { fontScale } = useWindowDimensions()
   const [focused, setFocused] = useState(false)
   return (
     <Pressable accessible focusable accessibilityRole={radio ? 'radio' : 'togglebutton'} accessibilityLabel={accessibilityLabel}
-      aria-pressed={radio ? undefined : selected} accessibilityState={{ checked: selected }}
+      accessibilityState={{ checked: selected }}
       onPress={onPress} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-      style={{ flexGrow: 1, flexBasis: 0, minWidth: sizes.target, minHeight: sizes.target, borderWidth: 2,
+      style={{ flexGrow: 1, flexBasis: 'auto', flexShrink: 0, minWidth: Math.max(sizes.target, label.length * typography.label.fontSize * fontScale + space[4]), minHeight: sizes.target, borderWidth: 2,
         borderColor: selected ? colors.brand : colors.borderStrong, borderRadius: radius.md,
         backgroundColor: selected ? colors.brandTint : colors.surfaceCard, paddingHorizontal: space[1], paddingVertical: space[2],
-        flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: space[1],
+        flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'center', justifyContent: 'center', gap: space[1],
         outlineWidth: focused ? 2 : 0, outlineColor: colors.brand, outlineOffset: 2 }}>
-      {selected && <Check size={space[4]} color={colors.ink} accessible={false} />}
-      <Text importantForAccessibility="no">{label}</Text>
+      {selected && fontScale < 1.5 && <Check size={space[4]} color={colors.ink} accessible={false} />}
+      <Text variant="label" importantForAccessibility="no" style={{ flexShrink: 0 }}>{label}</Text>
     </Pressable>
   )
 }
@@ -28,7 +29,7 @@ export function Segmented<T extends string>({ value, options, onChange }: {
 }) {
   const { space } = useTheme()
   // Keep the child radios individually reachable by TalkBack.
-  return <View accessible={false} accessibilityRole="radiogroup" accessibilityLabel="Appearance" style={{ flexDirection: 'row', gap: space[2] }}>
+  return <View accessible={false} accessibilityRole="radiogroup" accessibilityLabel="Appearance" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
     {options.map((option) => <Segment key={option.value} label={option.label} selected={option.value === value} radio onPress={() => onChange(option.value)} />)}
   </View>
 }

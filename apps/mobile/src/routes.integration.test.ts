@@ -9,6 +9,16 @@ import { holdTarget, peekHeldTarget, releaseReplayHolds, takeHeldTarget, takeRep
 
 const Native: typeof import('react-native') = require('react-native')
 
+// Observe the actual values rendered by Settings, including transient frames.
+const mockSettingFields: { value: string; token: string | null; status: string }[] = []
+jest.mock('./components/settings/TimeField', () => {
+  const actual = jest.requireActual('./components/settings/TimeField')
+  return { TimeField: (props: { value: string; label: string; onPress(): void }) => {
+    const session = require('./lib/session-store').useSession()
+    mockSettingFields.push({ value: props.value, token: require('./lib/auth').getToken(), status: session.status })
+    return require('react').createElement(actual.TimeField, props)
+  } }
+})
 jest.mock('./app/play/[sessionId]/index', () => ({ __esModule: true, default: () => null }))
 jest.mock('@expo-google-fonts/inter', () => ({ useFonts: () => [true, null] }))
 jest.mock('expo-splash-screen', () => ({ preventAutoHideAsync: jest.fn(), hideAsync: jest.fn() }))
@@ -71,6 +81,7 @@ const invite = {
 beforeEach(() => {
   // expo-router installs its Reanimated mock after imports; supply the missing native hook.
   require('react-native-reanimated').useReducedMotion = () => true
+  mockSettingFields.length = 0
   releaseReplayHolds()
   takeHeldTarget()
   jest.mocked(api).mockReset()
@@ -521,4 +532,29 @@ test('a replacement token can enable notifications while an old registration is 
   await fireEvent.press(screen.getByRole('switch', { name: 'Send me questions' }))
   expect(enable).toHaveBeenCalledTimes(2)
   expect(jest.mocked(api).mock.calls.filter(([path]) => path === '/push/preferences')).toHaveLength(0)
+})
+
+test.each(['owner', 'status'])('Settings hides the previous preferences in every render when %s changes', async (boundary) => {
+  jest.useFakeTimers()
+  jest.mocked(getToken).mockReturnValue('token-a')
+  const session = liveSession(ready)
+  jest.mocked(api).mockResolvedValue(settingsFixture)
+  await renderRouter({ appDir: 'src/app', overrides: {
+    // Keep Settings mounted so only its own render-time guard can hide stale data.
+    _layout: () => require('react').createElement(require('./theme/ThemeProvider').ThemeProvider, null,
+      require('react').createElement(require('expo-router').Stack, { screenOptions: { headerShown: false } })),
+  } }, { initialUrl: '/settings' })
+  await screen.findByText('learner@example.com')
+  expect(screen.getByRole('button', { name: 'From 7:00 AM' })).toBeOnTheScreen()
+  mockSettingFields.length = 0
+  jest.mocked(api).mockReturnValue(new Promise(() => {}))
+  await act(async () => {
+    if (boundary === 'owner') {
+      jest.mocked(getToken).mockReturnValue('token-b')
+      session.set({ ...ready, user: { ...ready.user, name: 'Current learner' } })
+    } else session.set({ ...signedOut, status: 'loading' })
+  })
+  expect(screen.queryByText('learner@example.com')).toBeNull()
+  expect(screen.queryByRole('button', { name: 'From 7:00 AM' })).toBeNull()
+  expect(mockSettingFields).toEqual([])
 })

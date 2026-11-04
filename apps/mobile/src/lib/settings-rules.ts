@@ -14,3 +14,16 @@ export function toggleSettingsDay(days: number[], day: number, workingDays: numb
   if (!workingDays.includes(day) || !canToggleDay(days, day)) return null
   return days.includes(day) ? days.filter((value) => value !== day) : [...days, day].sort((a, b) => a - b)
 }
+
+// Normalize the entire PUT, including edits unrelated to hours. Saved hours
+// can predate a narrower company window (#636).
+export function pushPreferencesBody(prefs: QuestionPreferences, company: CompanyWindow | null, deviceTimezone: string): QuestionPreferences {
+  if (!company) return { ...prefs, timezone: deviceTimezone }
+  const startMinute = Math.min(Math.max(prefs.startMinute, company.startMinute), company.endMinute - 30)
+  const endMinute = Math.min(Math.max(prefs.endMinute, startMinute + 30), company.endMinute)
+  return { ...prefs, startMinute, endMinute, timezone: company.timezone }
+}
+export function deviceTimezone(fallback: string): string {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || fallback }
+  catch { return fallback }
+}

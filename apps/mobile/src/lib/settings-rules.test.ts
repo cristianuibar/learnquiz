@@ -1,4 +1,4 @@
-import { questionSwitchOn, settingsTimeOptions, toggleSettingsDay } from './settings-rules'
+import { pushPreferencesBody, questionSwitchOn, settingsTimeOptions, toggleSettingsDay } from './settings-rules'
 const company = { name: 'Northwind', startMinute: 360, endMinute: 1080, days: [1, 2, 3, 4, 5], timezone: 'UTC' }
 const prefs = { paused: false, startMinute: 420, endMinute: 930, days: [1, 2], timezone: 'UTC' }
 
@@ -27,4 +27,16 @@ test('days toggle only company working days and retain the last day', () => {
   expect(toggleSettingsDay([2], 2, company.days)).toBeNull()
   expect(toggleSettingsDay([2], 1, company.days)).toEqual([1, 2])
   expect(toggleSettingsDay([2], 7, company.days)).toBeNull()
+})
+
+test.each([
+  [540, 1020, 600, 960], [1020, 1080, 930, 960], [300, 360, 600, 630],
+])('saved hours %s–%s are clamped into narrowed company hours', (startMinute, endMinute, expectedStart, expectedEnd) => {
+  expect(pushPreferencesBody({ ...prefs, startMinute, endMinute, paused: true },
+    { ...company, startMinute: 600, endMinute: 960, timezone: 'Europe/Bucharest' }, 'America/Los_Angeles')).toEqual({
+    ...prefs, paused: true, startMinute: expectedStart, endMinute: expectedEnd, timezone: 'Europe/Bucharest',
+  })
+})
+test('learners without a company use their device timezone instead of the GET default', () => {
+  expect(pushPreferencesBody(prefs, null, 'America/Los_Angeles')).toEqual({ ...prefs, timezone: 'America/Los_Angeles' })
 })

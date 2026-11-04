@@ -1,9 +1,11 @@
+import { Appearance } from 'react-native'
+
 export type AppearanceChoice = 'system' | 'light' | 'dark'
 // Appearance belongs to the device, so learner sign-out must not clear it.
 export const APPEARANCE_KEY = 'device:appearance'
-type ReadDeps = { getJSON(key: string): Promise<unknown>; setColorScheme(value: 'light' | 'dark' | null): void }
+type ReadDeps = { getJSON(key: string): Promise<unknown>; setColorScheme(value: 'light' | 'dark' | 'unspecified'): void }
 export function applyAppearance(value: AppearanceChoice) {
-  require('react-native').Appearance.setColorScheme(value === 'system' ? null : value)
+  Appearance.setColorScheme(value === 'system' ? 'unspecified' : value)
 }
 export async function readAppearance(getJSON?: ReadDeps['getJSON']): Promise<AppearanceChoice> {
   try {
@@ -14,7 +16,7 @@ export async function readAppearance(getJSON?: ReadDeps['getJSON']): Promise<App
 }
 export async function applyStoredAppearance(deps?: ReadDeps): Promise<AppearanceChoice> {
   const value = await readAppearance(deps?.getJSON)
-  if (deps) deps.setColorScheme(value === 'system' ? null : value)
+  if (deps) deps.setColorScheme(value === 'system' ? 'unspecified' : value)
   else applyAppearance(value)
   return value
 }
