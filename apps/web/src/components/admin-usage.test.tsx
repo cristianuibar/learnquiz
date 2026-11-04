@@ -55,7 +55,7 @@ async function mount(entry = '/admin/usage') {
   document.body.appendChild(container)
   const root = createRoot(container)
   await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
-  return { container, unmount: async () => { await act(async () => root.unmount()); container.remove() } }
+  return { container, router, unmount: async () => { await act(async () => root.unmount()); container.remove() } }
 }
 
 const button = (c: HTMLElement, name: string) => [...c.querySelectorAll('button')].find((b) => b.textContent!.includes(name))!
@@ -193,5 +193,23 @@ it('filters the latency chart by job without touching the other figures', async 
 
     await act(async () => { select.value = ''; select.dispatchEvent(new Event('change', { bubbles: true })) })
     expect(footer(table(container, 'Latency by day'))).toEqual(['30 days', '1.5 s', '6.8 s'])
+  } finally { await unmount() }
+})
+
+it('starts the failures on page 1 when Back returns to a shorter range', async () => {
+  // 7 days have 10 failures, 90 days have 30.
+  const failure = usage.failures[0]
+  vi.mocked(getModelUsage).mockImplementation((async ({ data }: { data: { from: string; to: string } }) =>
+    ({ ...usage, from: data.from, to: data.to, failures: Array.from({ length: data.from === '2026-10-28' ? 10 : 30 }, (_, i) => ({ ...failure, id: `f${i}` })) })) as never)
+  const { container, router, unmount } = await mount('/admin/usage?range=7')
+  try {
+    const failures = () => container.querySelector('section[aria-labelledby="usage-failures"]') as HTMLElement
+    await click(button(container, '90 days'))
+    await click(button(failures(), 'Next'))
+    expect(failures().querySelectorAll('tbody tr')).toHaveLength(5)
+    await act(async () => { router.history.back(); await router.load() })
+    expect(button(container, '7 days').getAttribute('aria-pressed')).toBe('true')
+    expect(failures().querySelectorAll('tbody tr')).toHaveLength(10)
+    expect(failures().querySelector('[role="status"]')!.textContent).toBe('1–10 of 10 failures')
   } finally { await unmount() }
 })
