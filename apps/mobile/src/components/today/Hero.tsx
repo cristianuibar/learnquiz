@@ -45,7 +45,7 @@ export function Hero({ hero, onPlay }: HeroProps) {
               <Bar outline color={heroText} value={ready / total * 100} accessibilityLabel="Questions ready" accessibilityValue={{ text: hero.status ?? undefined }} />
             )}
             {hero.status !== null && (
-              <Text variant="body" num style={{ color: heroText }}>{hero.status}</Text>
+              <Text variant="body" num style={{ color: metaColor }}>{hero.status}</Text>
             )}
             {hero.note !== null && (
               <Text variant="body" style={{ color: heroText }}>{hero.note}</Text>
@@ -55,7 +55,7 @@ export function Hero({ hero, onPlay }: HeroProps) {
           <Text variant="body" num style={{ color: metaColor }}>{hero.meta}</Text>
         )}
       </View>
-      <Button variant="accent" size="lg" disabled={hero.play.disabled} accessibilityLabel={hero.play.accessibleLabel} onPress={onPlay} style={{ alignSelf: 'stretch' }}>{hero.play.label}</Button>
+      <Button variant="accent" size="lg" disabled={hero.play.disabled} accessibilityLabel={hero.play.accessibleLabel} onPress={onPlay} style={{ alignSelf: 'stretch', ...(light ? { outlineColor: colors.onBrand } : {}) }}>{hero.play.label}</Button>
     </Card>
   )
 }

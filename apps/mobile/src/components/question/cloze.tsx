@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { isAnswerReady } from '@learnquiz/api'
 import { Pressable, StyleSheet, TextInput, View } from 'react-native'
 import { clozeAnswer, clozeMaxLength, splitClozeStem } from '../../lib/session/cloze'
@@ -9,6 +9,7 @@ import type { QuestionBodyProps } from './types'
 export function ClozeBody({ item, answer, onAnswer, marks, disabled, onSubmit }: QuestionBodyProps) {
   const { colors, typography, space, radius, sizes } = useTheme()
   const input = useRef<TextInput>(null)
+  const [focused, setFocused] = useState(false)
   const numeric = item.blank?.numeric === true
   const readOnly = disabled || marks !== null
   const { before, prefix, suffix, after } = splitClozeStem(item.stem)
@@ -70,6 +71,8 @@ export function ClozeBody({ item, answer, onAnswer, marks, disabled, onSubmit }:
           ref={input}
           value={answer.text ?? ''}
           onChangeText={(value) => { if (!readOnly) onAnswer(clozeAnswer(value, numeric)) }}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           editable={!readOnly}
           autoFocus={!readOnly}
           keyboardType={numeric ? 'number-pad' : 'default'}
@@ -96,6 +99,9 @@ export function ClozeBody({ item, answer, onAnswer, marks, disabled, onSubmit }:
             paddingHorizontal: space[2],
             borderWidth: 2,
             borderColor: colors.brand,
+            outlineWidth: focused ? 2 : 0,
+            outlineOffset: 2,
+            outlineColor: colors.brand,
             borderRadius: radius.md,
             backgroundColor: colors.surfaceCard,
             color: colors.ink,

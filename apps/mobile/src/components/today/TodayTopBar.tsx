@@ -54,6 +54,7 @@ export function TodayTopBar({ streak, streakCount, reward, popIn, headingRef }: 
         <StreakPill
           key={reward ? 'reward' : 'quiet'}
           count={streakCount}
+          iconSize={space[4] + space[1]}
           variant={reward ? 'reward' : 'quiet'}
           popIn={reward && popIn}
           accessibilityLabel={streak.label}

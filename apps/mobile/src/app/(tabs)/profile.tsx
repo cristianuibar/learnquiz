@@ -168,7 +168,14 @@ export default function Profile() {
           {retryButton}
         </View>
       )}
-      {!profile && status === 'loading' ? <Skeleton /> : (
+      {!profile && status === 'loading' ? (
+        <>
+          <Skeleton />
+          <View accessible role="status" accessibilityLiveRegion="polite">
+            <Text variant="label" muted>Loading your progress</Text>
+          </View>
+        </>
+      ) : (
         <>
           {profile && (profile.started ? (
             <>

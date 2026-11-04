@@ -95,7 +95,14 @@ export default function UnitScreen() {
         {missing ? (
           <Button variant="secondary" onPress={back}>Back to Path</Button>
         ) : !unit || !path ? (
-          !failed && <Skeleton />
+          !failed && (
+            <>
+              <Skeleton />
+              <View accessible role="status" accessibilityLiveRegion="polite">
+                <Text variant="label" muted>Loading this unit</Text>
+              </View>
+            </>
+          )
         ) : (
           <>
             <UnitBar mastery={unitMastery(unit, path.benchmark)} />
