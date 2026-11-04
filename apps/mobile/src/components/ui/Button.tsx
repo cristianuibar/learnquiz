@@ -1,10 +1,11 @@
-import { useState, type ComponentType, type ReactNode } from 'react'
-import { Pressable, type PressableProps } from 'react-native'
+import { useState, type ComponentType, type ReactNode, type Ref } from 'react'
+import { Pressable, type PressableProps, type View } from 'react-native'
 import type { LucideProps } from 'lucide-react-native'
 import { useTheme } from '../../theme/ThemeProvider'
 import { Text } from './Text'
 
 export type ButtonProps = Omit<PressableProps, 'children'> & {
+  ref?: Ref<View>
   children: ReactNode
   variant?: 'primary' | 'secondary' | 'ghost' | 'accent'
   size?: 'md' | 'lg'

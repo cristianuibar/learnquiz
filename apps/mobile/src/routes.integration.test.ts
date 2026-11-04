@@ -363,6 +363,24 @@ test('Profile keeps loaded mastery visible during a return-from-Settings refetch
   expect(await screen.findByLabelText('72% of 85% benchmark')).toBeOnTheScreen()
 })
 
+test('Profile ignores an earlier request that answers after the refetch that replaced it', async () => {
+  const profile = { name: 'Learner', role: null, started: true, mastery: 0.66, benchmark: 0.85,
+    onboarding: { day: 16, days: 30 }, proficiency: { achievedAt: null, projectedAt: null }, weeks: [] }
+  let resolveFirst!: (value: unknown) => void
+  const first = new Promise((done) => { resolveFirst = done })
+  jest.mocked(getToken).mockReturnValue('token-a')
+  jest.mocked(useSession).mockReturnValue(ready)
+  jest.mocked(api).mockReturnValueOnce(first).mockResolvedValueOnce({ ...profile, mastery: 0.72 })
+  await renderRouter('src/app', { initialUrl: '/profile' })
+  // Leaving and coming back replaces the first request with a refetch, which answers first.
+  await fireEvent.press(await screen.findByRole('button', { name: 'Settings' }))
+  await act(async () => { router.back() })
+  expect(await screen.findByLabelText('72% of 85% benchmark')).toBeOnTheScreen()
+  await act(async () => { resolveFirst(profile) })
+  expect(screen.getByLabelText('72% of 85% benchmark')).toBeOnTheScreen()
+  expect(screen.queryByLabelText('66% of 85% benchmark')).toBeNull()
+})
+
 test('Profile keeps its empty state when Today fails, retries, and returns accessibility focus to its heading', async () => {
   jest.useFakeTimers()
   jest.spyOn(Native, 'findNodeHandle').mockReturnValue(42)
@@ -396,6 +414,41 @@ test('Profile keeps its empty state when Today fails, retries, and returns acces
   expect(jest.mocked(api).mock.calls.map(([path]) => path)).toEqual(['/me/profile', '/today', '/me/profile', '/today'])
   expect(focus).toHaveBeenCalledWith(42)
   expect(screen.getByRole('header', { name: 'Training progress' })).toBeOnTheScreen()
+})
+
+test('a retry that loads the profile but then fails on Today moves TalkBack focus to the dock Try again', async () => {
+  jest.useFakeTimers()
+  // Tag each node by what it is, so the test sees where focus went, not only that it moved.
+  jest.spyOn(Native, 'findNodeHandle').mockImplementation((node) => {
+    const props = (node as { props?: { accessibilityRole?: string; accessibilityState?: { busy?: boolean } } } | null)?.props
+    return props?.accessibilityRole === 'button' ? 7 : 42
+  })
+  const focus = jest.spyOn(Native.AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => {})
+  const profile = { name: 'Learner', role: null, started: false, benchmark: 0.85, onboarding: { day: 1, days: 30 } }
+  let profileCalls = 0
+  jest.mocked(getToken).mockReturnValue('token-a')
+  jest.mocked(useSession).mockReturnValue(ready)
+  jest.mocked(api).mockImplementation((path) => {
+    if (path === '/me/profile') return ++profileCalls === 1 ? Promise.reject(new Error('Network unavailable')) : Promise.resolve(profile)
+    if (path === '/today') return Promise.reject(new Error('Network unavailable'))
+    throw new Error(`Unexpected request: ${path}`)
+  })
+  await renderRouter('src/app', { initialUrl: '/profile' })
+  expect(await screen.findByText('Could not load training progress.')).toBeOnTheScreen()
+  await act(async () => { await jest.advanceTimersByTimeAsync(100) })
+  const pageRetry = screen.getByRole('button', { name: 'Try again' })
+  await fireEvent(pageRetry, 'focus')
+  focus.mockClear()
+  await fireEvent.press(pageRetry)
+  // The profile loads, then Today fails: the page error and its Try again are gone,
+  // and the first-session Try again sits in the dock instead.
+  expect(await screen.findByText('Could not load the first session.')).toBeOnTheScreen()
+  expect(screen.queryByText('Could not load training progress.')).toBeNull()
+  expect(screen.getByText('Your progress shows up after your first session.')).toBeOnTheScreen()
+  expect(screen.getAllByRole('button', { name: 'Try again' })).toHaveLength(1)
+  expect(jest.mocked(api).mock.calls.map(([path]) => path)).toEqual(['/me/profile', '/me/profile', '/today'])
+  await act(async () => { await jest.advanceTimersByTimeAsync(100) })
+  expect(focus.mock.calls).toEqual([[7]])
 })
 
 test('the actual router keeps an open invitation mounted while the session reloads for a new bearer', async () => {
