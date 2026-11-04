@@ -4,12 +4,13 @@ import { useRouter } from '@tanstack/react-router'
 import { errorMessage } from '@/components/inline-error'
 import { usePortal } from '@/components/portal/portal-context'
 import { Button } from '@/components/ui/button'
+import type { ItemPayload } from '@/lib/llm/schemas'
 import { reviewQuestion } from '@/server/question-review'
 import { FlagGroup } from './flag-group'
 import { QuestionEditor } from './question-editor'
-import { isFlagged, shortDate, type Question } from './question-row'
+import { isFlagged, shortDate, type Question, type Review } from './question-row'
 
-const FORMAT: Record<string, string> = {
+export const FORMAT: Record<string, string> = {
   mcq: 'Multiple choice', multi: 'Multiple answer', order: 'Order the steps', cloze: 'Fill in the blank', short: 'Short answer', image: 'Image choice',
 }
 
@@ -20,9 +21,10 @@ function typeLine(q: Question) {
   return `${fmt} · Unreviewed · Generated ${shortDate(q.createdAt)}${q.source ? ` from ${q.source.title}` : ''}`
 }
 
-export function QuestionDetails({ question, slug, stemId, onApprove, onAnnounce }: {
+export function QuestionDetails({ question, slug, sources, stemId, onApprove, onAnnounce }: {
   question: Question
   slug: string
+  sources: Review['sources']
   stemId: string
   // Called when Approve is pressed; the returned callback runs once the approval is saved and the data refreshed.
   onApprove: (id: string) => () => void
@@ -59,16 +61,31 @@ export function QuestionDetails({ question, slug, stemId, onApprove, onAnnounce 
     }
   }
 
+  async function save(payload: ItemPayload, sourceId: string | undefined) {
+    setBusy(true)
+    setError('')
+    try {
+      await reviewQuestion({ data: { slug, itemId: question.id, action: 'edit', payload, sourceId } })
+      await router.invalidate()
+      refocusEdit.current = true
+      setEditing(false)
+      onAnnounce('Changes saved. Review the question before approving it again.')
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (editing) {
     return (
       <QuestionEditor
         question={question}
-        slug={slug}
-        onDone={(saved) => {
-          refocusEdit.current = true
-          setEditing(false)
-          if (saved) onAnnounce('Changes saved. Review the question before approving it again.')
-        }}
+        sources={sources}
+        busy={busy}
+        error={error}
+        onSave={(payload, sourceId) => void save(payload, sourceId)}
+        onCancel={() => { refocusEdit.current = true; setError(''); setEditing(false) }}
       />
     )
   }

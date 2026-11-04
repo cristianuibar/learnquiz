@@ -136,7 +136,7 @@ function Body({ data, slug, search, onClear }: { data: Review; slug: string; sea
                 <h2 id={hid} className="text-title-2 text-ink">{u.name}</h2>
                 <p className="text-caption text-ink-muted">{`${plural(u.concepts.length, 'concept')} · ${plural(total, 'question')}`}</p>
               </div>
-              {u.concepts.map((c) => <ConceptBlock key={c.id} concept={c} slug={slug} expanded={expanded} showAll={showAll.has(c.id)} onShowAll={() => setShowAll((s) => new Set(s).add(c.id))} onToggle={toggle} onApprove={approve} onAnnounce={setMessage} />)}
+              {u.concepts.map((c) => <ConceptBlock key={c.id} concept={c} slug={slug} sources={data.sources} expanded={expanded} showAll={showAll.has(c.id)} onShowAll={() => setShowAll((s) => new Set(s).add(c.id))} onToggle={toggle} onApprove={approve} onAnnounce={setMessage} />)}
             </section>
           )
         })}
@@ -145,9 +145,10 @@ function Body({ data, slug, search, onClear }: { data: Review; slug: string; sea
   )
 }
 
-function ConceptBlock({ concept: c, slug, expanded, showAll, onShowAll, onToggle, onApprove, onAnnounce }: {
+function ConceptBlock({ concept: c, slug, sources, expanded, showAll, onShowAll, onToggle, onApprove, onAnnounce }: {
   concept: Concept
   slug: string
+  sources: Review['sources']
   expanded: Set<string>
   showAll: boolean
   onShowAll: () => void
@@ -171,7 +172,7 @@ function ConceptBlock({ concept: c, slug, expanded, showAll, onShowAll, onToggle
       <div className="rounded-md border border-border bg-surface-card">
         <ul aria-labelledby={hid} className="divide-y divide-border">
           {shown.map((q) => (
-            <QuestionRow key={q.id} question={q} critical={c.critical} slug={slug} expanded={expanded.has(q.id)} onToggle={() => onToggle(q.id)} onApprove={onApprove} onAnnounce={onAnnounce} />
+            <QuestionRow key={q.id} question={q} critical={c.critical} slug={slug} sources={sources} expanded={expanded.has(q.id)} onToggle={() => onToggle(q.id)} onApprove={onApprove} onAnnounce={onAnnounce} />
           ))}
         </ul>
         {hidden > 0 && (

@@ -34,7 +34,7 @@ function PortalRoot() {
 
 type Q = { id: string; status: string; reviewedAt: number | null; payload: unknown; flags?: unknown[] }
 const question = (q: Q) => ({
-  difficulty: 2, reviewerName: null, createdAt: Date.UTC(2026, 10, 2, 12), check: null, source: null, flags: [], ...q,
+  difficulty: 2, sourceId: 'doc1', reviewerName: null, createdAt: Date.UTC(2026, 10, 2, 12), check: null, source: null, flags: [], ...q,
 })
 const concept = (id: string, questions: Q[]) => ({
   id, name: `Concept ${id}`, critical: false,
@@ -43,6 +43,7 @@ const concept = (id: string, questions: Q[]) => ({
 })
 const review = (concepts: ReturnType<typeof concept>[], unreviewed: number) => ({
   name: 'Acme', roles: [{ id: 'r', name: 'Role' }], role: { id: 'r', name: 'Role' }, unreviewed,
+  sources: [{ id: 'doc1', title: 'Algebra', version: 1 }, { id: 'doc2', title: 'Geometry', version: 2 }],
   units: [{ id: 'u', name: 'Unit', concepts }],
 }) as never
 const stemOf = (id: string) => ({ ...payload('mcq', [true, false]), stem: `Stem ${id}` })
@@ -157,4 +158,53 @@ it('shows who reported a flagged question and resolves the flag on approval', as
   expect(c.textContent).toContain('Reported by Jordan Reyes · ')
   expect(c.querySelector('a[href="/org/x/people/u9"]')!.textContent).toBe('Jordan Reyes')
   expect(button(c, 'Approve, resolve flag and next')).toBeDefined()
+})
+
+const labelled = (c: HTMLElement, name: string) => c.querySelector<HTMLInputElement>(`[aria-label="${name}"]`)!
+const typeIn = (el: HTMLInputElement, v: string) => act(async () => {
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(el, v)
+  el.dispatchEvent(new Event('input', { bubbles: true }))
+})
+const sentData = () => vi.mocked(reviewQuestion).mock.calls[0]![0].data as { payload: ReturnType<typeof payload>; sourceId?: string }
+
+it('edits a multiple choice question: focuses the heading, saves correct option, difficulty and source, then refocuses Edit', async () => {
+  const q = { id: 'q1', status: 'active', reviewedAt: null, payload: payload('mcq', [true, false, false, false]) }
+  const c = await mountAt(review([concept('c', [q])], 1), '/org/x/questions', review([concept('c', [q])], 1))
+  await act(async () => button(c, 'Edit').click())
+  expect(document.activeElement).toBe([...c.querySelectorAll('h4')].find((h) => h.textContent === 'Edit question'))
+  await act(async () => [...c.querySelectorAll('label')].find((l) => l.textContent === 'Correct answer: option 3')!.querySelector('input')!.click())
+  await act(async () => button(c, '4').click())
+  await submit(c)
+  await vi.waitFor(() => expect(document.activeElement).toBe(button(c, 'Edit')))
+  expect(sentData().payload.options.map((o) => o.is_correct)).toEqual([false, false, true, false])
+  expect(sentData().payload.difficulty).toBe(4)
+  expect(sentData().sourceId).toBe('doc1')
+})
+
+it('edits short answer chips and saves accepted answers with no options', async () => {
+  const c = await mount({ ...payload('short', []), accepted_answers: ['Cat', 'Dog'] })
+  const input = labelled(c, 'New accepted answer')
+  await typeIn(input, 'Bird')
+  await act(async () => { input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })) })
+  await typeIn(input, 'Cat')
+  await act(async () => button(c, 'Add answer').click())
+  await typeIn(input, '  ')
+  await act(async () => button(c, 'Add answer').click())
+  await typeIn(input, 'Fish')
+  await act(async () => button(c, 'Add answer').click())
+  await act(async () => button(c, 'Remove Dog').click())
+  await submit(c)
+  expect(sent().accepted_answers).toEqual(['Cat', 'Bird', 'Fish'])
+  expect(sent().options).toEqual([])
+})
+
+it('shows a quote miss on the Source quote field and focuses it', async () => {
+  const c = await mount(payload('mcq', [true, false]))
+  vi.mocked(reviewQuestion).mockRejectedValueOnce(new Error("This quote isn't in Algebra v1. Copy it exactly from the document."))
+  await submit(c)
+  const area = c.querySelector<HTMLTextAreaElement>('textarea[id^="quote-"]')!
+  await vi.waitFor(() => expect(c.querySelector('[role=alert]')!.textContent).toContain("This quote isn't in Algebra v1."))
+  expect(area.getAttribute('aria-invalid')).toBe('true')
+  expect(c.querySelector('[role=alert]')!.id).toBe(area.getAttribute('aria-describedby'))
+  expect(document.activeElement).toBe(area)
 })
