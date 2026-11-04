@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { PortalMasteryBar } from '@/components/portal-mastery-bar'
 import { authClient } from '@/lib/auth-client'
 import { plural } from '@/lib/utils'
 import { getPeople } from '@/server/org'
@@ -191,38 +192,38 @@ function People() {
       )}
       <section className="mt-10">
         <h2 className="text-xl font-semibold">Members</h2>
-        <ul className="mt-4 flex flex-col gap-3">
-          {org.members.map((m) => (
-            <li key={m.id} className="rounded-lg border p-4">
-              <p className="font-medium">
-                {org.readOnly ? m.name : (
-                  <Link to="/org/$slug/people/$id" params={{ slug: org.slug, id: m.userId }} className="inline-flex min-h-11 items-center text-primary underline focus-visible:outline-2">
-                    {m.name}
-                  </Link>
-                )}{' '}
-                <span className="font-normal text-muted-foreground">{m.email}</span>
-              </p>
-              <p className="text-sm">{[m.role, m.jobRole].filter(Boolean).join(' · ')}</p>
-              <p className="mt-2 text-sm">
-                {m.training?.stage === 'proficient' ? 'Proficient' : 'Active'}
-                {m.training?.daysToProficiency != null && ` · ${plural(m.training.daysToProficiency, 'day', 'days')} to proficiency`}
-              </p>
-              {m.training && (
-                <>
-                  <div className="mt-2 flex items-center gap-3 text-sm">
-                    <progress className="h-2 w-40" value={m.training.progress} max={1} aria-label="Progress toward benchmark" />
-                    <span>{Math.round(m.training.progress * 100)}% of benchmark</span>
-                  </div>
-                  {m.training.criticalConfidentErrors > 0 && (
-                    <p className="mt-1 text-sm font-medium text-wrong">
-                      {plural(m.training.criticalConfidentErrors, 'confident error', 'confident errors')} on a critical step
-                    </p>
-                  )}
-                </>
-              )}
-              <p className="mt-1 text-sm text-muted-foreground">Last active: {m.lastActiveAt === null ? '-' : date(m.lastActiveAt)}</p>
-            </li>
-          ))}
+        {!org.members.some((m) => m.training) && (
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <p className="text-muted-foreground">Invite your first employee.</p>
+            {!org.readOnly && <Button type="button" onClick={() => document.getElementById('name')?.focus()}>Invite an employee</Button>}
+          </div>
+        )}
+        <ul className="mt-4 divide-y divide-border rounded-lg border border-border bg-surface-card">
+          {org.members.map((m) => {
+            const name = org.readOnly ? m.name : (
+              <Link to="/org/$slug/people/$id" params={{ slug: org.slug, id: m.userId }} className="inline-flex min-h-11 items-center text-primary underline focus-visible:outline-2">
+                {m.name}
+              </Link>
+            )
+            return (
+              <li key={m.id} className="p-4">
+                {m.training ? (
+                  <PortalMasteryBar name={name} label={m.name} mastery={m.training.mastery} benchmark={m.training.benchmark} />
+                ) : (
+                  <p className="text-label">{name} <span className="font-normal text-muted-foreground">No job role</span></p>
+                )}
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {[m.email, [m.role, m.jobRole].filter(Boolean).join(' · '), m.training?.daysToProficiency != null && `${plural(m.training.daysToProficiency, 'day', 'days')} to proficiency`].filter(Boolean).join(' · ')}
+                </p>
+                {m.training && m.training.criticalConfidentErrors > 0 && (
+                  <p className="mt-1 text-sm font-medium text-wrong">
+                    {plural(m.training.criticalConfidentErrors, 'confident error', 'confident errors')} on a critical step
+                  </p>
+                )}
+                <p className="mt-1 text-sm text-muted-foreground">Last active: {m.lastActiveAt === null ? '-' : date(m.lastActiveAt)}</p>
+              </li>
+            )
+          })}
         </ul>
       </section>
     </main>

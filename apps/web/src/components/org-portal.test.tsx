@@ -139,28 +139,51 @@ async function renderAt(path: string, leaf: { path: string; loader: (ctx: { para
   }
 }
 
-it('shows status, progress toward benchmark and last active for each person', async () => {
-  const training = { stage: 'onboarding', progress: 0.5, daysToProficiency: null, criticalConfidentErrors: 0 }
+const peopleLeaf = { path: '/people', loader: peopleRoute.options.loader as (ctx: { params: { slug: string } }) => ReturnType<typeof getPeople>, component: peopleRoute.options.component }
+
+it('shows status chip, mastery bar and last active for each person', async () => {
+  const training = { stage: 'onboarding', progress: 0.5, daysToProficiency: null, criticalConfidentErrors: 0, benchmark: 85 }
   vi.mocked(getPeople).mockResolvedValue({
     id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles: [], readOnly: false,
     invites: [{ id: 'inv1', name: 'Ana', email: 'ana@acme.test', jobRole: 'Cashier', expiresAt: 0, expired: false }],
     members: [
-      { id: 'm1', userId: 'u1', name: 'Ben', email: 'ben@acme.test', role: 'member', jobRole: 'Cashier', lastActiveAt: Date.UTC(2026, 2, 5), training },
-      { id: 'm2', userId: 'u2', name: 'Cy', email: 'cy@acme.test', role: 'member', jobRole: 'Cashier', lastActiveAt: null, training: { ...training, stage: 'proficient', progress: 1 } },
+      { id: 'm1', userId: 'u1', name: 'Ben', email: 'ben@acme.test', role: 'member', jobRole: 'Cashier', lastActiveAt: Date.UTC(2026, 2, 5), training: { ...training, mastery: 100 } },
+      { id: 'm2', userId: 'u2', name: 'Cy', email: 'cy@acme.test', role: 'member', jobRole: 'Cashier', lastActiveAt: null, training: { ...training, mastery: 62 } },
+      { id: 'm3', userId: 'u3', name: 'Di', email: 'di@acme.test', role: 'member', jobRole: 'Cashier', lastActiveAt: null, training: { ...training, mastery: 0 } },
     ],
   } as never)
-  const { container, cleanup } = await renderAt('/org/x/people', { path: '/people', loader: peopleRoute.options.loader as (ctx: { params: { slug: string } }) => ReturnType<typeof getPeople>, component: peopleRoute.options.component })
+  const { container, cleanup } = await renderAt('/org/x/people', peopleLeaf)
   try {
     const items = [...container.querySelectorAll('li')].map((li) => li.textContent)
     expect(items.some((t) => t!.includes('Ana') && t!.includes('Invited'))).toBe(true)
-    const ben = items.find((t) => t!.includes('Ben'))!
-    expect(ben).toContain('Active')
-    expect(ben).toContain('50% of benchmark')
-    expect(ben).toContain('Last active: 5 Mar 2026')
-    const cy = items.find((t) => t!.includes('Cy'))!
-    expect(cy).toContain('Proficient')
-    expect(cy).toContain('Last active: -')
-    expect(container.querySelector('progress[aria-label="Progress toward benchmark"]')).not.toBeNull()
+    const row = (name: string) => [...container.querySelectorAll('li')].find((li) => li.textContent!.includes(name))!
+    for (const [name, status, value] of [['Ben', 'Mastered', 100], ['Cy', 'Still learning', 62], ['Di', 'Not started', 0]] as const) {
+      const li = row(name)
+      const chip = [...li.querySelectorAll('span')].find((s) => s.textContent === status)!
+      expect(chip.querySelector('svg')).not.toBeNull()
+      const bar = li.querySelector('[role=progressbar]')!
+      expect(bar.getAttribute('aria-valuenow')).toBe(String(value))
+      expect(bar.getAttribute('aria-label')).toBe(`${name} mastery`)
+      expect(li.textContent).toContain(`${value}%`)
+    }
+    expect(row('Ben').textContent).toContain('Last active: 5 Mar 2026')
+    expect(row('Cy').textContent).toContain('Last active: -')
+  } finally {
+    await cleanup()
+  }
+})
+
+it('invites the first employee when nobody has a job role yet', async () => {
+  vi.mocked(getPeople).mockResolvedValue({
+    id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles: [{ id: 'r1', name: 'Cashier' }], readOnly: false, invites: [],
+    members: [{ id: 'm1', userId: 'u1', name: 'Ben', email: 'ben@acme.test', role: 'owner', jobRole: null, lastActiveAt: null, training: null }],
+  } as never)
+  const { container, cleanup } = await renderAt('/org/x/people', peopleLeaf)
+  try {
+    expect(container.textContent).toContain('Invite your first employee.')
+    const button = [...container.querySelectorAll('button')].find((b) => b.textContent === 'Invite an employee')!
+    await act(async () => { button.click() })
+    expect(document.activeElement).toBe(container.querySelector('#name'))
   } finally {
     await cleanup()
   }
