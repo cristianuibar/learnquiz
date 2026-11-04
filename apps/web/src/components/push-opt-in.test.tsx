@@ -57,7 +57,7 @@ it('shows the facts and preview from the schedule, and an example card when ther
   try {
     expect(container.querySelector('h1')?.textContent).toBe('Get a question during your shift?')
     const facts = [...container.querySelectorAll('ul[aria-label="How questions work"] li')].map((li) => li.textContent)
-    expect(facts).toEqual(['Up to 5 a day while you’re onboarding, then 2.', 'Only 9:00 AM–5:00 PM, Monday to Friday.', 'Skip any. Nothing is lost.'])
+    expect(facts).toEqual(['Up to 5 a day while you’re onboarding, then 2.', 'Only 9:00 AM–5:00 PM, Monday to Friday. You can narrow it in Settings.', 'Skip any. Nothing is lost.'])
     expect(container.querySelector('[role="img"]')?.getAttribute('aria-label')).toBe('Preview of a notification from Learn Quiz: Which valve closes first?')
   } finally { await cleanup() }
 
