@@ -4,6 +4,7 @@ import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rou
 import * as Notifications from 'expo-notifications'
 import type { SummaryView } from '@learnquiz/api'
 import { ApiError, api } from '@/lib/api'
+import { summaryAttribution } from '@/lib/model-attribution'
 import { placementToPrepare, prepareNext } from '@/lib/prepare-next'
 import { readPromptCounts, recordFinished, shouldPromptOptIn, type PushPermission } from '@/lib/push-prompt'
 import { scoreLine, streakLabel } from '@/lib/summary-format'
@@ -145,6 +146,7 @@ function Summary({ summary, finished, toToday, active }: {
   const placed = summary.kind === 'placement' && summary.level !== null
   const streak = streakLabel(summary.streak)
   const coach = placed && summary.levelLine ? summary.levelLine : summary.nextLine
+  const attribution = summaryAttribution(summary)
 
   const onContinue = async () => {
     if (pending || !active.current) return
@@ -205,6 +207,7 @@ function Summary({ summary, finished, toToday, active }: {
       </View>
       <MasteryMoved rows={summary.masteryMoved} benchmark={summary.benchmark} />
       <MistakesDisclosure mistakes={summary.mistakes} />
+      {attribution ? <Text variant="caption" muted>{attribution}</Text> : null}
     </Screen>
   )
 }

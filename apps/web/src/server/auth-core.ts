@@ -28,7 +28,7 @@ async function moveGuestData(guestId: string, userId: string) {
 }
 
 // The app and API live on app.learnquiz.com; the apex learnquiz.com still serves the app until the marketing site takes it over.
-const APP_ORIGINS = ['https://app.learnquiz.com', 'https://learnquiz.com']
+export const APP_ORIGINS = ['https://app.learnquiz.com', 'https://learnquiz.com']
 
 // Share the session cookie across learnquiz.com and its subdomains, so a sign-in on the apex carries over to the app host.
 function isLearnquizHost(url: string): boolean {

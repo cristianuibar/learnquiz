@@ -2,6 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "learnquiz-site",
   "compatibility_date": "2026-10-23",
+  "routes": [{ "pattern": "learnquiz.com", "custom_domain": true }],
   "assets": {
     "directory": "dist/client"
   }

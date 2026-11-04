@@ -22,12 +22,24 @@ export function niceScale(max: number, intervals = 4): { max: number; ticks: num
   }
 }
 
-/** Card around a chart: title on the left, legend (hidden from assistive tech; the table carries the data) on the right. */
-export function ChartCard({ title, legend, children }: { title: string; legend?: ReactNode; children: ReactNode }) {
+/** X tick spacing: every point up to 31 points, then about 15 labels. */
+export const tickEvery = (n: number) => (n > 31 ? Math.ceil(n / 15) : 1)
+
+/** Whether point i of n gets an x label: every tickEvery-th and the last, dropping ones crowding the last. */
+export const tickShown = (i: number, n: number) => {
+  const step = tickEvery(n)
+  return i === n - 1 || (i % step === 0 && n - 1 - i >= step / 2)
+}
+
+/** Card around a chart: title (and optional controls) on the left, legend (hidden from assistive tech; the table carries the data) on the right. */
+export function ChartCard({ title, legend, actions, children }: { title: string; legend?: ReactNode; actions?: ReactNode; children: ReactNode }) {
   return (
     <figure className="m-0 flex min-w-0 flex-col gap-4 rounded-md border border-border bg-surface-card p-6 text-ink">
       <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <figcaption className="text-label">{title}</figcaption>
+        <div className="flex flex-wrap items-baseline gap-4">
+          <figcaption className="text-label">{title}</figcaption>
+          {actions}
+        </div>
         {legend && (
           <div aria-hidden className="flex flex-wrap gap-4 text-[13px]/[18px] font-medium text-ink-muted">
             {legend}
@@ -50,13 +62,18 @@ export function LegendKey({ children, label }: { children: ReactNode; label: str
 }
 
 /** The sr-only table every chart carries, with the same numbers as the drawing. */
-export function ChartTable({ caption, columns, rows, total }: {
+export type ChartTableProps = {
   caption: string
   columns: string[]
   rows: { key: string; cells: ReactNode[] }[]
   /** Cells of the final total row; omitted for the line chart. */
   total?: ReactNode[]
-}) {
+}
+
+const rowCells = (cells: ReactNode[]) =>
+  cells.map((c, i) => (i === 0 ? <th key={i} scope="row">{c}</th> : <td key={i}>{c}</td>))
+
+export function ChartTable({ caption, columns, rows, total }: ChartTableProps) {
   return (
     <table className="sr-only">
       <caption>{caption}</caption>
@@ -65,12 +82,12 @@ export function ChartTable({ caption, columns, rows, total }: {
       </thead>
       <tbody>
         {rows.map((r) => (
-          <tr key={r.key}>{r.cells.map((c, i) => <td key={i}>{c}</td>)}</tr>
+          <tr key={r.key}>{rowCells(r.cells)}</tr>
         ))}
       </tbody>
       {total && (
         <tfoot>
-          <tr>{total.map((c, i) => <td key={i}>{c}</td>)}</tr>
+          <tr>{rowCells(total)}</tr>
         </tfoot>
       )}
     </table>

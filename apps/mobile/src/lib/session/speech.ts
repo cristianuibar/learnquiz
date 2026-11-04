@@ -1,10 +1,12 @@
 import type { ItemView } from '@learnquiz/api'
+import { MULTI_CAPTION } from './multi'
+import { ORDER_CAPTION } from './order'
 
 export function speechSegments(item: ItemView): string[] {
   const segments = [item.stem.replace(/____/g, 'blank')]
   if (item.image?.alt) segments.push(item.image.alt)
-  if (item.format === 'multi') segments.push('Choose all that apply')
-  if (item.format === 'order') segments.push('Put the steps in order')
+  if (item.format === 'multi') segments.push(MULTI_CAPTION)
+  if (item.format === 'order') segments.push(ORDER_CAPTION)
   segments.push(...item.options.map((option) => option.text))
   return segments.filter((segment) => segment.trim().length > 0)
 }

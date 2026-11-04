@@ -20,6 +20,7 @@ import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminCompaniesRouteImport } from './routes/admin.companies'
 import { Route as AdminFlagsRouteImport } from './routes/admin.flags'
 import { Route as AdminJobsRouteImport } from './routes/admin.jobs'
+import { Route as AdminUsageRouteImport } from './routes/admin.usage'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as JoinInvitationIdRouteImport } from './routes/join.$invitationId'
 import { Route as MeIndexRouteImport } from './routes/me.index'
@@ -48,6 +49,7 @@ import { Route as ApiOrgOrgIdLogoRouteImport } from './routes/api/org.$orgId.log
 import { Route as OrgSlugPeopleIdRouteImport } from './routes/org.$slug.people_.$id'
 import { Route as OrgSlugRolesRoleIdRouteImport } from './routes/org.$slug.roles_.$roleId'
 import { Route as TTopicIdUUnitIdRouteImport } from './routes/t.$topicId.u.$unitId'
+import { Route as ApiOrgOrgIdRolesRoleIdDocumentsRouteImport } from './routes/api/org.$orgId.roles.$roleId.documents'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -102,6 +104,11 @@ const AdminFlagsRoute = AdminFlagsRouteImport.update({
 const AdminJobsRoute = AdminJobsRouteImport.update({
   id: '/jobs',
   path: '/jobs',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminUsageRoute = AdminUsageRouteImport.update({
+  id: '/usage',
+  path: '/usage',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
@@ -245,6 +252,12 @@ const TTopicIdUUnitIdRoute = TTopicIdUUnitIdRouteImport.update({
   path: '/t/$topicId/u/$unitId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiOrgOrgIdRolesRoleIdDocumentsRoute =
+  ApiOrgOrgIdRolesRoleIdDocumentsRouteImport.update({
+    id: '/api/org/$orgId/roles/$roleId/documents',
+    path: '/api/org/$orgId/roles/$roleId/documents',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -257,6 +270,7 @@ export interface FileRoutesByFullPath {
   '/admin/companies': typeof AdminCompaniesRoute
   '/admin/flags': typeof AdminFlagsRoute
   '/admin/jobs': typeof AdminJobsRoute
+  '/admin/usage': typeof AdminUsageRoute
   '/admin/users': typeof AdminUsersRoute
   '/join/$invitationId': typeof JoinInvitationIdRoute
   '/me/flag': typeof MeFlagRoute
@@ -286,6 +300,7 @@ export interface FileRoutesByFullPath {
   '/org/$slug/people/$id': typeof OrgSlugPeopleIdRoute
   '/org/$slug/roles/$roleId': typeof OrgSlugRolesRoleIdRoute
   '/t/$topicId/u/$unitId': typeof TTopicIdUUnitIdRoute
+  '/api/org/$orgId/roles/$roleId/documents': typeof ApiOrgOrgIdRolesRoleIdDocumentsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -297,6 +312,7 @@ export interface FileRoutesByTo {
   '/admin/companies': typeof AdminCompaniesRoute
   '/admin/flags': typeof AdminFlagsRoute
   '/admin/jobs': typeof AdminJobsRoute
+  '/admin/usage': typeof AdminUsageRoute
   '/admin/users': typeof AdminUsersRoute
   '/join/$invitationId': typeof JoinInvitationIdRoute
   '/me/flag': typeof MeFlagRoute
@@ -325,6 +341,7 @@ export interface FileRoutesByTo {
   '/org/$slug/people/$id': typeof OrgSlugPeopleIdRoute
   '/org/$slug/roles/$roleId': typeof OrgSlugRolesRoleIdRoute
   '/t/$topicId/u/$unitId': typeof TTopicIdUUnitIdRoute
+  '/api/org/$orgId/roles/$roleId/documents': typeof ApiOrgOrgIdRolesRoleIdDocumentsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -338,6 +355,7 @@ export interface FileRoutesById {
   '/admin/companies': typeof AdminCompaniesRoute
   '/admin/flags': typeof AdminFlagsRoute
   '/admin/jobs': typeof AdminJobsRoute
+  '/admin/usage': typeof AdminUsageRoute
   '/admin/users': typeof AdminUsersRoute
   '/join/$invitationId': typeof JoinInvitationIdRoute
   '/me/flag': typeof MeFlagRoute
@@ -367,6 +385,7 @@ export interface FileRoutesById {
   '/org/$slug/people_/$id': typeof OrgSlugPeopleIdRoute
   '/org/$slug/roles_/$roleId': typeof OrgSlugRolesRoleIdRoute
   '/t/$topicId/u/$unitId': typeof TTopicIdUUnitIdRoute
+  '/api/org/$orgId/roles/$roleId/documents': typeof ApiOrgOrgIdRolesRoleIdDocumentsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -381,6 +400,7 @@ export interface FileRouteTypes {
     | '/admin/companies'
     | '/admin/flags'
     | '/admin/jobs'
+    | '/admin/usage'
     | '/admin/users'
     | '/join/$invitationId'
     | '/me/flag'
@@ -410,6 +430,7 @@ export interface FileRouteTypes {
     | '/org/$slug/people/$id'
     | '/org/$slug/roles/$roleId'
     | '/t/$topicId/u/$unitId'
+    | '/api/org/$orgId/roles/$roleId/documents'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -421,6 +442,7 @@ export interface FileRouteTypes {
     | '/admin/companies'
     | '/admin/flags'
     | '/admin/jobs'
+    | '/admin/usage'
     | '/admin/users'
     | '/join/$invitationId'
     | '/me/flag'
@@ -449,6 +471,7 @@ export interface FileRouteTypes {
     | '/org/$slug/people/$id'
     | '/org/$slug/roles/$roleId'
     | '/t/$topicId/u/$unitId'
+    | '/api/org/$orgId/roles/$roleId/documents'
   id:
     | '__root__'
     | '/'
@@ -461,6 +484,7 @@ export interface FileRouteTypes {
     | '/admin/companies'
     | '/admin/flags'
     | '/admin/jobs'
+    | '/admin/usage'
     | '/admin/users'
     | '/join/$invitationId'
     | '/me/flag'
@@ -490,6 +514,7 @@ export interface FileRouteTypes {
     | '/org/$slug/people_/$id'
     | '/org/$slug/roles_/$roleId'
     | '/t/$topicId/u/$unitId'
+    | '/api/org/$orgId/roles/$roleId/documents'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -519,6 +544,7 @@ export interface RootRouteChildren {
   ApiInvitesInvitationIdLogoRoute: typeof ApiInvitesInvitationIdLogoRoute
   ApiOrgOrgIdLogoRoute: typeof ApiOrgOrgIdLogoRoute
   TTopicIdUUnitIdRoute: typeof TTopicIdUUnitIdRoute
+  ApiOrgOrgIdRolesRoleIdDocumentsRoute: typeof ApiOrgOrgIdRolesRoleIdDocumentsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -598,6 +624,13 @@ declare module '@tanstack/react-router' {
       path: '/jobs'
       fullPath: '/admin/jobs'
       preLoaderRoute: typeof AdminJobsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/usage': {
+      id: '/admin/usage'
+      path: '/usage'
+      fullPath: '/admin/usage'
+      preLoaderRoute: typeof AdminUsageRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/users': {
@@ -796,6 +829,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TTopicIdUUnitIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/org/$orgId/roles/$roleId/documents': {
+      id: '/api/org/$orgId/roles/$roleId/documents'
+      path: '/api/org/$orgId/roles/$roleId/documents'
+      fullPath: '/api/org/$orgId/roles/$roleId/documents'
+      preLoaderRoute: typeof ApiOrgOrgIdRolesRoleIdDocumentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -803,6 +843,7 @@ interface AdminRouteChildren {
   AdminCompaniesRoute: typeof AdminCompaniesRoute
   AdminFlagsRoute: typeof AdminFlagsRoute
   AdminJobsRoute: typeof AdminJobsRoute
+  AdminUsageRoute: typeof AdminUsageRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminCompaniesSlugRoute: typeof AdminCompaniesSlugRoute
@@ -812,6 +853,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminCompaniesRoute: AdminCompaniesRoute,
   AdminFlagsRoute: AdminFlagsRoute,
   AdminJobsRoute: AdminJobsRoute,
+  AdminUsageRoute: AdminUsageRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminCompaniesSlugRoute: AdminCompaniesSlugRoute,
@@ -869,6 +911,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiInvitesInvitationIdLogoRoute: ApiInvitesInvitationIdLogoRoute,
   ApiOrgOrgIdLogoRoute: ApiOrgOrgIdLogoRoute,
   TTopicIdUUnitIdRoute: TTopicIdUUnitIdRoute,
+  ApiOrgOrgIdRolesRoleIdDocumentsRoute: ApiOrgOrgIdRolesRoleIdDocumentsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

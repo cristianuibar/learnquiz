@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { ChevronRight } from 'lucide-react'
@@ -13,6 +13,7 @@ import type { RoleDetail as RoleDetailData } from '@/server/role-detail'
 import { Curriculum } from './curriculum'
 import { DocumentsCard } from './documents-card'
 import { PasteTextPanel } from './paste-text-panel'
+import { useUpload } from './use-upload'
 
 const ring = 'outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50'
 
@@ -24,12 +25,49 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
   const [building, setBuilding] = useState(false)
   const [buildError, setBuildError] = useState('')
   const [pasteOpen, setPasteOpen] = useState(false)
-  const [announcement, setAnnouncement] = useState('')
   const opener = useRef<HTMLElement | null>(null)
   const { role, documents, units } = detail
+  const [finished, setFinished] = useState<{ name: string; size: number; sourceId: string; refocus: boolean } | null>(null)
+  const [announced, setAnnounced] = useState('')
+  const [focusId, setFocusId] = useState('')
+  const uploader = useUpload({
+    orgSlug: slug,
+    roleId: role.id,
+    async onDone(result, file) {
+      const refocus = document.activeElement?.id === 'rd-cancel-upload'
+      setFinished({ name: file.name, size: file.size, sourceId: result.sourceId, refocus })
+      await router.invalidate()
+    },
+  })
+  const sending = typeof uploader.state === 'object' && 'loaded' in uploader.state
+  const busy = sending || finished !== null
+  let uploadStatus = announced
+  if (typeof uploader.state === 'object' && 'loaded' in uploader.state) {
+    const pct = (uploader.state.loaded / (uploader.state.total || 1)) * 100
+    const q = Math.min(75, Math.floor(pct / 25) * 25)
+    uploadStatus = q ? `Uploading ${uploader.state.file.name}, ${q}%` : ''
+  }
   const concepts = units.flatMap((u) => u.concepts)
   const running = role.topicStatus === 'generating' || concepts.some((c) => c.genStatus === 'pending' || c.genStatus === 'generating')
   const canUpload = !readOnly && (role.topicStatus === 'draft' || role.topicStatus === 'failed')
+
+  useLayoutEffect(() => {
+    if (!finished || !documents.some((d) => d.id === finished.sourceId)) return
+    setAnnounced(`${finished.name} uploaded. ${plural(documents.length, 'document', 'documents')} ready.`)
+    if (finished.refocus) setFocusId(`rd-replace-${finished.sourceId}`)
+    setFinished(null)
+  }, [finished, documents])
+
+  // Replace is disabled until the hook settles, so focus waits for the card to be idle again.
+  useLayoutEffect(() => {
+    if (!focusId || busy) return
+    document.getElementById(focusId)?.focus()
+    setFocusId('')
+  }, [focusId, busy])
+
+  useEffect(() => {
+    if (sending) setAnnounced('')
+  }, [sending])
 
   useEffect(() => {
     if (!running) return
@@ -61,7 +99,6 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
 
   return (
     <Page capped>
-      <p role="status" className="sr-only">{announcement}</p>
       <PageHeader
         crumbs={
           <ol className="flex flex-wrap items-center gap-1">
@@ -80,9 +117,11 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
           </Button>
         ) : undefined}
       />
+      <p role="status" aria-live="polite" className="sr-only">{uploadStatus}</p>
       <div className="flex flex-col gap-10">
         <DocumentsCard
-          announce={setAnnouncement}
+          uploader={uploader}
+          finishing={finished}
           detail={detail}
           readOnly={readOnly}
           pasteOpen={pasteOpen}
@@ -94,9 +133,11 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
         <Curriculum
           detail={detail}
           readOnly={readOnly}
-          announce={setAnnouncement}
+          announce={setAnnounced}
           error={buildError ? <Banner kind="alert">{buildError}</Banner> : null}
-          controls={canUpload && documents.length > 0 ? (
+          controls={canUpload && busy ? (
+            <Button type="button" variant="secondary" disabled>Build curriculum</Button>
+          ) : canUpload && documents.length > 0 ? (
             <div className="flex flex-wrap items-center gap-4">
               <span className="text-body text-ink-muted">{plural(documents.length, 'document', 'documents')}</span>
               <Button type="button" variant="accent" disabled={building} onClick={buildCurriculum}>
