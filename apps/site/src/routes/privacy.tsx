@@ -34,7 +34,17 @@ const sections: LegalSection[] = [
     heading: 'Who may use it',
     blocks: ['LearnQuiz is for adults at work and is not meant for anyone under 16.'],
   },
-  { id: 'contact', heading: 'Contact', blocks: ['Questions about this notice go to hello@learnquiz.com.'] },
+  {
+    id: 'contact',
+    heading: 'Contact',
+    blocks: [
+      'Questions about this notice go to hello@learnquiz.com.',
+      {
+        id: 'delete',
+        text: "To delete your account and everything LearnQuiz recorded about you, email hello@learnquiz.com from your account's address; we delete it within 30 days.",
+      },
+    ],
+  },
 ]
 
 export const Route = createFileRoute('/privacy')({

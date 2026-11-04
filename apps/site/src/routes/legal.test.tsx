@@ -58,6 +58,16 @@ it('keeps the privacy notice’s draft sections and drops the draft disclaimer',
   expect(body).not.toContain('Draft notice')
 })
 
+it('links the data deletion instructions at /privacy#delete, under Contact', async () => {
+  const main = (await prerender('/privacy')).querySelector('main')!
+  const target = main.querySelector('#delete')!
+  expect(text(target)).toBe(
+    "To delete your account and everything LearnQuiz recorded about you, email hello@learnquiz.com from your account's address; we delete it within 30 days.",
+  )
+  const section = target.closest('section')!
+  expect(text(main.querySelector(`#${section.getAttribute('aria-labelledby')}`)!)).toBe('Contact')
+})
+
 it('gives the terms their own text instead of repeating the privacy notice', async () => {
   const main = (await prerender('/terms')).querySelector('main')!
   const headings = [...main.querySelectorAll('h2')].map(text)
