@@ -3,7 +3,7 @@ import { and, asc, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '@/db'
 import { member, user } from '@/db/auth-schema'
-import { concepts, jobRoles, memberRoleAssignments, sources, topics, units } from '@/db/schema'
+import { concepts, items, jobRoles, memberRoleAssignments, sources, topics, units } from '@/db/schema'
 import { requireOrgAdmin, requireOrgReader } from '@/server/authz'
 import { httpError } from '@/server/helpers'
 import { releaseStaleBuild } from '@/server/role-curriculum'
@@ -11,7 +11,7 @@ import { releaseStaleBuild } from '@/server/role-curriculum'
 export type RoleDetail = {
   org: { slug: string; name: string }
   readOnly: boolean
-  role: { id: string; name: string; benchmark: number; onboardingDays: number; topicId: string; topicStatus: typeof topics.$inferSelect.status; people: number }
+  role: { id: string; name: string; benchmark: number; onboardingDays: number; topicId: string; topicStatus: typeof topics.$inferSelect.status; people: number; liveQuestions: number; criticalQuestions: number }
   documents: {
     id: string
     title: string
@@ -29,7 +29,7 @@ export type RoleDetail = {
     id: string
     name: string
     summary: string
-    concepts: { id: string; name: string; summary: string; critical: boolean; genStatus: string; genError: string | null }[]
+    concepts: { id: string; name: string; summary: string; critical: boolean; genStatus: string; genError: string | null; questionCount: number }[]
   }[]
 }
 
@@ -46,7 +46,7 @@ export const getRoleDetail = createServerFn({ method: 'GET' })
     if (!role) throw httpError('Role not found', 404)
     if (role.topicStatus === 'generating' && await releaseStaleBuild(db, role.topicId)) role.topicStatus = 'failed'
 
-    const [documents, unitRows, conceptRows, [assigned]] = await Promise.all([
+    const [documents, unitRows, conceptRows, questionRows, [assigned]] = await Promise.all([
       db.select({
         id: sources.id, title: sources.title, kind: sources.kind, version: sources.version, createdAt: sources.createdAt, status: sources.status, error: sources.error,
         sizeBytes: sources.sizeBytes, pageCount: sources.pageCount, chars: sql<number>`length(${sources.bodyText})`, uploaderName: user.name,
@@ -60,18 +60,29 @@ export const getRoleDetail = createServerFn({ method: 'GET' })
         .from(concepts)
         .where(eq(concepts.topicId, role.topicId))
         .orderBy(asc(concepts.order)),
+      db.select({ conceptId: items.conceptId, n: count() })
+        .from(items)
+        .where(and(eq(items.topicId, role.topicId), inArray(items.status, ['active', 'reported'])))
+        .groupBy(items.conceptId),
       // The same people rule as the company overview: assigned to this role and still a member of the company.
       db.select({ n: count() })
         .from(memberRoleAssignments)
         .innerJoin(member, and(eq(member.userId, memberRoleAssignments.userId), eq(member.organizationId, memberRoleAssignments.orgId)))
         .where(and(eq(memberRoleAssignments.jobRoleId, role.id), eq(memberRoleAssignments.orgId, org.id))),
     ])
+    const questions = new Map(questionRows.map((q) => [q.conceptId, q.n]))
+    const withCounts = conceptRows.map((c) => ({ ...c, questionCount: questions.get(c.id) ?? 0 }))
     return {
       org: { slug: org.slug, name: org.name },
       readOnly,
-      role: { ...role, people: assigned?.n ?? 0 },
+      role: {
+        ...role,
+        people: assigned?.n ?? 0,
+        liveQuestions: withCounts.reduce((sum, c) => sum + c.questionCount, 0),
+        criticalQuestions: withCounts.reduce((sum, c) => sum + (c.critical ? c.questionCount : 0), 0),
+      },
       documents,
-      units: unitRows.map((u) => ({ ...u, concepts: conceptRows.filter((c) => c.unitId === u.id).map(({ unitId: _unitId, ...c }) => c) })),
+      units: unitRows.map((u) => ({ ...u, concepts: withCounts.filter((c) => c.unitId === u.id).map(({ unitId: _unitId, ...c }) => c) })),
     }
   })
 

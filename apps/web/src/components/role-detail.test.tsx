@@ -6,6 +6,7 @@ import { PortalProvider } from '@/components/portal/portal-context'
 import { afterEach, expect, it, vi } from 'vitest'
 import { Route as roleDetailRoute } from '@/routes/org.$slug.roles_.$roleId'
 import { retireRoleDocument } from '@/server/role-documents'
+import { retryConceptGeneration } from '@/server/curriculum'
 import { getRoleDetail, updateRoleConcept } from '@/server/role-detail'
 
 vi.mock('@/server/role-detail', () => ({ getRoleDetail: vi.fn(), updateRoleConcept: vi.fn() }))
@@ -22,16 +23,14 @@ function PortalRoot() {
 type Doc = { id: string; title: string; kind: string; version: number; createdAt: number; status: string; error: null; sizeBytes: number | null; pageCount: number | null; chars: number; uploaderName: string | null }
 const pdf: Doc = { id: 'd1', title: 'Till handbook', kind: 'pdf', version: 2, createdAt: Date.UTC(2026, 9, 28), status: 'ready', error: null, sizeBytes: 1000, pageCount: 18, chars: 9000, uploaderName: 'Dana Whitaker' }
 const pasted: Doc = { ...pdf, id: 'd2', title: 'Closing notes', kind: 'text', version: 1, createdAt: Date.UTC(2026, 10, 2), pageCount: null, chars: 6240 }
-const concepts = [
-  { id: 'c1', name: 'Cash float', summary: 'Count the float', critical: false, genStatus: 'ready', genError: null },
-  { id: 'c2', name: 'Card reader', summary: 'Pair the reader', critical: false, genStatus: 'generating', genError: null },
-]
+const concept = (id: string, name: string, genStatus: string, over: Record<string, unknown> = {}) => ({ id, name, summary: `About ${name}`, critical: false, genStatus, genError: null, questionCount: genStatus === 'ready' ? 4 : 0, ...over })
+const concepts = [concept('c1', 'Cash float', 'ready'), concept('c2', 'Card reader', 'generating')]
 
 function makeDetail(over: { status?: string; documents?: Doc[]; units?: unknown[]; readOnly?: boolean } = {}) {
   return {
     org: { slug: 'x', name: 'Acme' },
     readOnly: over.readOnly ?? false,
-    role: { id: 'r1', name: 'Cashier', benchmark: 0.85, onboardingDays: 30, topicId: 't1', topicStatus: over.status ?? 'draft', people: 3 },
+    role: { id: 'r1', name: 'Cashier', benchmark: 0.85, onboardingDays: 30, topicId: 't1', topicStatus: over.status ?? 'draft', people: 3, liveQuestions: 12, criticalQuestions: 5 },
     documents: over.documents ?? [],
     units: over.units ?? [],
   }
@@ -48,11 +47,12 @@ async function renderDetail(detail: ReturnType<typeof makeDetail>) {
   const root = createRoot(container)
   await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
   const button = (name: string) => [...container.querySelectorAll('button')].find((b) => b.textContent === name || b.getAttribute('aria-label') === name)
+  const status = () => container.querySelector('[role="status"]')!.textContent
   const cleanup = async () => {
     await act(async () => root.unmount())
     container.remove()
   }
-  return { container, button, cleanup }
+  return { container, button, cleanup, router, status }
 }
 
 let cleanups: Array<() => Promise<void>> = []
@@ -69,20 +69,89 @@ afterEach(async () => {
   delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT
 })
 
-it('shows a role with its documents and concepts and saves the Critical toggle', async () => {
-  vi.mocked(updateRoleConcept).mockResolvedValue({ ok: true })
-  const { container } = await mount(makeDetail({ status: 'generating', documents: [pdf], units: [{ id: 'u1', name: 'Opening', summary: 'Start of day', concepts }] }))
+const nameOf = (el: Element, root: Element) => el.getAttribute('aria-labelledby')!.split(' ').map((id) => root.querySelector(`[id="${id}"]`)!.textContent).join(' ')
+const unit = (list: unknown[]) => [{ id: 'u1', name: 'Opening', summary: 'Start of day', concepts: list }]
+
+it('shows a role with its documents and concepts', async () => {
+  const { container } = await mount(makeDetail({ status: 'generating', documents: [pdf], units: unit(concepts) }))
   expect(container.textContent).toContain('v2')
   expect(container.textContent).toContain('Cash float')
   expect(container.textContent).toContain('Card reader')
-  expect(container.textContent).toContain('1 of 2 concepts done')
+  expect(container.textContent).toContain('1 of 2 concepts ready')
   expect(container.textContent).toContain('Benchmark 85% · Onboarding 30 days · 3 people')
   expect(getRoleDetail).toHaveBeenCalledWith({ data: { slug: 'x', roleId: 'r1' } })
+})
+
+it('saves the Critical switch, named by its column header and concept', async () => {
+  vi.mocked(updateRoleConcept).mockResolvedValue({ ok: true })
+  const { container } = await mount(makeDetail({ status: 'ready', documents: [pdf], units: unit([concept('c1', 'Cash float', 'ready')]) }))
+  const sw = container.querySelector('[role="switch"]')!
+  expect(nameOf(sw, container)).toBe('Critical Cash float')
   const before = vi.mocked(getRoleDetail).mock.calls.length
-  const box = container.querySelector<HTMLInputElement>('input[type="checkbox"]')!
-  await act(async () => { box.click() })
+  await act(async () => { (sw as HTMLElement).click() })
   expect(updateRoleConcept).toHaveBeenCalledWith({ data: { slug: 'x', conceptId: 'c1', critical: true } })
   await vi.waitFor(() => expect(vi.mocked(getRoleDetail).mock.calls.length).toBeGreaterThan(before))
+})
+
+it('saves the edit form with a Critical value toggled before the page reloaded', async () => {
+  vi.mocked(updateRoleConcept).mockResolvedValue({ ok: true })
+  const { container, button } = await mount(makeDetail({ status: 'ready', documents: [pdf], units: unit([concept('c1', 'Cash float', 'ready')]) }))
+  await act(async () => { (container.querySelector('[role="switch"]') as HTMLElement).click() })
+  await act(async () => { button('Edit concept: Cash float')!.click() })
+  const form = container.querySelector<HTMLFormElement>('form[aria-label="Edit concept: Cash float"]')!
+  expect(form.querySelector('[role="switch"]')!.getAttribute('aria-checked')).toBe('true')
+  await act(async () => { form.requestSubmit() })
+  expect(updateRoleConcept).toHaveBeenLastCalledWith({ data: { slug: 'x', conceptId: 'c1', name: 'Cash float', summary: 'About Cash float', critical: true } })
+})
+
+it('disables Edit while a concept is queued, and moves focus into and out of the edit form', async () => {
+  const { container, button } = await mount(makeDetail({ status: 'generating', documents: [pdf], units: unit([concept('c1', 'Cash float', 'ready'), concept('c2', 'Card reader', 'pending')]) }))
+  expect(button('Edit concept: Card reader')!.hasAttribute('disabled')).toBe(true)
+  await act(async () => { button('Edit concept: Cash float')!.click() })
+  const form = container.querySelector('form[aria-label="Edit concept: Cash float"]')!
+  expect(document.activeElement).toBe(form.querySelector('input'))
+  expect((document.activeElement as HTMLInputElement).value).toBe('Cash float')
+  await act(async () => { [...form.querySelectorAll('button')].find((b) => b.textContent === 'Cancel')!.click() })
+  expect(document.activeElement).toBe(button('Edit concept: Cash float'))
+})
+
+it('announces build progress every five concepts and when the curriculum is ready', async () => {
+  const build = (readyN: number, done = false) => {
+    const list = Array.from({ length: 31 }, (_, i) => concept(`c${i}`, `Concept ${i}`, i < readyN ? 'ready' : 'pending'))
+    return makeDetail({ status: done ? 'ready' : 'generating', documents: [pdf], units: unit(list) })
+  }
+  const { container, router, status } = await mount(build(10))
+  expect(status()).toBe('10 of 31 concepts ready')
+  const refresh = async (d: ReturnType<typeof makeDetail>) => {
+    vi.mocked(getRoleDetail).mockResolvedValue(d as never)
+    await act(() => router.invalidate())
+  }
+  for (const n of [11, 12, 13, 14]) {
+    await refresh(build(n))
+    expect(status()).toBe('10 of 31 concepts ready')
+  }
+  await refresh(build(15))
+  expect(status()).toBe('15 of 31 concepts ready')
+  expect(container.textContent).not.toContain('Curriculum ready ·')
+  await refresh(build(31, true))
+  expect(status()).toBe('31 of 31 concepts ready. Curriculum ready.')
+  expect(container.textContent).toContain('Curriculum ready · 31 concepts')
+  expect(container.textContent).toContain('31 concepts · 12 live questions · 5 critical questions')
+})
+
+it('retries a failed concept', async () => {
+  vi.mocked(retryConceptGeneration).mockResolvedValue({ ok: true } as never)
+  const { button } = await mount(makeDetail({ status: 'ready', documents: [pdf], units: unit([concept('c9', 'Safe drop', 'failed', { genError: 'No draft passed' })]) }))
+  await act(async () => { button('Retry questions for Safe drop')!.click() })
+  expect(retryConceptGeneration).toHaveBeenCalledWith({ data: { slug: 'x', conceptId: 'c9' } })
+})
+
+it('shows only the Critical chip when read-only', async () => {
+  const { container, button } = await mount(makeDetail({ status: 'ready', readOnly: true, documents: [pdf], units: unit([concept('c1', 'Cash float', 'ready', { critical: true }), concept('c2', 'Card reader', 'failed')]) }))
+  expect(container.querySelector('[role="switch"]')).toBeNull()
+  expect(button('Edit concept: Cash float')).toBeUndefined()
+  expect(button('Retry questions for Card reader')).toBeUndefined()
+  expect(container.querySelector('li li')!.textContent).toContain('Critical')
 })
 
 it('retires a document from its row menu after confirmation', async () => {
