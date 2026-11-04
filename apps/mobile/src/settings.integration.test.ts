@@ -371,9 +371,9 @@ test('at font scale 2, selected days, Appearance and time options show the check
 })
 
 describe.each(['light', 'dark'] as const)('%s Appearance columns', (scheme) => {
-  test.each([360, 390])('at %s dp selection keeps equal columns; days, times and 200%% text retain their layouts', async (width) => {
+  test.each([360, 390].flatMap((width) => [1, 1.15, 1.3].map((fontScale) => ({ width, fontScale }))))('at $width dp and $fontScale text selection keeps equal columns; days, times and 200% text retain their layouts', async ({ width, fontScale }) => {
     const Native: typeof import('react-native') = require('react-native')
-    const dimensions = jest.spyOn(Native, 'useWindowDimensions').mockReturnValue({ width, height: 740, scale: 1, fontScale: 1 })
+    const dimensions = jest.spyOn(Native, 'useWindowDimensions').mockReturnValue({ width, height: 740, scale: 1, fontScale })
     jest.spyOn(Native, 'useColorScheme').mockReturnValue(scheme)
     await renderRouter('src/app', { initialUrl: '/settings' })
     await screen.findByText('ana@example.com')
@@ -419,7 +419,7 @@ describe.each(['light', 'dark'] as const)('%s Appearance columns', (scheme) => {
       expect(screen.getByRole('button', { name: 'To 3:30 PM' })).toBeOnTheScreen()
     }
 
-    await legacyLayouts(1)
+    await legacyLayouts(fontScale)
     dimensions.mockReturnValue({ width, height: 740, scale: 1, fontScale: 2 })
     for (const selected of ['Light', 'Dark', 'System']) {
       await fireEvent.press(screen.getByRole('radio', { name: selected }))

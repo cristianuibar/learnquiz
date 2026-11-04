@@ -13,11 +13,12 @@ export type QuestionDockProps = {
   onConfidenceChange(confidence: Confidence): void
   onSubmit(): void
   disabled?: boolean
+  voiceCapturing?: boolean
   busy?: boolean
   mode?: 'check' | 'retry'
 }
 
-export function QuestionDock({ item, answer, confidence, onConfidenceChange, onSubmit, disabled = false, busy = false, mode = 'check' }: QuestionDockProps) {
+export function QuestionDock({ item, answer, confidence, onConfidenceChange, onSubmit, disabled = false, voiceCapturing = false, busy = false, mode = 'check' }: QuestionDockProps) {
   const { colors, space } = useTheme()
   const insets = useSafeAreaInsets()
   const compact = useKeyboardState((state) => state.isVisible)
@@ -34,7 +35,7 @@ export function QuestionDock({ item, answer, confidence, onConfidenceChange, onS
       borderTopColor: colors.border,
     }}>
       <ConfidencePicker value={confidence} onChange={onConfidenceChange} disabled={disabled || busy} compact={compact} />
-      <CheckButton mode={mode} format={item.format} disabled={disabled || !ready} busy={busy} onPress={onSubmit} />
+      <CheckButton mode={mode} format={item.format} disabled={disabled || voiceCapturing || !ready} busy={busy} onPress={onSubmit} />
     </View>
   )
 }

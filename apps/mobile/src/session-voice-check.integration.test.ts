@@ -4,6 +4,7 @@ import { AppState } from 'react-native'
 import { requestRecordingPermissionsAsync, useAudioStream } from 'expo-audio'
 import type { ItemView } from '@learnquiz/api'
 import SessionScreen from './app/play/[sessionId]/index'
+import QuickSessionScreen from './app/play/quick/[itemId]'
 import { QuestionDock } from './components/session/QuestionDock'
 import { api, postForm } from './lib/api'
 import { ThemeProvider } from './theme/ThemeProvider'
@@ -11,7 +12,7 @@ import { ThemeProvider } from './theme/ThemeProvider'
 jest.mock('expo-router', () => {
   const router = { replace: jest.fn() }
   return {
-    useLocalSearchParams: () => ({ sessionId: 'personal-session' }),
+    useLocalSearchParams: () => ({ sessionId: 'personal-session', itemId: 'short-answer' }),
     useRouter: () => router,
     useFocusEffect: jest.fn(),
   }
@@ -21,6 +22,7 @@ jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({
 jest.mock('react-native-keyboard-controller', () => ({ useKeyboardState: () => false }))
 jest.mock('react-native-reanimated', () => ({ useReducedMotion: () => true }))
 jest.mock('expo-speech', () => ({ stop: jest.fn() }))
+jest.mock('./lib/haptics', () => ({ resultHaptic: jest.fn() }))
 type BufferCallback = (chunk: { data: ArrayBuffer; sampleRate: number; channels: number }) => void
 jest.mock('expo-audio', () => {
   const stream = { start: jest.fn(async () => {}), stop: jest.fn() }
@@ -63,8 +65,8 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
-async function review() {
-  await render(h(ThemeProvider, { children: h(SessionScreen) }))
+async function review(scheme: 'light' | 'dark' = 'light') {
+  await render(h(ThemeProvider, { scheme, children: h(SessionScreen) }))
   await fireEvent.press(await screen.findByRole('button', { name: 'Type instead' }))
   await fireEvent.changeText(screen.getByLabelText('Your answer'), oldText)
   await fireEvent.press(screen.getByRole('radio', { name: 'Sure' }))
@@ -80,6 +82,15 @@ async function expectBlocked() {
   expect(check).toBeDisabled()
   await fireEvent.press(check)
   expect(answerRequests()).toHaveLength(0)
+}
+
+async function chooseWhileCapturing(label: string) {
+  for (const name of ['Sure', 'Unsure', 'Guessing']) {
+    expect(screen.getByRole('radio', { name })).toBeEnabled()
+  }
+  await fireEvent.press(screen.getByRole('radio', { name: label }))
+  expect(screen.getByRole('radio', { name: label })).toBeChecked()
+  await expectBlocked()
 }
 
 async function submit(text: string) {
@@ -103,36 +114,76 @@ beforeEach(() => {
 })
 afterEach(() => jest.restoreAllMocks())
 
-test('re-record blocks Check through delayed permission, startup, recording and transcription, then submits the edited new answer', async () => {
-  const permission = deferred<Awaited<ReturnType<typeof requestRecordingPermissionsAsync>>>()
-  const startup = deferred<void>()
-  const transcript = deferred<string>()
-  jest.mocked(requestRecordingPermissionsAsync).mockReturnValueOnce(permission.promise)
-  jest.mocked(postForm).mockReturnValueOnce(transcript.promise)
+describe.each(['light', 'dark'] as const)('%s voice capture', (scheme) => {
+  test.each(['first recording', 're-record'] as const)('%s keeps confidence usable and Check blocked through permission, startup, recording and transcription', async (capture) => {
+    const permission = deferred<Awaited<ReturnType<typeof requestRecordingPermissionsAsync>>>()
+    const startup = deferred<void>()
+    const transcript = deferred<string>()
+    jest.mocked(requestRecordingPermissionsAsync).mockReturnValueOnce(permission.promise)
+    jest.mocked(postForm).mockReturnValueOnce(transcript.promise)
+    if (capture === 're-record') await review(scheme)
+    else await render(h(ThemeProvider, { scheme, children: h(SessionScreen) }))
+    stream().start.mockReturnValueOnce(startup.promise)
+
+    await fireEvent.press(capture === 're-record'
+      ? screen.getByRole('button', { name: 'Record again' })
+      : await screen.findByRole('togglebutton', { name: 'Record answer' }))
+    await chooseWhileCapturing('Guessing')
+    expect(stream().start).not.toHaveBeenCalled()
+    await act(async () => { permission.resolve({ granted: true, canAskAgain: true } as never) })
+    expect(stream().start).toHaveBeenCalledTimes(1)
+    await chooseWhileCapturing('Unsure')
+    await act(async () => { startup.resolve() })
+    const stop = screen.getByRole('togglebutton', { name: 'Stop recording' })
+    expect(stop).toBeEnabled()
+    await chooseWhileCapturing('Sure')
+
+    const onBuffer = jest.mocked(useAudioStream).mock.lastCall![0]!.onBuffer as BufferCallback
+    await act(async () => { onBuffer({ data: new Int16Array(2400).fill(3000).buffer, sampleRate: 24_000, channels: 1 }) })
+    await fireEvent.press(stop)
+    expect(stream().stop).toHaveBeenCalledTimes(1)
+    expect(screen.getByText('Turning your recording into text…')).toHaveProp('accessibilityLiveRegion', 'polite')
+    await chooseWhileCapturing('Unsure')
+    await act(async () => { transcript.resolve('Hit the stop button') })
+    expect(screen.getByLabelText('Your answer')).toHaveProp('value', 'Hit the stop button')
+    await fireEvent.changeText(screen.getByLabelText('Your answer'), 'Hit the emergency stop')
+    expect(screen.getByRole('radio', { name: 'Unsure' })).toBeChecked()
+    await fireEvent.press(screen.getByRole('radio', { name: 'Sure' }))
+    await submit('Hit the emergency stop')
+  })
+})
+
+test('checking and reveal still disable confidence', async () => {
   await review()
-  stream().start.mockReturnValueOnce(startup.promise)
+  const result = deferred<unknown>()
+  jest.mocked(api).mockReturnValueOnce(result.promise)
+  await fireEvent.press(screen.getByRole('button', { name: 'Check' }))
+  for (const name of ['Sure', 'Unsure', 'Guessing']) expect(screen.getByRole('radio', { name })).toBeDisabled()
+  await fireEvent.press(screen.getByRole('radio', { name: 'Unsure' }))
+  expect(screen.getByRole('radio', { name: 'Sure' })).toBeChecked()
+  await act(async () => { result.resolve({ correct: true }) })
+  for (const name of ['Sure', 'Unsure', 'Guessing']) expect(screen.getByRole('radio', { name })).toBeDisabled()
+})
 
-  await fireEvent.press(screen.getByRole('button', { name: 'Record again' }))
-  await expectBlocked()
-  expect(stream().start).not.toHaveBeenCalled()
-  await act(async () => { permission.resolve({ granted: true, canAskAgain: true } as never) })
-  expect(stream().start).toHaveBeenCalledTimes(1)
-  await expectBlocked()
-  await act(async () => { startup.resolve() })
-  const stop = screen.getByRole('togglebutton', { name: 'Stop recording' })
-  expect(stop).toBeEnabled()
-  await expectBlocked()
-
-  const onBuffer = jest.mocked(useAudioStream).mock.lastCall![0]!.onBuffer as BufferCallback
-  await act(async () => { onBuffer({ data: new Int16Array(2400).fill(3000).buffer, sampleRate: 24_000, channels: 1 }) })
-  await fireEvent.press(stop)
-  expect(stream().stop).toHaveBeenCalledTimes(1)
-  expect(screen.getByText('Turning your recording into text…')).toHaveProp('accessibilityLiveRegion', 'polite')
-  await expectBlocked()
-  await act(async () => { transcript.resolve('Hit the stop button') })
-  expect(screen.getByLabelText('Your answer')).toHaveProp('value', 'Hit the stop button')
-  await fireEvent.changeText(screen.getByLabelText('Your answer'), 'Hit the emergency stop')
-  await submit('Hit the emergency stop')
+test('quick questions still allow confidence before Check and block it while checking', async () => {
+  jest.mocked(api).mockResolvedValueOnce({ sessionId: 'personal-session' })
+  await render(h(ThemeProvider, { children: h(QuickSessionScreen) }))
+  await fireEvent.changeText(await screen.findByLabelText('Your answer'), oldText)
+  expect(screen.getByRole('button', { name: 'Check' })).toBeDisabled()
+  await fireEvent.press(screen.getByRole('radio', { name: 'Unsure' }))
+  expect(screen.getByRole('radio', { name: 'Unsure' })).toBeChecked()
+  expect(screen.getByRole('button', { name: 'Check' })).toBeEnabled()
+  const result = deferred<unknown>()
+  jest.mocked(api).mockReturnValueOnce(result.promise)
+  await fireEvent.press(screen.getByRole('button', { name: 'Check' }))
+  expect(answerRequests()).toHaveLength(1)
+  expect(answerRequests()[0][1]?.body).toEqual(expect.objectContaining({ confidence: 'unsure', answer: { text: oldText } }))
+  for (const name of ['Sure', 'Unsure', 'Guessing']) expect(screen.getByRole('radio', { name })).toBeDisabled()
+  await act(async () => { result.reject(new Error('Offline')) })
+  expect(screen.getByRole('button', { name: 'Try again' })).toBeEnabled()
+  await fireEvent.press(screen.getByRole('radio', { name: 'Sure' }))
+  expect(screen.getByRole('radio', { name: 'Sure' })).toBeChecked()
+  expect(screen.getByRole('button', { name: 'Check' })).toBeEnabled()
 })
 
 test.each(['denied permission', 'failed startup'] as const)('%s restores the review text and enables Check', async (outcome) => {
