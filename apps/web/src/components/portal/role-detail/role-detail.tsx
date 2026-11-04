@@ -25,6 +25,7 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
   const [building, setBuilding] = useState(false)
   const [buildError, setBuildError] = useState('')
   const [pasteOpen, setPasteOpen] = useState(false)
+  const [pasteFor, setPasteFor] = useState<string | undefined>()
   const opener = useRef<HTMLElement | null>(null)
   const { role, documents, units } = detail
   const [finished, setFinished] = useState<{ name: string; size: number; sourceId: string; refocus: boolean } | null>(null)
@@ -47,13 +48,15 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
     const q = Math.min(75, Math.floor(pct / 25) * 25)
     uploadStatus = q ? `Uploading ${uploader.state.file.name}, ${q}%` : ''
   }
+  const ready = documents.filter((d) => d.status === 'ready').length
   const concepts = units.flatMap((u) => u.concepts)
   const running = role.topicStatus === 'generating' || concepts.some((c) => c.genStatus === 'pending' || c.genStatus === 'generating')
   const canUpload = !readOnly && (role.topicStatus === 'draft' || role.topicStatus === 'failed')
 
   useLayoutEffect(() => {
     if (!finished || !documents.some((d) => d.id === finished.sourceId)) return
-    setAnnounced(`${finished.name} uploaded. ${plural(documents.length, 'document', 'documents')} ready.`)
+    const added = documents.find((d) => d.id === finished.sourceId)!
+    setAnnounced(added.status === 'failed' ? `${finished.name} uploaded. Extraction failed: ${added.error}` : `${finished.name} uploaded. ${plural(ready, 'document', 'documents')} ready.`)
     if (finished.refocus) setFocusId(`rd-replace-${finished.sourceId}`)
     setFinished(null)
   }, [finished, documents])
@@ -88,9 +91,10 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
     }
   }
 
-  function togglePaste(el: HTMLElement) {
+  function togglePaste(el: HTMLElement, replacesId?: string) {
     opener.current = el
-    setPasteOpen((open) => !open)
+    setPasteFor(replacesId)
+    setPasteOpen(!pasteOpen || pasteFor !== replacesId)
   }
   function closePaste() {
     setPasteOpen(false)
@@ -125,9 +129,10 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
           detail={detail}
           readOnly={readOnly}
           pasteOpen={pasteOpen}
+          pasteFor={pasteFor}
           onTogglePaste={togglePaste}
           panel={pasteOpen && canUpload ? (
-            <PasteTextPanel roleId={role.id} onClose={closePaste} onAdded={async () => { setPasteOpen(false); await router.invalidate() }} />
+            <PasteTextPanel key={pasteFor ?? 'new'} replacesId={pasteFor} roleId={role.id} onClose={closePaste} onAdded={async () => { setPasteOpen(false); await router.invalidate() }} />
           ) : null}
         />
         <Curriculum
@@ -137,9 +142,9 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
           error={buildError ? <Banner kind="alert">{buildError}</Banner> : null}
           controls={canUpload && busy ? (
             <Button type="button" variant="secondary" disabled>Build curriculum</Button>
-          ) : canUpload && documents.length > 0 ? (
+          ) : canUpload && ready > 0 ? (
             <div className="flex flex-wrap items-center gap-4">
-              <span className="text-body text-ink-muted">{plural(documents.length, 'document', 'documents')}</span>
+              <span className="text-body text-ink-muted">{plural(ready, 'document', 'documents')}</span>
               <Button type="button" variant="accent" disabled={building} onClick={buildCurriculum}>
                 {building ? 'Building…' : 'Build curriculum'}
               </Button>

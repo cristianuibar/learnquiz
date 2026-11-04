@@ -62,6 +62,7 @@ export async function addRoleDocument(data: ReturnType<typeof parseDocumentForm>
   let bytes: ArrayBuffer | undefined
   let sizeBytes: number | null = null
   let pageCount: number | null = null
+  let failed = false
   if (data.file) {
     const file = data.file
     if (file.size > MAX_ROLE_DOCUMENT_BYTES) throw httpError('Documents must be 10 MB or smaller', 413)
@@ -79,7 +80,11 @@ export async function addRoleDocument(data: ReturnType<typeof parseDocumentForm>
     } catch {
       throw httpError('This PDF could not be read', 422)
     }
-    if (!bodyText) throw httpError('This PDF has no text layer. Paste the text instead.', 422)
+    if (!bodyText) {
+      // A new scan is kept as a failed source so the admin sees it; a replacement must never retire a live document for one.
+      if (old) throw httpError('This PDF has no text layer. Paste the text instead.', 422)
+      failed = true
+    }
     kind = 'pdf'
     sizeBytes = file.size
     if (!title) title = file.name.replace(/\.pdf$/i, '').trim().slice(0, 200)
@@ -99,8 +104,11 @@ export async function addRoleDocument(data: ReturnType<typeof parseDocumentForm>
   const bucket = getEnv().MEDIA
   if (r2Key && bytes) await bucket.put(r2Key, bytes, { httpMetadata: { contentType: 'application/pdf' } })
   const now = Date.now()
-  const version = old ? old.version + 1 : 1
-  const newSource = { id, topicId, kind, title, bodyText, r2Key, sizeBytes, pageCount, version, uploadedBy: user.id, status: 'ready' as const, createdAt: now }
+  const status = failed ? 'failed' as const : 'ready' as const
+  const error = failed ? 'No selectable text found. This looks like a scan.' : null
+  // Replacing a failed source is a retry of the same version, not a new one.
+  const version = old ? (old.status === 'failed' ? old.version : old.version + 1) : 1
+  const newSource = { id, topicId, kind, title, bodyText, r2Key, sizeBytes, pageCount, version, uploadedBy: user.id, status, error, createdAt: now }
   try {
     if (!old) {
       await db.insert(sources).values(newSource)
@@ -118,14 +126,14 @@ export async function addRoleDocument(data: ReturnType<typeof parseDocumentForm>
             id: sql<string>`${id}`.as('id'), topicId: sql<string>`${topicId}`.as('topicId'), kind: sql<typeof kind>`${kind}`.as('kind'), title: sql<string>`${title}`.as('title'),
             bodyText: sql<string>`${bodyText}`.as('bodyText'), r2Key: sql<string | null>`${r2Key}`.as('r2Key'),
             sizeBytes: sql<number | null>`${sizeBytes}`.as('sizeBytes'), pageCount: sql<number | null>`${pageCount}`.as('pageCount'), version: sql<number>`${version}`.as('version'),
-            uploadedBy: sql<string>`${user.id}`.as('uploadedBy'), status: sql<'ready'>`${'ready'}`.as('status'), error: sql<string | null>`${null}`.as('error'),
+            uploadedBy: sql<string>`${user.id}`.as('uploadedBy'), status: sql<'ready'>`${status}`.as('status'), error: sql<string | null>`${error}`.as('error'),
             retiredAt: sql<number | null>`${null}`.as('retiredAt'), deletedAt: sql<number | null>`${null}`.as('deletedAt'), createdAt: sql<number>`${now}`.as('createdAt'),
           }).from(topics).where(and(
             eq(topics.id, topicId), ne(topics.status, 'generating'),
             exists(db.select({ one: sql`1` }).from(sources).where(liveSource(old.id, topicId))),
           )),
         ).returning({ id: sources.id }),
-        db.update(sources).set({ retiredAt: now }).where(and(eq(sources.id, old.id), inserted)),
+        db.update(sources).set(old.status === 'failed' ? { deletedAt: now } : { retiredAt: now }).where(and(eq(sources.id, old.id), inserted)),
         db.update(items).set({ status: 'retired' })
           .where(and(eq(items.sourceId, old.id), eq(items.sourceVersion, old.version), inArray(items.status, LIVE), inserted)),
         ...cited.map((concept) => db.update(concepts).set({ ...requeue, sourceQuote: findSourceQuote(concept.sourceQuote, bodyText) })
@@ -142,7 +150,7 @@ export async function addRoleDocument(data: ReturnType<typeof parseDocumentForm>
     throw error
   }
   if (old) runInBackground(drainConceptQueue())
-  return { sourceId: id, topicId, r2Key, chars: bodyText.length, version }
+  return { sourceId: id, topicId, r2Key, chars: bodyText.length, version, status }
 }
 
 

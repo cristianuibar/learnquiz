@@ -1,4 +1,4 @@
-import { and, asc, eq, exists, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
+import { and, asc, eq, exists, inArray, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb, type Db } from '@/db'
 import { conceptEdges, concepts, jobRoles, sources, topics, units } from '@/db/schema'
@@ -76,7 +76,7 @@ export async function claimRoleBuild({ orgId, ownerId, roleId }: { orgId: string
   if (!row) throw httpError('Role topic not found', 404)
   const topicId = row.topic.id
   const liveDocuments = () => db.select().from(sources)
-    .where(and(eq(sources.topicId, topicId), isNull(sources.deletedAt), isNull(sources.retiredAt)))
+    .where(and(eq(sources.topicId, topicId), isNull(sources.deletedAt), isNull(sources.retiredAt), ne(sources.status, 'failed')))
     .orderBy(asc(sources.createdAt), asc(sources.id))
   const missingDocuments = () => httpError('Add documents with extracted text before building the curriculum.', 422)
   const unusable = (docs: { bodyText: string }[]) => !docs.length || docs.some((d) => !d.bodyText.trim())

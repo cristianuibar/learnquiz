@@ -5,13 +5,13 @@ import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet
 import { PortalProvider } from '@/components/portal/portal-context'
 import { afterEach, expect, it, vi } from 'vitest'
 import { Route as roleDetailRoute } from '@/routes/org.$slug.roles_.$roleId'
-import { retireRoleDocument } from '@/server/role-documents'
+import { previewRetireRoleDocument, removeRoleDocument, retireRoleDocument, uploadRoleDocument } from '@/server/role-documents'
 import { retryConceptGeneration } from '@/server/curriculum'
 import { getRoleDetail, updateRoleConcept } from '@/server/role-detail'
 
 vi.mock('@/server/role-detail', () => ({ getRoleDetail: vi.fn(), updateRoleConcept: vi.fn() }))
 vi.mock('@/server/curriculum', () => ({ generateRoleCurriculum: vi.fn(), retryConceptGeneration: vi.fn() }))
-vi.mock('@/server/role-documents', () => ({ uploadRoleDocument: vi.fn(), retireRoleDocument: vi.fn() }))
+vi.mock('@/server/role-documents', () => ({ uploadRoleDocument: vi.fn(), retireRoleDocument: vi.fn(), previewRetireRoleDocument: vi.fn(), removeRoleDocument: vi.fn() }))
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
 
 // The portal layout provides the link context; screens are rendered under it here.
@@ -20,7 +20,7 @@ function PortalRoot() {
   return <PortalProvider slug={slug ?? ''} base="org" readOnly={false}><Outlet /></PortalProvider>
 }
 
-type Doc = { id: string; title: string; kind: string; version: number; createdAt: number; status: string; error: null; sizeBytes: number | null; pageCount: number | null; chars: number; uploaderName: string | null }
+type Doc = { id: string; title: string; kind: string; version: number; createdAt: number; status: string; error: string | null; sizeBytes: number | null; pageCount: number | null; chars: number; uploaderName: string | null }
 const pdf: Doc = { id: 'd1', title: 'Till handbook', kind: 'pdf', version: 2, createdAt: Date.UTC(2026, 9, 28), status: 'ready', error: null, sizeBytes: 1000, pageCount: 18, chars: 9000, uploaderName: 'Dana Whitaker' }
 const pasted: Doc = { ...pdf, id: 'd2', title: 'Closing notes', kind: 'text', version: 1, createdAt: Date.UTC(2026, 10, 2), pageCount: null, chars: 6240 }
 const concept = (id: string, name: string, genStatus: string, over: Record<string, unknown> = {}) => ({ id, name, summary: `About ${name}`, critical: false, genStatus, genError: null, questionCount: genStatus === 'ready' ? 4 : 0, ...over })
@@ -154,18 +154,90 @@ it('shows only the Critical chip when read-only', async () => {
   expect(container.querySelector('li li')!.textContent).toContain('Critical')
 })
 
-it('retires a document from its row menu after confirmation', async () => {
+it('retires a document after a confirmation that lists the consequences', async () => {
   vi.mocked(retireRoleDocument).mockResolvedValue({ ok: true })
-  const confirm = vi.fn(() => true)
-  vi.stubGlobal('confirm', confirm)
+  vi.mocked(previewRetireRoleDocument).mockResolvedValue({ questions: 38, alsoIn: [{ concept: 'Cash float', document: 'Picking SOP v3' }], orphaned: 2 })
   const { button } = await mount(makeDetail({ status: 'ready', documents: [pdf] }))
+  const open = async () => {
+    await act(async () => { button('More actions for Till handbook')!.click() })
+    const item = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((b) => b.textContent === 'Retire')!
+    await act(async () => { item.click() })
+  }
+  await open()
+  const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!
+  expect(dialog.textContent).toContain('Retire Till handbook?')
+  expect(previewRetireRoleDocument).toHaveBeenCalledWith({ data: { slug: 'x', roleId: 'r1', sourceId: 'd1' } })
+  const list = document.getElementById(dialog.getAttribute('aria-describedby')!)!
+  expect(list.tagName).toBe('UL')
+  const lines = [...list.querySelectorAll('li')].map((li) => li.textContent)
+  expect(lines[0]).toBe('Its 38 questions leave play for everyone in Cashier.')
+  expect(lines).toContain('Cash float is also in Picking SOP v3. New questions are generated from it and arrive as Unreviewed.')
+  expect(lines).toContain('People keep their progress. Nothing is deleted.')
+  expect(document.activeElement?.textContent).toBe('Cancel')
+  await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
+  await vi.waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull())
+  expect(retireRoleDocument).not.toHaveBeenCalled()
+  await vi.waitFor(() => expect(document.activeElement).toBe(button('More actions for Till handbook')))
+
   const before = vi.mocked(getRoleDetail).mock.calls.length
-  await act(async () => { button('More actions for Till handbook')!.click() })
-  const item = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((b) => b.textContent === 'Retire document')!
-  await act(async () => { item.click() })
-  expect(confirm).toHaveBeenCalledWith('Retire this document? Its questions stop appearing in practice.')
+  await open()
+  const confirm = [...document.querySelectorAll('button')].find((b) => b.textContent === 'Retire document')!
+  await act(async () => { confirm.click() })
   expect(retireRoleDocument).toHaveBeenCalledWith({ data: { slug: 'x', roleId: 'r1', sourceId: 'd1' } })
   await vi.waitFor(() => expect(vi.mocked(getRoleDetail).mock.calls.length).toBeGreaterThan(before))
+})
+
+it('keeps the old row live while a replacement uploads', async () => {
+  vi.stubGlobal('XMLHttpRequest', FakeXhr)
+  FakeXhr.instances = []
+  const { container, button } = await mount(makeDetail({ status: 'draft', documents: [pdf, pasted] }))
+  await act(async () => { button('Replace Till handbook')!.click() })
+  const file = new File(['%PDF'], 'handbook.pdf', { type: 'application/pdf' })
+  Object.defineProperty(file, 'size', { value: 2.5 * MB })
+  await pickFile(container, file)
+  expect(FakeXhr.instances).toHaveLength(1)
+  const xhr = FakeXhr.instances[0]!
+  await act(async () => { xhr.upload.onprogress!({ loaded: 1.6 * MB, total: 2.5 * MB }) })
+  const rows = container.querySelectorAll('ul[aria-label^="Documents for"] > li')
+  expect(rows).toHaveLength(2)
+  expect(rows[0]!.textContent).toContain('Till handbook')
+  expect(rows[0]!.textContent).toContain('v2 stays live until v3 is ready.')
+  expect(rows[0]!.textContent).toContain('1.6 of 2.5 MB')
+  expect(container.querySelector('[role="progressbar"]')!.getAttribute('aria-label')).toBe('Uploading Till handbook v3')
+  expect(rows[1]!.textContent).toContain('Closing notes')
+})
+
+const failed: Doc = { ...pdf, id: 'd3', title: 'Scanned SOP', version: 1, status: 'failed', error: 'No selectable text found. This looks like a scan.', pageCount: null, sizeBytes: 3.1 * 1048576, chars: 0 }
+
+it('shows an extraction failure with its recovery actions', async () => {
+  vi.mocked(removeRoleDocument).mockResolvedValue({ ok: true })
+  vi.mocked(uploadRoleDocument).mockResolvedValue({ sourceId: '0-0-0-0-4', topicId: 't1', r2Key: null, chars: 24, version: 1, status: 'ready' })
+  const { container, button } = await mount(makeDetail({ documents: [failed] }))
+  expect(container.textContent).toContain('Extraction failed')
+  expect(container.textContent).toContain('No selectable text found. This looks like a scan.')
+  expect(container.textContent).toContain('PDF · 3.1 MB · Oct 28, 2026 · Dana Whitaker')
+  expect(button('Replace file Scanned SOP')).toBeTruthy()
+  const paste = button('Paste text instead')!
+  expect(paste.getAttribute('aria-expanded')).toBe('false')
+  await act(async () => { paste.click() })
+  expect(paste.getAttribute('aria-expanded')).toBe('true')
+  const text = container.querySelector<HTMLTextAreaElement>('#rd-paste-text')!
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(text, 'Count the till at close.')
+    text.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await act(async () => { button('Add text')!.click() })
+  expect(vi.mocked(uploadRoleDocument).mock.calls[0]![0].data.get('replacesId')).toBe('d3')
+  expect(paste.getAttribute('aria-expanded')).toBe('false')
+  await act(async () => { button('More actions for Scanned SOP')!.click() })
+  const remove = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((b) => b.textContent === 'Remove')!
+  await act(async () => { remove.click() })
+  expect(removeRoleDocument).toHaveBeenCalledWith({ data: { slug: 'x', roleId: 'r1', sourceId: 'd3' } })
+})
+
+it('offers no Build curriculum while the only document failed', async () => {
+  const { button } = await mount(makeDetail({ documents: [failed] }))
+  expect(button('Build curriculum')).toBeUndefined()
 })
 
 it('shows the drop zone and no file list for an empty role', async () => {
