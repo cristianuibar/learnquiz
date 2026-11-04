@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>People · Northwind Logistics</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" style="position: relative;">
+  <div class="app">
+    <dc-import name="PortalNav" active="people" readonly="{{readonly}}" hint-size="248px,900px"></dc-import>
+    <main class="main">
+      <div class="page">
+        <div class="page-head">
+          <div class="page-head-text">
+            <h1 class="t-title1" tabindex="-1">People</h1>
+          </div>
+          <sc-if value="{{hasPeople}}" hint-placeholder-val="{{ true }}">
+            <div class="page-actions">
+              <a class="btn btn-accent" href="People-Invite.dc.html"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Invite people</a>
+            </div>
+          </sc-if>
+        </div>
+
+        <!-- ============ EMPTY: no one invited ============ -->
+        <sc-if value="{{isEmpty}}" hint-placeholder-val="{{ false }}">
+          <div class="card" style="max-width: 720px;">
+            <div class="card-pad" style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+              <p class="t-body-lg">No one invited yet.</p>
+              <a class="btn btn-accent" href="People-Invite.dc.html"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Invite people</a>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- ============ LIST ============
+             Columns: Name (+ job role, + email for invites) · Status (+ last active / invite date) · Progress to benchmark (+ onboarding day / days to proficiency / link expiry) · Open critical errors · actions.
+             Job role, onboarding and last active ride as cell-sub lines so the table fits 1024 without sideways scroll.
+             No sort controls: people are never ranked. Names that open a Person page are brand-colored links. -->
+        <sc-if value="{{hasPeople}}" hint-placeholder-val="{{ true }}">
+          <section class="section" aria-label="People in Northwind Logistics">
+            <div class="dt-toolbar">
+              <div class="input-icon grow">
+                <label class="sr-only" for="pp-search">Search people</label>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+                <input class="input" id="pp-search" type="search" placeholder="Search by name or email">
+              </div>
+              <div class="select-wrap" style="flex: 0 1 220px; min-width: 180px;">
+                <label class="sr-only" for="pp-role">Job role</label>
+                <select class="select" id="pp-role">
+                  <option>All roles</option>
+                  <option>Warehouse picker</option>
+                  <option>Forklift operator</option>
+                </select>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+              </div>
+              <div role="group" aria-label="Filter by status" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button class="filter-chip" type="button" aria-pressed="{{pressInvited}}" onClick="{{filterInvited}}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"></path></svg>Invited <span class="count">{{countInvited}}</span></button>
+                <button class="filter-chip" type="button" aria-pressed="{{pressActive}}" onClick="{{filterActive}}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active <span class="count">1</span></button>
+                <button class="filter-chip" type="button" aria-pressed="{{pressProficient}}" onClick="{{filterProficient}}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Proficient <span class="count">1</span></button>
+                <button class="filter-chip" type="button" aria-pressed="{{pressExpired}}" onClick="{{filterExpired}}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Expired <span class="count">1</span></button>
+              </div>
+            </div>
+
+            <div class="dt-wrap">
+              <table class="dt dt-stack" role="table">
+                <caption class="sr-only">People and their training progress. In alphabetical order.</caption>
+                <thead role="rowgroup">
+                  <tr role="row">
+                    <th role="columnheader" scope="col"><span style="display: block; min-width: 168px;">Name</span></th>
+                    <th role="columnheader" scope="col">Status</th>
+                    <th role="columnheader" scope="col">Progress to benchmark</th>
+                    <th role="columnheader" scope="col" class="r" style="white-space: normal;">Open critical errors</th>
+                    <th role="columnheader" scope="col" class="col-actions"><span class="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody role="rowgroup">
+                  <!-- Amara Okafor · Proficient -->
+                  <tr role="row" style="{{rowAmara}}">
+                    <td role="cell"style="grid-column: 1; grid-row: 1;">
+                      <a class="cell-main" href="Person-Proficient.dc.html" style="color: var(--brand);">Amara Okafor</a>
+                      <div class="cell-sub">Warehouse picker</div>
+                    </td>
+                    <td role="cell"style="grid-column: 3; grid-row: 1; align-self: start; justify-self: end; margin-top: -4px; white-space: nowrap;">
+                      <span class="chip chip-mastered"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Proficient</span>
+                      <div class="cell-sub">Last active yesterday</div>
+                    </td>
+                    <td role="cell"data-label="Progress to benchmark" style="grid-column: 1; grid-row: 2;">
+                      <div class="progress-cell" style="max-width: 280px;">
+                        <div class="bar" aria-hidden="true"><span class="bar-fill" style="width: 88%;"></span><span class="bar-bench" style="left: calc(85% - 1px);"></span></div>
+                        <span class="num" style="text-align: right;">88%<span class="sr-only"> of 85% benchmark</span></span>
+                      </div>
+                      <div class="cell-sub" style="white-space: nowrap;">Proficient in 21 days</div>
+                    </td>
+                    <td role="cell"data-label="Open critical errors" class="r num" style="grid-column: 2 / span 2; grid-row: 2; align-self: start;">0</td>
+                    <td role="cell"class="col-actions stack-hide"></td>
+                  </tr>
+
+                  <!-- Jordan Reyes · Active -->
+                  <tr role="row" style="{{rowJordan}}">
+                    <td role="cell"style="grid-column: 1; grid-row: 1;">
+                      <a class="cell-main" href="Person.dc.html" style="color: var(--brand);">Jordan Reyes</a>
+                      <div class="cell-sub">Warehouse picker</div>
+                    </td>
+                    <td role="cell"style="grid-column: 3; grid-row: 1; align-self: start; justify-self: end; margin-top: -4px; white-space: nowrap;">
+                      <span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active</span>
+                      <div class="cell-sub">Last active today 10:42</div>
+                    </td>
+                    <td role="cell"data-label="Progress to benchmark" style="grid-column: 1; grid-row: 2;">
+                      <div class="progress-cell" style="max-width: 280px;">
+                        <div class="bar" aria-hidden="true"><span class="bar-fill" style="width: 42%;"></span><span class="bar-bench" style="left: calc(85% - 1px);"></span></div>
+                        <span class="num" style="text-align: right;">42%<span class="sr-only"> of 85% benchmark</span></span>
+                      </div>
+                      <div class="cell-sub num" style="white-space: nowrap;">Day 9 of 30</div>
+                    </td>
+                    <td role="cell"data-label="Open critical errors" class="r num" style="grid-column: 2 / span 2; grid-row: 2; align-self: start;">1</td>
+                    <td role="cell"class="col-actions stack-hide"></td>
+                  </tr>
+
+                  <!-- Luca Moretti · Invited -->
+                  <tr role="row" style="{{rowLuca}}">
+                    <td role="cell"style="grid-column: 1; grid-row: 1;">
+                      <span class="cell-main">Luca Moretti</span>
+                      <div class="cell-sub">Warehouse picker</div>
+                      <div class="cell-sub">luca.moretti@northwind.example</div>
+                    </td>
+                    <td role="cell"style="grid-column: 3; grid-row: 1; align-self: start; justify-self: end; margin-top: -4px; white-space: nowrap;">
+                      <span class="chip chip-dashed"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"></path></svg>Invited</span>
+                      <div class="cell-sub">Invited Nov 2</div>
+                    </td>
+                    <td role="cell"data-label="Progress to benchmark" style="grid-column: 1 / span 2; grid-row: 2;">
+                      <span class="null">Not joined</span>
+                      <div class="cell-sub" style="white-space: nowrap;">Link expires Nov 9</div>
+                    </td>
+                    <td role="cell"class="r num stack-hide"><span class="null" aria-hidden="true">—</span><span class="sr-only">Not joined</span></td>
+                    <td role="cell"class="col-actions" style="grid-column: 3; grid-row: 2; align-self: center; justify-self: end;">
+                      <div class="menu-anchor" style="display: inline-block;">
+                        <button class="icon-btn" type="button" aria-haspopup="menu" aria-expanded="{{lucaMenuExpanded}}" aria-label="More actions for Luca Moretti" onClick="{{toggleLucaMenu}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg></button>
+                        <sc-if value="{{lucaMenuOpen}}" hint-placeholder-val="{{ false }}">
+                          <div class="menu" role="menu" aria-label="Actions for Luca Moretti" style="text-align: left;">
+                            <a class="menu-item" role="menuitem" href="People-InviteLink.dc.html"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><path d="M14 14h3v3h-3zM21 14v.01M14 21h.01M17 21h4v-4"></path></svg>Show invite link</a>
+                            <button class="menu-item" role="menuitem" type="button"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m5.6 5.6 12.8 12.8"></path></svg>Revoke</button>
+                          </div>
+                        </sc-if>
+                      </div>
+                    </td>
+                  </tr>
+
+                  <!-- Sam Whitfield · Invite expired -->
+                  <tr role="row" style="{{rowSam}}">
+                    <td role="cell"style="grid-column: 1; grid-row: 1;">
+                      <span class="cell-main">Sam Whitfield</span>
+                      <div class="cell-sub">Forklift operator</div>
+                      <div class="cell-sub">sam.whitfield@northwind.example</div>
+                    </td>
+                    <td role="cell"style="grid-column: 3; grid-row: 1; align-self: start; justify-self: end; margin-top: -4px; white-space: nowrap;">
+                      <span class="chip chip-muted"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Expired</span>
+                      <div class="cell-sub">Invited Oct 20</div>
+                    </td>
+                    <td role="cell"data-label="Progress to benchmark" style="grid-column: 1 / span 2; grid-row: 2;">
+                      <span class="null">Not joined</span>
+                      <div class="cell-sub" style="white-space: nowrap;">Link expired Oct 27</div>
+                    </td>
+                    <td role="cell"class="r num stack-hide"><span class="null" aria-hidden="true">—</span><span class="sr-only">Not joined</span></td>
+                    <td role="cell"class="col-actions" style="grid-column: 3; grid-row: 2; align-self: center; justify-self: end;">
+                      <div class="menu-anchor opens-up" style="display: inline-block;">
+                        <button class="icon-btn" type="button" aria-haspopup="menu" aria-expanded="{{samMenuExpanded}}" aria-label="More actions for Sam Whitfield" onClick="{{toggleSamMenu}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg></button>
+                        <sc-if value="{{samMenuOpen}}" hint-placeholder-val="{{ false }}">
+                          <div class="menu" role="menu" aria-label="Actions for Sam Whitfield" style="text-align: left;">
+                            <button class="menu-item" role="menuitem" type="button"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"></path></svg>Create new link</button>
+                            <button class="menu-item" role="menuitem" type="button"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>Remove</button>
+                          </div>
+                        </sc-if>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="pager">
+                <p class="t-caption muted num" role="status">{{footText}}</p>
+              </div>
+            </div>
+          </section>
+        </sc-if>
+      </div>
+    </main>
+  </div>
+
+  <!-- ============ DIALOG: invite people ============ -->
+  <sc-if value="{{isInvite}}" hint-placeholder-val="{{ false }}">
+    <div class="overlay">
+      <div class="dialog dialog-wide" role="dialog" aria-modal="true" aria-labelledby="pp-inv-title">
+        <div class="dialog-head">
+          <h2 id="pp-inv-title" class="t-title2">Invite people</h2>
+          <a class="icon-btn" href="People.dc.html" aria-label="Close"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></a>
+        </div>
+        <div class="dialog-body">
+          <fieldset>
+            <legend class="sr-only">Person 1</legend>
+            <div class="field-row" style="grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));">
+              <div class="field">
+                <label class="field-label" for="pp-inv-name-1">Name</label>
+                <input class="input" id="pp-inv-name-1" type="text" autocomplete="off" value="Luca Moretti">
+              </div>
+              <div class="field">
+                <label class="field-label" for="pp-inv-email-1">Email</label>
+                <input class="input" id="pp-inv-email-1" type="email" autocomplete="off" value="luca.moretti@northwind.example">
+              </div>
+              <div class="field">
+                <label class="field-label" for="pp-inv-role-1">Job role</label>
+                <div class="select-wrap">
+                  <select class="select" id="pp-inv-role-1">
+                    <option selected>Warehouse picker</option>
+                    <option>Forklift operator</option>
+                  </select>
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+                </div>
+              </div>
+            </div>
+          </fieldset>
+          <sc-if value="{{hasSecond}}" hint-placeholder-val="{{ false }}">
+            <fieldset style="border-top: 1px solid var(--border); padding-top: 16px;">
+              <legend class="sr-only">Person 2</legend>
+              <div class="field-row" style="grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));">
+                <div class="field">
+                  <label class="field-label" for="pp-inv-name-2">Name</label>
+                  <input class="input" id="pp-inv-name-2" type="text" autocomplete="off">
+                </div>
+                <div class="field">
+                  <label class="field-label" for="pp-inv-email-2">Email</label>
+                  <input class="input" id="pp-inv-email-2" type="email" autocomplete="off">
+                </div>
+                <div class="field">
+                  <label class="field-label" for="pp-inv-role-2">Job role</label>
+                  <div class="select-wrap">
+                    <select class="select" id="pp-inv-role-2">
+                      <option selected>Warehouse picker</option>
+                      <option>Forklift operator</option>
+                    </select>
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+                  </div>
+                </div>
+              </div>
+            </fieldset>
+          </sc-if>
+          <div>
+            <button class="btn btn-ghost" type="button" onClick="{{addPerson}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Add another person</button>
+          </div>
+        </div>
+        <div class="dialog-foot">
+          <a class="btn btn-secondary" href="People.dc.html">Cancel</a>
+          <a class="btn btn-primary" href="People-InviteLink.dc.html">Create invite links</a>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ============ DIALOG: invite link + QR ============
+       Revoke link acts at once and offers Undo in a status line (no confirm step); the QR fades and Copy link turns off while revoked. -->
+  <sc-if value="{{isInviteLink}}" hint-placeholder-val="{{ false }}">
+    <div class="overlay">
+      <div class="dialog dialog-wide" role="dialog" aria-modal="true" aria-labelledby="pp-link-title">
+        <div class="dialog-head">
+          <h2 id="pp-link-title" class="t-title2">Invite link for Luca Moretti</h2>
+          <a class="icon-btn" href="People.dc.html" aria-label="Close"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></a>
+        </div>
+        <div class="dialog-body">
+          <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;">
+            <div class="qr" style="flex: none;">
+              <svg viewBox="0 0 29 29" width="288" height="288" shape-rendering="crispEdges" role="img" aria-label="QR code for Luca Moretti's invite link" style="{{qrStyle}}"><path fill="#000000" d="M0 0h7v1h-7zM8 0h1v1h-1zM11 0h1v1h-1zM15 0h3v1h-3zM19 0h2v1h-2zM22 0h7v1h-7zM0 1h1v1h-1zM6 1h1v1h-1zM8 1h1v1h-1zM10 1h1v1h-1zM14 1h1v1h-1zM17 1h1v1h-1zM22 1h1v1h-1zM28 1h1v1h-1zM0 2h1v1h-1zM2 2h3v1h-3zM6 2h1v1h-1zM8 2h2v1h-2zM11 2h3v1h-3zM15 2h2v1h-2zM18 2h1v1h-1zM20 2h1v1h-1zM22 2h1v1h-1zM24 2h3v1h-3zM28 2h1v1h-1zM0 3h1v1h-1zM2 3h3v1h-3zM6 3h1v1h-1zM9 3h3v1h-3zM15 3h1v1h-1zM17 3h2v1h-2zM20 3h1v1h-1zM22 3h1v1h-1zM24 3h3v1h-3zM28 3h1v1h-1zM0 4h1v1h-1zM2 4h3v1h-3zM6 4h1v1h-1zM8 4h1v1h-1zM10 4h3v1h-3zM14 4h1v1h-1zM18 4h3v1h-3zM22 4h1v1h-1zM24 4h3v1h-3zM28 4h1v1h-1zM0 5h1v1h-1zM6 5h1v1h-1zM8 5h1v1h-1zM11 5h1v1h-1zM16 5h4v1h-4zM22 5h1v1h-1zM28 5h1v1h-1zM0 6h7v1h-7zM8 6h1v1h-1zM10 6h1v1h-1zM12 6h1v1h-1zM14 6h1v1h-1zM16 6h1v1h-1zM18 6h1v1h-1zM20 6h1v1h-1zM22 6h7v1h-7zM8 7h1v1h-1zM11 7h1v1h-1zM17 7h1v1h-1zM19 7h2v1h-2zM0 8h1v1h-1zM4 8h3v1h-3zM8 8h2v1h-2zM11 8h4v1h-4zM16 8h2v1h-2zM19 8h1v1h-1zM21 8h3v1h-3zM1 9h1v1h-1zM3 9h3v1h-3zM7 9h2v1h-2zM10 9h2v1h-2zM15 9h3v1h-3zM20 9h1v1h-1zM22 9h1v1h-1zM25 9h1v1h-1zM1 10h1v1h-1zM6 10h1v1h-1zM9 10h2v1h-2zM13 10h1v1h-1zM18 10h2v1h-2zM22 10h1v1h-1zM24 10h2v1h-2zM27 10h1v1h-1zM0 11h4v1h-4zM7 11h3v1h-3zM11 11h5v1h-5zM18 11h1v1h-1zM22 11h2v1h-2zM25 11h1v1h-1zM27 11h2v1h-2zM0 12h1v1h-1zM3 12h2v1h-2zM6 12h1v1h-1zM10 12h3v1h-3zM15 12h3v1h-3zM23 12h4v1h-4zM2 13h3v1h-3zM9 13h2v1h-2zM12 13h2v1h-2zM16 13h2v1h-2zM19 13h3v1h-3zM25 13h1v1h-1zM2 14h5v1h-5zM10 14h1v1h-1zM15 14h3v1h-3zM19 14h2v1h-2zM22 14h1v1h-1zM24 14h1v1h-1zM27 14h2v1h-2zM5 15h1v1h-1zM7 15h2v1h-2zM13 15h1v1h-1zM15 15h1v1h-1zM17 15h1v1h-1zM23 15h1v1h-1zM25 15h3v1h-3zM1 16h1v1h-1zM3 16h1v1h-1zM5 16h4v1h-4zM10 16h1v1h-1zM15 16h3v1h-3zM19 16h1v1h-1zM23 16h1v1h-1zM27 16h1v1h-1zM0 17h1v1h-1zM2 17h1v1h-1zM4 17h1v1h-1zM10 17h1v1h-1zM13 17h1v1h-1zM15 17h4v1h-4zM28 17h1v1h-1zM1 18h1v1h-1zM4 18h6v1h-6zM15 18h3v1h-3zM22 18h1v1h-1zM26 18h1v1h-1zM28 18h1v1h-1zM0 19h4v1h-4zM5 19h1v1h-1zM8 19h1v1h-1zM10 19h1v1h-1zM12 19h1v1h-1zM21 19h1v1h-1zM23 19h1v1h-1zM26 19h1v1h-1zM0 20h4v1h-4zM6 20h4v1h-4zM11 20h2v1h-2zM14 20h2v1h-2zM18 20h8v1h-8zM8 21h6v1h-6zM15 21h1v1h-1zM17 21h1v1h-1zM19 21h2v1h-2zM24 21h1v1h-1zM27 21h1v1h-1zM0 22h7v1h-7zM8 22h4v1h-4zM14 22h1v1h-1zM18 22h1v1h-1zM20 22h1v1h-1zM22 22h1v1h-1zM24 22h1v1h-1zM26 22h1v1h-1zM28 22h1v1h-1zM0 23h1v1h-1zM6 23h1v1h-1zM8 23h9v1h-9zM18 23h3v1h-3zM24 23h2v1h-2zM28 23h1v1h-1zM0 24h1v1h-1zM2 24h3v1h-3zM6 24h1v1h-1zM8 24h1v1h-1zM10 24h2v1h-2zM13 24h13v1h-13zM28 24h1v1h-1zM0 25h1v1h-1zM2 25h3v1h-3zM6 25h1v1h-1zM9 25h1v1h-1zM11 25h1v1h-1zM21 25h1v1h-1zM23 25h1v1h-1zM26 25h3v1h-3zM0 26h1v1h-1zM2 26h3v1h-3zM6 26h1v1h-1zM8 26h2v1h-2zM11 26h2v1h-2zM15 26h1v1h-1zM18 26h2v1h-2zM21 26h1v1h-1zM26 26h1v1h-1zM28 26h1v1h-1zM0 27h1v1h-1zM6 27h1v1h-1zM8 27h1v1h-1zM11 27h2v1h-2zM14 27h1v1h-1zM18 27h1v1h-1zM20 27h2v1h-2zM26 27h2v1h-2zM0 28h7v1h-7zM8 28h2v1h-2zM12 28h4v1h-4zM18 28h4v1h-4zM23 28h2v1h-2zM26 28h1v1h-1z"></path></svg>
+            </div>
+            <div style="flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+              <div class="field">
+                <label class="field-label" for="pp-link-url">Invite link</label>
+                <input class="input" id="pp-link-url" type="text" readonly value="learnquiz.com/join/nw-7Kq2-mX9p">
+              </div>
+              <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <sc-if value="{{linkLive}}" hint-placeholder-val="{{ true }}">
+                  <button class="btn btn-primary" type="button" onClick="{{copyLink}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"></rect><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"></path></svg>Copy link</button>
+                </sc-if>
+                <sc-if value="{{linkRevoked}}" hint-placeholder-val="{{ false }}">
+                  <button class="btn btn-primary" type="button" aria-disabled="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"></rect><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"></path></svg>Copy link</button>
+                </sc-if>
+                <p class="t-label" role="status">{{copiedText}}</p>
+              </div>
+              <p class="t-caption muted">Joins as Warehouse picker · Expires Nov 9 · Works once</p>
+            </div>
+          </div>
+        </div>
+        <div class="dialog-foot" style="align-items: center;">
+          <div role="status" style="margin-right: auto; display: flex; align-items: center; gap: 4px;">
+            <sc-if value="{{linkLive}}" hint-placeholder-val="{{ true }}">
+              <button class="btn btn-ghost" type="button" onClick="{{revokeLink}}">Revoke link</button>
+            </sc-if>
+            <sc-if value="{{linkRevoked}}" hint-placeholder-val="{{ false }}">
+              <span class="t-label" style="padding-left: 12px;">Link revoked</span>
+              <span class="muted" aria-hidden="true">·</span>
+              <button class="link-btn" type="button" onClick="{{undoRevoke}}">Undo</button>
+            </sc-if>
+          </div>
+          <a class="btn btn-secondary" href="People.dc.html">Done</a>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light"},"state":{"editor":"enum","options":["list","invite","invitelink","empty"],"default":"list"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { filter: null, menu: null, copied: false, second: false, revoked: false };
+  }
+  renderVals() {
+    const s = this.props.state ?? 'list';
+    const st = this.state || {};
+    const isEmpty = s === 'empty';
+    // Luca is the person being invited in the dialog; he joins the list once his link exists.
+    const lucaListed = s !== 'invite';
+    const people = [
+      { key: 'amara', status: 'proficient', listed: true },
+      { key: 'jordan', status: 'active', listed: true },
+      { key: 'luca', status: 'invited', listed: lucaListed },
+      { key: 'sam', status: 'expired', listed: true },
+    ];
+    const f = st.filter || null;
+    const shownBy = (p) => p.listed && (!f || p.status === f);
+    const grid = 'grid-template-columns: minmax(0, 1fr) auto auto;';
+    const row = (k) => {
+      const p = people.find((x) => x.key === k);
+      return shownBy(p) ? grid : grid + ' display: none;';
+    };
+    const listed = people.filter((p) => p.listed).length;
+    const shown = people.filter(shownBy).length;
+    const pick = (key) => () => {
+      const cur = (this.state || {}).filter || null;
+      this.setState({ filter: cur === key ? null : key, menu: null });
+    };
+    const menu = (key) => () => {
+      const cur = (this.state || {}).menu || null;
+      this.setState({ menu: cur === key ? null : key });
+    };
+    const revoked = !!st.revoked;
+    return {
+      theme: this.props.theme ?? 'light',
+      readonly: false,
+      isEmpty,
+      hasPeople: !isEmpty,
+      isInvite: s === 'invite',
+      isInviteLink: s === 'invitelink',
+      rowAmara: row('amara'), rowJordan: row('jordan'), rowLuca: row('luca'), rowSam: row('sam'),
+      countInvited: people.filter((p) => p.listed && p.status === 'invited').length,
+      pressInvited: f === 'invited' ? 'true' : 'false',
+      pressActive: f === 'active' ? 'true' : 'false',
+      pressProficient: f === 'proficient' ? 'true' : 'false',
+      pressExpired: f === 'expired' ? 'true' : 'false',
+      filterInvited: pick('invited'), filterActive: pick('active'), filterProficient: pick('proficient'), filterExpired: pick('expired'),
+      footText: f ? shown + ' of ' + listed + ' people' : listed + ' people',
+      lucaMenuOpen: st.menu === 'luca', lucaMenuExpanded: st.menu === 'luca' ? 'true' : 'false', toggleLucaMenu: menu('luca'),
+      samMenuOpen: st.menu === 'sam', samMenuExpanded: st.menu === 'sam' ? 'true' : 'false', toggleSamMenu: menu('sam'),
+      hasSecond: !!st.second,
+      addPerson: () => this.setState({ second: true }),
+      linkLive: !revoked, linkRevoked: revoked,
+      qrStyle: revoked ? 'display: block; opacity: 0.15;' : 'display: block;',
+      copiedText: st.copied && !revoked ? 'Link copied' : '',
+      copyLink: () => this.setState({ copied: true }),
+      revokeLink: () => this.setState({ revoked: true, copied: false }),
+      undoRevoke: () => this.setState({ revoked: false }),
+    };
+  }
+}
+</script>
+</body>
+</html>

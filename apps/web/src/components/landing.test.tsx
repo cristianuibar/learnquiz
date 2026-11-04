@@ -8,7 +8,6 @@ import { createMemoryHistory, createRootRoute, createRoute, createRouter, Router
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { Route as appRootRoute } from '@/routes/__root'
 import { Route as indexRoute } from '@/routes/index'
-import { Route as meRoute } from '@/routes/me.index'
 import { Route as orgLayoutRoute } from '@/routes/org.$slug'
 import { Route as orgRoute } from '@/routes/org.$slug.index'
 import { Route as rolesRoute } from '@/routes/org.$slug.roles'
@@ -104,7 +103,6 @@ async function renderApp(initialEntry = '/sign-in') {
     createRoute({ getParentRoute: () => rootRoute, path: '/join/$token', component: () => <h1>Join</h1> }),
     createRoute({ getParentRoute: () => rootRoute, path: '/start', validateSearch: startRoute.options.validateSearch, component: startRoute.options.component }),
     createRoute({ getParentRoute: () => rootRoute, path: '/today', beforeLoad: todayRoute.options.beforeLoad, loader: todayRoute.options.loader, errorComponent: todayRoute.options.errorComponent, component: todayRoute.options.component }),
-    createRoute({ getParentRoute: () => rootRoute, path: '/me', beforeLoad: meRoute.options.beforeLoad, loader: meRoute.options.loader, component: meRoute.options.component }),
     orgLayout.addChildren([
       createRoute({ getParentRoute: () => orgLayout, path: '/', loader: orgRoute.options.loader as (ctx: { params: { slug: string } }) => unknown, errorComponent: orgRoute.options.errorComponent, component: orgRoute.options.component }),
       createRoute({ getParentRoute: () => orgLayout, path: '/roles', loader: rolesRoute.options.loader as (ctx: { params: { slug: string } }) => unknown, errorComponent: rolesRoute.options.errorComponent, component: rolesRoute.options.component }),
@@ -139,10 +137,6 @@ it.each([
       await vi.waitFor(() => expect(router.state.location.pathname).toBe(pathname))
     })
     expect(container.querySelector('h1')?.textContent).toBe(heading)
-    if (id === 'employee' || id === 'standalone') {
-      await act(async () => { await router.navigate({ to: '/me' }) })
-      expect(container.querySelectorAll('a[href^="/org/"]')).toHaveLength(0)
-    }
   } finally { await cleanup() }
 })
 
@@ -174,7 +168,7 @@ it('prefills an editable email from the sign-in link and returns to the redirect
   } finally { await cleanup() }
 })
 
-it('lets an owner leave the portal to train, return through Profile and sign out', async () => {
+it('lets an owner leave the portal to train and return to a portal', async () => {
   sqlite.prepare('INSERT INTO org_settings (org_id, company_name, working_hours_json, logo_key, accent) VALUES (?, ?, ?, ?, ?)').run('northwind', 'Northwind', JSON.stringify({ days: [1, 2, 3, 4, 5], start: '09:00', end: '17:00' }), 'northwind-logo', '#543189')
   vi.mocked(getSessionUser).mockResolvedValue({ id: 'owner', name: 'Owner', isAnonymous: false, role: 'admin' } as never)
   const { container, router, cleanup } = await renderApp('/')
@@ -185,20 +179,10 @@ it('lets an owner leave the portal to train, return through Profile and sign out
     await act(async () => { container.querySelector<HTMLAnchorElement>('header a')!.click(); await router.load() })
     expect(router.state.location.pathname).toBe('/start')
     expect(container.querySelector('h1')?.textContent).toBe('What do you want to learn?')
-    await act(async () => { await router.navigate({ to: '/me' }) })
-    expect([...container.querySelectorAll('a[href^="/org/"]')].map((a) => a.textContent)).toEqual(['Northwind portal', 'Contoso portal'])
-    expect(container.querySelector('a[href="/admin"]')?.textContent).toBe('Staff area')
-    await act(async () => { container.querySelector<HTMLAnchorElement>('a[href="/org/contoso"]')!.click(); await router.load() })
-    expect(router.state.location.pathname).toBe('/org/contoso')
+    await act(async () => { await router.navigate({ to: '/org/$slug', params: { slug: 'contoso' } }) })
     expect(container.querySelector('h1')?.textContent).toBe('Contoso')
     await act(async () => { container.querySelector<HTMLAnchorElement>('header a')!.click(); await router.load() })
-    await act(async () => { await router.navigate({ to: '/me' }) })
-    const signOut = [...container.querySelectorAll<HTMLButtonElement>('main button')].find((button) => button.textContent === 'Sign out')!
-    await act(async () => {
-      signOut.click()
-      await vi.waitFor(() => expect(router.state.location.pathname).toBe('/'))
-    })
-    expect(container.querySelector('h1')?.textContent).toBe('Quiz it, until you learn it')
+    expect(router.state.location.pathname).toBe('/start')
   } finally { await cleanup() }
 })
 

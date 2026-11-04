@@ -44,7 +44,8 @@ async function renderStart(initialEntry = '/start') {
   const loading = createRoute({ getParentRoute: () => rootRoute, path: '/play/loading', component: () => <h1>Preparing</h1> })
   const done = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId/done', component: () => <h1>Session done</h1> })
   const me = createRoute({ getParentRoute: () => rootRoute, path: '/me', component: () => <h1>Learner</h1> })
-  const router = createRouter({ routeTree: rootRoute.addChildren([index, start, today, loading, play, done, me]), history: createMemoryHistory({ initialEntries: [initialEntry] }) })
+  const profile = createRoute({ getParentRoute: () => rootRoute, path: '/me/profile', component: () => <h1>Learner</h1> })
+  const router = createRouter({ routeTree: rootRoute.addChildren([index, start, today, loading, play, done, me, profile]), history: createMemoryHistory({ initialEntries: [initialEntry] }) })
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -142,15 +143,15 @@ it('shows the three tabs on Today and moves focus to the page heading on Profile
   try {
     const links = () => [...container.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Main"] a')]
     expect(links().map((link) => link.textContent?.trim())).toEqual(['Today', 'Path', 'Profile'])
-    expect(links().map((link) => link.getAttribute('href'))).toEqual(['/today', '/t/topic-1/path', '/me'])
+    expect(links().map((link) => link.getAttribute('href'))).toEqual(['/today', '/t/topic-1/path', '/me/profile'])
     expect(links()[0].getAttribute('aria-current')).toBe('page')
     expect(links()[2].getAttribute('aria-current')).toBeNull()
     expect(container.querySelector('header')).toBeNull()
     await act(async () => { links()[2].click(); await router.load() })
-    expect(router.state.location.pathname).toBe('/me')
+    expect(router.state.location.pathname).toBe('/me/profile')
     expect(links()[2].getAttribute('aria-current')).toBe('page')
     expect(links()[0].getAttribute('aria-current')).toBeNull()
-    expect(container.querySelector('header')).not.toBeNull()
+    expect(container.querySelector('header')).toBeNull() // Training progress brings its own header
     const h1 = container.querySelector('h1')!
     expect(h1.textContent).toBe('Learner')
     expect(document.activeElement).toBe(h1)

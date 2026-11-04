@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Users · Staff admin</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" style="position: relative;">
+  <div class="app">
+    <dc-import name="StaffNav" active="users" hint-size="248px,900px"></dc-import>
+    <main class="main">
+      <div class="page">
+        <div class="page-head">
+          <div class="page-head-text">
+            <h1 class="t-title1" tabindex="-1">Users</h1>
+          </div>
+        </div>
+
+        <!-- ============ BANNED: confirmation ============ -->
+        <sc-if value="{{isBanned}}" hint-placeholder-val="{{ false }}">
+          <div class="banner" role="status">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m5.6 5.6 12.8 12.8"></path></svg>
+            <p class="banner-text">Theo Marsh is banned.</p>
+            <a class="link-btn" href="Users.dc.html">Undo</a>
+          </div>
+        </sc-if>
+
+        <section class="section" aria-label="User list">
+          <div class="dt-toolbar" role="search">
+            <div class="grow">
+              <label for="us-search" class="sr-only">Search by email or name</label>
+              <span class="input-icon">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+                <input id="us-search" class="input" type="search" placeholder="Search by email or name" autocomplete="off">
+              </span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <label for="us-role" class="t-label">Global role</label>
+              <span class="select-wrap" style="width: 128px;">
+                <select id="us-role" class="select"><option>All</option><option>Admin</option><option>User</option></select>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+              </span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <label for="us-status" class="t-label">Status</label>
+              <span class="select-wrap" style="width: 128px;">
+                <select id="us-status" class="select"><option>All</option><option>Active</option><option>Banned</option></select>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+              </span>
+            </div>
+          </div>
+
+          <div class="dt-wrap">
+            <table class="dt">
+              <caption class="sr-only">Users, newest first</caption>
+              <thead>
+                <tr>
+                  <th scope="col"><button class="th-sort" type="button">Name<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"></path></svg></button></th>
+                  <th scope="col">Global role</th>
+                  <th scope="col">Company</th>
+                  <th scope="col">Status</th>
+                  <th scope="col" aria-sort="descending"><button class="th-sort" type="button">Joined<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 10 5 5 5-5"></path></svg></button></th>
+                  <th scope="col" class="r"><span class="sr-only">Action</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><div class="cell-main">Noor Haddad</div><div class="cell-sub">noor.haddad@tallishotels.com</div></td>
+                  <td>User</td>
+                  <td><div>Tallis Hotels</div><div class="cell-sub">Member</div></td>
+                  <td><span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active</span></td>
+                  <td>Nov 3, 2026</td>
+                  <td class="r"><button class="link-btn" type="button">Ban<span class="sr-only"> Noor Haddad</span></button></td>
+                </tr>
+                <tr>
+                  <td><div class="cell-main">Felix Brandt</div><div class="cell-sub">felix.brandt@lumenretail.com</div></td>
+                  <td>User</td>
+                  <td><div>Lumen Retail Group</div><div class="cell-sub">Member</div></td>
+                  <td><span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active</span></td>
+                  <td>Nov 2, 2026</td>
+                  <td class="r"><button class="link-btn" type="button">Ban<span class="sr-only"> Felix Brandt</span></button></td>
+                </tr>
+                <tr>
+                  <td><div class="cell-main">Sofia Lindqvist</div><div class="cell-sub">sofia.lindqvist@brightwaterpack.com</div></td>
+                  <td>User</td>
+                  <td><div>Brightwater Packaging</div><div class="cell-sub">Member</div></td>
+                  <td><span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active</span></td>
+                  <td>Nov 1, 2026</td>
+                  <td class="r"><button class="link-btn" type="button">Ban<span class="sr-only"> Sofia Lindqvist</span></button></td>
+                </tr>
+                <tr>
+                  <td><div class="cell-main">Hannah Osei</div><div class="cell-sub">hannah@orchardlanebakeries.com</div></td>
+                  <td>User</td>
+                  <td><div>Orchard Lane Bakeries</div><div class="cell-sub">Owner</div></td>
+                  <td><span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active</span></td>
+                  <td>Oct 31, 2026</td>
+                  <td class="r"><button class="link-btn" type="button">Ban<span class="sr-only"> Hannah Osei</span></button></td>
+                </tr>
+                <tr>
+                  <td><div class="cell-main">Diego Alvarez</div><div class="cell-sub">diego@orchardlanebakeries.com</div></td>
+                  <td>User</td>
+                  <td><div>Orchard Lane Bakeries</div><div class="cell-sub">Member</div></td>
+                  <td><span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active</span></td>
+                  <td>Oct 31, 2026</td>
+                  <td class="r"><button class="link-btn" type="button">Ban<span class="sr-only"> Diego Alvarez</span></button></td>
+                </tr>
+                <tr aria-selected="{{theoSelected}}">
+                  <td><div class="cell-main">Theo Marsh</div><div class="cell-sub">theo.marsh@kestrelcouriers.com</div></td>
+                  <td>User</td>
+                  <td><div>Kestrel Couriers</div><div class="cell-sub">Member</div></td>
+                  <td>
+                    <sc-if value="{{theoActive}}" hint-placeholder-val="{{ true }}">
+                      <span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active</span>
+                    </sc-if>
+                    <sc-if value="{{isBanned}}" hint-placeholder-val="{{ false }}">
+                      <span class="chip chip-strong"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m5.6 5.6 12.8 12.8"></path></svg>Banned</span>
+                      <div class="cell-sub" style="margin-top: 4px;">Scripted answers: 1,140 in 40 minutes</div>
+                    </sc-if>
+                  </td>
+                  <td>Oct 30, 2026</td>
+                  <td class="r">
+                    <sc-if value="{{theoActive}}" hint-placeholder-val="{{ true }}">
+                      <a class="link-btn" href="Users-Ban.dc.html">Ban<span class="sr-only"> Theo Marsh</span></a>
+                    </sc-if>
+                    <sc-if value="{{isBanned}}" hint-placeholder-val="{{ false }}">
+                      <a class="link-btn" href="Users.dc.html">Unban<span class="sr-only"> Theo Marsh</span></a>
+                    </sc-if>
+                  </td>
+                </tr>
+                <tr>
+                  <td><div class="cell-main">Leah Kowalski</div><div class="cell-sub">leah.kowalski@corvidfreight.com</div></td>
+                  <td>User</td>
+                  <td><div>Corvid Freight</div><div class="cell-sub">Member</div></td>
+                  <td><span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active</span></td>
+                  <td>Oct 29, 2026</td>
+                  <td class="r"><button class="link-btn" type="button">Ban<span class="sr-only"> Leah Kowalski</span></button></td>
+                </tr>
+                <tr>
+                  <td><div class="cell-main">Kai Brennan</div><div class="cell-sub">kai.brennan@corvidfreight.com</div></td>
+                  <td>User</td>
+                  <td><div>Corvid Freight</div><div class="cell-sub">Member</div></td>
+                  <td>
+                    <span class="chip chip-strong"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m5.6 5.6 12.8 12.8"></path></svg>Banned</span>
+                    <div class="cell-sub" style="margin-top: 4px;">Shared one account across 6 people</div>
+                  </td>
+                  <td>Oct 28, 2026</td>
+                  <td class="r"><button class="link-btn" type="button">Unban<span class="sr-only"> Kai Brennan</span></button></td>
+                </tr>
+                <tr>
+                  <td><div class="cell-main">Ravi Menon</div><div class="cell-sub">ravi.menon@kestrelcouriers.com</div></td>
+                  <td>User</td>
+                  <td><div>Kestrel Couriers</div><div class="cell-sub">Member</div></td>
+                  <td><span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active</span></td>
+                  <td>Oct 27, 2026</td>
+                  <td class="r"><button class="link-btn" type="button">Ban<span class="sr-only"> Ravi Menon</span></button></td>
+                </tr>
+                <tr>
+                  <td><div class="cell-main">Jordan Reyes</div><div class="cell-sub">jordan.reyes@northwind.example</div></td>
+                  <td>User</td>
+                  <td><div>Northwind Logistics</div><div class="cell-sub">Member</div></td>
+                  <td><span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active</span></td>
+                  <td>Oct 26, 2026</td>
+                  <td class="r"><button class="link-btn" type="button">Ban<span class="sr-only"> Jordan Reyes</span></button></td>
+                </tr>
+                <tr>
+                  <td><div class="cell-main">Chloe Martin</div><div class="cell-sub">chloe.martin@lumenretail.com</div></td>
+                  <td>User</td>
+                  <td><div>Lumen Retail Group</div><div class="cell-sub">Member</div></td>
+                  <td><span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active</span></td>
+                  <td>Oct 24, 2026</td>
+                  <td class="r"><button class="link-btn" type="button">Ban<span class="sr-only"> Chloe Martin</span></button></td>
+                </tr>
+                <tr>
+                  <td><div class="cell-main">Ben Adeyemi</div><div class="cell-sub">ben.adeyemi@bluefieldfoods.com</div></td>
+                  <td>User</td>
+                  <td><div>Bluefield Foods</div><div class="cell-sub">Member</div></td>
+                  <td><span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active</span></td>
+                  <td>Oct 22, 2026</td>
+                  <td class="r"><button class="link-btn" type="button">Ban<span class="sr-only"> Ben Adeyemi</span></button></td>
+                </tr>
+                <tr>
+                  <td><div class="cell-main">Tomás Rivera</div><div class="cell-sub">tomas.rivera@bluefieldfoods.com</div></td>
+                  <td>User</td>
+                  <td><div>Bluefield Foods</div><div class="cell-sub">Member</div></td>
+                  <td><span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active</span></td>
+                  <td>Oct 20, 2026</td>
+                  <td class="r"><button class="link-btn" type="button">Ban<span class="sr-only"> Tomás Rivera</span></button></td>
+                </tr>
+                <tr>
+                  <td><div class="cell-main">Mei Tanaka</div><div class="cell-sub">mei.tanaka@lumenretail.com</div></td>
+                  <td>User</td>
+                  <td><div>Lumen Retail Group</div><div class="cell-sub">Member</div></td>
+                  <td><span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active</span></td>
+                  <td>Oct 17, 2026</td>
+                  <td class="r"><button class="link-btn" type="button">Ban<span class="sr-only"> Mei Tanaka</span></button></td>
+                </tr>
+                <tr>
+                  <td><div class="cell-main">Owen Pryce</div><div class="cell-sub">owen.pryce@tallishotels.com</div></td>
+                  <td>User</td>
+                  <td><div>Tallis Hotels</div><div class="cell-sub">Member</div></td>
+                  <td><span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active</span></td>
+                  <td>Oct 15, 2026</td>
+                  <td class="r"><button class="link-btn" type="button">Ban<span class="sr-only"> Owen Pryce</span></button></td>
+                </tr>
+                <tr>
+                  <td><div class="cell-main">Isla Fraser</div><div class="cell-sub">isla.fraser@brightwaterpack.com</div></td>
+                  <td>User</td>
+                  <td><div>Brightwater Packaging</div><div class="cell-sub">Admin</div></td>
+                  <td><span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active</span></td>
+                  <td>Oct 13, 2026</td>
+                  <td class="r"><button class="link-btn" type="button">Ban<span class="sr-only"> Isla Fraser</span></button></td>
+                </tr>
+                <tr>
+                  <td><div class="cell-main">Rhys Calder</div><div class="cell-sub">rhys.calder@lumenretail.com</div></td>
+                  <td>User</td>
+                  <td><div>Lumen Retail Group</div><div class="cell-sub">Admin</div></td>
+                  <td><span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active</span></td>
+                  <td>Oct 10, 2026</td>
+                  <td class="r"><button class="link-btn" type="button">Ban<span class="sr-only"> Rhys Calder</span></button></td>
+                </tr>
+                <tr>
+                  <td><div class="cell-main">Marta Silva</div><div class="cell-sub">marta.silva@kestrelcouriers.com</div></td>
+                  <td>User</td>
+                  <td><div>Kestrel Couriers</div><div class="cell-sub">Member</div></td>
+                  <td><span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active</span></td>
+                  <td>Oct 8, 2026</td>
+                  <td class="r"><button class="link-btn" type="button">Ban<span class="sr-only"> Marta Silva</span></button></td>
+                </tr>
+                <tr>
+                  <td><div class="cell-main">Jonas Weber</div><div class="cell-sub">jonas.weber@corvidfreight.com</div></td>
+                  <td>User</td>
+                  <td><div>Corvid Freight</div><div class="cell-sub">Member</div></td>
+                  <td><span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active</span></td>
+                  <td>Oct 6, 2026</td>
+                  <td class="r"><button class="link-btn" type="button">Ban<span class="sr-only"> Jonas Weber</span></button></td>
+                </tr>
+                <tr>
+                  <td><div class="cell-main">Grace Holloway</div><div class="cell-sub">grace.holloway@tallishotels.com</div></td>
+                  <td>User</td>
+                  <td><div>Tallis Hotels</div><div class="cell-sub">Admin</div></td>
+                  <td><span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active</span></td>
+                  <td>Oct 3, 2026</td>
+                  <td class="r"><button class="link-btn" type="button">Ban<span class="sr-only"> Grace Holloway</span></button></td>
+                </tr>
+                <tr>
+                  <td><div class="cell-main">Amara Okafor</div><div class="cell-sub">amara.okafor@northwind.example</div></td>
+                  <td>User</td>
+                  <td><div>Northwind Logistics</div><div class="cell-sub">Member</div></td>
+                  <td><span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active</span></td>
+                  <td>Oct 1, 2026</td>
+                  <td class="r"><button class="link-btn" type="button">Ban<span class="sr-only"> Amara Okafor</span></button></td>
+                </tr>
+                <tr>
+                  <td><div class="cell-main">Marcus Lee</div><div class="cell-sub">marcus.lee@northwind.example</div></td>
+                  <td>User</td>
+                  <td><div>Northwind Logistics</div><div class="cell-sub">Admin</div></td>
+                  <td><span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active</span></td>
+                  <td>Sep 30, 2026</td>
+                  <td class="r"><button class="link-btn" type="button">Ban<span class="sr-only"> Marcus Lee</span></button></td>
+                </tr>
+                <tr>
+                  <td><div class="cell-main">Dana Whitaker</div><div class="cell-sub">dana.whitaker@northwind.example</div></td>
+                  <td>User</td>
+                  <td><div>Northwind Logistics</div><div class="cell-sub">Owner</div></td>
+                  <td><span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active</span></td>
+                  <td>Sep 29, 2026</td>
+                  <td class="r"><button class="link-btn" type="button">Ban<span class="sr-only"> Dana Whitaker</span></button></td>
+                </tr>
+                <tr>
+                  <td><div class="cell-main">Mihai Ionescu</div><div class="cell-sub">mihai@learnquiz.com</div></td>
+                  <td><span class="tag">Admin</span></td>
+                  <td><span class="null" aria-hidden="true">—</span><span class="sr-only">No company</span></td>
+                  <td><span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active</span></td>
+                  <td>Sep 28, 2026</td>
+                  <td class="r"><button class="link-btn" type="button">Ban<span class="sr-only"> Mihai Ionescu</span></button></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div style="display: flex; align-items: center; gap: 8px;"><span class="cell-main">Ana Popescu</span><span class="tag">You</span></div>
+                    <div class="cell-sub">ana@learnquiz.com</div>
+                  </td>
+                  <td><span class="tag">Admin</span></td>
+                  <td><span class="null" aria-hidden="true">—</span><span class="sr-only">No company</span></td>
+                  <td><span class="chip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"></circle></svg>Active</span></td>
+                  <td>Sep 28, 2026</td>
+                  <td class="r"><span class="null" aria-hidden="true">—</span><span class="sr-only">No action</span></td>
+                </tr>
+              </tbody>
+            </table>
+            <nav class="pager" aria-label="Pages">
+              <p class="t-caption muted num">1–25 of 214 users</p>
+              <div class="pager-btns">
+                <button class="btn btn-secondary" type="button" disabled><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg>Previous</button>
+                <button class="btn btn-secondary" type="button">Next<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button>
+              </div>
+            </nav>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- ============ BAN: confirmation dialog ============ -->
+  <!-- On open, initial focus goes to the Reason field. Escape and Cancel close it and return focus to Theo Marsh's Ban button. -->
+  <sc-if value="{{isBan}}" hint-placeholder-val="{{ false }}">
+    <div class="overlay">
+      <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="us-ban-title" aria-describedby="us-ban-who us-ban-cons">
+        <div class="dialog-head">
+          <h2 id="us-ban-title" class="t-title2">Ban Theo Marsh?</h2>
+          <a class="icon-btn" href="Users.dc.html" aria-label="Close"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></a>
+        </div>
+        <div class="dialog-body">
+          <p id="us-ban-who" class="t-body muted">theo.marsh@kestrelcouriers.com · Kestrel Couriers · Member</p>
+          <div class="field">
+            <label for="us-reason" class="field-label">Reason</label>
+            <textarea id="us-reason" class="textarea" required aria-describedby="us-reason-meta">Scripted answers: 1,140 in 40 minutes</textarea>
+            <p id="us-reason-meta" class="field-meta">Only Learn Quiz staff see this.</p>
+          </div>
+          <ul id="us-ban-cons" class="consequences">
+            <li><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H4"></path></svg><span>They're signed out on every device and can't sign in.</span></li>
+            <li><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"></path></svg><span>Their training records stay. Unban restores access.</span></li>
+          </ul>
+        </div>
+        <div class="dialog-foot">
+          <a class="btn btn-secondary" href="Users.dc.html">Cancel</a>
+          <a class="btn btn-danger" href="Users-Banned.dc.html">Ban user</a>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light"},"state":{"editor":"enum","options":["list","ban","banned"],"default":"list"},"$preview":{"width":1440,"height":1950}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.props.state ?? 'list';
+    return {
+      theme: this.props.theme ?? 'light',
+      isBan: s === 'ban',
+      isBanned: s === 'banned',
+      theoActive: s !== 'banned',
+      theoSelected: s === 'ban' ? 'true' : undefined,
+    };
+  }
+}
+</script>
+</body>
+</html>

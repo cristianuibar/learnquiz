@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Role not found · Northwind Logistics</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" style="position: relative;">
+  <div class="app">
+    <dc-import name="PortalNav" active="none" readonly="false" hint-size="248px,900px"></dc-import>
+    <main class="main">
+      <div class="page page-capped">
+        <section aria-labelledby="nf-title" style="display: flex; flex-direction: column; gap: 24px; max-width: 560px;">
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <h1 id="nf-title" class="t-title1" tabindex="-1">Role not found</h1>
+            <p class="t-body-lg muted">The link may be wrong, or the role was renamed.</p>
+          </div>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <a class="btn btn-primary" href="Overview.dc.html">Go to Overview</a>
+            <a class="btn btn-secondary" href="Roles.dc.html">View roles</a>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light"},"state":{"editor":"enum","options":["default"],"default":"default"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      theme: this.props.theme ?? 'light',
+    };
+  }
+}
+</script>
+</body>
+</html>

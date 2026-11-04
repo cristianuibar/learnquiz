@@ -8,18 +8,19 @@ export function Segment({ label, accessibilityLabel = label, selected, radio, on
   label: string; accessibilityLabel?: string; selected: boolean; radio?: boolean; onPress(): void
 }) {
   const { colors, space, radius, sizes, typography } = useTheme()
+  // The check and its gap are part of a selected option's width, so it shows at every font scale (#669).
   const { fontScale } = useWindowDimensions()
   const [focused, setFocused] = useState(false)
   return (
     <Pressable accessible focusable accessibilityRole={radio ? 'radio' : 'togglebutton'} accessibilityLabel={accessibilityLabel}
       accessibilityState={{ checked: selected }}
       onPress={onPress} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-      style={{ flexGrow: 1, flexBasis: 'auto', flexShrink: 0, minWidth: Math.max(sizes.target, label.length * typography.label.fontSize * fontScale + space[4]), minHeight: sizes.target, borderWidth: 2,
+      style={{ flexGrow: 1, flexBasis: 'auto', flexShrink: 0, minWidth: Math.max(sizes.target, label.length * typography.label.fontSize * fontScale + space[4] + (selected ? space[4] + space[1] : 0)), minHeight: sizes.target, borderWidth: 2,
         borderColor: selected ? colors.brand : colors.borderStrong, borderRadius: radius.md,
         backgroundColor: selected ? colors.brandTint : colors.surfaceCard, paddingHorizontal: space[1], paddingVertical: space[2],
         flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'center', justifyContent: 'center', gap: space[1],
         outlineWidth: focused ? 2 : 0, outlineColor: colors.brand, outlineOffset: 2 }}>
-      {selected && fontScale < 1.5 && <Check size={space[4]} color={colors.ink} accessible={false} />}
+      {selected && <Check size={space[4]} color={colors.ink} accessible={false} />}
       <Text variant="label" importantForAccessibility="no" style={{ flexShrink: 0 }}>{label}</Text>
     </Pressable>
   )

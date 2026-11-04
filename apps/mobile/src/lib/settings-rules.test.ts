@@ -40,3 +40,8 @@ test.each([
 test('learners without a company use their device timezone instead of the GET default', () => {
   expect(pushPreferencesBody(prefs, null, 'America/Los_Angeles')).toEqual({ ...prefs, timezone: 'America/Los_Angeles' })
 })
+test('an empty effective days list is left out of the PUT so the server keeps the saved days (#669)', () => {
+  const body = pushPreferencesBody({ ...prefs, days: [], paused: true }, company, 'UTC')
+  expect(body).not.toHaveProperty('days')
+  expect(body).toEqual({ paused: true, startMinute: 420, endMinute: 930, timezone: 'UTC' })
+})

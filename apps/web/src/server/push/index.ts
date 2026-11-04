@@ -94,7 +94,10 @@ export const savePushPreferences = createServerFn({ method: 'POST' }).validator(
     if (data.startMinute < window.startMinute || data.endMinute > window.endMinute || data.endMinute - data.startMinute < 30) {
       throw httpError(`Choose hours inside ${formatMinute(window.startMinute)}–${formatMinute(window.endMinute)}`, 400)
     }
-    if (days && (!days.length || new Set(days).size !== days.length || days.some((day) => !window.days.includes(day)))) {
+    // An empty list is the no-day window echoed back after the company dropped all the learner's days: keep the saved days.
+    const [saved] = days?.length === 0 ? await db.select({ days: pushPrefs.days }).from(pushPrefs).where(eq(pushPrefs.userId, user.id)) : []
+    if (saved?.days && !saved.days.some((day) => window.days.includes(day))) stored = undefined
+    else if (days && (!days.length || new Set(days).size !== days.length || days.some((day) => !window.days.includes(day)))) {
       throw httpError(`Choose days inside ${where}`, 400)
     }
     timezone = window.timezone

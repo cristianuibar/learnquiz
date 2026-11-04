@@ -409,6 +409,10 @@ it('lets company members pick hours and days inside the company window and rejec
   after = await getPushSettings()
   expect(after.prefs.days).toEqual([])
   expect(after.schedule.window).toEqual({ startMinute: 600, endMinute: 930, days: [], timezone: 'Europe/Bucharest', source: 'learner' })
+  // The empty days come back on pause and hour saves, which keep the saved days.
+  await savePushPreferences({ data: { ...after.prefs, paused: true } })
+  await savePushPreferences({ data: { ...after.prefs, startMinute: 660 } })
+  expect(rows('SELECT paused, start_minute, days_json FROM push_prefs')).toEqual([{ paused: 0, start_minute: 660, days_json: '[1,3]' }])
   // Every company day on goes back to following the company's days.
   await savePushPreferences({ data: { ...base, days: [2, 4, 5] } })
   expect(rows('SELECT days_json FROM push_prefs')).toEqual([{ days_json: null }])

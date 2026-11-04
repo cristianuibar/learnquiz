@@ -11,7 +11,6 @@ import { Route as orgRoute } from '@/routes/org.$slug'
 import { Route as personRoute } from '@/routes/org.$slug.people_.$id'
 import { getProfile } from '@/server/profile'
 import { getSessionFn } from '@/server/session-fn'
-import { getPushSettings } from '@/server/push'
 import { getToday } from '@/server/today'
 import { authClient } from '@/lib/auth-client'
 
@@ -21,10 +20,6 @@ vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => null }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
 vi.mock('@/server/today', () => ({ getToday: vi.fn() }))
-vi.mock('@/server/push', () => ({
-  getPushSettings: vi.fn(),
-  subscribe: vi.fn(), unsubscribe: vi.fn(), sendTestPush: vi.fn(), savePushPreferences: vi.fn(),
-}))
 
 function mockProfile() {
   const day = 86_400_000
@@ -40,10 +35,7 @@ function mockProfile() {
   })
 }
 
-it.each(['user', 'admin'])('opens training progress for %s, preserves staff access, and redirects signed-out visitors', async (role) => {
-  vi.mocked(getPushSettings).mockResolvedValue({ publicKey: null, isStaff: role === 'admin', endpoints: [], canPrompt: false,
-    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC', days: [1, 2, 3, 4, 5] }, company: null,
-    schedule: { window: { startMinute: 540, endMinute: 1020, days: [1, 2, 3, 4, 5], timezone: 'UTC', source: 'default' }, dailyCap: 3, steadyCap: 3, phase: 'steady', preview: null } })
+it.each(['user', 'admin'])('sends %s accounts from /me to training progress with a Settings link, and redirects signed-out visitors', async (role) => {
   mockProfile()
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   let user: { id: string; name: string; isAnonymous: boolean; role: string } | null = { id: 'learner', name: 'Learner', isAnonymous: false, role }
@@ -52,23 +44,17 @@ it.each(['user', 'admin'])('opens training progress for %s, preserves staff acce
   const me = createRoute({ getParentRoute: () => rootRoute, path: '/me', beforeLoad: meRoute.options.beforeLoad, loader: meRoute.options.loader, component: meRoute.options.component })
   const profile = createRoute({ getParentRoute: () => rootRoute, path: '/me/profile', beforeLoad: profileRoute.options.beforeLoad, loader: profileRoute.options.loader, component: profileRoute.options.component })
   const index = createRoute({ getParentRoute: () => rootRoute, path: '/', component: () => <h1>Home</h1> })
-  const router = createRouter({ routeTree: rootRoute.addChildren([me, profile, index]), history: createMemoryHistory({ initialEntries: ['/me'] }) })
+  const settings = createRoute({ getParentRoute: () => rootRoute, path: '/me/settings', component: () => <h1>Settings</h1> })
+  const router = createRouter({ routeTree: rootRoute.addChildren([me, profile, settings, index]), history: createMemoryHistory({ initialEntries: ['/me'] }) })
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
   try {
     await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
-    expect(container.querySelector('#push-heading')?.textContent).toBe('Notifications')
-    const staffLink = [...container.querySelectorAll('a')].find((a) => a.textContent === 'Staff area')
-    expect(staffLink?.getAttribute('href')).toBe(role === 'admin' ? '/admin' : undefined)
-    const portalLink = [...container.querySelectorAll('a')].find((a) => a.textContent === 'Acme portal')
-    expect(portalLink?.getAttribute('href')).toBe('/org/acme')
-    await act(async () => {
-      const link = [...container.querySelectorAll('a')].find((a) => a.textContent === 'Training progress')!
-      expect(link.getAttribute('href')).toBe('/me/profile')
-      link.click()
-      await vi.waitFor(() => expect(container.querySelector('h1')?.textContent).toBe('Training progress'))
-    })
+    // Accounts never see the old /me page: it redirects to Training progress.
+    expect(router.state.location.pathname).toBe('/me/profile')
+    expect(container.querySelector('h1')?.textContent).toBe('Training progress')
+    expect([...container.querySelectorAll('a')].find((a) => a.getAttribute('aria-label') === 'Settings')?.getAttribute('href')).toBe('/me/settings')
     expect([...container.querySelectorAll('h2')].map((h) => h.textContent)).toEqual(['Role mastery', 'Weekly trend', 'By unit', 'Critical steps to recheck'])
     expect(container.textContent).toContain('Dana Learner')
     expect(container.textContent).toContain('Projected: Nov 10')
@@ -140,7 +126,6 @@ it('shows a company admin the member’s Training progress read-only and refuses
 
 it('shows a guest their topic progress and reaches sign-up in one tap', async () => {
   vi.mocked(getToday).mockResolvedValue({ topic: { id: 't1', title: 'Spanish verbs', placed: true, placeable: true, due: 0, xp: 120, streak: 3 }, role: null, plan: null } as Awaited<ReturnType<typeof getToday>>)
-  vi.mocked(getPushSettings).mockClear()
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'guest', name: 'Anonymous', isAnonymous: true, role: 'user' }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] })
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
@@ -155,7 +140,6 @@ it('shows a guest their topic progress and reaches sign-up in one tap', async ()
     expect(container.querySelector('h1')?.textContent).toBe('Guest')
     expect(container.textContent).toContain('Spanish verbs')
     expect(container.textContent).toContain('Streak 3 · 120 XP')
-    expect(getPushSettings).not.toHaveBeenCalled()
     expect([...container.querySelectorAll('button')].some((b) => b.textContent === 'Sign out')).toBe(false)
     await act(async () => {
       const link = [...container.querySelectorAll('a')].find((a) => a.textContent === 'Save your progress')!

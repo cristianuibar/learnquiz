@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Create your company · Learn Quiz</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="lq" data-theme="{{theme}}" style="position: relative; display: flex; flex-direction: column;">
+  <header style="display: flex; align-items: center; gap: 8px; min-height: 72px; padding: 0 32px;">
+    <svg viewBox="0 0 64 64" width="24" height="24" aria-hidden="true"><mask id="lqm-cc" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="#fff"></rect><circle cx="48" cy="48" r="13"></circle></mask><circle cx="32" cy="32" r="19" fill="none" stroke="var(--brand)" stroke-width="14" mask="url(#lqm-cc)"></circle><circle cx="48" cy="48" r="9" fill="#F2A900"></circle></svg>
+    <span class="t-label">Learn Quiz</span>
+  </header>
+
+  <main style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 16px; padding: 120px 16px 96px;">
+    <section class="card" aria-labelledby="cc-title" style="width: 100%; max-width: 480px;">
+      <form style="display: flex; flex-direction: column; gap: 24px; padding: 32px;">
+        <h1 id="cc-title" class="t-title1" tabindex="-1">Create your company</h1>
+
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          <div class="field">
+            <label class="field-label" for="cc-name">Company name</label>
+            <input class="input" id="cc-name" name="company" type="text" value="Northwind Logistics" autocomplete="organization">
+          </div>
+          <div class="field">
+            <label class="field-label" for="cc-role">First job role</label>
+            <input class="input" id="cc-role" name="role" type="text" value="Warehouse picker" autocomplete="off">
+          </div>
+        </div>
+
+        <sc-if value="{{isError}}" hint-placeholder-val="{{ false }}">
+          <div class="banner banner-alert" role="alert">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5h.01"></path></svg>
+            <p class="banner-text"><strong>Couldn't create the company.</strong> The connection dropped before it saved. Your entries are still here.</p>
+          </div>
+        </sc-if>
+
+        <!-- Build: this is <button type="submit"> on the form; an <a> here only so the canvas flow can click through. -->
+        <a class="btn btn-accent btn-block" href="Overview-Empty.dc.html">Create company</a>
+      </form>
+    </section>
+
+    <p class="t-caption muted" style="display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; text-align: center;">
+      <span>Signed in as dana.whitaker@northwind.example</span>
+      <button class="link-btn" type="button">Sign out</button>
+    </p>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light"},"state":{"editor":"enum","options":["default","error"],"default":"default"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.props.state ?? 'default';
+    return {
+      theme: this.props.theme ?? 'light',
+      isError: s === 'error',
+    };
+  }
+}
+</script>
+</body>
+</html>

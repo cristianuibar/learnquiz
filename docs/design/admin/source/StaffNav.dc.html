@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Staff admin navigation</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div style="display: contents">
+  <nav class="sidenav" aria-label="Staff admin">
+    <div class="nav-org">
+      <svg viewBox="0 0 64 64" width="32" height="32" aria-hidden="true"><mask id="lqm-snav" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="#fff"></rect><circle cx="48" cy="48" r="13"></circle></mask><circle cx="32" cy="32" r="19" fill="none" stroke="var(--brand)" stroke-width="14" mask="url(#lqm-snav)"></circle><circle cx="48" cy="48" r="9" fill="#F2A900"></circle></svg>
+      <div style="display: flex; flex-direction: column;">
+        <span class="nav-org-name">Learn Quiz</span>
+        <span class="t-caption muted">Staff admin</span>
+      </div>
+    </div>
+    <ul class="nav-list">
+      <li><a class="nav-item" href="Companies.dc.html" aria-current="{{cCompanies}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="1"></rect><path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1M10 21v-3h4v3"></path></svg>Companies</a></li>
+      <li><a class="nav-item" href="Users.dc.html" aria-current="{{cUsers}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg>Users</a></li>
+      <li><a class="nav-item" href="ModelUsage.dc.html" aria-current="{{cUsage}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V4M4 20h16M8 16v-4M12 16V8M16 16v-6"></path></svg>Model usage</a></li>
+      <li><a class="nav-item" href="Jobs.dc.html" aria-current="{{cJobs}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5z"></path><path d="m3 13 9 5 9-5"></path></svg>Generation jobs<sc-if value="{{hasFailed}}" hint-placeholder-val="{{ true }}"><span class="nav-count">{{failed}}<span class="sr-only"> failed</span></span></sc-if></a></li>
+      <li><a class="nav-item" href="Flags.dc.html" aria-current="{{cFlags}}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>Content flags</a></li>
+    </ul>
+    <div class="nav-foot">
+      <div class="nav-user">
+        <span class="avatar" aria-hidden="true">AP</span>
+        <div style="display: flex; flex-direction: column; min-width: 0; flex: 1;">
+          <span class="t-label">Ana Popescu</span>
+          <span class="t-caption muted">Staff</span>
+        </div>
+        <button class="icon-btn" type="button" aria-label="Sign out"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H4"></path></svg></button>
+      </div>
+    </div>
+  </nav>
+  <header class="topbar">
+    <div class="nav-org">
+      <svg viewBox="0 0 64 64" width="28" height="28" aria-hidden="true"><mask id="lqm-snav2" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="#fff"></rect><circle cx="48" cy="48" r="13"></circle></mask><circle cx="32" cy="32" r="19" fill="none" stroke="var(--brand)" stroke-width="14" mask="url(#lqm-snav2)"></circle><circle cx="48" cy="48" r="9" fill="#F2A900"></circle></svg>
+      <span class="nav-org-name">Learn Quiz staff</span>
+    </div>
+    <button class="icon-btn" type="button" aria-label="Menu" aria-expanded="false" aria-controls="staff-menu"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"></path></svg></button>
+  </header>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"active":{"editor":"enum","options":["companies","users","usage","jobs","flags"],"default":"companies"},"failed":{"editor":"int","default":3},"$preview":{"width":248,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const a = this.props.active ?? 'companies';
+    const cur = (k) => (a === k ? 'page' : undefined);
+    const failed = Number(this.props.failed ?? 3);
+    return { failed, hasFailed: failed > 0, cCompanies: cur('companies'), cUsers: cur('users'), cUsage: cur('usage'), cJobs: cur('jobs'), cFlags: cur('flags') };
+  }
+}
+</script>
+</body>
+</html>
