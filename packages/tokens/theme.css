@@ -22,6 +22,9 @@
   --color-feedback-learning-tint: var(--feedback-learning-tint);
   --color-on-feedback: var(--on-feedback);
   --color-scrim: var(--scrim);
+  --color-surface-inverse: var(--surface-inverse);
+  --color-on-inverse: var(--on-inverse);
+  --color-row-hover: var(--row-hover);
   --color-os-ground: var(--os-ground);
   --color-os-card: var(--os-card);
   --color-os-ink: var(--os-ink);
@@ -118,6 +121,9 @@
   --feedback-learning-tint: #FAF0DF;
   --on-feedback: #FFFFFF;
   --scrim: rgba(20,24,31,0.48);
+  --surface-inverse: #14181F;
+  --on-inverse: #F7F6F2;
+  --row-hover: #F7F6F2;
   --os-ground: #1A1C1F;
   --os-card: #2B2E33;
   --os-ink: #F1F2F4;
@@ -159,6 +165,9 @@
     --feedback-learning-tint: #2C2112;
     --on-feedback: #121417;
     --scrim: rgba(0,0,0,0.6);
+    --surface-inverse: #ECEEF1;
+    --on-inverse: #121417;
+    --row-hover: #20252B;
     --os-ground: #1A1C1F;
     --os-card: #2B2E33;
     --os-ink: #F1F2F4;
@@ -192,6 +201,9 @@
   --feedback-learning-tint: #2C2112;
   --on-feedback: #121417;
   --scrim: rgba(0,0,0,0.6);
+  --surface-inverse: #ECEEF1;
+  --on-inverse: #121417;
+  --row-hover: #20252B;
   --os-ground: #1A1C1F;
   --os-card: #2B2E33;
   --os-ink: #F1F2F4;
