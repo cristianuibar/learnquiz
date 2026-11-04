@@ -184,3 +184,23 @@ it('keeps the user on Settings and says why when sign-out fails', async () => {
     expect(router.state.location.pathname).toBe('/me/settings')
   }
 })
+
+// Each row: saved hours, the clamped hours shown, then From/To picks inside the company window.
+it.each([
+  ['both after', 1140, 1260, ['1050', '1080'], [['#settings-from', '600'], ['#settings-to', '900']]],
+  ['both before', 240, 300, ['360', '390'], [['#settings-to', '900'], ['#settings-from', '600']]],
+  ['under 30 minutes inside', 360, 375, ['360', '390'], [['#settings-to', '900'], ['#settings-from', '600']]],
+] as const)('saves From and To when saved hours fall %s the company window', async (_name, startMinute, endMinute, shown, picks) => {
+  // Mirrors savePushPreferences, which refuses hours outside the company window.
+  vi.mocked(savePushPreferences).mockImplementation(async ({ data }) => {
+    if (data.startMinute < company.startMinute || data.endMinute > company.endMinute || data.endMinute - data.startMinute < 30) throw new Error('400')
+    return { saved: true }
+  })
+  await render({ push: { company, prefs: { ...prefs, startMinute, endMinute } } })
+  const value = (id: string) => (container.querySelector(id) as unknown as HTMLSelectElement).value
+  expect([value('#settings-from'), value('#settings-to')]).toEqual(shown)
+  for (const [id, minute] of picks) await choose(id, minute)
+  expect(alertText()).toBeUndefined()
+  expect([value('#settings-from'), value('#settings-to')]).toEqual(['600', '900'])
+  expect(savePushPreferences).toHaveBeenLastCalledWith({ data: { ...prefs, startMinute: 600, endMinute: 900 } })
+})

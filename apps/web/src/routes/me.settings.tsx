@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createFileRoute, Link, redirect, useRouter } from '@tanstack/react-router'
 import { ChevronLeft } from 'lucide-react'
-import { canToggleDay, timeOptions } from '@learnquiz/api/settings'
+import { canToggleDay, clampHours, timeOptions } from '@learnquiz/api/settings'
 import { formatMinute } from '@learnquiz/api/schedule'
 import { AccountRows } from '@/components/settings/account-rows'
 import { AppearanceControl, type Theme } from '@/components/settings/appearance-control'
@@ -46,7 +46,8 @@ function Settings() {
   const { company, publicKey, isStaff } = push
   // Grows when this browser subscribes, so the new subscription counts as this account's.
   const [endpoints, setEndpoints] = useState(push.endpoints)
-  const [prefs, setPrefs] = useState(push.prefs)
+  // Hours outside the company window would make every save fail, so they start clamped inside it.
+  const [prefs, setPrefs] = useState(() => ({ ...push.prefs, ...clampHours(company, push.prefs.startMinute, push.prefs.endMinute) }))
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(false)
   const [dayNotice, setDayNotice] = useState('')
