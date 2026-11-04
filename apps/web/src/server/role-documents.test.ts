@@ -273,6 +273,7 @@ it('repoints a concept published after the concept read but before the replaceme
 
 it('refuses retiring a document when a build claims the topic after the check', async () => {
   seedV1()
+  sqlite.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, status, created_at) VALUES ('src-other', 'topic-role-a', 'text', 'Other rules', 'Stop at the red line.', 'ready', 2)").run()
   beforeSql = { prefix: 'update "sources"', fn: () => sqlite.prepare("UPDATE topics SET status = 'generating' WHERE id = 'topic-role-a'").run() }
   await expect(retireRoleDocument({ data: { slug: 'acme', roleId: 'role-a', sourceId: 'src-1' } })).rejects.toMatchObject({ status: 409 })
   expect(sqlite.prepare("SELECT retired_at FROM sources WHERE id = 'src-1'").get()).toEqual({ retired_at: null })
@@ -288,6 +289,7 @@ it('refuses to replace a document that is already retired', async () => {
 
 it('retires a document and its items without touching other items', async () => {
   seedV1()
+  sqlite.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, status, created_at) VALUES ('src-other', 'topic-role-a', 'text', 'Other rules', 'Stop at the red line.', 'ready', 2)").run()
   await expect(retireRoleDocument({ data: { slug: 'acme', roleId: 'role-a', sourceId: 'src-1' } })).resolves.toEqual({ ok: true })
   expect(sqlite.prepare("SELECT retired_at IS NOT NULL AS retired FROM sources WHERE id = 'src-1'").get()).toEqual({ retired: 1 })
   expect(itemStatus()).toEqual({ 'item-1': 'retired', 'item-2': 'retired', 'item-other': 'active' })
@@ -296,13 +298,35 @@ it('retires a document and its items without touching other items', async () => 
   await expect(retireRoleDocument({ data: { slug: 'acme', roleId: 'role-a', sourceId: 'src-1' } })).rejects.toMatchObject({ status: 404 })
 })
 
-it('counts only the failed scan once the last readable document of a ready role is retired', async () => {
+it('keeps the last readable document available for replacement without losing learning progress', async () => {
   seedV1()
-  sqlite.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, version, status, created_at) VALUES ('src-scan', 'topic-role-a', 'pdf', 'Scan', '', 1, 'failed', 2)").run()
-  await retireRoleDocument({ data: { slug: 'acme', roleId: 'role-a', sourceId: 'src-1' } })
+  sqlite.prepare("INSERT INTO learner_concept (learner_id, concept_id, p_known, n_attempts, updated_at) VALUES ('member-a', 'con-1', 0.8, 3, 1)").run()
+  const progress = sqlite.prepare('SELECT * FROM learner_concept').all()
+  await expect(retireRoleDocument({ data: { slug: 'acme', roleId: 'role-a', sourceId: 'src-1' } })).rejects.toMatchObject({
+    status: 409, message: 'Keep at least one readable document. Use Replace to change the last document.',
+  })
+  expect(sqlite.prepare("SELECT retired_at FROM sources WHERE id = 'src-1'").get()).toEqual({ retired_at: null })
+  expect(itemStatus()).toEqual({ 'item-1': 'active', 'item-2': 'active', 'item-other': 'active' })
+  expect(sqlite.prepare("SELECT source_id, gen_status FROM concepts WHERE id = 'con-1'").get()).toEqual({ source_id: 'src-1', gen_status: 'ready' })
+  const result = await uploadRoleDocument({ data: form({ replacesId: 'src-1', text: 'Always wear a vest on the dock.' }) })
+  expect(result).toMatchObject({ version: 2, status: 'ready' })
+  expect(sqlite.prepare("SELECT source_id, gen_status FROM concepts WHERE id = 'con-1'").get()).toEqual({ source_id: result.sourceId, gen_status: 'pending' })
+  expect(sqlite.prepare('SELECT * FROM learner_concept').all()).toEqual(progress)
   expect((await listRoles({ data: { slug: 'acme' } })).roles).toEqual([
-    expect.objectContaining({ id: 'role-a', topicStatus: 'ready', documentCount: 1, failedDocuments: 1 }),
+    expect.objectContaining({ id: 'role-a', topicStatus: 'ready', documentCount: 1, failedDocuments: 0 }),
   ])
+})
+
+it('does not count failed, retired, deleted or other-role documents as a replacement for the last readable document', async () => {
+  seedV1()
+  sqlite.exec(`INSERT INTO sources (id, topic_id, kind, title, body_text, status, retired_at, deleted_at, created_at) VALUES
+    ('scan', 'topic-role-a', 'pdf', 'Scan', '', 'failed', NULL, NULL, 2),
+    ('retired', 'topic-role-a', 'text', 'Retired', 'Old rules.', 'ready', 2, NULL, 2),
+    ('deleted', 'topic-role-a', 'text', 'Deleted', 'Old rules.', 'ready', NULL, 2, 2),
+    ('other-role', 'topic-role-b', 'text', 'Other role', 'Other rules.', 'ready', NULL, NULL, 2)`)
+  await expect(retireRoleDocument({ data: { slug: 'acme', roleId: 'role-a', sourceId: 'src-1' } })).rejects.toMatchObject({ status: 409 })
+  expect(sqlite.prepare("SELECT retired_at FROM sources WHERE id = 'src-1'").get()).toEqual({ retired_at: null })
+  expect(itemStatus()['item-1']).toBe('active')
 })
 
 it('refuses retiring a document for a plain member', async () => {
@@ -366,7 +390,7 @@ it('retiring repoints concepts another document covers and fails the orphans, wi
 // The other document goes away between the concept read and the retire write: the concept never lands on a retired document.
 it.each([
   ['replaced', true, { source_id: 'src-2b', gen_status: 'pending', gen_error: null }],
-  ['retired', false, { source_id: 'src-1', gen_status: 'failed', gen_error: 'The document behind this concept was retired' }],
+  ['retired', false, { source_id: 'src-1', gen_status: 'ready', gen_error: null }],
 ] as const)('retiring reads the other documents again when the one it picked is %s mid-retire', async (_label, replaced, con1) => {
   seedShared()
   beforeSql = {
@@ -376,11 +400,13 @@ it.each([
       if (replaced) sqlite.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, version, status, created_at) VALUES ('src-2b', 'topic-role-a', 'text', 'Site guide', 'Wear a vest on the dock, always.', 4, 'ready', 4)").run()
     },
   }
-  await expect(retireRoleDocument({ data: { ...ids, sourceId: 'src-1' } })).resolves.toEqual({ ok: true })
+  const retirement = retireRoleDocument({ data: { ...ids, sourceId: 'src-1' } })
+  if (replaced) await expect(retirement).resolves.toEqual({ ok: true })
+  else await expect(retirement).rejects.toMatchObject({ status: 409, message: 'Keep at least one readable document. Use Replace to change the last document.' })
   expect(beforeSql).toBeNull()
   expect(sqlite.prepare("SELECT source_id, gen_status, gen_error FROM concepts WHERE id = 'con-1'").get()).toEqual(con1)
-  expect(sqlite.prepare("SELECT retired_at IS NOT NULL AS retired FROM sources WHERE id = 'src-1'").get()).toEqual({ retired: 1 })
-  expect(itemStatus()).toEqual({ 'item-1': 'retired', 'item-2': 'retired', 'item-other': 'active' })
+  expect(sqlite.prepare("SELECT retired_at IS NOT NULL AS retired FROM sources WHERE id = 'src-1'").get()).toEqual({ retired: replaced ? 1 : 0 })
+  expect(itemStatus()).toEqual({ 'item-1': replaced ? 'retired' : 'active', 'item-2': replaced ? 'retired' : 'active', 'item-other': 'active' })
 })
 
 // The browser upload route: same handler as the server function, with the org and role taken from the URL.

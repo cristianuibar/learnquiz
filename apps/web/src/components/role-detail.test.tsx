@@ -274,10 +274,23 @@ it('shows only the Critical chip when read-only', async () => {
   expect(container.querySelector('li li')!.textContent).toContain('Critical')
 })
 
+it('keeps Replace available and explains why the last readable document cannot be retired', async () => {
+  vi.stubGlobal('XMLHttpRequest', FakeXhr)
+  FakeXhr.instances = []
+  const { container, button } = await mount(makeDetail({ status: 'ready', documents: [pdf, failed] }))
+  expect(container.textContent).toContain('Keep at least one readable document. Use Replace to change the last document.')
+  expect(button('More actions for Till handbook')).toBeUndefined()
+  await act(async () => { button('Replace Till handbook')!.click() })
+  await pickFile(container, new File(['%PDF'], 'correct-handbook.pdf', { type: 'application/pdf' }))
+  expect(FakeXhr.instances).toHaveLength(1)
+  expect((FakeXhr.instances[0]!.send.mock.calls[0]![0] as FormData).get('replacesId')).toBe('d1')
+  expect(retireRoleDocument).not.toHaveBeenCalled()
+})
+
 it('retires a document after a confirmation that lists the consequences', async () => {
   vi.mocked(retireRoleDocument).mockResolvedValue({ ok: true })
   vi.mocked(previewRetireRoleDocument).mockResolvedValue({ questions: 38, alsoIn: [{ concept: 'Cash float', document: 'Picking SOP v3' }], orphaned: 2 })
-  const { button } = await mount(makeDetail({ status: 'ready', documents: [pdf] }))
+  const { button } = await mount(makeDetail({ status: 'ready', documents: [pdf, pasted] }))
   const open = async () => {
     await act(async () => { button('More actions for Till handbook')!.click() })
     const item = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((b) => b.textContent === 'Retire')!
@@ -310,7 +323,7 @@ it('retires a document after a confirmation that lists the consequences', async 
 it('names a single orphaned concept without a count', async () => {
   const lines = async (preview: { questions: number; alsoIn: { concept: string; document: string }[]; orphaned: number }) => {
     vi.mocked(previewRetireRoleDocument).mockResolvedValue(preview)
-    const { button, cleanup } = await renderDetail(makeDetail({ status: 'ready', documents: [pdf] }))
+    const { button, cleanup } = await renderDetail(makeDetail({ status: 'ready', documents: [pdf, pasted] }))
     await act(async () => { button('More actions for Till handbook')!.click() })
     const item = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((b) => b.textContent === 'Retire')!
     await act(async () => { item.click() })
@@ -319,9 +332,9 @@ it('names a single orphaned concept without a count', async () => {
     await cleanup()
     return text
   }
-  expect(await lines({ questions: 4, alsoIn: [], orphaned: 1 })).toContain('The Till handbook concept has no other source. It leaves training until you add a document.')
-  expect(await lines({ questions: 4, alsoIn: [{ concept: 'Cash float', document: 'Picking SOP v3' }], orphaned: 1 })).toContain('The other Till handbook concept has no other source. It leaves training until you add a document.')
-  expect(await lines({ questions: 4, alsoIn: [], orphaned: 2 })).toContain('The 2 Till handbook concepts have no other source. They leave training until you add a document.')
+  expect(await lines({ questions: 4, alsoIn: [], orphaned: 1 })).toContain('The Till handbook concept has no other source. It leaves training.')
+  expect(await lines({ questions: 4, alsoIn: [{ concept: 'Cash float', document: 'Picking SOP v3' }], orphaned: 1 })).toContain('The other Till handbook concept has no other source. It leaves training.')
+  expect(await lines({ questions: 4, alsoIn: [], orphaned: 2 })).toContain('The 2 Till handbook concepts have no other source. They leave training.')
 })
 
 it('keeps the old row live while a replacement uploads', async () => {
