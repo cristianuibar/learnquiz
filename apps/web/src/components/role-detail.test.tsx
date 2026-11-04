@@ -430,17 +430,20 @@ async function pickFile(container: HTMLElement, file: File) {
 const statusText = (container: HTMLElement) => container.querySelector('[role="status"]')!.textContent
 const MB = 1048576
 
-it('rejects a PDF over 10 MB before sending anything and keeps focus where it was', async () => {
+it.each([
+  [10 * MB + 1, 'just over 10 MB'],
+  [11 * MB, '11.0 MB'],
+])('rejects a %i-byte PDF before sending anything and keeps focus where it was', async (size, displayedSize) => {
   vi.stubGlobal('XMLHttpRequest', FakeXhr)
   FakeXhr.instances = []
   const { container, button } = await mount(makeDetail())
   button('Upload PDF')!.focus()
   const focused = document.activeElement
   const file = new File(['x'], 'Forklift manual.pdf', { type: 'application/pdf' })
-  Object.defineProperty(file, 'size', { value: 11 * MB })
+  Object.defineProperty(file, 'size', { value: size })
   await pickFile(container, file)
   expect(FakeXhr.instances).toHaveLength(0)
-  expect(container.querySelector('[role="alert"]')!.textContent).toBe("Forklift manual.pdf wasn't uploaded. It's 11.0 MB; the limit is 10 MB. Split it or export a smaller PDF.")
+  expect(container.querySelector('[role="alert"]')!.textContent).toBe(`Forklift manual.pdf wasn't uploaded. It's ${displayedSize}; the limit is 10 MB. Split it or export a smaller PDF.`)
   expect(document.activeElement).toBe(focused)
   await act(async () => { button('Dismiss')!.click() })
   expect(container.querySelector('[role="alert"]')).toBeNull()
