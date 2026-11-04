@@ -11,10 +11,12 @@ import { IconButton } from '@/components/ui/IconButton'
 import { RetryIcon } from '@/components/ui/icons'
 import { Text } from '@/components/ui/Text'
 import { ConceptRow } from '@/components/unit/ConceptRow'
+import { Procedure } from '@/components/unit/Procedure'
 import { UnitBar } from '@/components/unit/UnitBar'
 import { getToken } from '@/lib/auth'
 import { pathError } from '@/lib/path'
 import { useTopicPath } from '@/lib/topic-path'
+import { useUnitProcedure } from '@/lib/unit-procedure'
 import { canPractice, conceptRows, findUnit, notFoundText, practiceLabel, practiceParams, sourceCaption, unitMastery, unitRouteParams } from '@/lib/unit'
 import { useTheme } from '@/theme/ThemeProvider'
 
@@ -29,6 +31,7 @@ export default function UnitScreen() {
   const heading = useRef<NativeText>(null)
 
   const unit = path ? findUnit(path, unitId) : null
+  const procedure = useUnitProcedure(unit?.id ?? null)
   const missing = topicId === null || unitId === null || (path !== null && unit === null)
   const failed = !missing && (status === 'offline' || status === 'error')
   const title = unit?.name ?? (missing ? notFoundText : null)
@@ -112,6 +115,7 @@ export default function UnitScreen() {
                 </View>
               )}
             </View>
+            {procedure && <Procedure graph={procedure.graph} source={procedure.source} />}
           </>
         )}
       </ScrollView>
