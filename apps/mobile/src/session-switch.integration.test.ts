@@ -235,7 +235,7 @@ test('sign-in with a held unit while B\'s /session stalls: loading shows nothing
 
 test("Ana's profile, even her late refetch, never shows to Bo after she signs out and he signs in", async () => {
   const anaProfile = { name: 'Ana', role: null, started: true, mastery: 0.66, benchmark: 0.85,
-    onboarding: { day: 16, days: 30 }, proficiency: { achievedAt: null, projectedAt: null }, weeks: [] }
+    onboarding: { day: 16, days: 30 }, proficiency: { achievedAt: null, projectedAt: null }, weeks: [], units: [], confidentErrors: [] }
   const boProfile = { ...anaProfile, name: 'Bo', mastery: 0.12 }
   const anaRefetch = deferred()
   const boLoad = deferred()
@@ -294,7 +294,7 @@ test("Ana's profile, even her late refetch, never shows to Bo after she signs ou
 // signs out and Bo signs in, and only its own checks keep Ana's data back.
 test("with the route guard taken out, Profile itself never shows Ana's profile, error or late answer to Bo", async () => {
   const anaProfile = { name: 'Ana', role: null, started: true, mastery: 0.66, benchmark: 0.85,
-    onboarding: { day: 16, days: 30 }, proficiency: { achievedAt: null, projectedAt: null }, weeks: [] }
+    onboarding: { day: 16, days: 30 }, proficiency: { achievedAt: null, projectedAt: null }, weeks: [], units: [], confidentErrors: [] }
   const anaLate = deferred()
   const boLoad = deferred()
   let anaCalls = 0

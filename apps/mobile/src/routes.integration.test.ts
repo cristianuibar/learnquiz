@@ -365,7 +365,7 @@ test('Profile keeps loaded mastery visible during a return-from-Settings refetch
 
 test('Profile ignores an earlier request that answers after the refetch that replaced it', async () => {
   const profile = { name: 'Learner', role: null, started: true, mastery: 0.66, benchmark: 0.85,
-    onboarding: { day: 16, days: 30 }, proficiency: { achievedAt: null, projectedAt: null }, weeks: [] }
+    onboarding: { day: 16, days: 30 }, proficiency: { achievedAt: null, projectedAt: null }, weeks: [], units: [], confidentErrors: [] }
   let resolveFirst!: (value: unknown) => void
   const first = new Promise((done) => { resolveFirst = done })
   jest.mocked(getToken).mockReturnValue('token-a')
