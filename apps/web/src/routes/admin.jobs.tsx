@@ -52,12 +52,13 @@ function Jobs() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState<{ text: string } | null>(null)
   const noticeRef = useRef<HTMLDivElement>(null)
-  const inTable = useRef(false)
+  const tableRef = useRef<HTMLDivElement>(null)
   const idle = useRef(true)
   idle.current = !paused && selected.size === 0
 
   useEffect(() => {
-    const timer = setInterval(() => { if (idle.current && !inTable.current) void router.invalidate() }, POLL_MS)
+    // Read focus at each tick: a focused control that unmounts (Clear selection) fires no blur.
+    const timer = setInterval(() => { if (idle.current && !tableRef.current?.contains(document.activeElement)) void router.invalidate() }, POLL_MS)
     return () => clearInterval(timer)
   }, [router])
 
@@ -135,10 +136,7 @@ function Jobs() {
         </div>
       )}
       {error && <ErrorRow message={error} />}
-      <div
-        onFocus={() => { inTable.current = true }}
-        onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) inTable.current = false }}
-      >
+      <div ref={tableRef}>
         <DataTable
           caption={CAPTIONS[filter]}
           columns={columns}

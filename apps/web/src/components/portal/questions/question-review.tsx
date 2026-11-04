@@ -11,6 +11,7 @@ import { ReviewToolbar, type FilterPatch, type ReviewSearch } from './review-too
 import { isFlagged, isUnreviewed, QuestionRow, stemId, toggleId, type Review } from './question-row'
 
 const VISIBLE = 4
+const CLEAR_ID = 'review-clear-filters'
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
 export type { ReviewSearch }
@@ -93,16 +94,16 @@ function Body({ data, slug, search, onClear }: { data: Review; slug: string; sea
     const at = approved.order.indexOf(approvedId)
     const order = approved.order.slice(at + 1).concat(approved.order.slice(0, Math.max(at, 0)))
     const next = order.map((id) => byId.get(id)).find((e) => e !== undefined && (isUnreviewed(e.q) || isFlagged(e.q)))
+    // With no open question left, stay on the approved row; if a filter removed it, the nearest remaining row, else Clear filters.
+    const target = next ?? settled ?? order.map((id) => byId.get(id)).find((e) => e !== undefined)
     setExpanded((s) => {
       const n = new Set(s)
       n.delete(approvedId)
       if (next) n.add(next.q.id)
       return n
     })
-    if (next) {
-      if (next.index >= VISIBLE) setShowAll((s) => new Set(s).add(next.conceptId))
-      setFocusId(stemId(next.q.id))
-    } else setFocusId(toggleId(approvedId))
+    if (target && target.index >= VISIBLE) setShowAll((s) => new Set(s).add(target.conceptId))
+    setFocusId(!target ? CLEAR_ID : target === next ? stemId(target.q.id) : toggleId(target.q.id))
   }, [approved, flat, data.unreviewed])
 
   const approve = (id: string) => {
@@ -124,7 +125,7 @@ function Body({ data, slug, search, onClear }: { data: Review; slug: string; sea
         {units.length === 0 && data.units.length > 0 ? (
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-md border border-border bg-surface-card p-6">
             <p className="text-body text-ink">No questions match these filters. Flagged questions have already been reviewed.</p>
-            <Button variant="secondary" onClick={onClear}>Clear filters</Button>
+            <Button id={CLEAR_ID} variant="secondary" onClick={onClear}>Clear filters</Button>
           </div>
         ) : null}
         {units.map((u) => {

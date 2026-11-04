@@ -13,6 +13,11 @@ import { ConceptEditForm } from './concept-edit-form'
 
 type Concept = RoleDetail['units'][number]['concepts'][number]
 
+// Shared by the column header row so both stack below a 560px list.
+export const rowGrid = 'grid grid-cols-[minmax(0,1fr)_auto] gap-x-6 gap-y-2 px-6 @max-[560px]:grid-cols-1'
+// Below 560px the controls sit left, so the Questions cell keeps the header's width.
+export const questionCell = '@max-[560px]:min-w-16'
+
 export function ConceptRow({ concept, slug, readOnly, critHeaderId }: { concept: Concept; slug: string; readOnly: boolean; critHeaderId: string }) {
   const router = useRouter()
   const update = useServerFn(updateRoleConcept)
@@ -68,7 +73,7 @@ export function ConceptRow({ concept, slug, readOnly, critHeaderId }: { concept:
   const failed = concept.genStatus === 'failed'
 
   return (
-    <li className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-6 gap-y-2 border-t border-border px-6 py-3 @max-[560px]:grid-cols-1">
+    <li className={`${rowGrid} border-t border-border py-3`}>
       <div className="flex min-w-0 flex-col gap-0.5">
         <span id={nameId} className="text-label text-ink">{concept.name}</span>
         <span className="text-body text-ink-muted">{concept.summary}</span>
@@ -81,7 +86,7 @@ export function ConceptRow({ concept, slug, readOnly, critHeaderId }: { concept:
         )}
       </div>
       <div className="flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2">
+        <div className={`flex items-center gap-2 ${questionCell}`}>
           {concept.genStatus === 'ready' && <span className="text-body text-ink-muted tabular-nums">{concept.questionCount}</span>}
           {concept.genStatus === 'pending' && <Status word="Queued" />}
           {concept.genStatus === 'generating' && <Status word="Generating questions" />}

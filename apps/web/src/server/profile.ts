@@ -152,8 +152,9 @@ export const getProfile = createServerFn({ method: 'GET' })
     const estimatedDays = achievedAt === null && activeDays >= 2 && gainPerDay > 0 ? Math.ceil(days[6].gap / gainPerDay) : null
 
     // Up to six Monday-aligned UTC weeks from the first attempt to `end`; a week past `end` is still running.
+    // The last week is the one holding `end - 1`, so an `end` on a Monday boundary still yields six weeks.
     const weeksUntil = (end: number) => {
-      const weeksFrom = history.length ? Math.max(mondayOf(history[0].at), mondayOf(end) - 5 * WEEK) : end
+      const weeksFrom = history.length ? Math.max(mondayOf(history[0].at), mondayOf(end - 1) - 5 * WEEK) : end
       const series = masterySeries(conceptRows.map((c) => c.id), history.map((a) => ({ ...a, pKnownAfter: a.after })), weeksFrom, end, knownBefore)
       return series.map(({ mastery }, k) => {
         const from = weeksFrom + k * WEEK
