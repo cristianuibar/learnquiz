@@ -13,6 +13,7 @@ export function MasteryBar({
   estimate,
   valueText,
   label,
+  size,
   className,
 }: {
   value: number
@@ -21,6 +22,7 @@ export function MasteryBar({
   estimate?: boolean
   valueText?: string
   label: string
+  size?: 'lg'
   className?: string
 }) {
   const [shown, setShown] = useState(from ?? value)
@@ -31,7 +33,7 @@ export function MasteryBar({
       aria-label={label}
       aria-valuenow={Math.round(value * 100)}
       aria-valuetext={valueText}
-      className={cn('h-2 *:motion-reduce:transition-none', benchmark === undefined && !estimate && className)}
+      className={cn(size === 'lg' ? 'h-3' : 'h-2', '*:motion-reduce:transition-none', benchmark === undefined && !estimate && className)}
     />
   )
   if (benchmark === undefined && !estimate) return bar
