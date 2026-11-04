@@ -104,9 +104,22 @@ it('gives an admin the role documents newest first and its units with concept ge
   ])
   expect(result.role.people).toBe(2)
   expect(result.units).toEqual([{ id: 'picker-unit', name: 'Picking', summary: 'Pick orders.', concepts: [
-    { id: 'scan-bin', name: 'Scan the bin', summary: 'Scan the bin barcode.', critical: true, genStatus: 'ready', genError: null },
-    { id: 'scan-sku', name: 'Scan the SKU', summary: 'Scan each SKU.', critical: false, genStatus: 'failed', genError: 'Model timed out' },
+    { id: 'scan-bin', name: 'Scan the bin', summary: 'Scan the bin barcode.', critical: true, genStatus: 'ready', genError: null, questionCount: 0 },
+    { id: 'scan-sku', name: 'Scan the SKU', summary: 'Scan each SKU.', critical: false, genStatus: 'failed', genError: 'Model timed out', questionCount: 0 },
   ] }])
+})
+
+it('counts live questions per concept (active and reported only) and totals them for the role and its critical concepts', async () => {
+  const item = raw.prepare("INSERT INTO items (id, concept_id, topic_id, format, payload_json, status, created_at) VALUES (?, ?, ?, 'mcq', '{}', ?, 1)")
+  for (const [id, conceptId, status] of [
+    ['a1', 'scan-sku', 'active'], ['a2', 'scan-sku', 'active'], ['a3', 'scan-sku', 'reported'], ['a4', 'scan-sku', 'rejected'], ['a5', 'scan-sku', 'retired'],
+    ['b1', 'scan-bin', 'active'], ['b2', 'scan-bin', 'retired'],
+    ['f1', 'foreign-concept', 'active'],
+  ]) item.run(id, conceptId, conceptId === 'foreign-concept' ? 'other-role-topic' : 'picker-topic', status)
+  const result = await read()
+  expect(result.units[0].concepts.map((c) => [c.id, c.questionCount])).toEqual([['scan-bin', 1], ['scan-sku', 3]])
+  expect(result.role.liveQuestions).toBe(4)
+  expect(result.role.criticalQuestions).toBe(1)
 })
 
 it('releases a build claim left by a request that died, so the role can be rebuilt', async () => {

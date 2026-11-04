@@ -15,7 +15,8 @@ import { FileRow } from './file-row'
 
 const isPdf = (f: File) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
 
-export function DocumentsCard({ detail, readOnly, pasteOpen, onTogglePaste, panel }: {
+export function DocumentsCard({ announce, detail, readOnly, pasteOpen, onTogglePaste, panel }: {
+  announce: (message: string) => void
   detail: RoleDetail
   readOnly: boolean
   pasteOpen: boolean
@@ -45,6 +46,7 @@ export function DocumentsCard({ detail, readOnly, pasteOpen, onTogglePaste, pane
     if (replacesId) data.set('replacesId', replacesId)
     setError('')
     setUploading(file.name)
+    announce(`Uploading ${file.name}…`)
     try {
       await upload({ data })
       await router.invalidate()
@@ -120,7 +122,7 @@ export function DocumentsCard({ detail, readOnly, pasteOpen, onTogglePaste, pane
       </div>
       {canChange && <input ref={input} type="file" accept="application/pdf" hidden tabIndex={-1} aria-hidden onChange={chosen} />}
       {error && <Banner kind="alert">{error}</Banner>}
-      {busy && <p role="status" className="text-body text-ink-muted">Uploading {uploading}…</p>}
+      {busy && <p className="text-body text-ink-muted">Uploading {uploading}…</p>}
       {documents.length === 0 ? (
         canUpload ? (
           <Dropzone over={over} busy={busy} pasteOpen={pasteOpen} onPick={() => pick()} onPaste={onTogglePaste} />
