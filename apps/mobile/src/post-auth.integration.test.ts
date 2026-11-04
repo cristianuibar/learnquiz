@@ -127,8 +127,11 @@ async function submitSignIn() {
 test('first-time learners can open web sign-up from Sign in', async () => {
   await renderRouter('src/app', { initialUrl: '/sign-in' })
   expect(screen.getByText('New to Learn Quiz? Create your account on the web, then sign in here.')).toBeOnTheScreen()
-  await fireEvent.press(screen.getByRole('button', { name: 'Open web sign-up, opens browser' }))
-  expect(Linking.openURL).toHaveBeenCalledWith('https://app.learnquiz.com/sign-in')
+  const link = screen.getByRole('link', { name: 'Open web sign-up, opens browser' })
+  expect(link).toHaveProp('accessibilityHint', 'Opens in your browser')
+  expect(link).toHaveStyle({ alignSelf: 'flex-start', paddingHorizontal: 0 })
+  await fireEvent.press(link)
+  expect(Linking.openURL).toHaveBeenCalledWith('https://app.learnquiz.com/sign-in?mode=up')
   expect(screen.getByLabelText('Email')).toBeOnTheScreen()
   expect(screen.getByLabelText('Password')).toBeOnTheScreen()
 })
