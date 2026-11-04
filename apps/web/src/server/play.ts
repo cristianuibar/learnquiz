@@ -360,7 +360,7 @@ export const startSession = createServerFn({ method: 'POST' })
             category: category(id),
             review: due.find((d) => d.id === id),
           })) }),
-          maxTokens: 2000, timeoutMs: 4000, retry: false, learnerId, sessionId, topicId: topic.id,
+          maxTokens: 2000, timeoutMs: 4000, retry: false, learnerId, sessionId, topicId: topic.id, orgId: topic.orgId,
         })
         planning = { planner: selected.model, steps }
       }
@@ -498,7 +498,7 @@ export const transcribeAnswer = createServerFn({ method: 'POST' })
     } catch (e) {
       throw httpError(e instanceof Error ? e.message : 'Invalid recording.', 400)
     }
-    return transcribeAudio({ audio: data.audio, learnerId, sessionId: session.id, topicId: session.topicId })
+    return transcribeAudio({ audio: data.audio, learnerId, sessionId: session.id, topicId: session.topicId, orgId: topic.orgId })
   })
 
 // Sticky: a role topic's assignment gets proficient_at once the benchmark is met, and it is never cleared.
@@ -669,6 +669,7 @@ export const answerItem = createServerFn({ method: 'POST' })
           maxTokens: 2000,
           learnerId,
           sessionId: session.id,
+          orgId: topic.orgId,
         })
         grade.correct = shortGrade.score >= 0.8
       } catch (e) {
@@ -911,6 +912,7 @@ ${log.map((l) => `- ${concept.get(l.itemId) ?? 'unknown'}: ${l.correct ? 'right'
       learnerId,
       sessionId: session.id,
       topicId: topic.id,
+      orgId: topic.orgId,
     })
     return { levelLine: line, levelLineModel: model }
   } catch (e) {

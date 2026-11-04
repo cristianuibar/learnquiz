@@ -12,6 +12,7 @@ const Icon = ({ size = 20, children }: { size?: number; children: ReactNode }) =
 const icons = {
   companies: <Icon><rect x="4" y="3" width="16" height="18" rx="1" /><path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1M10 21v-3h4v3" /></Icon>,
   users: <Icon><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></Icon>,
+  usage: <Icon><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></Icon>,
   jobs: <Icon><path d="m12 3 9 5-9 5-9-5z" /><path d="m3 13 9 5 9-5" /></Icon>,
   flags: <Icon><path d="M5 21V4M5 4h11l-2 4 2 4H5" /></Icon>,
 }
@@ -64,6 +65,7 @@ export function StaffNav({ failed, name, children }: { failed: number; name: str
   const items: SideNavItem[] = [
     { to: { to: '/admin/companies' }, label: 'Companies', icon: icons.companies },
     { to: { to: '/admin/users', search: { search: '', field: 'email', offset: 0 }, activeOptions: { includeSearch: false } }, label: 'Users', icon: icons.users },
+    { to: { to: '/admin/usage', activeOptions: { includeSearch: false } }, label: 'Model usage', icon: icons.usage },
     {
       to: { to: '/admin/jobs' },
       label: 'Generation jobs',
