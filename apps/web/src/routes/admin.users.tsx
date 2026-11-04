@@ -48,6 +48,7 @@ function Users() {
   const searchRef = useRef<HTMLInputElement>(null)
   const bannedRef = useRef<string | null>(null)
   const refocusRef = useRef<string | null>(null)
+  const undoRef = useRef<HTMLButtonElement>(null)
   const [target, setTarget] = useState<UserRow | null>(null)
   const [open, setOpen] = useState(false)
   const [message, setMessage] = useState<{ user: UserRow; banned: boolean } | null>(null)
@@ -58,7 +59,8 @@ function Users() {
 
   useEffect(() => {
     if (!refocusRef.current) return
-    document.querySelector<HTMLElement>(`[data-ban-user="${refocusRef.current}"]`)?.focus()
+    // A status filter can drop the unbanned row; fall back to the search field.
+    ;(document.querySelector<HTMLElement>(`[data-ban-user="${refocusRef.current}"]`) ?? searchRef.current)?.focus()
     refocusRef.current = null
   }, [users])
 
@@ -158,7 +160,7 @@ function Users() {
           <Banner
             icon={Ban}
             action={message.banned && (
-              <Button variant="link" onClick={() => void unban(message.user)}>Undo</Button>
+              <Button ref={undoRef} variant="link" onClick={() => void unban(message.user)}>Undo</Button>
             )}
           >
             {message.user.name} is {message.banned ? 'banned' : 'unbanned'}.
@@ -243,7 +245,8 @@ function Users() {
         returnFocus={() => {
           const id = bannedRef.current
           bannedRef.current = null
-          return id ? document.querySelector<HTMLElement>(`[data-unban-user="${id}"]`) : null
+          // A status filter can drop the banned row; fall back to the banner's Undo.
+          return id ? document.querySelector<HTMLElement>(`[data-unban-user="${id}"]`) ?? undoRef.current : null
         }}
         onConfirm={async (reason) => {
           if (!target) return
