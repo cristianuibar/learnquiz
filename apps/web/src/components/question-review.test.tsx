@@ -287,3 +287,40 @@ describe('question review outline', () => {
     expect(entries(c).map(([name]) => name)).toEqual(['Cells', 'Energy', 'Division'])
   })
 })
+
+describe('question review rows', () => {
+  const row = (c: HTMLElement, id: keyof typeof STEMS) => [...c.querySelectorAll('h4')].find((h) => h.textContent === STEMS[id])!.closest('li')!
+  const chips = (li: Element) => [...li.querySelectorAll('[data-slot=status-chip]')].filter((s) => !s.closest('[id^=body-]')).map((s) => s.textContent)
+
+  // The first unreviewed or flagged question of each concept opens by default, so check later ones.
+  const rowsFixture = () => {
+    const data = fixture() as { units: { concepts: { critical: boolean; questions: Q[] }[] }[] }
+    data.units[0]!.concepts[0]!.questions[1]!.reviewedAt = Date.UTC(2026, 9, 31, 12)
+    data.units[1]!.concepts[0]!.questions[1]!.reviewedAt = null
+    return data
+  }
+
+  it.each([
+    ['unreviewed', 'q7', ['Live', 'Unreviewed'], undefined],
+    ['approved', 'q2', ['Live'], 'Approved Oct 31'],
+    ['retired', 'q4', ['Retired'], undefined],
+    ['flagged', 'q3', ['Flagged by learner'], undefined],
+  ] as const)('shows the %s status in the collapsed row', async (_name, id, words, approved) => {
+    const { c } = await mountAt(rowsFixture())
+    const li = row(c, id)
+    expect(chips(li)).toEqual(words)
+    if (approved) expect(li.textContent).toContain(approved)
+  })
+
+  it('shows Live next to Critical and the difficulty in an expanded unreviewed row', async () => {
+    const data = rowsFixture()
+    data.units[1]!.concepts[0]!.critical = true
+    const { c } = await mountAt(data)
+    await act(async () => row(c, 'q7').querySelector<HTMLButtonElement>('button[aria-label="Show details"]')!.click())
+    const li = row(c, 'q7')
+    expect(li.querySelector('[id^=body-]')).not.toBeNull()
+    expect(chips(li)).toEqual(['Live', 'Critical'])
+    const header = [...li.children].filter((el) => !el.id.startsWith('body-')).map((el) => el.textContent).join(' ')
+    expect(header).toContain('Difficulty 2')
+  })
+})

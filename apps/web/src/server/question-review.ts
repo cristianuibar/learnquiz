@@ -96,7 +96,7 @@ export const reviewQuestion = createServerFn({ method: 'POST' })
     const scope = and(eq(items.id, data.itemId), inArray(items.topicId, db.select({ id: topics.id }).from(topics).where(inArray(topics.jobRoleId, companyRoleIds(db, org.id)))))
     const row = await db.select({ item: items, concept: concepts, sourceText: sources.bodyText, sourceTitle: sources.title, sourceVersion: sources.version }).from(items)
       .innerJoin(concepts, and(eq(concepts.id, items.conceptId), eq(concepts.topicId, items.topicId)))
-      .leftJoin(sources, and(eq(sources.id, concepts.sourceId), eq(sources.topicId, items.topicId)))
+      .leftJoin(sources, and(eq(sources.id, concepts.sourceId), eq(sources.topicId, items.topicId), ne(sources.status, 'failed')))
       .where(scope).get()
     if (!row) throw httpError('Question not found', 404)
 

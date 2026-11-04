@@ -26,6 +26,7 @@ export function ConfirmDialog({ open, onOpenChange, title, consequences, verb, o
   const id = useId()
   const reasonId = `${id}-reason`
   const descId = `${id}-desc`
+  const listId = `${id}-list`
   const cancelRef = useRef<HTMLButtonElement>(null)
   const reasonRef = useRef<HTMLTextAreaElement>(null)
   const pendingRef = useRef(false)
@@ -71,7 +72,7 @@ export function ConfirmDialog({ open, onOpenChange, title, consequences, verb, o
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent initialFocus={askReason ? reasonRef : cancelRef} aria-describedby={description ? descId : undefined}
+      <DialogContent initialFocus={askReason ? reasonRef : cancelRef} aria-describedby={description ? descId : listId}
         onCloseAutoFocus={(event) => {
           event.preventDefault()
           const target = returnFocus?.()
@@ -101,7 +102,7 @@ export function ConfirmDialog({ open, onOpenChange, title, consequences, verb, o
             {error && <FieldError id={reasonId}>{error}</FieldError>}
           </div>
         )}
-        <ul className="flex flex-col gap-3">
+        <ul id={listId} className="flex flex-col gap-3">
           {consequences.map(({ icon: Icon, text }, i) => (
             <li key={i} className="flex items-start gap-3 text-body text-ink">
               <Icon aria-hidden className="mt-px size-5 shrink-0 text-ink-muted" />

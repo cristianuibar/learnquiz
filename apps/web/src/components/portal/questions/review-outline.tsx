@@ -64,7 +64,7 @@ export function ReviewLayout({ units, mode, children }: { units: Review['units']
                 className="flex min-h-11 items-center justify-between gap-2 px-3 text-[14px]/[20px] font-semibold text-ink"
               >
                 {u.name}
-                <span className="text-caption text-ink-muted tabular-nums">
+                <span className="shrink-0 text-caption whitespace-nowrap text-ink-muted tabular-nums">
                   {countText(u.concepts.reduce((n, c) => n + c.questions.length, 0), mode)}
                 </span>
               </p>
@@ -78,7 +78,7 @@ export function ReviewLayout({ units, mode, children }: { units: Review['units']
                       className={linkClass}
                     >
                       <span>{c.name}</span>
-                      <span className="text-caption text-ink-muted tabular-nums">
+                      <span className="shrink-0 text-caption whitespace-nowrap text-ink-muted tabular-nums">
                         {countText(c.questions.length, mode)}
                       </span>
                     </a>

@@ -17,7 +17,7 @@ export function statusWord(q: Question): ComponentProps<typeof Status>['word'] {
   if (q.status === 'retired') return 'Retired'
   if (q.status === 'rejected') return 'Rejected'
   if (isFlagged(q)) return 'Flagged by learner'
-  return q.reviewedAt === null ? 'Unreviewed' : 'Live'
+  return 'Live'
 }
 
 export type Action = 'approve' | 'retire'
@@ -69,7 +69,9 @@ export function QuestionRow({ question, critical, expanded, slug, sources, onTog
         <div className="grid min-h-14 grid-cols-[minmax(0,1fr)_44px] items-center gap-3 py-1.5 pr-2 pl-4 md:grid-cols-[168px_150px_minmax(0,1fr)_80px_44px]">
           <span className="justify-self-start max-md:hidden"><Status word={statusWord(question)} /></span>
           <span className="flex items-center gap-1 text-caption text-ink-muted max-md:hidden">
-            {question.reviewedAt !== null ? <><Check aria-hidden className="size-4 shrink-0" />{`Approved ${shortDate(question.reviewedAt)}`}</> : null}
+            {isUnreviewed(question)
+              ? <Status word="Unreviewed" />
+              : question.reviewedAt !== null ? <><Check aria-hidden className="size-4 shrink-0" />{`Approved ${shortDate(question.reviewedAt)}`}</> : null}
           </span>
           <h4 id={sid} tabIndex={-1} className="truncate text-body text-ink outline-none">{question.payload.stem}</h4>
           <span className="text-caption text-ink-muted tabular-nums max-md:hidden">{`Difficulty ${question.difficulty}`}</span>
