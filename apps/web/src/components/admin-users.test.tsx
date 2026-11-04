@@ -151,3 +151,22 @@ it('keeps the dialog open with an alert when banning fails', async () => {
   const dialog = document.querySelector('[role="dialog"]')!
   expect([...dialog.querySelectorAll('[role="alert"]')].map((a) => a.textContent).join(' ')).toContain('Server said no')
 })
+
+it('keeps focus in the search field when a changed query is submitted or cleared', async () => {
+  vi.mocked(listUsers).mockResolvedValue({ users: [], total: 0 })
+  const container = await render('/admin/users')
+  const input = container.querySelector<HTMLInputElement>('input[type="search"]')!
+  input.focus()
+  await setValue(input, 'zed', 'input')
+  await act(async () => { container.querySelector('form[role="search"]')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })) })
+  await settle()
+  expect(lastData().search).toBe('zed')
+  expect(container.querySelector('input[type="search"]')).toBe(input)
+  expect(document.activeElement).toBe(input)
+  await click(button('Clear filters'))
+  await settle()
+  expect(lastData().search).toBe('')
+  expect(container.querySelector('input[type="search"]')).toBe(input)
+  expect(input.value).toBe('')
+  expect(document.activeElement).toBe(input)
+})
