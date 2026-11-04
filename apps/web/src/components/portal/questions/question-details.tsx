@@ -20,11 +20,12 @@ function typeLine(q: Question) {
   return `${fmt} · Unreviewed · Generated ${shortDate(q.createdAt)}${q.source ? ` from ${q.source.title}` : ''}`
 }
 
-export function QuestionDetails({ question, slug, stemId, onApproved, onAnnounce }: {
+export function QuestionDetails({ question, slug, stemId, onApprove, onAnnounce }: {
   question: Question
   slug: string
   stemId: string
-  onApproved: (id: string) => void
+  // Called when Approve is pressed; the returned callback runs once the approval is saved and the data refreshed.
+  onApprove: (id: string) => () => void
   onAnnounce: (message: string) => void
 }) {
   const router = useRouter()
@@ -45,10 +46,11 @@ export function QuestionDetails({ question, slug, stemId, onApproved, onAnnounce
   async function act(action: 'approve' | 'retire') {
     setBusy(true)
     setError('')
+    const approved = action === 'approve' ? onApprove(question.id) : null
     try {
       await reviewQuestion({ data: { slug, itemId: question.id, action } })
       await router.invalidate()
-      if (action === 'approve') onApproved(question.id)
+      if (approved) approved()
       else document.getElementById(stemId)?.focus()
     } catch (err) {
       setError(errorMessage(err))

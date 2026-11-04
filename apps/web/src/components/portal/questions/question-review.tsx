@@ -38,7 +38,8 @@ function Body({ data, slug, item }: { data: Review; slug: string; item?: string 
   const [showAll, setShowAll] = useState(init.showAll)
   const [focusId, setFocusId] = useState<string | null>(init.focus)
   const [message, setMessage] = useState('')
-  const [approvedId, setApprovedId] = useState<string | null>(null)
+  // The approved id and the outline order when Approve was pressed; the refreshed list re-sorts the approved question.
+  const [approved, setApproved] = useState<{ id: string; order: string[] } | null>(null)
 
   useEffect(() => {
     if (!focusId) return
@@ -52,15 +53,18 @@ function Body({ data, slug, item }: { data: Review; slug: string; item?: string 
 
   const flat = useMemo(() => data.units.flatMap((u) => u.concepts.flatMap((c) => c.questions.map((q, i) => ({ q, conceptId: c.id, index: i })))), [data])
 
-  // Once the refreshed data shows the approved question settled, move on to the next open one.
+  // Once the refreshed data shows the approved question settled, move on to the next open one in the pre-approval order.
   useEffect(() => {
-    if (!approvedId) return
-    const at = flat.findIndex((e) => e.q.id === approvedId)
-    if (at >= 0 && (isUnreviewed(flat[at]!.q) || isFlagged(flat[at]!.q))) return
-    setApprovedId(null)
+    if (!approved) return
+    const { id: approvedId } = approved
+    const byId = new Map(flat.map((e) => [e.q.id, e]))
+    const settled = byId.get(approvedId)
+    if (settled && (isUnreviewed(settled.q) || isFlagged(settled.q))) return
+    setApproved(null)
     setMessage(`Approved. ${data.unreviewed} unreviewed.`)
-    const order = flat.slice(at + 1).concat(flat.slice(0, Math.max(at, 0) + 1))
-    const next = order.find((e) => e.q.id !== approvedId && (isUnreviewed(e.q) || isFlagged(e.q)))
+    const at = approved.order.indexOf(approvedId)
+    const order = approved.order.slice(at + 1).concat(approved.order.slice(0, Math.max(at, 0)))
+    const next = order.map((id) => byId.get(id)).find((e) => e !== undefined && (isUnreviewed(e.q) || isFlagged(e.q)))
     setExpanded((s) => {
       const n = new Set(s)
       n.delete(approvedId)
@@ -71,7 +75,12 @@ function Body({ data, slug, item }: { data: Review; slug: string; item?: string 
       if (next.index >= VISIBLE) setShowAll((s) => new Set(s).add(next.conceptId))
       setFocusId(stemId(next.q.id))
     } else setFocusId(toggleId(approvedId))
-  }, [approvedId, flat, data.unreviewed])
+  }, [approved, flat, data.unreviewed])
+
+  const approve = (id: string) => {
+    const order = flat.map((e) => e.q.id)
+    return () => setApproved({ id, order })
+  }
 
   const toggle = (id: string) => setExpanded((s) => {
     const n = new Set(s)
@@ -92,7 +101,7 @@ function Body({ data, slug, item }: { data: Review; slug: string; item?: string 
               <h2 id={hid} className="text-title-2 text-ink">{u.name}</h2>
               <p className="text-caption text-ink-muted">{`${plural(u.concepts.length, 'concept')} · ${plural(total, 'question')}`}</p>
             </div>
-            {u.concepts.map((c) => <ConceptBlock key={c.id} concept={c} slug={slug} expanded={expanded} showAll={showAll.has(c.id)} onShowAll={() => setShowAll((s) => new Set(s).add(c.id))} onToggle={toggle} onApproved={setApprovedId} onAnnounce={setMessage} />)}
+            {u.concepts.map((c) => <ConceptBlock key={c.id} concept={c} slug={slug} expanded={expanded} showAll={showAll.has(c.id)} onShowAll={() => setShowAll((s) => new Set(s).add(c.id))} onToggle={toggle} onApprove={approve} onAnnounce={setMessage} />)}
           </section>
         )
       })}
@@ -100,14 +109,14 @@ function Body({ data, slug, item }: { data: Review; slug: string; item?: string 
   )
 }
 
-function ConceptBlock({ concept: c, slug, expanded, showAll, onShowAll, onToggle, onApproved, onAnnounce }: {
+function ConceptBlock({ concept: c, slug, expanded, showAll, onShowAll, onToggle, onApprove, onAnnounce }: {
   concept: Concept
   slug: string
   expanded: Set<string>
   showAll: boolean
   onShowAll: () => void
   onToggle: (id: string) => void
-  onApproved: (id: string) => void
+  onApprove: (id: string) => () => void
   onAnnounce: (m: string) => void
 }) {
   const hid = `concept-${c.id}`
@@ -126,7 +135,7 @@ function ConceptBlock({ concept: c, slug, expanded, showAll, onShowAll, onToggle
       <div className="rounded-md border border-border bg-surface-card">
         <ul aria-labelledby={hid} className="divide-y divide-border">
           {shown.map((q) => (
-            <QuestionRow key={q.id} question={q} critical={c.critical} slug={slug} expanded={expanded.has(q.id)} onToggle={() => onToggle(q.id)} onApproved={onApproved} onAnnounce={onAnnounce} />
+            <QuestionRow key={q.id} question={q} critical={c.critical} slug={slug} expanded={expanded.has(q.id)} onToggle={() => onToggle(q.id)} onApprove={onApprove} onAnnounce={onAnnounce} />
           ))}
         </ul>
         {hidden > 0 && (

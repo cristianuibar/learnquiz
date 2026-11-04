@@ -23,13 +23,13 @@ function statusWord(q: Question): ComponentProps<typeof Status>['word'] {
 export const stemId = (id: string) => `stem-${id}`
 export const toggleId = (id: string) => `toggle-${id}`
 
-export function QuestionRow({ question, critical, expanded, slug, onToggle, onApproved, onAnnounce }: {
+export function QuestionRow({ question, critical, expanded, slug, onToggle, onApprove, onAnnounce }: {
   question: Question
   critical: boolean
   expanded: boolean
   slug: string
   onToggle: () => void
-  onApproved: (id: string) => void
+  onApprove: (id: string) => () => void
   onAnnounce: (message: string) => void
 }) {
   const sid = stemId(question.id)
@@ -75,7 +75,7 @@ export function QuestionRow({ question, critical, expanded, slug, onToggle, onAp
       )}
       {expanded && (
         <div id={bodyId} className="px-4 pb-4">
-          <QuestionDetails question={question} slug={slug} stemId={sid} onApproved={onApproved} onAnnounce={onAnnounce} />
+          <QuestionDetails question={question} slug={slug} stemId={sid} onApprove={onApprove} onAnnounce={onAnnounce} />
         </div>
       )}
     </li>

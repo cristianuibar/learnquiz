@@ -118,6 +118,21 @@ it('approves, moves focus to the next unreviewed question and announces the coun
   expect(c.querySelector('[role=status]')!.textContent).toBe('Approved. 1 unreviewed.')
 })
 
+it('approving moves to the next open question in the same concept even after the list re-sorts', async () => {
+  const a1 = { id: 'a1', status: 'active', payload: stemOf('A1') }
+  const a2 = { id: 'a2', status: 'active', reviewedAt: null, payload: stemOf('A2') }
+  const b1 = { id: 'b1', status: 'active', reviewedAt: null, payload: stemOf('B1') }
+  const c = await mountAt(
+    review([concept('a', [{ ...a1, reviewedAt: null }, a2]), concept('b', [b1])], 3), '/org/x/questions',
+    // The server lists open questions first, so the approved one moves below A2.
+    review([concept('a', [a2, { ...a1, reviewedAt: Date.UTC(2026, 9, 30) }]), concept('b', [b1])], 2),
+  )
+  await act(async () => button(c, 'Approve and next').click())
+  await vi.waitFor(() => expect(document.activeElement?.textContent).toBe('Stem A2'))
+  expect(document.activeElement!.closest('li')!.querySelector('button[aria-label="Hide details"]')!.getAttribute('aria-expanded')).toBe('true')
+  expect(c.querySelector('[role=status]')!.textContent).toBe('Approved. 2 unreviewed.')
+})
+
 it('expands and focuses the question named by ?item=', async () => {
   const qs = Array.from({ length: 6 }, (_, i) => ({ id: `r${i}`, status: 'active', reviewedAt: Date.UTC(2026, 9, 30), payload: stemOf(String(i)) }))
   const c = await mountAt(review([concept('c', qs)], 0), '/org/x/questions?item=r5')
