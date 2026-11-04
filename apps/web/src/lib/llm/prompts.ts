@@ -3,8 +3,7 @@ import type { ItemPayload } from '@/lib/llm/schemas'
 
 type Prompt = { system: string; user: string }
 
-// multi and order stay off until both clients render them.
-export const ENABLED_FORMATS: ItemPayload['format'][] = ['mcq', 'cloze', 'short']
+export const ENABLED_FORMATS: ItemPayload['format'][] = ['mcq', 'multi', 'cloze', 'short', 'order']
 
 const LEVELS = ['novice', 'beginner', 'intermediate', 'advanced', 'fluent']
 const levelLabel = (level: number) => `${level} of 5 (${LEVELS[Math.min(5, Math.max(1, Math.round(level))) - 1]})`
