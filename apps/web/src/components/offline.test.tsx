@@ -184,7 +184,7 @@ it('keeps the answer after an offline Check and submits it with Try again online
     })
     await act(async () => { retry.click() })
     expect(answerItem).toHaveBeenLastCalledWith({ data: expect.objectContaining({ itemId: 'item', answer: { optionId: 'four' }, confidence: 'sure' }) })
-    expect(container.querySelector('[role="status"] h2')?.textContent).toBe('Correct, you were sure')
+    expect(document.querySelector('[role="dialog"] h2')?.textContent).toBe('Correct')
     expect(container.querySelector('[role="alert"]')).toBeNull()
   } finally {
     await cleanup()

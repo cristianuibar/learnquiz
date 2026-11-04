@@ -18,6 +18,7 @@ vi.mock('@tanstack/react-start', () => ({
 }))
 
 const DAY = 86_400_000
+const WEEK = 7 * DAY
 const start = Date.UTC(2026, 10, 2)
 const now = start + 6 * DAY + DAY / 2
 let raw: DatabaseSync
@@ -105,14 +106,77 @@ it('returns the latest ready topic and a week of the caller’s own mastery, cor
   expect(profile.units.map((u) => [u.name, u.concepts.map((c) => [c.name, c.pKnown, c.critical])])).toEqual([
     ['Foundations', [['Emergency exits', 0.8, true]]], ['In practice', [['Reporting hazards', 0.7, false]]],
   ])
-  expect(profile.weekly.map((d) => Math.round(d.mastery * 1000))).toEqual([300, 350, 425, 500, 600, 650, 750])
-  expect(profile.weekly.map((d) => [d.attempts, d.sessions])).toEqual(Array.from({ length: 7 }, () => [1, 1]))
+  expect(profile.weeks).toEqual([{ start, mastery: 0.75, sessions: 7, partial: true }])
+  expect(profile.mastery).toBe(0.75)
+  expect(profile.started).toBe(true)
+  // Both units are practiced below the 0.85 benchmark.
+  expect(profile.units.map((u) => [u.mastery, u.state, u.concepts.map((c) => [c.measured, c.status])])).toEqual([
+    [0.8, 'learning', [[true, 'learning']]], [0.7, 'learning', [[true, 'learning']]],
+  ])
   expect(profile.sessionCounts).toEqual({ week: 7, total: 7 })
   expect(profile.confidentErrors).toEqual([
     { id: 'a4', conceptId: 'c1', concept: 'Emergency exits', at: start + 4 * DAY + 3600_000, correctedAt: null },
     { id: 'a0', conceptId: 'c1', concept: 'Emergency exits', at: start + 3600_000, correctedAt: start + DAY + 3600_000 },
   ])
   expect(profile.proficiency).toEqual({ achievedAt: null, days: null, estimatedDays: 2, projectedAt: now + 2 * DAY })
+  holder.user = { id: 'admin-a', name: 'Admin', isAnonymous: false }
+  expect(await getProfile({ data: { org: 'company-a', learnerId: 'learner-a' } })).toEqual(profile)
+})
+
+it.each([
+  ['placed and unlocked', true, true, 'estimate'],
+  ['placed but not unlocked', true, false, 'locked'],
+  ['not placed', false, false, 'not_started'],
+])('leaves an unpracticed unit %s with its concepts not started', async (_name, placed, unlocked, state) => {
+  seedWeek()
+  raw.exec('DELETE FROM attempts')
+  if (placed) raw.prepare('INSERT INTO placements (id, learner_id, topic_id, log_json, created_at) VALUES (?, ?, ?, ?, ?)').run('placement', 'learner-a', 'training', '[]', now)
+  if (unlocked) raw.prepare('INSERT INTO learner_unit (learner_id, unit_id, unlocked_at) VALUES (?, ?, ?)').run('learner-a', 'basics', now)
+  const profile = await getProfile({ data: {} })
+  expect(profile.units[0]).toMatchObject({ state, concepts: [{ measured: false, status: 'not_started' }] })
+  expect(profile.weeks).toEqual([])
+})
+
+it('reports at most six Monday-aligned UTC weeks with sessions counted by end time and only the running week partial', async () => {
+  seedWeek()
+  raw.exec('DELETE FROM attempts; DELETE FROM sessions')
+  const attempt = raw.prepare('INSERT INTO attempts (id, learner_id, item_id, concept_id, at, answer_json, correct, score, confidence, response_ms, rating, p_known_before, p_known_after) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+  // The first attempt is eight weeks back, so the series is capped to the latest six weeks.
+  for (const [at, concept, before, after] of [
+    [start - 8 * WEEK + 2 * DAY, 'c1', 0.1, 0.3],
+    [start - 4 * WEEK + 3 * DAY, 'c1', 0.3, 0.5],
+    [start - 2 * WEEK + DAY, 'c2', 0.2, 0.6],
+    [start + DAY, 'c1', 0.5, 0.9],
+  ] as const) attempt.run(`w${at}`, 'learner-a', `i-${at}`, concept, at, '"answer"', 1, 1, 'sure', 1000, 3, before, after)
+  const session = raw.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, started_at, ended_at) VALUES (?, ?, ?, ?, ?, ?)')
+  const endings = [
+    start - 8 * WEEK + DAY, // before the first of the six weeks
+    start - 5 * WEEK + DAY, start - 4 * WEEK - 1,
+    start - 3 * WEEK + 2 * DAY,
+    start - 2 * WEEK, start - WEEK - 1, start - WEEK - 2,
+    start, start + 6 * DAY, now + 1, // the last is still in the future
+  ]
+  endings.forEach((endedAt, i) => session.run(`e${i}`, 'learner-a', 'training', 'session', endedAt - 1000, endedAt))
+  session.run('never-ended', 'learner-a', 'training', 'session', start, null)
+
+  const check = (profile: Awaited<ReturnType<typeof getProfile>>) => {
+    expect(profile.weeks.map((w) => [w.start, Math.round(w.mastery * 1000), w.sessions, w.partial])).toEqual([
+      [start - 5 * WEEK, 250, 2, false],
+      [start - 4 * WEEK, 350, 0, false],
+      [start - 3 * WEEK, 350, 1, false],
+      [start - 2 * WEEK, 550, 3, false],
+      [start - WEEK, 550, 0, false],
+      [start, 750, 2, true],
+    ])
+    expect(profile.weeks).toHaveLength(6)
+    for (const w of profile.weeks) {
+      expect(new Date(w.start).getUTCDay()).toBe(1)
+      expect(w.start % DAY).toBe(0)
+    }
+    expect(profile.weeks.filter((w) => w.partial)).toEqual([profile.weeks[5]])
+  }
+  const profile = await getProfile({ data: {} })
+  check(profile)
   holder.user = { id: 'admin-a', name: 'Admin', isAnonymous: false }
   expect(await getProfile({ data: { org: 'company-a', learnerId: 'learner-a' } })).toEqual(profile)
 })
@@ -212,7 +276,9 @@ it('has no projection before training and refuses a target without a company', a
   const profile = await getProfile({ data: {} })
   expect(profile.topic).toBeNull()
   expect(profile.units).toEqual([])
-  expect(profile.weekly.map((d) => [d.mastery, d.attempts, d.sessions])).toEqual(Array.from({ length: 7 }, () => [0, 0, 0]))
+  expect(profile.started).toBe(false)
+  expect(profile.weeks).toEqual([])
+  expect(profile.mastery).toBe(0)
   expect(profile.proficiency.projectedAt).toBeNull()
   expect(() => getProfile({ data: { learnerId: 'learner-a' } as never })).toThrow()
 })

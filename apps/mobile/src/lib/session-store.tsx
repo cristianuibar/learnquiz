@@ -5,6 +5,7 @@ import { api, ApiError, authCall } from './api'
 import { getToken, handleUnauthorized, loadToken, signOut, subscribeAuth } from './auth'
 import { releaseReplayHolds } from './held-target'
 import * as kv from './kv'
+import { setPushUser } from './push'
 import { tokenFingerprint } from './token-fingerprint'
 
 export type { Branding, SessionUser } from '@learnquiz/api'
@@ -135,6 +136,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (stale()) return
       if (!session.user) { await handleUnauthorized(); return }
       const user = session.user
+      setPushUser(user.id)
       const last = await readStored()
       if (stale()) return
       // Another learner (or an unknown one) used this phone: end every older save

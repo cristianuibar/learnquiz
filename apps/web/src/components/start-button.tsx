@@ -3,6 +3,7 @@ import { useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { InlineError, errorMessage } from '@/components/inline-error'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { Working } from '@/components/working'
 import { startPlacement, startSession } from '@/server/play'
 
@@ -12,11 +13,21 @@ export function StartButton({
   topicId,
   placement,
   variant,
+  size,
+  label,
+  disabled,
+  describedBy,
+  className,
   children,
 }: {
   topicId: string
   placement?: boolean
   variant?: 'primary' | 'accent' | 'secondary' | 'ghost' | 'link'
+  size?: 'default' | 'lg'
+  label?: string
+  disabled?: boolean
+  describedBy?: string
+  className?: string
   children: React.ReactNode
 }) {
   const router = useRouter()
@@ -46,7 +57,15 @@ export function StartButton({
   }
   if (error) return <InlineError message={error} onRetry={go} />
   return (
-    <Button variant={variant} className="w-full px-6 sm:w-auto" onClick={go}>
+    <Button
+      variant={variant}
+      size={size}
+      className={cn('w-full px-6 sm:w-auto', className)}
+      aria-label={label}
+      aria-describedby={describedBy}
+      disabled={disabled}
+      onClick={go}
+    >
       {children}
     </Button>
   )

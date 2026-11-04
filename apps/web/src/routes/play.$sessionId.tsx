@@ -5,16 +5,16 @@ import { useServerFn } from '@tanstack/react-start'
 import { InlineError, RouteError, errorMessage } from '@/components/inline-error'
 import { ProgressHeader } from '@/components/progress-header'
 import { ModelLabel } from '@/components/model-label'
-import { RevealCard } from '@/components/reveal-card'
+import { RevealOverlay } from '@/components/reveal-overlay'
+import { RevealedOptions } from '@/components/revealed-options'
 import { ModelTrace } from '@/components/model-trace'
 import { QuestionScreen } from '@/components/question/question-screen'
-import { Button } from '@/components/ui/button'
 import { Working } from '@/components/working'
 import { stopSpeaking } from '@/lib/speech'
 import { isAnswerReady } from '@learnquiz/api'
 import type { Answer, Confidence, ItemFormat, Reveal, SessionView } from '@learnquiz/api'
 import { checkFailedMessage } from '@learnquiz/api/system-copy'
-import { answerItem, endSession, getSession, nextItem, prepareNextSession, reportItem } from '@/server/play'
+import { answerItem, endSession, getSession, nextItem, prepareNextSession } from '@/server/play'
 
 export const Route = createFileRoute('/play/$sessionId')({
   beforeLoad: ({ context }) => {
@@ -96,15 +96,13 @@ function Play({ initial }: { initial: SessionView }) {
   const check = useServerFn(answerItem)
   const next = useServerFn(nextItem)
   const end = useServerFn(endSession)
-  const report = useServerFn(reportItem)
   const sync = useServerFn(getSession)
   const prepare = useServerFn(prepareNextSession)
   const [view, setView] = useState(initial)
   const [choice, setChoice] = useState('') // option id (mcq), comma-joined option ids (multi, order) or typed text
   const [confidence, setConfidence] = useState<Confidence | null>(null)
   const [reveal, setReveal] = useState<Reveal | null>(null)
-  const [why, setWhy] = useState('')
-  const [reported, setReported] = useState(false)
+  const [announcement, setAnnouncement] = useState('')
   const [busy, setBusy] = useState(false)
   const [voiceBusy, setVoiceBusy] = useState(false)
   // Answer controls stay disabled until the current position is known; the server HTML renders them disabled too.
@@ -113,6 +111,9 @@ function Play({ initial }: { initial: SessionView }) {
   const [error, setError] = useState<{ message: string; retry: () => void; ending?: boolean } | null>(null)
   const shownAt = useRef(Date.now())
   const questionHeading = useRef<HTMLHeadingElement>(null)
+  // Read by the pageshow handler, which is registered once.
+  const revealShowing = useRef(false)
+  revealShowing.current = Boolean(reveal)
 
   const { item, progress } = view
   const placement = view.kind === 'placement'
@@ -141,16 +142,20 @@ function Play({ initial }: { initial: SessionView }) {
 
   // Back then Forward can restore a page showing an earlier question: reload the session before answering resumes.
   useEffect(() => {
-    const reload = () =>
+    const reload = () => {
+      // A reveal on screen is this session's own result; reloading would discard it.
+      if (revealShowing.current) return setLoading(false)
       void run(async () => {
         await resync()
         setLoading(false)
       })
+    }
     if (openedFromHistory()) reload()
     else setLoading(false)
     const onPageShow = (e: PageTransitionEvent) => {
       if (!e.persisted) return
       // Synchronous, so no keystroke reaches the restored question before the controls lock.
+      if (revealShowing.current) return
       flushSync(() => setLoading(true))
       reload()
     }
@@ -199,13 +204,12 @@ function Play({ initial }: { initial: SessionView }) {
     setChoice(draft?.choice ?? '')
     setConfidence(draft?.confidence ?? null)
     setReveal(null)
-    setWhy('')
-    setReported(false)
     shownAt.current = Date.now()
   }
 
   function submitCheck() {
     if (!item || !ready || busy || voiceBusy || loading) return
+    setAnnouncement('')
     const responseMs = Date.now() - shownAt.current
     stopSpeaking()
     void run(async () => {
@@ -231,101 +235,89 @@ function Play({ initial }: { initial: SessionView }) {
     set(value)
   }
 
-  function submitNext() {
+  function submitNext(why: string) {
     if (busy) return
     void run(async () => {
-      const v = await next({ data: { sessionId: view.id, why: why.trim() || undefined } })
+      const v = await next({ data: { sessionId: view.id, why: why || undefined } })
       setView(v)
       if (v.ended) return finish()
       setChoice('')
       setConfidence(null)
       setReveal(null)
-      setWhy('')
-      setReported(false)
       shownAt.current = Date.now()
     })
   }
 
-  const chosen = item?.options.find((o) => o.id === choice)?.text ?? (item?.format === 'cloze' || item?.format === 'short' ? choice.trim() : null)
+  function reportSent(why: string) {
+    setAnnouncement('Report sent')
+    submitNext(why)
+  }
+
+  const revealed = !view.ended && item && reveal ? { item, reveal } : null
+  const answer = revealed ? toAnswer(revealed.item.format, choice) : null
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col px-4">
-      <ProgressHeader
-        position={progress.position}
-        total={progress.total}
-        onEnd={leave}
-        endDisabled={busy}
-        readAloud={item && !reveal && !loading ? [item.stem, ...item.options.map((o) => o.text)] : null}
-      />
-      {!view.ended && item && !reveal ? (
-        <QuestionScreen
-          item={item}
-          sessionId={view.id}
-          voiceEnabled={Boolean(view.voiceEnabled)}
-          choice={choice}
-          onChoice={edit(setChoice)}
-          busy={busy}
-          voiceBusy={voiceBusy}
-          onVoiceBusy={setVoiceBusy}
+      {/* The overlay portals out of this wrapper, so only the page behind it goes inert. */}
+      <div inert={Boolean(revealed)} className="flex flex-1 flex-col">
+        <ProgressHeader
+          position={progress.position}
+          total={progress.total}
           onEnd={leave}
-          headingRef={questionHeading}
-          loading={loading}
-          confidence={confidence}
-          onConfidence={edit(setConfidence)}
-          canCheck={ready && !busy && !voiceBusy && !loading}
-          error={error}
-          onCheck={submitCheck}
+          endDisabled={busy}
+          readAloud={item && !reveal && !loading ? [item.stem, ...item.options.map((o) => o.text)] : null}
         />
-      ) : (
-        <>
+        {!view.ended && item && !reveal ? (
+          <QuestionScreen
+            item={item}
+            sessionId={view.id}
+            voiceEnabled={Boolean(view.voiceEnabled)}
+            choice={choice}
+            onChoice={edit(setChoice)}
+            busy={busy}
+            voiceBusy={voiceBusy}
+            onVoiceBusy={setVoiceBusy}
+            onEnd={leave}
+            headingRef={questionHeading}
+            loading={loading}
+            confidence={confidence}
+            onConfidence={edit(setConfidence)}
+            canCheck={ready && !busy && !voiceBusy && !loading}
+            error={error}
+            onCheck={submitCheck}
+          />
+        ) : (
           <div className="mt-6 flex flex-1 flex-col gap-6 pb-6">
-            {view.ended || !item ? (
-              !error && <Working label={placement ? 'Working out your level' : 'Wrapping up'} />
-            ) : (
+            {revealed && answer ? (
               <>
-                <p className="text-xl font-semibold">{item.stem}</p>
-                <form
-                  id="play"
-                  onSubmit={(e) => {
-                    e.preventDefault()
-                    submitNext()
-                  }}
-                >
-                  <RevealCard reveal={reveal!} chosen={chosen} why={why} onWhy={setWhy} model={item.generatedBy} />
-                </form>
-                {reported ? (
-                  <p className="text-sm text-muted-foreground">Reported</p>
-                ) : (
-                  <Button
-                    variant="link"
-                    className="self-start px-0 text-muted-foreground"
-                    disabled={busy}
-                    onClick={() =>
-                      void run(async () => {
-                        await report({ data: { itemId: item.id } })
-                        setReported(true)
-                      })
-                    }
-                  >
-                    Report this question
-                  </Button>
-                )}
-                <ModelLabel model={item.generatedBy} />
+                <h1 className="text-title-2 text-ink">{revealed.item.stem}</h1>
+                {revealed.item.options.length > 0 && <RevealedOptions item={revealed.item} answer={answer} reveal={revealed.reveal} />}
+                <ModelLabel model={revealed.item.generatedBy} />
               </>
+            ) : (
+              (view.ended || !item) && !error && <Working label={placement ? 'Working out your level' : 'Wrapping up'} />
             )}
-            {error && <InlineError message={error.message} onRetry={error.retry} />}
+            {!revealed && error && <InlineError message={error.message} onRetry={error.retry} />}
             {!placement && <ModelTrace key={view.id} scope={{ scope: 'session', sessionId: view.id }} />}
           </div>
-          {!view.ended && item && reveal && (
-            // Pinned to the bottom edge so the thumb reaches it; autoFocus lands on Continue after a check.
-            <div className="sticky bottom-0 -mx-4 border-t bg-background px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-              <Button type="submit" form="play" autoFocus disabled={busy} className="w-full px-6">
-                {reveal.state === 'D' ? 'Got it' : 'Continue'}
-              </Button>
-            </div>
-          )}
-        </>
+        )}
+      </div>
+      {revealed && answer && (
+        <RevealOverlay
+          reveal={revealed.reveal}
+          item={revealed.item}
+          answer={answer}
+          hasCompany={false}
+          company={null}
+          busy={busy}
+          error={error?.message ?? null}
+          onContinue={submitNext}
+          onReportSent={reportSent}
+        />
       )}
+      <p role="status" className="sr-only">
+        {announcement}
+      </p>
     </main>
   )
 }

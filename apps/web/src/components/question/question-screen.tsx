@@ -87,13 +87,19 @@ export function QuestionScreen({
           <Body {...props} busy={locked} />
         </fieldset>
       </form>
-      {error && (
+      {error?.ending && (
         <div className="pb-3">
-          {error.ending ? <InlineError message={error.message} onRetry={error.retry} /> : <ErrorRow message={error.message} />}
+          <InlineError message={error.message} onRetry={error.retry} />
         </div>
       )}
-      {answerable && (
-        <QuestionDock confidence={confidence} onConfidence={onConfidence} locked={locked} canCheck={canCheck} failed={Boolean(failedCheck)} onRetry={failedCheck?.retry ?? onCheck} />
+      {answerable ? (
+        <QuestionDock confidence={confidence} onConfidence={onConfidence} locked={locked} canCheck={canCheck} error={failedCheck?.message ?? null} onRetry={failedCheck?.retry ?? onCheck} />
+      ) : (
+        failedCheck && (
+          <div className="pb-3">
+            <ErrorRow message={failedCheck.message} />
+          </div>
+        )
       )}
     </>
   )

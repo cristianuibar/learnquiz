@@ -1,10 +1,11 @@
 import { createElement as h, type ReactNode } from 'react'
-import { act, render, screen } from '@testing-library/react-native'
+import { act, fireEvent, render, screen } from '@testing-library/react-native'
 import { AccessibilityInfo } from 'react-native'
 import type { ItemView } from '@learnquiz/api'
 import SessionScreen from './app/play/[sessionId]/index'
 import { useHeadingFocus } from './components/ui/Screen'
-import { api } from './lib/api'
+import { ReadAloudButton } from './components/session/ReadAloudButton'
+import { api, postForm } from './lib/api'
 import { ThemeProvider } from './theme/ThemeProvider'
 
 jest.mock('expo-router', () => {
@@ -16,7 +17,22 @@ jest.mock('expo-router', () => {
   }
 })
 jest.mock('expo-image', () => ({ Image: require('react-native').Image }))
-jest.mock('./lib/api', () => ({ api: jest.fn() }))
+jest.mock('./components/question/diagram-image', () => ({ DiagramImage: () => null }))
+type MockOnBuffer = (chunk: { data: ArrayBuffer; sampleRate: number; channels: number }) => void
+jest.mock('expo-audio', () => {
+  const stream = { start: jest.fn(async () => {}), stop: jest.fn() }
+  const audio = {
+    onBuffer: null as null | MockOnBuffer,
+    useAudioStream: (options: { onBuffer: MockOnBuffer }) => {
+      audio.onBuffer = options.onBuffer
+      return { stream, isStreaming: false }
+    },
+    requestRecordingPermissionsAsync: jest.fn(async () => ({ granted: true, canAskAgain: true })),
+  }
+  return audio
+})
+jest.mock('./components/session/ReadAloudButton', () => ({ ReadAloudButton: jest.fn(() => null) }))
+jest.mock('./lib/api', () => ({ api: jest.fn(), postForm: jest.fn() }))
 jest.mock('./lib/session-store', () => ({ useSession: () => ({ branding: null }) }))
 jest.mock('./lib/session/draft', () => ({
   draftForView: jest.fn(async () => ({ answer: {}, confidence: null })),
@@ -25,7 +41,7 @@ jest.mock('./lib/session/draft', () => ({
 }))
 jest.mock('./components/ui/Screen', () => ({ useHeadingFocus: jest.fn() }))
 jest.mock('./components/session/SessionFrame', () => ({
-  SessionFrame: ({ children }: { children: ReactNode }) => children,
+  SessionFrame: ({ children, trailing }: { children: ReactNode; trailing?: ReactNode }) => [trailing, children],
 }))
 jest.mock('./components/session/QuestionDock', () => ({ QuestionDock: () => null }))
 jest.mock('./components/sheet/sheet-host', () => ({
@@ -38,9 +54,9 @@ const item: ItemView = {
   stem: 'The pallet limit is ____.', options: [], blank: { numeric: true }, image: null, difficulty: 1,
 }
 
-async function session(question: ItemView = item) {
+async function session(question: ItemView = item, voiceEnabled?: boolean) {
   jest.mocked(api).mockResolvedValue({
-    item: question, ended: false, progress: { position: 1, total: 20 },
+    id: 'session-337', item: question, ended: false, progress: { position: 1, total: 20 }, voiceEnabled,
   })
   await render(h(ThemeProvider, { children: h(SessionScreen) }))
 }
@@ -120,4 +136,44 @@ test.each([
   expect(screen.getByRole('text', { name: stem.replace('____', 'blank') })).toBeOnTheScreen()
   expect(suffix.parent).toBe(field.parent)
   expect(field.parent).toHaveStyle({ flexDirection: 'row', flexWrap: 'nowrap', gap: 0 })
+})
+
+const short: ItemView = { ...item, format: 'short', stem: 'A carton is stuck in the conveyor. What do you do?', blank: null }
+
+test('a short answer offers recording when the session allows voice', async () => {
+  await session(short, true)
+  expect(await screen.findByRole('togglebutton', { name: 'Record answer' })).toBeOnTheScreen()
+  expect(screen.getByText('Tap to record')).toBeOnTheScreen()
+  expect(screen.getByRole('button', { name: 'Type instead' })).toBeOnTheScreen()
+  expect(screen.queryByLabelText('Your answer')).toBeNull()
+})
+
+test.each([false, undefined])('a role topic or an older server (voiceEnabled %s) types the short answer only', async (voiceEnabled) => {
+  await session(short, voiceEnabled)
+  expect(await screen.findByLabelText('Your answer')).toBeOnTheScreen()
+  expect(screen.queryByRole('togglebutton', { name: 'Record answer' })).toBeNull()
+  expect(screen.queryByText('Tap to record')).toBeNull()
+})
+
+test('Read aloud is blocked from the record tap until the transcript lands', async () => {
+  const readAloudBlocked = () => jest.mocked(ReadAloudButton).mock.lastCall?.[0].blocked
+  let transcribe!: (text: unknown) => void
+  jest.mocked(postForm).mockImplementation(() => new Promise((done) => { transcribe = done }))
+  await session(short, true)
+  await screen.findByRole('togglebutton', { name: 'Record answer' })
+  expect(readAloudBlocked()).toBe(false)
+
+  await act(async () => { fireEvent.press(screen.getByRole('togglebutton', { name: 'Record answer' })) })
+  expect(await screen.findByRole('togglebutton', { name: 'Stop recording' })).toBeOnTheScreen()
+  expect(readAloudBlocked()).toBe(true)
+
+  const audio = jest.requireMock('expo-audio') as { onBuffer: MockOnBuffer }
+  await act(async () => { audio.onBuffer({ data: new Int16Array(2400).fill(3000).buffer, sampleRate: 24_000, channels: 1 }) })
+  await act(async () => { fireEvent.press(screen.getByRole('togglebutton', { name: 'Stop recording' })) })
+  expect(screen.getByText('Turning your recording into text…')).toBeOnTheScreen()
+  expect(readAloudBlocked()).toBe(true)
+
+  await act(async () => { transcribe('Hit the stop button') })
+  expect(await screen.findByRole('button', { name: 'Record again' })).toBeOnTheScreen()
+  expect(readAloudBlocked()).toBe(false)
 })

@@ -11,8 +11,8 @@ export function ClozeBody({ item, answer, onAnswer, marks, disabled, onSubmit }:
   const input = useRef<TextInput>(null)
   const numeric = item.blank?.numeric === true
   const readOnly = disabled || marks !== null
-  const { before, suffix, after } = splitClozeStem(item.stem)
-  const sentence = [...before, `blank${suffix}`, ...after].join(' ')
+  const { before, prefix, suffix, after } = splitClozeStem(item.stem)
+  const sentence = [...before, `${prefix}blank${suffix}`, ...after].join(' ')
   const hitSlop = { top: space[2], bottom: space[2], left: space[1], right: space[1] }
 
   function focus() {
@@ -61,6 +61,11 @@ export function ClozeBody({ item, answer, onAnswer, marks, disabled, onSubmit }:
       />
       {words(before, 'before')}
       <View style={{ flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'center', gap: 0 }}>
+        {prefix ? (
+          <Text variant="title2" accessible={false} importantForAccessibility="no" style={{ lineHeight: typography.title2.lineHeight + space[3] }}>
+            {prefix}
+          </Text>
+        ) : null}
         <TextInput
           ref={input}
           value={answer.text ?? ''}

@@ -1,5 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { motion, useReducedMotion } from 'motion/react'
+import { useId, useState, type ReactNode, type Ref } from 'react'
 import { Check, ChevronDown, Flag, Info, RotateCcw, ShieldAlert, X } from 'lucide-react'
 import { ConceptDiagram } from '@/components/concept-diagram'
 import { ErrorRow } from '@/components/question/error-row'
@@ -56,28 +55,31 @@ export function RevealSheet({
   onReport,
   busy,
   error,
+  headingId,
+  headingRef,
+  reportRef,
 }: {
   reveal: Reveal
   item: ItemView
   answer: Answer
   hasCompany: boolean
   onContinue(reflection: string): void
-  onReport(): void
+  onReport?(reflection: string): void // absent once a report has been sent
   busy?: boolean
   error?: string | null
+  headingId: string
+  headingRef: Ref<HTMLHeadingElement>
+  reportRef: Ref<HTMLButtonElement>
 }) {
   const model = revealModel(reveal, { hasCompany })
   const { variant } = model
   const tone = TONE[model.tone]
-  const reduce = useReducedMotion()
-  const headingId = useId()
+  const reflectionId = useId()
   const whyId = useId()
   const diagramId = useId()
-  const heading = useRef<HTMLHeadingElement>(null)
   const [whyOpen, setWhyOpen] = useState(model.openByDefault)
   const [diagramOpen, setDiagramOpen] = useState(false)
   const [reflection, setReflection] = useState('')
-  useEffect(() => heading.current?.focus(), [])
 
   const optionText = (id: string) => item.options.find((o) => o.id === id)?.text ?? id
   const label = item.format === 'cloze' ? revealCopy.youWrote : item.format === 'short' ? revealCopy.yourAnswer : revealCopy.youChose
@@ -172,12 +174,12 @@ export function RevealSheet({
           {explanation}
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor={`${headingId}-reflection`}>
+          <Label htmlFor={reflectionId}>
             {revealCopy.reflection}
             <span className="text-caption text-ink-muted">{revealCopy.optional}</span>
           </Label>
           <Input
-            id={`${headingId}-reflection`}
+            id={reflectionId}
             maxLength={300}
             autoComplete="off"
             value={reflection}
@@ -203,55 +205,53 @@ export function RevealSheet({
 
   return (
     <>
-      <div aria-hidden className="fixed inset-0 z-40 bg-scrim" />
-      <motion.section
-        role="dialog"
-        aria-labelledby={headingId}
-        initial={reduce ? false : { opacity: 0, y: 32 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: [0.2, 0, 0, 1] }}
-        className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[calc(100%-48px)] max-w-md flex-col overflow-hidden rounded-t-lg bg-surface-card shadow-raised"
-      >
-        <div aria-hidden className="absolute top-2 left-1/2 h-1 w-9 -translate-x-1/2 rounded-full bg-border-strong" />
-        <div role="status" className={cn('flex items-center gap-3 px-4 pt-6 pb-4', tone.ground)}>
-          <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-full', tone.disc)}>
-            <tone.Icon aria-hidden className="size-5" />
-          </span>
-          <h2
-            id={headingId}
-            ref={heading}
-            tabIndex={-1}
-            className={cn('text-title-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand', tone.text)}
-          >
-            {model.heading}
-          </h2>
-          {model.xpText && <span className="ml-auto text-label text-ink-muted tabular-nums">{model.xpText}</span>}
-        </div>
-        <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
-          {body}
-          {reveal.diagramConceptId && (
-            <div className="flex flex-col gap-2">
-              <Disclosure label="Concept diagram" open={diagramOpen} onToggle={() => setDiagramOpen(!diagramOpen)} id={diagramId} />
-              {diagramOpen && <div id={diagramId}><ConceptDiagram conceptId={reveal.diagramConceptId} /></div>}
-            </div>
-          )}
-        </div>
-        <div className="flex flex-col gap-1 border-t border-border px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]">
-          {error && <ErrorRow message={error} />}
+      <div aria-hidden className="absolute top-2 left-1/2 h-1 w-9 -translate-x-1/2 rounded-full bg-border-strong" />
+      <div role="status" className={cn('flex items-center gap-3 px-4 pt-6 pb-4', tone.ground)}>
+        <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-full', tone.disc)}>
+          <tone.Icon aria-hidden className="size-5" />
+        </span>
+        <h2
+          id={headingId}
+          ref={headingRef}
+          tabIndex={-1}
+          className={cn('text-title-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand', tone.text)}
+        >
+          {model.heading}
+        </h2>
+        {model.xpText && <span className="ml-auto text-label text-ink-muted tabular-nums">{model.xpText}</span>}
+      </div>
+      <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
+        {body}
+        {reveal.diagramConceptId && (
+          <div className="flex flex-col gap-2">
+            <Disclosure label="Concept diagram" open={diagramOpen} onToggle={() => setDiagramOpen(!diagramOpen)} id={diagramId} />
+            {diagramOpen && <div id={diagramId}><ConceptDiagram conceptId={reveal.diagramConceptId} /></div>}
+          </div>
+        )}
+      </div>
+      <div className="flex flex-col gap-1 border-t border-border px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]">
+        {error && <ErrorRow message={error} />}
+        <Button
+          size="lg"
+          className="w-full"
+          disabled={busy}
+          onClick={() => onContinue(variant === 'sureWrong' ? reflection.trim() : '')}
+        >
+          {model.continueLabel}
+        </Button>
+        {onReport && (
           <Button
-            size="lg"
-            className="w-full"
+            ref={reportRef}
+            variant="link"
+            className="text-ink-muted"
             disabled={busy}
-            onClick={() => onContinue(variant === 'sureWrong' ? reflection.trim() : '')}
+            onClick={() => onReport(variant === 'sureWrong' ? reflection.trim() : '')}
           >
-            {model.continueLabel}
-          </Button>
-          <Button variant="link" className="text-ink-muted" onClick={onReport}>
             <Flag aria-hidden className="size-4" />
             {revealCopy.report}
           </Button>
-        </div>
-      </motion.section>
+        )}
+      </div>
     </>
   )
 }
