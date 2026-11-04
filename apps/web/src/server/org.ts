@@ -1,13 +1,13 @@
 import { createServerFn } from '@tanstack/react-start'
 import { getRequestHeaders } from '@tanstack/react-start/server'
-import { and, asc, count, desc, eq, gt, lte, max, notExists, or } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gt, isNull, lte, max, notExists, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/sqlite-core'
 import type { InviteView } from '@learnquiz/api/invite'
 import { brandProblem } from '@learnquiz/tokens'
 import { z } from 'zod'
 import { getDb } from '@/db'
 import { invitation, member, organization, user } from '@/db/auth-schema'
-import { attempts, concepts, jobRoles, learnerConcept, memberRoleAssignments, orgSettings, sessions, topics } from '@/db/schema'
+import { attempts, concepts, jobRoles, items, learnerConcept, memberRoleAssignments, orgSettings, sessions, sources, topics } from '@/db/schema'
 import { roleMastery } from '@/lib/learning/path'
 import { WEEK, benchmarkMet } from '@/lib/learning/profile'
 import { getAuth } from '@/server/auth'
@@ -41,6 +41,25 @@ const rolesOf = (orgId: string) =>
     .innerJoin(topics, eq(topics.jobRoleId, jobRoles.id))
     .where(and(eq(jobRoles.orgId, orgId), eq(jobRoles.status, 'active')))
     .orderBy(asc(jobRoles.createdAt))
+
+// Per active role: people assigned, live documents, and how many of the topic's live concepts are generated.
+async function roleSummaries(orgId: string) {
+  const db = getDb()
+  const [roles, people, documents, conceptRows] = await Promise.all([
+    rolesOf(orgId),
+    db.select({ id: memberRoleAssignments.jobRoleId, n: count() }).from(memberRoleAssignments).where(eq(memberRoleAssignments.orgId, orgId)).groupBy(memberRoleAssignments.jobRoleId),
+    db.select({ id: sources.topicId, n: count() }).from(sources).innerJoin(topics, eq(topics.id, sources.topicId)).where(and(eq(topics.orgId, orgId), isNull(sources.retiredAt), isNull(sources.deletedAt))).groupBy(sources.topicId),
+    db.select({ id: concepts.topicId, total: count(), ready: sql<number>`coalesce(sum(${concepts.genStatus} = 'ready'), 0)`, busy: sql<number>`coalesce(sum(${concepts.genStatus} in ('pending', 'generating')), 0)` })
+      .from(concepts).innerJoin(topics, eq(topics.id, concepts.topicId)).where(and(eq(topics.orgId, orgId), liveConcept())).groupBy(concepts.topicId),
+  ])
+  const peopleBy = new Map(people.map((r) => [r.id, r.n]))
+  const documentsBy = new Map(documents.map((r) => [r.id, r.n]))
+  const conceptsBy = new Map(conceptRows.map((r) => [r.id, r]))
+  return roles.map((role) => {
+    const c = conceptsBy.get(role.topicId)
+    return { ...role, people: peopleBy.get(role.id) ?? 0, documents: documentsBy.get(role.topicId) ?? 0, conceptsReady: Number(c?.ready ?? 0), conceptsTotal: c?.total ?? 0, preparing: role.topicStatus === 'generating' || Number(c?.busy ?? 0) > 0 }
+  })
+}
 
 type Training = { stage: 'onboarding' | 'proficient'; progress: number; daysToProficiency: number | null; criticalConfidentErrors: number; mastery: number; benchmark: number }
 
@@ -150,8 +169,9 @@ export const getOrgOverview = createServerFn({ method: 'GET' })
     const { org, readOnly } = await requireOrgReader(data.slug)
     const db = getDb()
     const now = Date.now()
-    const [roles, progress, [invited], [errors]] = await Promise.all([
-      rolesOf(org.id),
+    const weekErrors = and(eq(memberRoleAssignments.orgId, org.id), eq(attempts.correct, false), gt(attempts.at, now - WEEK), lte(attempts.at, now))
+    const [roles, progress, [invited], [errors], [openError], assignments, unreviewed] = await Promise.all([
+      roleSummaries(org.id),
       trainingOf(org.id),
       // Invited employees count before they join, the same ones People shows as Invited rather than Expired.
       db.select({ n: count() })
@@ -163,11 +183,36 @@ export const getOrgOverview = createServerFn({ method: 'GET' })
         .innerJoin(topics, and(eq(topics.id, concepts.topicId), eq(topics.status, 'ready')))
         .innerJoin(memberRoleAssignments, and(eq(memberRoleAssignments.userId, attempts.learnerId), eq(memberRoleAssignments.jobRoleId, topics.jobRoleId)))
         .innerJoin(member, and(eq(member.userId, memberRoleAssignments.userId), eq(member.organizationId, memberRoleAssignments.orgId)))
-        .where(and(eq(memberRoleAssignments.orgId, org.id), eq(attempts.correct, false), gt(attempts.at, now - WEEK), lte(attempts.at, now))),
+        .where(weekErrors),
+      db.select({ userId: attempts.learnerId })
+        .from(attempts)
+        .innerJoin(concepts, and(eq(concepts.id, attempts.conceptId), eq(concepts.critical, true)))
+        .innerJoin(topics, and(eq(topics.id, concepts.topicId), eq(topics.status, 'ready')))
+        .innerJoin(memberRoleAssignments, and(eq(memberRoleAssignments.userId, attempts.learnerId), eq(memberRoleAssignments.jobRoleId, topics.jobRoleId)))
+        .innerJoin(member, and(eq(member.userId, memberRoleAssignments.userId), eq(member.organizationId, memberRoleAssignments.orgId)))
+        .where(weekErrors)
+        .orderBy(desc(attempts.at), desc(attempts.id))
+        .limit(1),
+      db.select({ userId: memberRoleAssignments.userId, proficientAt: memberRoleAssignments.proficientAt }).from(memberRoleAssignments).where(eq(memberRoleAssignments.orgId, org.id)),
+      // Live documents of active roles that still hold active items nobody has reviewed, newest first.
+      db.select({ id: sources.id, title: sources.title, roleId: topics.jobRoleId, topicId: topics.id, unreviewed: count() })
+        .from(sources)
+        .innerJoin(items, and(eq(items.sourceId, sources.id), eq(items.status, 'active'), isNull(items.reviewedAt)))
+        .innerJoin(concepts, and(eq(concepts.id, items.conceptId), liveConcept()))
+        .innerJoin(topics, eq(topics.id, sources.topicId))
+        .innerJoin(jobRoles, and(eq(jobRoles.id, topics.jobRoleId), eq(jobRoles.orgId, org.id), eq(jobRoles.status, 'active')))
+        .where(and(eq(topics.orgId, org.id), isNull(sources.retiredAt), isNull(sources.deletedAt)))
+        .groupBy(sources.id)
+        .orderBy(desc(sources.createdAt), desc(sources.id)),
     ])
-    const proficient = [...progress.values()].filter((row) => row.stage === 'proficient')
-    const days = proficient.flatMap((row) => row.daysToProficiency === null ? [] : [row.daysToProficiency])
-    return { name: org.name, slug: org.slug, roles, readOnly, training: { employees: progress.size + (invited?.n ?? 0), proficientEmployees: proficient.length, daysToProficiency: days.length ? Math.ceil(mean(days)) : null, criticalErrorsThisWeek: errors?.n ?? 0, documentsToReview: null as number | null } }
+    const proficient = [...progress].filter(([, row]) => row.stage === 'proficient')
+    const days = proficient.flatMap(([, row]) => row.daysToProficiency === null ? [] : [row.daysToProficiency])
+    const reached = new Map<string, number>()
+    for (const row of assignments) if (row.proficientAt !== null) reached.set(row.userId, Math.min(reached.get(row.userId) ?? Infinity, row.proficientAt))
+    const first = proficient.map(([userId]) => userId).sort((a, b) => (reached.get(a) ?? Infinity) - (reached.get(b) ?? Infinity) || (a < b ? -1 : a > b ? 1 : 0))[0] ?? null
+    const top = unreviewed[0]
+    const nextStep: { unreviewed: number; documentTitle: string; roleId: string; topicId: string } | null = top?.roleId ? { unreviewed: top.unreviewed, documentTitle: top.title, roleId: top.roleId, topicId: top.topicId } : null
+    return { name: org.name, slug: org.slug, readOnly, roles, nextStep, training: { employees: progress.size + (invited?.n ?? 0), proficientEmployees: proficient.length, daysToProficiency: days.length ? Math.ceil(mean(days)) : null, criticalErrorsThisWeek: errors?.n ?? 0, documentsToReview: unreviewed.length, firstProficientUserId: first, openErrorUserId: openError?.userId ?? null } }
   })
 
 export const getPeople = createServerFn({ method: 'GET' })

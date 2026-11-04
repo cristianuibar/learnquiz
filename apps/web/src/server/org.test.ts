@@ -177,7 +177,7 @@ it('reports assigned training stages, unresolved critical errors and company pro
     expect.objectContaining({ name: 'member', training: { stage: 'onboarding', progress: expect.closeTo(0.4 / 3 / 0.85, 10), daysToProficiency: null, criticalConfidentErrors: 2, mastery: 13, benchmark: 85 }, lastActiveAt: now - day }),
   ])
   expect(people.invites).toEqual([expect.objectContaining({ name: 'Waiting', expired: false })])
-  expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { employees: 3, proficientEmployees: 1, daysToProficiency: 4, criticalErrorsThisWeek: 1, documentsToReview: null } })
+  expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { employees: 3, proficientEmployees: 1, daysToProficiency: 4, criticalErrorsThisWeek: 1, documentsToReview: 0, firstProficientUserId: 'admin', openErrorUserId: 'member' } })
 
   // Expired and accepted invitations are not employees waiting to join.
   sqlite.prepare('INSERT INTO invitation (id, organization_id, email, status, expires_at, inviter_id, job_role_id, invitee_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
@@ -192,7 +192,7 @@ it('reports assigned training stages, unresolved critical errors and company pro
     expect.objectContaining({ name: 'admin', training: { stage: 'onboarding', progress: expect.closeTo(0.6 / 0.85, 10), daysToProficiency: null, criticalConfidentErrors: 0, mastery: 86, benchmark: 85 } }),
     expect.objectContaining({ name: 'member', training: { stage: 'onboarding', progress: expect.closeTo(0.4 / 3 / 0.85, 10), daysToProficiency: null, criticalConfidentErrors: 1, mastery: 13, benchmark: 85 } }),
   ])
-  expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { employees: 3, proficientEmployees: 0, daysToProficiency: null, criticalErrorsThisWeek: 1, documentsToReview: null } })
+  expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { employees: 3, proficientEmployees: 0, daysToProficiency: null, criticalErrorsThisWeek: 1, documentsToReview: 0, firstProficientUserId: null } })
 })
 
 it('ignores concepts of a retired document when deciding an employee is proficient', async () => {
@@ -215,6 +215,33 @@ it('ignores concepts of a retired document when deciding an employee is proficie
   const people = await getPeople({ data: { slug: 'alpha' } })
   expect(people.members.find((m) => m.name === 'member')!.training).toEqual({ stage: 'proficient', progress: 1, daysToProficiency: null, criticalConfidentErrors: 0, mastery: 93, benchmark: 85 })
   expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ training: { employees: 1, proficientEmployees: 1 } })
+})
+
+it('counts live documents with unreviewed active items and summarizes each role', async () => {
+  const topic = sqlite.prepare('SELECT id FROM topics WHERE job_role_id = ?').get('legacy-role')!.id as string
+  sqlite.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES (?, ?, ?, 1)').run('member', 'org-a', 'legacy-role')
+  const source = sqlite.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, created_at, retired_at) VALUES (?, ?, 'text', ?, '', ?, ?)")
+  source.run('new-doc', topic, 'Safety handbook', 3, null)
+  source.run('reviewed-doc', topic, 'Returns policy', 2, null)
+  source.run('old-doc', topic, 'Retired handbook', 1, 5)
+  const concept = sqlite.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary, source_id, gen_status) VALUES (?, ?, ?, 0, ?, ?, ?, ?)')
+  concept.run('c-ready', topic, 'warehouse', 'Scan', '', 'new-doc', 'ready')
+  concept.run('c-pending', topic, 'warehouse', 'Label', '', 'new-doc', 'pending')
+  concept.run('c-returns', topic, 'warehouse', 'Returns', '', 'reviewed-doc', 'ready')
+  concept.run('c-dead', topic, 'warehouse', 'Forklift', '', 'old-doc', 'ready')
+  concept.run('c-loose', topic, 'warehouse', 'Loose', '', null, 'ready')
+  const item = sqlite.prepare("INSERT INTO items (id, concept_id, topic_id, format, payload_json, status, reviewed_at, source_id, created_at) VALUES (?, ?, ?, 'cloze', '{}', ?, ?, ?, 1)")
+  item.run('i1', 'c-ready', topic, 'active', null, 'new-doc')
+  item.run('i2', 'c-pending', topic, 'active', null, 'new-doc')
+  item.run('i3', 'c-ready', topic, 'active', 9, 'new-doc')
+  item.run('i4', 'c-ready', topic, 'rejected', null, 'new-doc')
+  item.run('i5', 'c-returns', topic, 'active', 9, 'reviewed-doc')
+  item.run('i6', 'c-loose', topic, 'active', null, 'old-doc')
+  item.run('i7', 'c-dead', topic, 'active', null, 'old-doc')
+  const overview = await getOrgOverview({ data: { slug: 'alpha' } })
+  expect(overview.training.documentsToReview).toBe(1)
+  expect(overview.nextStep).toEqual({ unreviewed: 2, documentTitle: 'Safety handbook', roleId: 'legacy-role', topicId: topic })
+  expect(overview.roles).toEqual([expect.objectContaining({ id: 'legacy-role', topicId: topic, documents: 2, conceptsReady: 3, conceptsTotal: 4, people: 1, preparing: true })])
 })
 
 it("returns each member's mastery against their job role benchmark", async () => {
