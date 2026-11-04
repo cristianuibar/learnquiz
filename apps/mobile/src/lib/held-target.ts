@@ -53,9 +53,28 @@ export function joinAttemptHeld(owner: string): boolean {
   return false
 }
 
+// The root layout's post-sign-in handoff to index, waiting for the session. It
+// belongs to the Join that the closing sign-in screen uncovered (its route key).
+// That Join cancels it whenever it acts on its own result; the layout runs it
+// only while that Join is still in front with no attempt held.
+let handoff: string | null = null
+
+export function armHandoff(owner: string): void {
+  handoff = owner
+}
+
+export function cancelHandoff(owner: string): void {
+  if (handoff === owner) handoff = null
+}
+
+export function handoffOwner(): string | null {
+  return handoff
+}
+
 // Sign-out ends every join attempt, so no stale hold can block a later session.
 export function releaseReplayHolds(): void {
   attempts.clear()
+  handoff = null
   if (holds.size === 0) return
   holds.clear()
   holdsEnded()

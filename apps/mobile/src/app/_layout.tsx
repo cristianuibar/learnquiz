@@ -14,7 +14,16 @@ import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { ThemeProvider } from '@/theme/ThemeProvider'
 import { SessionProvider, useSession } from '@/lib/session-store'
-import { holdTarget, joinAttemptHeld, replayVersion, subscribeReplay, takeReplayTarget } from '@/lib/held-target'
+import {
+  armHandoff,
+  cancelHandoff,
+  handoffOwner,
+  holdTarget,
+  joinAttemptHeld,
+  replayVersion,
+  subscribeReplay,
+  takeReplayTarget,
+} from '@/lib/held-target'
 import { canOpenTarget, targetFromURL } from '@/lib/route-gates'
 import { useNotificationObserver } from '@/lib/notification-observer'
 
@@ -62,7 +71,7 @@ function SessionRoutes({ fontsLoaded }: { fontsLoaded: boolean }) {
   const focusedKey = focusedRouteKey(useRootNavigationState() as NavState | undefined)
   const lastURL = useRef<string | null>(null)
   const mounted = useRef(false)
-  // Set while the resolved stack shows sign-in, until the next resolved screen.
+  // Set while the stack shows sign-in, until the next screen.
   const fromSignIn = useRef(false)
   // Set once the first session resolved. A later loading (a new bearer waiting
   // for /session) keeps the stack, so an open invitation stays mounted.
@@ -79,13 +88,25 @@ function SessionRoutes({ fontsLoaded }: { fontsLoaded: boolean }) {
       if (target && !canOpenTarget(target, session)) holdTarget(target)
     }
     // Sign-in over Join: removing the protected sign-in screen uncovers Join, not
-    // index. Hand the post-auth decision to index, as when sign-in sits over it,
-    // unless that Join's own attempt still runs: then it navigates or shows its retry.
-    if (resolved) {
-      const signedInOverJoin = fromSignIn.current && session.status === 'ready' && pathname.startsWith('/join/')
-      fromSignIn.current = pathname === '/sign-in'
-      if (signedInOverJoin) {
-        if (!focusedKey || !joinAttemptHeld(focusedKey)) router.replace('/')
+    // index. The post-auth decision belongs to index, as when sign-in sits over it,
+    // so the uncovered Join gets a pending handoff to index. Back to Join while
+    // signed out is not a sign-in.
+    if (pathname === '/sign-in') fromSignIn.current = true
+    else if (fromSignIn.current) {
+      fromSignIn.current = false
+      if (session.status !== 'signedOut' && pathname.startsWith('/join/') && focusedKey) armHandoff(focusedKey)
+    }
+    // The handoff runs once the session is ready, only while that same Join is in
+    // front with no attempt held. Join cancels it when it acts on its own result
+    // (a new attempt, its retry, its own navigation); leaving that Join drops it.
+    const owner = handoffOwner()
+    if (owner !== null) {
+      if (owner !== focusedKey) cancelHandoff(owner)
+      else if (resolved && session.status === 'ready') {
+        // Join's attempt still runs: it navigates or shows its retry; no replay over it.
+        if (joinAttemptHeld(owner)) return
+        cancelHandoff(owner)
+        router.replace('/')
         return
       }
     }

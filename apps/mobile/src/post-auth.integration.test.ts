@@ -70,10 +70,15 @@ const invite = {
   otherAccount: false, roleName: 'Warehouse picker', accent: null, logoUrl: null,
 }
 let needsDisclosure = false
+let sessionGate: { promise: Promise<Reply>; resolve: (value: Reply) => void } | null = null
 type Reply = { data: unknown; token?: string; status?: number }
 const replies: Record<string, () => Reply | Promise<Reply>> = {
   '/api/auth/sign-in/email': () => ({ data: {}, token: 'token-a' }),
-  '/api/v1/session': () => ({ data: { user: { id: 'user-a', name: 'Ana', isAnonymous: false }, needsDisclosure } }),
+  // While a test holds sessionGate, every /session waits for it.
+  '/api/v1/session': async () => {
+    if (sessionGate) await sessionGate.promise
+    return { data: { user: { id: 'user-a', name: 'Ana', isAnonymous: false }, needsDisclosure } }
+  },
   '/api/v1/branding': () => ({ data: null }),
   '/api/v1/invites/inv-1': () => ({ data: invite }),
   '/api/v1/invites/inv-2': () => ({ data: { ...invite, company: 'Contoso Freight', roleName: 'Forklift driver' } }),
@@ -104,6 +109,7 @@ beforeEach(async () => {
   takeHeldTarget()
   needsDisclosure = false
   mockIndexOpen = true
+  sessionGate = null
   for (const path of Object.keys(replies)) if (!(path in baseReplies)) delete replies[path]
 })
 afterEach(() => { jest.restoreAllMocks() })
@@ -280,4 +286,114 @@ test('a failed attempt on a buried Join does not block the handoff from sign-in 
   expect(navigation.getPathname()).toBe('/today')
   expect(screen.getByText('Today screen')).toBeOnTheScreen()
   expect(replace.mock.calls.map(([target]) => target)).toEqual(['/', '/(tabs)/today'])
+})
+
+// #553 review: every ordering after sign-in closes over Join, with /session held
+// until the test lets it resolve. Join's sign-up stores the token and the sign-in
+// screen drops out at once (the store goes to loading); then the accept and the
+// store's /session resolve in the order of the row, or the learner goes Back.
+// Each row asserts where the learner ends and every replace on the way there.
+type Row = {
+  name: string
+  // 'attempt': Join's own Create account, whose accept the row settles.
+  // 'idle': Join does nothing; the learner signs in on the sign-in screen.
+  // 'race': Join's sign-up is still running when the learner signs in on the
+  // sign-in screen; that sign-up and the accept land only after /session.
+  join: 'attempt' | 'idle' | 'race'
+  accept?: 'ok' | 'fail'
+  // When the accept settles, against the store's /session; or Back to the Join beneath.
+  order: 'acceptFirst' | 'sessionFirst' | 'backFirst'
+  ends: string
+  replaces: string[]
+  retry?: boolean
+}
+
+const today = '/today'
+const rows: Row[] = [
+  { name: 'accept ok, then /session', join: 'attempt', accept: 'ok', order: 'acceptFirst', ends: today, replaces: ['/(tabs)/today'] },
+  { name: '/session, then accept ok', join: 'attempt', accept: 'ok', order: 'sessionFirst', ends: today, replaces: ['/(tabs)/today'] },
+  { name: 'accept fails, then /session', join: 'attempt', accept: 'fail', order: 'acceptFirst', ends: '/join/inv-1', replaces: [], retry: true },
+  { name: '/session, then accept fails', join: 'attempt', accept: 'fail', order: 'sessionFirst', ends: '/join/inv-1', replaces: [], retry: true },
+  { name: 'sign-in screen first, /session, then Join sign-up and accept ok', join: 'race', accept: 'ok', order: 'sessionFirst', ends: today, replaces: ['/(tabs)/today'] },
+  { name: 'sign-in screen first, /session, then Join sign-up and accept fails', join: 'race', accept: 'fail', order: 'sessionFirst', ends: '/join/inv-1', replaces: [], retry: true },
+  { name: 'idle Join, /session', join: 'idle', order: 'sessionFirst', ends: today, replaces: ['/', '/(tabs)/today'] },
+  { name: 'idle Join, Back before /session', join: 'idle', order: 'backFirst', ends: '/join/inv-2', replaces: [] },
+  { name: 'accept pending, Back before /session, then accept ok', join: 'attempt', accept: 'ok', order: 'backFirst', ends: '/join/inv-2', replaces: [] },
+  { name: 'accept pending, Back before /session, then accept fails', join: 'attempt', accept: 'fail', order: 'backFirst', ends: '/join/inv-2', replaces: [] },
+]
+
+test.each(rows)('after sign-in closes over Join: $name', async (row) => {
+  const signUp = deferred<Reply>()
+  const accept = deferred<Reply>()
+  replies['/api/auth/sign-up/email'] = () => signUp.promise
+  replies['/api/auth/organization/accept-invitation'] = () => accept.promise
+  // Back needs a screen beneath: another invitation, opened first.
+  const navigation = renderRouter('src/app', { initialUrl: row.order === 'backFirst' ? '/join/inv-2' : '/join/inv-1' })
+  await navigation
+  if (row.order === 'backFirst') {
+    expect(await screen.findByRole('header', { name: 'Train as a forklift driver' })).toBeOnTheScreen()
+    await act(async () => { router.push('/join/inv-1') })
+  }
+  expect(await screen.findByRole('header', { name: 'Train as a warehouse picker' })).toBeOnTheScreen()
+  if (row.join !== 'idle') {
+    await fireEvent.changeText(screen.getByLabelText('Create a password'), 'correct horse')
+    await fireEvent.press(screen.getByRole('button', { name: 'Create account' }))
+  }
+  await act(async () => { router.push('/sign-in') })
+  expect(navigation.getPathname()).toBe('/sign-in')
+  const replace = jest.spyOn(router, 'replace')
+  sessionGate = deferred<Reply>()
+
+  // Sign-in closes over Join while /session is still pending.
+  if (row.join === 'attempt') {
+    await act(async () => { signUp.resolve({ data: {}, token: 'token-a' }) })
+    await flush()
+    expect(getToken()).toBe('token-a')
+  } else {
+    await submitSignIn()
+  }
+  expect(navigation.getPathname()).toBe('/join/inv-1')
+
+  const settleAccept = async () => {
+    if (row.join === 'idle') return
+    // The sign-up resolves after the sign-in screen's own token: it stores nothing.
+    if (row.join === 'race') {
+      await act(async () => { signUp.resolve({ data: {}, token: 'token-a' }) })
+      await flush()
+    }
+    await act(async () => { accept.resolve(row.accept === 'ok' ? { data: {} } : { data: {}, status: 500 }) })
+    await flush()
+  }
+  const openSession = async () => {
+    const gate = sessionGate
+    sessionGate = null
+    await act(async () => { gate?.resolve({ data: null }) })
+    await flush()
+  }
+  if (row.order === 'acceptFirst') {
+    await settleAccept()
+    await openSession()
+  } else if (row.order === 'sessionFirst') {
+    await openSession()
+    if (row.join !== 'idle') {
+      // Ready, and Join's attempt still runs: nothing navigates yet.
+      expect(navigation.getPathname()).toBe('/join/inv-1')
+      expect(replace).not.toHaveBeenCalled()
+    }
+    await settleAccept()
+  } else {
+    await act(async () => { router.back() })
+    expect(navigation.getPathname()).toBe('/join/inv-2')
+    await openSession()
+    await settleAccept()
+  }
+
+  expect(navigation.getPathname()).toBe(row.ends)
+  expect(replace.mock.calls.map(([target]) => target)).toEqual(row.replaces)
+  if (row.ends === today) expect(screen.getByText('Today screen')).toBeOnTheScreen()
+  if (row.retry) {
+    expect(screen.getByText('Couldn’t join. Try again.')).toBeOnTheScreen()
+    expect(screen.getByRole('button', { name: 'Join Northwind Logistics' })).toBeOnTheScreen()
+  }
+  if (row.ends === '/join/inv-2') expect(screen.getByRole('button', { name: 'Join Contoso Freight' })).toBeOnTheScreen()
 })

@@ -187,6 +187,7 @@ function Invite({ invitationId, invite }: { invitationId: string; invite: Invite
     pending.current = null
     // Take the held link while this screen still holds replay, then leave.
     if (decision.takesHeld) takeHeldTarget()
+    attemptHold.end()
     router.replace(decision.target as Href)
   }, [focused, settled, session, flow, router, attemptHold])
 

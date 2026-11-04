@@ -1,4 +1,4 @@
-import { deferReplay, holdJoinAttempt, holdTarget, joinAttemptHeld, releaseReplayHolds, replayVersion, subscribeReplay, takeHeldTarget, takeReplayTarget } from './held-target'
+import { armHandoff, cancelHandoff, deferReplay, handoffOwner, holdJoinAttempt, holdTarget, joinAttemptHeld, releaseReplayHolds, replayVersion, subscribeReplay, takeHeldTarget, takeReplayTarget } from './held-target'
 
 test('take with nothing held returns null', () => {
   expect(takeHeldTarget()).toBeNull()
@@ -102,5 +102,26 @@ describe('join attempt holds', () => {
     expect(joinAttemptHeld('join-b')).toBe(false)
     release()
     expect(joinAttemptHeld('join-a')).toBe(false)
+  })
+})
+
+describe('the pending post-sign-in handoff', () => {
+  beforeEach(() => { releaseReplayHolds() })
+
+  test('only its own Join cancels it', () => {
+    armHandoff('join-a')
+    cancelHandoff('join-b')
+    expect(handoffOwner()).toBe('join-a')
+    cancelHandoff('join-a')
+    expect(handoffOwner()).toBeNull()
+  })
+
+  test('a later sign-in over another Join replaces it, and sign-out drops it', () => {
+    armHandoff('join-a')
+    armHandoff('join-b')
+    cancelHandoff('join-a')
+    expect(handoffOwner()).toBe('join-b')
+    releaseReplayHolds()
+    expect(handoffOwner()).toBeNull()
   })
 })
