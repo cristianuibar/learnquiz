@@ -40,7 +40,7 @@ export function FileRow({ doc, actions, readOnly }: { doc: Doc; actions?: ReactN
         <p className="text-[13px]/[18px] font-medium tabular-nums text-ink-muted">{fileMeta(doc)}</p>
         {failed && doc.error && <div className="mt-2"><FieldError id={`rd-doc-${doc.id}`} quiet>{doc.error}</FieldError></div>}
       </div>
-      {!readOnly && actions && <div className="col-start-2 flex items-center gap-1 sm:col-start-3">{actions}</div>}
+      {!readOnly && actions && <div className="col-start-2 flex flex-wrap items-center gap-1 sm:col-start-3">{actions}</div>}
     </li>
   )
 }
