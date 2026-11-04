@@ -141,6 +141,29 @@ it('bans with a reason, announces it, moves focus to Unban and undoes', async ()
   expect(button('Undo')).toBeUndefined()
 })
 
+it('keeps focus on the page when a status filter drops the banned or unbanned row', async () => {
+  vi.mocked(listUsers).mockResolvedValue({ users: [ana, bo], total: 2 })
+  await render('/admin/users?status=active')
+  await click(rowButton('data-ban-user', 'bo'))
+  await setValue(document.querySelector('textarea')!, 'Spam', 'input')
+  vi.mocked(listUsers).mockResolvedValue({ users: [ana], total: 1 })
+  await click(button('Ban user'))
+  await settle()
+  expect(document.querySelector('[data-unban-user="bo"]')).toBeNull()
+  expect(status()).toContain('Bo Lee is banned.')
+  expect(document.activeElement).toBe(button('Undo'))
+
+  await cleanups.pop()!()
+
+  vi.mocked(listUsers).mockResolvedValue({ users: [{ ...bo, banned: true, banReason: 'Spam' }], total: 1 })
+  const banned = await render('/admin/users?status=banned')
+  vi.mocked(listUsers).mockResolvedValue({ users: [], total: 0 })
+  await click(rowButton('data-unban-user', 'bo'))
+  await settle()
+  expect(status()).toContain('Bo Lee is unbanned.')
+  expect(document.activeElement).toBe(banned.querySelector('input[type="search"]'))
+})
+
 it('keeps the dialog open with an alert when banning fails', async () => {
   vi.mocked(listUsers).mockResolvedValue({ users: [ana, bo], total: 2 })
   vi.mocked(setUserBan).mockRejectedValue(new Error('Server said no'))
