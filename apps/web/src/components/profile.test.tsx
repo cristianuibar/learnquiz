@@ -39,7 +39,7 @@ it.each(['user', 'admin'])('sends %s accounts from /me to training progress with
   mockProfile()
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   let user: { id: string; name: string; isAnonymous: boolean; role: string } | null = { id: 'learner', name: 'Learner', isAnonymous: false, role }
-  vi.mocked(getSessionFn).mockImplementation(async () => ({ user, facebookEnabled: false, needsDisclosure: false, adminCompanies: [{ name: 'Acme', slug: 'acme' }] }))
+  vi.mocked(getSessionFn).mockImplementation(async () => ({ user, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [{ name: 'Acme', slug: 'acme' }] }))
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
   const me = createRoute({ getParentRoute: () => rootRoute, path: '/me', beforeLoad: meRoute.options.beforeLoad, loader: meRoute.options.loader, component: meRoute.options.component })
   const profile = createRoute({ getParentRoute: () => rootRoute, path: '/me/profile', beforeLoad: profileRoute.options.beforeLoad, loader: profileRoute.options.loader, component: profileRoute.options.component })
@@ -73,7 +73,7 @@ it.each(['user', 'admin'])('sends %s accounts from /me to training progress with
 it('shows a company admin the member’s Training progress read-only and refuses others with the server’s 403', async () => {
   mockProfile()
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
-  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'owner', name: 'Owner', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [{ name: 'Acme', slug: 'acme' }] })
+  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'owner', name: 'Owner', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [{ name: 'Acme', slug: 'acme' }] })
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
   const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, component: Outlet })
   const person = createRoute({ getParentRoute: () => org, path: '/people/$id', loader: personRoute.options.loader as (ctx: { params: { slug: string; id: string } }) => unknown, errorComponent: personRoute.options.errorComponent, component: personRoute.options.component })
@@ -127,7 +127,7 @@ it('shows a company admin the member’s Training progress read-only and refuses
 it('shows a guest their topic progress and reaches sign-up in one tap', async () => {
   vi.mocked(getToday).mockResolvedValue({ topic: { id: 't1', title: 'Spanish verbs', placed: true, placeable: true, due: 0, xp: 120, streak: 3 }, role: null, plan: null } as Awaited<ReturnType<typeof getToday>>)
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
-  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'guest', name: 'Anonymous', isAnonymous: true, role: 'user' }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })
+  vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'guest', name: 'Anonymous', isAnonymous: true, role: 'user' }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] })
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
   const me = createRoute({ getParentRoute: () => rootRoute, path: '/me', beforeLoad: meRoute.options.beforeLoad, loader: meRoute.options.loader, component: meRoute.options.component })
   const signIn = createRoute({ getParentRoute: () => rootRoute, path: '/sign-in', validateSearch: signInRoute.options.validateSearch, beforeLoad: signInRoute.options.beforeLoad, component: signInRoute.options.component })

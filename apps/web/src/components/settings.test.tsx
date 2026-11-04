@@ -52,7 +52,7 @@ afterEach(async () => {
 async function render({ user = learner, adminCompanies = [], push = {}, current = null }: Setup = {}) {
   registration.pushManager.getSubscription.mockResolvedValue(current)
   vi.mocked(getPushSettings).mockResolvedValue({ publicKey, isStaff: false, endpoints: [], prefs, company: null, canPrompt: false, schedule, ...push } as Awaited<ReturnType<typeof getPushSettings>>)
-  vi.mocked(getSessionFn).mockResolvedValue({ user, facebookEnabled: false, needsDisclosure: false, adminCompanies } as Awaited<ReturnType<typeof getSessionFn>>)
+  vi.mocked(getSessionFn).mockResolvedValue({ user, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies } as Awaited<ReturnType<typeof getSessionFn>>)
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader })
   const settings = createRoute({ getParentRoute: () => rootRoute, path: '/me/settings', beforeLoad: settingsRoute.options.beforeLoad, loader: settingsRoute.options.loader, component: settingsRoute.options.component })
   const stubs = ['/', '/me/profile', '/welcome', '/admin', '/org/$slug'].map((path) => createRoute({ getParentRoute: () => rootRoute, path, component: () => <h1>Stub {path}</h1> }))

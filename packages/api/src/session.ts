@@ -6,5 +6,7 @@ export type SessionResponse = {
   user: SessionUser | null
   facebookEnabled: boolean
   needsDisclosure: boolean
+  // Only a company member can flag an unfair result.
+  companyMember: boolean
   adminCompanies: { name: string; slug: string }[]
 }

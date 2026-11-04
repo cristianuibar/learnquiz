@@ -14,7 +14,7 @@ import { getSessionFn } from '@/server/session-fn'
 import type { SummaryView } from '@learnquiz/api'
 
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
-vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn(async () => ({ user: { id: 'u1', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })) }))
+vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn(async () => ({ user: { id: 'u1', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] })) }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => 't1' }))
 vi.mock('@/server/today', () => ({ getToday: vi.fn() }))
@@ -41,7 +41,7 @@ async function renderApp(entry: string) {
   const me = createRoute({ getParentRoute: () => rootRoute, path: '/me', component: () => <h1>Learner</h1> })
   const today = createRoute({ getParentRoute: () => rootRoute, path: '/today', component: () => <main>Today stub</main> })
   const optIn = createRoute({ getParentRoute: () => rootRoute, path: '/opt-in', beforeLoad: optInRoute.options.beforeLoad, loader: optInRoute.options.loader, component: optInRoute.options.component })
-  const router = createRouter({ routeTree: rootRoute.addChildren([done, quick, play, signIn, me, optIn, today]), history: createMemoryHistory({ initialEntries: [entry] }) })
+  const router = createRouter({ routeTree: rootRoute.addChildren([done, quick, play, signIn, me, optIn, today]), defaultPreload: 'intent', history: createMemoryHistory({ initialEntries: [entry] }) })
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -141,6 +141,30 @@ it('keeps mistakes collapsed until the disclosure is opened', async () => {
   } finally { await cleanup() }
 })
 
+it('starts a mistake review session only when the mistake is clicked, not on hover or focus', async () => {
+  vi.mocked(endSession).mockResolvedValue({ sessionId: 's1', kind: 'session', topicId: 't1', durationMs: 1000, correct: 9, total: 10, ungraded: 0, xp: 0,
+    streak: 0, level: 1, levelLine: null, levelLineModel: null, masteryMoved: [], benchmark: null, reviewsLeft: 0, nextLine: 'Come back soon.', endedEarly: false,
+    mistakes: [{ itemId: 'i1', conceptName: 'Pallet checks', stem: 'x', correctAnswer: 'y', wasSure: false, generatedBy: null }] } satisfies SummaryView)
+  vi.mocked(getPushSettings).mockResolvedValue({ publicKey: 'public-key', isStaff: false, endpoints: [], canPrompt: false,
+    prefs: { paused: false, startMinute: 540, endMinute: 1020, timezone: 'UTC', days: [1, 2, 3, 4, 5] }, company: null, schedule })
+  vi.mocked(startMiniSession).mockResolvedValue({ sessionId: 'mini-1' })
+  const { container, router, cleanup } = await renderApp('/play/s1/done')
+  try {
+    await act(async () => [...container.querySelectorAll('button')].find((b) => b.textContent?.includes('Mistakes (1)'))?.click())
+    const link = container.querySelector<HTMLAnchorElement>('a[href="/play/quick/i1"]')!
+    await act(async () => {
+      link.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+      link.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+      link.dispatchEvent(new TouchEvent('touchstart', { bubbles: true }))
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    })
+    expect(startMiniSession).not.toHaveBeenCalled()
+    await act(async () => link.click())
+    expect(startMiniSession).toHaveBeenCalledExactlyOnceWith({ data: { itemId: 'i1', pushId: undefined } })
+    expect(router.state.location.pathname).toBe('/play/mini-1')
+  } finally { await cleanup() }
+})
+
 it('opens a notification deep link through the quick route and redirects into focused play', async () => {
   vi.mocked(startMiniSession).mockResolvedValue({ sessionId: 'mini-1' })
   const { container, router, cleanup } = await renderApp('/play/quick/i1?pushId=push-1')
@@ -153,7 +177,7 @@ it('opens a notification deep link through the quick route and redirects into fo
 })
 
 it('preserves the notification link through sign-in without opening a session while signed out', async () => {
-  vi.mocked(getSessionFn).mockResolvedValue({ user: null, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] })
+  vi.mocked(getSessionFn).mockResolvedValue({ user: null, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] })
   const link = '/play/quick/i1?pushId=push-1'
   const { container, router, cleanup } = await renderApp(link)
   try {

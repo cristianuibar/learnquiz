@@ -46,28 +46,29 @@ export function thinLabels(spans: readonly Span[], reserved: Span | null = null,
 type PlotPoint = WeekPoint & { x: number; y: number }
 
 // Value, date and session-count labels for plotted weeks at a font size. The
-// count sits under its date and "so far" follows it; the pair moves inward
-// together at the right edge. A week's date and count share a column, so whole
+// count sits under its date and "so far" follows it; date and count share one
+// x, which moves inward just enough to keep both inside the chart. Whole
 // columns are thinned. The projection date sits only in the date row: a week's
 // date that reaches it is dropped, keeping its count.
 export function trendLabels<P extends PlotPoint, J extends { at: number; x: number }>(points: readonly P[], projection: J | null, width: number, font: number) {
   const labelled = points.map((point) => {
     const valueLabel = percentText(point.mastery)
     const dateLabel = formatShortDate(point.start)
+    const dateWidth = textWidth(dateLabel, font)
     const count = String(point.sessions)
     const countWidth = textWidth(count, font)
     const suffixWidth = point.partial ? textWidth('so far', font) : 0
     const suffixGap = Math.max(8, countWidth / 2 + 4)
-    const overflow = Math.max(0, point.x + (point.partial ? suffixGap + suffixWidth : countWidth / 2) - width)
-    const countX = Math.max(countWidth / 2, point.x - overflow)
+    const reach = Math.max(dateWidth / 2, point.partial ? suffixGap + suffixWidth : countWidth / 2)
+    const x = Math.max(Math.max(dateWidth, countWidth) / 2, Math.min(point.x, width - reach))
     return {
       ...point,
       valueLabel,
       dateLabel,
       value: { ...centeredLabel(point.x, textWidth(valueLabel, font), width), y: Math.max(font, point.y - 12) },
-      date: centeredLabel(point.x, textWidth(dateLabel, font), width),
-      count: { x: countX, text: count, suffixX: point.partial ? countX + suffixGap : null,
-        left: countX - countWidth / 2, right: point.partial ? countX + suffixGap + suffixWidth : countX + countWidth / 2 },
+      date: { x, left: x - dateWidth / 2, right: x + dateWidth / 2 },
+      count: { x, text: count, suffixX: point.partial ? x + suffixGap : null,
+        left: x - countWidth / 2, right: point.partial ? x + suffixGap + suffixWidth : x + countWidth / 2 },
     }
   })
   const labelledProjection = projection && (() => {

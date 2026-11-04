@@ -19,7 +19,7 @@ afterEach(async () => {
   vi.clearAllMocks()
 })
 
-async function mount() {
+async function mount(companyMember = true) {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   const rootRoute: any = createRootRoute()
   const flag = createRoute({
@@ -34,7 +34,7 @@ async function mount() {
   const router = createRouter({
     routeTree: rootRoute.addChildren([flag, profile]),
     history: createMemoryHistory({ initialEntries: ['/me/flag?conceptId=c-1'] }),
-    context: { user: { id: 'u' } },
+    context: { user: { id: 'u' }, companyMember },
   })
   const container = document.createElement('div')
   document.body.appendChild(container)
@@ -76,4 +76,25 @@ it('shows a neutral alert and stays put when sending fails', async () => {
   expect(container.querySelector('[role=alert]')?.textContent).toBe("Couldn't send. Check your connection and try again.")
   expect(router.state.location.pathname).toBe('/me/flag')
   expect(send(container).disabled).toBe(false)
+})
+
+it('sends a learner outside any company back to Training progress without the form', async () => {
+  const { container, router } = await mount(false)
+  expect(router.state.location.pathname).toBe('/me/profile')
+  expect(container.querySelector('form')).toBeNull()
+  expect(flagResult).not.toHaveBeenCalled()
+})
+
+it('ignores a late send success after the learner went Back and started a new note', async () => {
+  let finishA!: (v: { ok: true }) => void
+  vi.mocked(flagResult).mockReturnValueOnce(new Promise((r) => { finishA = r }))
+  const { container, router } = await mount()
+  await type(container.querySelector('textarea')!, 'Note A')
+  await act(async () => { container.querySelector('form')!.requestSubmit() })
+  await act(async () => { await router.navigate({ to: '/me/profile' }) })
+  await act(async () => { await router.navigate({ to: '/me/flag', search: { conceptId: 'c-1' } }) })
+  await type(container.querySelector('textarea')!, 'Note B')
+  await act(async () => { finishA({ ok: true }) })
+  expect(router.state.location.pathname).toBe('/me/flag')
+  expect(container.querySelector('textarea')!.value).toBe('Note B')
 })

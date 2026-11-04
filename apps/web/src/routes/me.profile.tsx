@@ -24,11 +24,13 @@ function MyProfile() {
   const { user } = Route.useRouteContext()
   const { profile, today } = Route.useLoaderData()
   const { status } = Route.useSearch()
+  const { companyMember } = Route.useRouteContext()
   const first = today?.topic && today.plan?.playable && !today.role?.preparing ? { topicId: today.topic.id, placement: today.plan.start === 'placement' } : null
   return (
     <TrainingProgress
       profile={profile}
       self
+      flag={companyMember}
       status={status === 'flag-sent' ? <p role="status" className="text-body text-ink">Flag sent</p> : undefined}
       trailing={!user?.isAnonymous && (
         <Button asChild variant="ghost" size="icon" className="text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">

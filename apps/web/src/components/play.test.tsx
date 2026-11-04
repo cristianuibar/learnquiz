@@ -22,7 +22,7 @@ vi.mock('@/server/diagrams', () => ({ generateConceptDiagram: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: vi.fn(async () => null) }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => 't1' }))
-vi.mock('@/server/session-fn', () => ({ getSessionFn: async () => ({ user: { id: 'u1', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] }) }))
+vi.mock('@/server/session-fn', () => ({ getSessionFn: async () => ({ user: { id: 'u1', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] }) }))
 
 let stopTrack: ReturnType<typeof vi.fn>
 let finishPermission: ((stream: MediaStream) => void) | undefined
@@ -750,6 +750,11 @@ describe('reveal overlay', () => {
       expect(router.state.location.pathname).toBe('/play/s1/done')
       expect(container.querySelector('h1')!.textContent).toContain('Session done')
       expect(heard()).toContain('Report sent')
+      // No mastery rows or mistakes: the page fills the screen so the dock still sits at the bottom, not under the trace link.
+      const dock = [...container.querySelectorAll('a')].find((a) => a.textContent === 'Continue')!.parentElement!
+      expect(dock.parentElement!.tagName).toBe('MAIN')
+      expect(dock.parentElement!.lastElementChild).toBe(dock)
+      expect(dock.parentElement!.classList).toContain('min-h-dvh')
     } finally { await cleanup() }
   })
 
