@@ -352,6 +352,26 @@ it('retiring repoints concepts another document covers and fails the orphans, wi
   expect(state.background).toHaveLength(0)
 })
 
+// The other document goes away between the concept read and the retire write: the concept never lands on a retired document.
+it.each([
+  ['replaced', true, { source_id: 'src-2b', gen_status: 'pending', gen_error: null }],
+  ['retired', false, { source_id: 'src-1', gen_status: 'failed', gen_error: 'The document behind this concept was retired' }],
+] as const)('retiring reads the other documents again when the one it picked is %s mid-retire', async (_label, replaced, con1) => {
+  seedShared()
+  beforeSql = {
+    prefix: 'update "sources"',
+    fn: () => {
+      sqlite.prepare("UPDATE sources SET retired_at = 4 WHERE id = 'src-2'").run()
+      if (replaced) sqlite.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, version, status, created_at) VALUES ('src-2b', 'topic-role-a', 'text', 'Site guide', 'Wear a vest on the dock, always.', 4, 'ready', 4)").run()
+    },
+  }
+  await expect(retireRoleDocument({ data: { ...ids, sourceId: 'src-1' } })).resolves.toEqual({ ok: true })
+  expect(beforeSql).toBeNull()
+  expect(sqlite.prepare("SELECT source_id, gen_status, gen_error FROM concepts WHERE id = 'con-1'").get()).toEqual(con1)
+  expect(sqlite.prepare("SELECT retired_at IS NOT NULL AS retired FROM sources WHERE id = 'src-1'").get()).toEqual({ retired: 1 })
+  expect(itemStatus()).toEqual({ 'item-1': 'retired', 'item-2': 'retired', 'item-other': 'active' })
+})
+
 // The browser upload route: same handler as the server function, with the org and role taken from the URL.
 const post = (body: FormData, origin = 'http://127.0.0.1:8800') => (Route.options.server!.handlers as unknown as {
   POST: (ctx: { request: Request; params: { orgId: string; roleId: string } }) => Promise<Response>
