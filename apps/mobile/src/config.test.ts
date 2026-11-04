@@ -55,6 +55,21 @@ test.each(['icon.png', 'adaptive-icon.png', 'notification-icon.png'])('enables o
   }])
 })
 
+test('uses the supplied launcher and notification assets with the official petrol background', () => {
+  exists.mockImplementation(jest.requireActual<typeof import('node:fs')>('node:fs').existsSync)
+
+  const result = config()
+  expect(result.icon).toBe('./assets/icon.png')
+  expect(result.android?.adaptiveIcon).toEqual({
+    foregroundImage: './assets/adaptive-icon.png',
+    backgroundColor: '#0E5A73',
+  })
+  expect(result.plugins).toContainEqual(['expo-notifications', {
+    color: '#0E5A73',
+    icon: './assets/notification-icon.png',
+  }])
+})
+
 test('uses local Firebase configuration when supplied', () => {
   exists.mockImplementation((path) => path === join(__dirname, '../google-services.json'))
   expect(config().android?.googleServicesFile).toBe('./google-services.json')
