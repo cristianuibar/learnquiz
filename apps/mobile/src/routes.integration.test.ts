@@ -219,7 +219,7 @@ async function signInThroughRoot(held: string | null, needsDisclosure = false) {
 test('real root sign-in opens a held unit once when refresh unlocks the private routes', async () => {
   const { navigation, replace } = await signInThroughRoot('/unit/u1')
   expect(navigation.getPathname()).toBe('/unit/u1')
-  expect(screen.getByText('Unit')).toBeOnTheScreen()
+  expect(screen.getByLabelText('Back to Path')).toBeOnTheScreen()
   expect(replace.mock.calls.map(([target]) => target)).toEqual(['/unit/u1'])
   expect(peekHeldTarget()).toBeNull()
 })
