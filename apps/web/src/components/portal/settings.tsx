@@ -289,6 +289,8 @@ export function SettingsForm({ settings, onSaved }: { settings: Settings; onSave
   }
 
   function discard() {
+    // While a save is in flight the saved values are not known yet.
+    if (savingRef.current) return
     applyBaseline(baseline)
   }
 
@@ -462,7 +464,7 @@ export function SettingsForm({ settings, onSaved }: { settings: Settings; onSave
             </fieldset>
           </Section>
           <div className="flex flex-wrap justify-end gap-3 border-t border-border px-6 py-4">
-            <Button variant="ghost" type="button" onClick={discard}>Discard</Button>
+            <Button variant="ghost" type="button" disabled={saving} onClick={discard}>Discard</Button>
             <Button type="submit">{saving ? 'Saving…' : 'Save changes'}</Button>
           </div>
         </form>
