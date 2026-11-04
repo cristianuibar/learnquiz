@@ -104,6 +104,7 @@ it('shows a company admin the member’s Training progress read-only and refuses
     await act(async () => { await router.load(); root.render(<RouterProvider router={router} />) })
     expect(getProfile).toHaveBeenLastCalledWith({ data: { org: 'acme', learnerId: 'learner' } })
     expect(container.querySelector('h1')?.textContent).toBe('Training progress')
+    expect(container.querySelector('h1')?.classList.contains('text-title-1')).toBe(true)
     expect(container.textContent).toContain('Dana Learner')
     expect([...container.querySelectorAll('h2')].map((h) => h.textContent)).toEqual(['Concept mastery', 'Time to proficiency', 'Confident errors', 'This week'])
     expect(container.querySelector('form, input, button')).toBeNull()
