@@ -26,6 +26,7 @@ export const getCompanySettings = createServerFn({ method: 'GET' })
       workingHours: settings?.workingHours ?? defaultWorkingHours,
       accent: settings?.accent ?? null,
       hasLogo: Boolean(settings?.logoKey),
+      logoUrl: companyLogoUrl(org.id, settings?.logoKey),
     }
   })
 
