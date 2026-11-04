@@ -13,7 +13,7 @@ import { uploadRoleDocument } from '@/server/role-documents'
 
 const fmt = (n: number) => n.toLocaleString('en-US')
 const overMessage = (count: number, max: number) =>
-  `${fmt(count)} / ${fmt(max)} characters. Remove ${fmt(count - max)} or upload a PDF instead.`
+  `${fmt(count)} / ${fmt(max)} characters. Shorten or split the document. The ${fmt(max)}-character limit also applies to extracted PDF text.`
 
 export function PasteTextPanel({ roleId, replacesId, onClose, onAdded }: { roleId: string; replacesId?: string; onClose: () => void; onAdded: (current: boolean) => unknown }) {
   const { slug } = usePortal()
