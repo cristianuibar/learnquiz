@@ -128,6 +128,24 @@ it('reloads the role when the last Critical save fails after an earlier one land
   await vi.waitFor(() => expect(vi.mocked(getRoleDetail).mock.calls.length).toBeGreaterThan(before))
 })
 
+it('saves the edit form after a Critical toggle in flight and skips the toggle it replaced', async () => {
+  const finish: Array<() => void> = []
+  vi.mocked(updateRoleConcept).mockImplementation(() => new Promise((resolve) => { finish.push(() => resolve({ ok: true })) }))
+  const { container, button } = await mount(makeDetail({ status: 'ready', documents: [pdf], units: unit([concept('c1', 'Cash float', 'ready')]) }))
+  const sw = container.querySelector<HTMLElement>('[role="switch"]')!
+  await act(async () => { sw.click() })
+  await act(async () => { sw.click() })
+  await act(async () => { button('Edit concept: Cash float')!.click() })
+  const form = container.querySelector<HTMLFormElement>('form[aria-label="Edit concept: Cash float"]')!
+  await act(async () => { form.querySelector<HTMLElement>('[role="switch"]')!.click() })
+  await act(async () => { form.requestSubmit() })
+  while (finish.length) await act(async () => { finish.shift()!() })
+  expect(vi.mocked(updateRoleConcept).mock.calls.map(([{ data }]) => data)).toEqual([
+    { slug: 'x', conceptId: 'c1', critical: true },
+    { slug: 'x', conceptId: 'c1', name: 'Cash float', summary: 'About Cash float', critical: true },
+  ])
+})
+
 // happy-dom applies no container queries, so this compares the narrow-list rules the header shares with the rows.
 it('stacks the Questions and Critical headers with the concept rows below a 560px list', async () => {
   const { container } = await mount(makeDetail({ status: 'ready', documents: [pdf], units: unit([concept('c1', 'Cash float', 'ready')]) }))

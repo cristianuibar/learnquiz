@@ -13,7 +13,8 @@ import { updateRoleConcept, type RoleDetail } from '@/server/role-detail'
 
 type Concept = RoleDetail['units'][number]['concepts'][number]
 
-export function ConceptEditForm({ concept, slug, onDone }: { concept: Concept; slug: string; onDone: () => void }) {
+// queue runs the save on the row's Critical save chain, so a queued toggle can't overwrite it.
+export function ConceptEditForm({ concept, slug, queue, onDone }: { concept: Concept; slug: string; queue: (run: () => Promise<unknown>) => Promise<unknown>; onDone: () => void }) {
   const router = useRouter()
   const update = useServerFn(updateRoleConcept)
   const nameRef = useRef<HTMLInputElement>(null)
@@ -37,15 +38,8 @@ export function ConceptEditForm({ concept, slug, onDone }: { concept: Concept; s
     setFields({})
     setBusy(true)
     try {
-      await update({
-        data: {
-          slug,
-          conceptId: concept.id,
-          name: String(f.get('name')).trim(),
-          summary: String(f.get('summary')).trim(),
-          critical,
-        },
-      })
+      const data = { slug, conceptId: concept.id, name: String(f.get('name')).trim(), summary: String(f.get('summary')).trim(), critical }
+      await queue(() => update({ data }))
       await router.invalidate()
       onDone()
     } catch (err) {
