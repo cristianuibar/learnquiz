@@ -213,7 +213,7 @@ it('seeds the three employee stages through the real SOP pipeline and preserves 
   ]))
   // The owner has no job role, so does not train and is not listed.
   expect(people.people).toHaveLength(3)
-  expect(await getOrgOverview({ data: { slug: result.slug } })).toMatchObject({ training: { employees: 3, proficientEmployees: 1, daysToProficiency: 6, criticalErrorsThisWeek: 1, documentsToReview: null } })
+  expect(await getOrgOverview({ data: { slug: result.slug } })).toMatchObject({ training: { employees: 3, proficientEmployees: 1, daysToProficiency: 6, criticalErrorsThisWeek: 1, documentsToReview: 1 } })
   await signIn(NORTHWIND.emails.onboarding, secret.learnerPassword)
 
   raw.prepare('UPDATE learner_concept SET p_known = 0.32 WHERE learner_id = (SELECT id FROM user WHERE email = ?)').run(NORTHWIND.emails.onboarding)

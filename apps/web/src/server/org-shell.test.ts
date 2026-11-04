@@ -29,11 +29,11 @@ beforeAll(() => {
   for (const file of readdirSync('drizzle').filter((f) => f.endsWith('.sql')).sort()) {
     sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8').replaceAll('--> statement-breakpoint', ''))
   }
-  for (const id of ['owner', 'admin', 'member', 'staff', 'outsider']) {
+  for (const id of ['owner', 'admin', 'member', 'staff', 'staff-member', 'outsider']) {
     sqlite.prepare('INSERT INTO user (id, name, email) VALUES (?, ?, ?)').run(id, `Name ${id}`, `${id}@x.test`)
   }
   sqlite.prepare('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, ?)').run('org-a', 'Alpha', 'alpha', 1)
-  for (const [id, role] of [['owner', 'owner'], ['admin', 'admin'], ['member', 'member']]) {
+  for (const [id, role] of [['owner', 'owner'], ['admin', 'admin'], ['member', 'member'], ['staff-member', 'member']]) {
     sqlite.prepare('INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES (?, ?, ?, ?, ?)').run(id, 'org-a', id, role, 1)
   }
   sqlite.prepare('INSERT INTO org_settings (org_id, company_name, working_hours_json, logo_key) VALUES (?, ?, ?, ?)').run('org-a', 'Alpha', '{}', 'logo 1')
@@ -62,6 +62,8 @@ it('shapes the portal shell for each kind of viewer', async () => {
   await expect(getPortalShell({ data: { slug: 'alpha' } })).resolves.toEqual({ ...base, logoUrl, userName: 'Name admin', role: 'admin', readOnly: false })
   as('staff', 'admin')
   await expect(getPortalShell({ data: { slug: 'alpha' } })).resolves.toEqual({ ...base, logoUrl: null, userName: 'Name staff', role: null, readOnly: true })
+  as('staff-member', 'admin')
+  await expect(getPortalShell({ data: { slug: 'alpha' } })).resolves.toEqual({ ...base, logoUrl, userName: 'Name staff-member', role: null, readOnly: true })
   as('member')
   await expect(getPortalShell({ data: { slug: 'alpha' } })).rejects.toMatchObject({ status: 403 })
   as(null)

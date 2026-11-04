@@ -103,12 +103,15 @@ it('shows the portal nav on portal pages, trimmed for Learn Quiz staff, with a w
   }
 })
 
-async function renderAt(path: string, leaf: { path: string; loader: (ctx: { params: { slug: string } }) => unknown; component: typeof peopleRoute.options.component }) {
+let refresh: () => Promise<void> = async () => {}
+
+async function renderAt(path: string, leaf: { path: string; loader: (ctx: { params: { slug: string } }) => unknown; component: typeof peopleRoute.options.component; pendingComponent?: unknown; errorComponent?: unknown }) {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   vi.mocked(getSessionFn).mockResolvedValue({ user: { id: 'u', name: 'U', isAnonymous: false, role: 'user' }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] } as never)
   const rootRoute = createRootRoute({ beforeLoad: appRootRoute.options.beforeLoad, loader: appRootRoute.options.loader, component: Outlet })
   const org = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug', beforeLoad: orgRoute.options.beforeLoad, loader: orgRoute.options.loader as (ctx: { params: { slug: string } }) => unknown, errorComponent: orgRoute.options.errorComponent, component: orgRoute.options.component })
-  const router = createRouter({ routeTree: rootRoute.addChildren([org.addChildren([createRoute({ getParentRoute: () => org, ...leaf })])]), history: createMemoryHistory({ initialEntries: [path] }) })
+  const router = createRouter({ routeTree: rootRoute.addChildren([org.addChildren([createRoute({ getParentRoute: () => org, ...(leaf as object) } as never)])]), history: createMemoryHistory({ initialEntries: [path] }) })
+  refresh = () => router.invalidate()
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -211,31 +214,100 @@ it('shows only a card with an Invite people button when nobody is invited', asyn
   }
 })
 
-it('shows the training figures on the overview, with a dash for unknown values', async () => {
-  vi.mocked(getOrgOverview).mockResolvedValue({
-    id: 'org', name: 'Acme', slug: 'x', readOnly: false, roles: [{ id: 'r1', name: 'Cashier' }],
-    training: { employees: 4, proficientEmployees: 1, daysToProficiency: null, criticalErrorsThisWeek: 2, documentsToReview: null },
-  } as never)
-  const { container, cleanup } = await renderAt('/org/x', { path: '/', loader: indexRoute.options.loader as (ctx: { params: { slug: string } }) => ReturnType<typeof getOrgOverview>, component: indexRoute.options.component })
+const overviewLeaf = {
+  path: '/',
+  loader: indexRoute.options.loader as (ctx: { params: { slug: string } }) => ReturnType<typeof getOrgOverview>,
+  component: indexRoute.options.component,
+  pendingComponent: indexRoute.options.pendingComponent,
+  errorComponent: indexRoute.options.errorComponent,
+}
+const training = { employees: 4, proficientEmployees: 1, daysToProficiency: null, criticalErrorsThisWeek: 2, documentsToReview: 6, firstProficientUserId: 'u1', openErrorUserId: null }
+const noTraining = { ...training, employees: 0, proficientEmployees: 0, criticalErrorsThisWeek: 0, documentsToReview: 0, firstProficientUserId: null }
+const role = { id: 'r1', name: 'Cashier', benchmark: 0.85, onboardingDays: 30, topicId: 't1', topicStatus: 'ready', people: 3, documents: 2, conceptsReady: 24, conceptsTotal: 24, preparing: false }
+const building = (ready: number) => ({ ...role, id: 'r2', name: 'Barista', topicId: 't2', topicStatus: 'generating', onboardingDays: 1, documents: 1, conceptsReady: ready, conceptsTotal: 31, preparing: ready < 31 })
+const overview = (o: Record<string, unknown>) => ({ name: 'Acme', slug: 'x', readOnly: false, nextStep: null, roles: [role], training, ...o }) as never
+const hrefs = (c: Element) => Object.fromEntries([...c.querySelectorAll('main a')].map((a) => [a.textContent, a.getAttribute('href')]))
+
+it('shows the figures, role table and next step on the overview', async () => {
+  vi.mocked(getOrgOverview).mockResolvedValue(overview({
+    roles: [role, { ...building(9), conceptsTotal: 24 }],
+    nextStep: { unreviewed: 12, documentTitle: 'Opening SOP', roleId: 'r1', topicId: 't1' },
+  }))
+  const { container, cleanup } = await renderAt('/org/x', overviewLeaf)
   try {
-    const figures = Object.fromEntries([...container.querySelectorAll('dl > div')].map((d) => [d.querySelector('dt')!.textContent, d.querySelector('dd')!.textContent]))
-    expect(figures).toEqual({
-      Employees: '4', Proficient: '1', 'Average days to proficiency': '-', 'Critical-step errors this week': '2', 'Documents waiting for review': '-',
-    })
+    expect(container.querySelector('h1')!.textContent).toBe('Overview')
+    const text = container.textContent!
+    expect(text).toContain('Employees4')
+    expect(text).toContain('Avg. days to proficiency—No data yet')
+    expect(text).toContain('Next step: review 12 new questions from Opening SOP.')
+    const links = hrefs(container)
+    expect(links['Review questions']).toBe('/org/x/questions?role=r1')
+    expect(links['Cashier']).toBe('/org/x/roles/r1')
+    expect(links['All roles']).toBe('/org/x/roles')
+    expect(links['Avg. days to proficiency—No data yet']).toBe('/org/x/people/u1')
+    expect(links['Critical-step errors this week2']).toBeUndefined()
+    const rows = [...container.querySelectorAll('tbody tr')].map((r) => r.textContent)
+    expect(rows[0]).toContain('Ready')
+    expect(rows[0]).toContain('85%')
+    expect(rows[0]).toContain('30 days')
+    expect(rows[1]).toContain('Preparing training')
+    expect(rows[1]).toContain('9 of 24 concepts')
+    expect(rows[1]).toContain('1 day')
   } finally {
     await cleanup()
   }
 })
 
-it('links an empty job role list on the overview to the roles page', async () => {
-  vi.mocked(getOrgOverview).mockResolvedValue({
-    id: 'org', name: 'Acme', slug: 'x', readOnly: false, roles: [],
-    training: { employees: 0, proficientEmployees: 0, daysToProficiency: null, criticalErrorsThisWeek: 0, documentsToReview: 0 },
-  } as never)
-  const { container, cleanup } = await renderAt('/org/x', { path: '/', loader: indexRoute.options.loader as (ctx: { params: { slug: string } }) => ReturnType<typeof getOrgOverview>, component: indexRoute.options.component })
+it.each([
+  ['a role without documents', [{ ...role, topicStatus: 'draft', documents: 0 }], 'Cashier has no documents yet', 'Upload SOP', '/org/x/roles/r1'],
+  ['no roles', [], 'Create your first job role.', 'Create your first job role.', '/org/x/roles'],
+])('guides the first step on an empty overview with %s', async (_name, roles, copy, link, href) => {
+  vi.mocked(getOrgOverview).mockResolvedValue(overview({ roles, training: noTraining }))
+  const { container, cleanup } = await renderAt('/org/x', overviewLeaf)
   try {
-    const link = [...container.querySelectorAll('main a')].find((a) => a.textContent === 'Create your first job role.')
-    expect(link?.getAttribute('href')).toBe('/org/x/roles')
+    expect(container.querySelector('h2#overview-empty')!.textContent).toBe('Add your first SOP')
+    expect(container.textContent).toContain(copy)
+    expect(hrefs(container)[link]).toBe(href)
+    expect(container.textContent).not.toContain('Employees')
+  } finally {
+    await cleanup()
+  }
+})
+
+it('announces build progress politely in steps of five, and the end', async () => {
+  let ready = 12
+  vi.mocked(getOrgOverview).mockImplementation(async () => overview({ roles: [building(ready)], training: noTraining }))
+  const { container, cleanup } = await renderAt('/org/x', overviewLeaf)
+  try {
+    const status = () => container.querySelector('p[role="status"]')!.textContent
+    expect(container.querySelector('h2#overview-preparing')!.textContent).toBe('Preparing Barista training')
+    expect(container.querySelector('[role="progressbar"]')!.getAttribute('aria-valuetext')).toBe('12 of 31 concepts ready')
+    expect(status()).toBe('')
+    const hrefsNow = hrefs(container)
+    expect(hrefsNow['Invite people']).toBe('/org/x/people')
+    expect(hrefsNow['Watch the build']).toBe('/org/x/roles/r2')
+    for (const [next, said] of [[14, ''], [15, '15 of 31 concepts ready'], [19, '15 of 31 concepts ready'], [31, '31 of 31 concepts ready.']] as const) {
+      ready = next
+      await act(async () => { await refresh() })
+      expect(status()).toBe(said)
+    }
+  } finally {
+    await cleanup()
+  }
+})
+
+it.each([
+  ['a figures state', { roles: [role], nextStep: { unreviewed: 1, documentTitle: 'Doc', roleId: 'r1', topicId: 't1' } }],
+  ['an empty state', { roles: [{ ...role, topicStatus: 'draft', documents: 0 }], training: noTraining }],
+  ['a preparing state', { roles: [building(3)], training: noTraining }],
+])('hides every action staff cannot use on the read-only overview (%s)', async (_name, data) => {
+  vi.mocked(getOrgOverview).mockResolvedValue(overview({ ...data, readOnly: true }))
+  const { container, cleanup } = await renderAt('/org/x', overviewLeaf)
+  try {
+    const labels = Object.keys(hrefs(container))
+    for (const gone of ['Review questions', 'Upload SOP', 'Invite people', 'Watch the build', 'All roles', 'Cashier', 'Barista']) expect(labels).not.toContain(gone)
+    expect(container.textContent).not.toContain('Next step')
+    expect(container.textContent).toMatch(/Cashier|Barista/)
   } finally {
     await cleanup()
   }

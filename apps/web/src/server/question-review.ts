@@ -3,7 +3,8 @@ import { and, asc, desc, eq, inArray, isNull, ne } from 'drizzle-orm'
 import { reportReasons } from '@learnquiz/api/reveal'
 import { z } from 'zod'
 import { getDb, type Db } from '@/db'
-import { concepts, itemFlags, items, jobRoles, sources, topics } from '@/db/schema'
+import { user } from '@/db/auth-schema'
+import { attempts, concepts, itemFlags, items, jobRoles, sources, topics, units } from '@/db/schema'
 import { findSourceQuote } from '@/lib/curriculum/validate'
 import { ENABLED_FORMATS } from '@/lib/llm/prompts'
 import { ItemPayload } from '@/lib/llm/schemas'
@@ -18,31 +19,67 @@ const Slug = z.string().min(1).max(100)
 const companyRoleIds = (db: Db, orgId: string) =>
   db.select({ id: jobRoles.id }).from(jobRoles).where(eq(jobRoles.orgId, orgId))
 
+const answerText = (answerJson: string, payload: ItemPayload) => {
+  const text = (id: unknown) => payload.options.find((o) => o.id === id)?.text ?? String(id)
+  const a = JSON.parse(answerJson) as { optionId?: string; optionIds?: string[]; order?: string[]; text?: string }
+  return a.optionId !== undefined ? text(a.optionId) : a.optionIds ? a.optionIds.map(text).join(', ') : a.order ? a.order.map(text).join(' → ') : a.text ?? ''
+}
+
 export const getQuestionReview = createServerFn({ method: 'GET' })
-  .validator(z.object({ slug: Slug, topicId: z.string().min(1).optional() }))
+  .validator(z.object({ slug: Slug, roleId: z.string().min(1).optional() }))
   .handler(async ({ data }) => {
     const { org } = await requireOrgAdmin(data.slug)
     const db = getDb()
-    const topicRows = await db.select({ id: topics.id, title: topics.title }).from(topics)
-      .where(inArray(topics.jobRoleId, companyRoleIds(db, org.id))).orderBy(desc(topics.createdAt))
-    const topic = data.topicId ? topicRows.find((t) => t.id === data.topicId) : topicRows[0]
-    if (data.topicId && !topic) throw httpError('Topic not found', 404)
-    if (!topic) return { name: org.name, topics: topicRows, topic: null, concepts: [] }
-    const scope = db.select({ id: topics.id }).from(topics).where(and(eq(topics.id, topic.id), inArray(topics.jobRoleId, companyRoleIds(db, org.id))))
-    const [conceptRows, itemRows] = await Promise.all([
-      db.select({ id: concepts.id, name: concepts.name, sourceQuote: concepts.sourceQuote }).from(concepts)
-        .where(inArray(concepts.topicId, scope)).orderBy(asc(concepts.unitId), asc(concepts.order)),
-      db.select().from(items).where(inArray(items.topicId, scope)).orderBy(desc(items.createdAt)),
+    const roles = await db.select({ id: jobRoles.id, name: jobRoles.name }).from(jobRoles)
+      .where(and(eq(jobRoles.orgId, org.id), eq(jobRoles.status, 'active'))).orderBy(asc(jobRoles.createdAt))
+    const role = data.roleId ? roles.find((r) => r.id === data.roleId) : roles[0]
+    if (data.roleId && !role) throw httpError('Role not found', 404)
+    const topic = role && await db.select({ id: topics.id }).from(topics).where(eq(topics.jobRoleId, role.id)).get()
+    if (!role || !topic) return { name: org.name, roles, role: role ?? null, unreviewed: 0, units: [] }
+    const itemScope = db.select({ id: items.id }).from(items).where(eq(items.topicId, topic.id))
+    const openFlags = and(inArray(itemFlags.itemId, itemScope), isNull(itemFlags.resolvedAt))
+    const [unitRows, conceptRows, itemRows, flagRows, sourceRows, attemptRows] = await Promise.all([
+      db.select({ id: units.id, name: units.name }).from(units).where(eq(units.topicId, topic.id)).orderBy(asc(units.order)),
+      db.select({ id: concepts.id, unitId: concepts.unitId, name: concepts.name, critical: concepts.critical }).from(concepts)
+        .where(eq(concepts.topicId, topic.id)).orderBy(asc(concepts.order)),
+      db.select({ item: items, reviewerName: user.name }).from(items).leftJoin(user, eq(user.id, items.reviewedBy))
+        .where(eq(items.topicId, topic.id)).orderBy(asc(items.createdAt)),
+      db.select({ flag: itemFlags, reporterName: user.name }).from(itemFlags).leftJoin(user, eq(user.id, itemFlags.userId))
+        .where(openFlags).orderBy(desc(itemFlags.createdAt)),
+      db.select({ id: sources.id, title: sources.title, version: sources.version }).from(sources).where(eq(sources.topicId, topic.id)),
+      db.select({ id: attempts.id, itemId: attempts.itemId, answerJson: attempts.answerJson, confidence: attempts.confidence }).from(attempts)
+        .where(inArray(attempts.id, db.select({ id: itemFlags.attemptId }).from(itemFlags).where(openFlags))),
     ])
-    const itemScope = db.select({ id: items.id }).from(items).where(inArray(items.topicId, scope))
-    const flagRows = await db.select().from(itemFlags)
-      .where(and(inArray(itemFlags.itemId, itemScope), isNull(itemFlags.resolvedAt))).orderBy(desc(itemFlags.createdAt))
+    const sourceById = new Map(sourceRows.map((s) => [s.id, s]))
+    const attemptById = new Map(attemptRows.map((a) => [a.id, a]))
+    const flagged = new Set(flagRows.map((f) => f.flag.itemId))
+    const isFlagged = (i: typeof items.$inferSelect) => i.status === 'reported' || flagged.has(i.id)
+    const isUnreviewed = (i: typeof items.$inferSelect) => i.status === 'active' && i.reviewedAt === null && !isFlagged(i)
+    const rank = (i: typeof items.$inferSelect) => isFlagged(i) ? 0 : isUnreviewed(i) ? 1 : 2
+    const questions = itemRows.map(({ item: i, reviewerName }) => {
+      const payload = JSON.parse(i.payloadJson) as ItemPayload
+      const source = i.sourceId ? sourceById.get(i.sourceId) : undefined
+      return { item: i, rank: rank(i), question: {
+        id: i.id, status: i.status, difficulty: i.difficultyPrior, reviewedAt: i.reviewedAt, reviewerName, createdAt: i.createdAt,
+        check: i.checkJson ? { reasons: (JSON.parse(i.checkJson) as { reasons?: string[] }).reasons ?? [] } : null,
+        source: source ? { title: source.title, version: i.sourceVersion ?? source.version } : null,
+        payload,
+        flags: flagRows.filter((r) => r.flag.itemId === i.id).map(({ flag: f, reporterName: n }) => {
+          const at = f.attemptId ? attemptById.get(f.attemptId) : undefined
+          return { id: f.id, reporterId: f.userId, reporterName: n ?? f.userId, createdAt: f.createdAt, reason: f.reason, label: reasonLabels[f.reason] ?? f.reason, note: f.note,
+            attempt: at && at.itemId === i.id ? { answer: answerText(at.answerJson, payload), confidence: at.confidence } : null }
+        }),
+      } }
+    })
     return {
-      name: org.name, topics: topicRows, topic,
-      concepts: conceptRows.map((c) => ({ ...c, questions: itemRows.filter((i) => i.conceptId === c.id)
-        .map((i) => ({ id: i.id, status: i.status, reviewedBy: i.reviewedBy, reviewedAt: i.reviewedAt,
-          flags: flagRows.filter((f) => f.itemId === i.id).map((f) => ({ reason: f.reason, label: reasonLabels[f.reason] ?? f.reason, note: f.note, createdAt: f.createdAt })),
-          payload: JSON.parse(i.payloadJson) as ItemPayload })) })),
+      name: org.name, roles, role,
+      unreviewed: questions.filter((q) => q.rank === 1).length,
+      units: unitRows.map((u) => ({ ...u, concepts: conceptRows.filter((c) => c.unitId === u.id).map((c) => {
+        const own = questions.filter((q) => q.item.conceptId === c.id).sort((a, b) => a.rank - b.rank)
+        return { id: c.id, name: c.name, critical: c.critical, questions: own.map((q) => q.question), counts: {
+          total: own.length, unreviewed: own.filter((q) => q.rank === 1).length, flagged: own.filter((q) => q.rank === 0).length,
+          rejected: own.filter((q) => q.item.status === 'rejected').length } }
+      }) })),
     }
   })
 

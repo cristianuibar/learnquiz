@@ -72,21 +72,47 @@ beforeAll(() => {
         .run(`${id}-${name}`, `concept-${id}`, id, JSON.stringify(payload), Date.now())
     }
   }
-  raw.prepare("INSERT INTO item_flags (id, item_id, user_id, reason, note, created_at) VALUES ('flag-1', 'a-flag', 'member-a', 'unclear', 'Which x do you mean?', ?)").run(Date.now())
+  const flagged = JSON.stringify({ ...payload, options: [{ id: 'a', text: 'Alpha', is_correct: true, feedback: '' }] })
+  raw.prepare("UPDATE items SET payload_json = ?, source_id = 'source-a', check_json = '{\"index\":0,\"keep\":false,\"reasons\":[\"Ambiguous stem\"]}' WHERE id = 'a-flag'").run(flagged)
+  raw.prepare("INSERT INTO attempts (id, learner_id, item_id, concept_id, at, answer_json, correct, score, confidence, response_ms, rating, p_known_before, p_known_after) VALUES ('attempt-1', 'member-a', 'a-flag', 'concept-a', ?, '{\"optionId\":\"a\"}', 0, 0, 'sure', 1000, 1, 0.5, 0.5)").run(Date.now())
+  raw.prepare("INSERT INTO item_flags (id, item_id, user_id, reason, note, attempt_id, created_at) VALUES ('flag-1', 'a-flag', 'member-a', 'unclear', 'Which x do you mean?', 'attempt-1', ?)").run(Date.now())
+  // Ordering fixtures: an earlier unit and concept inserted last, an archived role and a later active role.
+  raw.prepare("INSERT INTO units (id, topic_id, 'order', name) VALUES ('unit-a-intro', 'a', -1, 'Intro')").run()
+  raw.prepare("INSERT INTO concepts (id, topic_id, unit_id, 'order', name, summary, critical) VALUES ('concept-a-intro', 'a', 'unit-a-intro', 0, 'Warm-up', '', 1)").run()
+  raw.prepare("INSERT INTO concepts (id, topic_id, unit_id, 'order', name, summary) VALUES ('concept-a-early', 'a', 'unit-a', -1, 'Earlier', '')").run()
+  raw.prepare("INSERT INTO job_roles (id, org_id, name, status, created_at) VALUES ('role-a-old', 'org-a', 'old', 'archived', ?)").run(Date.now() - 5)
+  raw.prepare("INSERT INTO job_roles (id, org_id, name, created_at) VALUES ('role-a-late', 'org-a', 'late', ?)").run(Date.now() + 5)
 })
 afterAll(() => { raw.close(); vi.useRealTimers() })
 
 it('lists company questions and learner flags, approves, edits and retires without resurrecting the question', async () => {
   holder.userId = 'admin-a'
   const review = await getQuestionReview({ data: { slug: 'alpha' } })
-  expect(review.topics).toEqual([{ id: 'a', title: 'a' }])
-  expect(review.concepts[0]).toMatchObject({ name: 'Equations', sourceQuote: payload.source_quote })
-  expect(review.concepts[0].questions.map((q) => [q.id, q.flags])).toEqual([
-    ['a-live', []], ['a-invalid', []],
-    ['a-flag', [{ reason: 'unclear', label: 'The question is unclear', note: 'Which x do you mean?', createdAt: Date.now() }]],
+  expect(review.roles).toEqual([{ id: 'role-a', name: 'a' }, { id: 'role-a-late', name: 'late' }])
+  expect(review.role).toEqual({ id: 'role-a', name: 'a' })
+  expect(review.unreviewed).toBe(2)
+  expect(review.units.map((u) => [u.name, u.concepts.map((c) => [c.name, c.critical])])).toEqual([
+    ['Intro', [['Warm-up', true]]], ['Basics', [['Earlier', false], ['Equations', false]]],
   ])
+  expect(review.units[1].concepts[0].counts).toEqual({ total: 0, unreviewed: 0, flagged: 0, rejected: 0 })
+  const equations = review.units[1].concepts[1]
+  expect(equations.counts).toEqual({ total: 3, unreviewed: 2, flagged: 1, rejected: 0 })
+  expect(equations.questions.map((q) => q.id)).toEqual(['a-flag', 'a-live', 'a-invalid'])
+  expect(equations.questions[0]).toMatchObject({
+    status: 'active', difficulty: 3, reviewedAt: null, reviewerName: null, createdAt: Date.now(),
+    check: { reasons: ['Ambiguous stem'] }, source: { title: 'Algebra', version: 1 },
+    flags: [{ id: 'flag-1', reporterId: 'member-a', reporterName: 'member-a', createdAt: Date.now(), reason: 'unclear', label: 'The question is unclear',
+      note: 'Which x do you mean?', attempt: { answer: 'Alpha', confidence: 'sure' } }],
+  })
+  expect(equations.questions[1]).toMatchObject({ flags: [], check: { reasons: [] }, source: null })
 
   await reviewQuestion({ data: { slug: 'alpha', itemId: 'a-live', action: 'approve' } })
+  expect(row('SELECT reviewed_by, reviewed_at FROM items WHERE id = ?', 'a-live')).toEqual({ reviewed_by: 'admin-a', reviewed_at: Date.now() })
+  const approved = await getQuestionReview({ data: { slug: 'alpha', roleId: 'role-a' } })
+  expect(approved.unreviewed).toBe(1)
+  expect(approved.units[1].concepts[1].questions.map((q) => [q.id, q.reviewerName, q.reviewedAt])).toEqual([
+    ['a-flag', null, null], ['a-invalid', null, null], ['a-live', 'admin-a', Date.now()],
+  ])
   expect(row('SELECT reviewed_by, reviewed_at FROM items WHERE id = ?', 'a-live')).toEqual({ reviewed_by: 'admin-a', reviewed_at: Date.now() })
   const edited: ItemPayload = {
     ...payload, format: 'mcq', stem: 'What is x when x + 1 = 2?', difficulty: 2, source_quote: 'subtract 1 from both sides.',
@@ -102,7 +128,7 @@ it('lists company questions and learner flags, approves, edits and retires witho
   await reviewQuestion({ data: { slug: 'alpha', itemId: 'a-flag', action: 'approve' } })
   expect(row('SELECT resolved_at FROM item_flags WHERE id = ?', 'flag-1')).toEqual({ resolved_at: Date.now() })
   const after = await getQuestionReview({ data: { slug: 'alpha' } })
-  expect(after.concepts[0].questions.find((q) => q.id === 'a-flag')?.flags).toEqual([])
+  expect(after.units[1].concepts[1].questions.find((q) => q.id === 'a-flag')?.flags).toEqual([])
   expect(row('SELECT status, reviewed_by FROM items WHERE id = ?', 'a-flag')).toEqual({ status: 'active', reviewed_by: 'admin-a' })
   await reviewQuestion({ data: { slug: 'alpha', itemId: 'a-live', action: 'retire' } })
   await expect(reviewQuestion({ data: { slug: 'alpha', itemId: 'a-live', action: 'approve' } })).rejects.toMatchObject({ status: 409 })
@@ -166,10 +192,12 @@ it.each([null, 'member-a', 'owner-b'])('refuses review reads and writes for %s',
   }
 })
 
-it('scopes topic reads and every review action to the admin company, excluding personal topics', async () => {
+it('scopes role reads and every review action to the admin company, excluding personal topics', async () => {
   holder.userId = 'admin-a'
+  const late = await getQuestionReview({ data: { slug: 'alpha', roleId: 'role-a-late' } })
+  expect(late).toEqual({ name: 'alpha', roles: expect.any(Array), role: { id: 'role-a-late', name: 'late' }, unreviewed: 0, units: [] })
+  for (const roleId of ['role-a-old', 'role-b']) await expect(getQuestionReview({ data: { slug: 'alpha', roleId } })).rejects.toMatchObject({ status: 404 })
   for (const topicId of ['b', 'personal']) {
-    await expect(getQuestionReview({ data: { slug: 'alpha', topicId } })).rejects.toMatchObject({ status: 404 })
     const original = row('SELECT * FROM items WHERE id = ?', `${topicId}-live`)
     for (const action of ['approve', 'edit', 'retire'] as const) {
       await expect(reviewQuestion({ data: { slug: 'alpha', itemId: `${topicId}-live`, action, payload } })).rejects.toMatchObject({ status: 404 })

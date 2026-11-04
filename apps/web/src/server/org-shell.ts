@@ -18,14 +18,16 @@ export const getPortalShell = createServerFn({ method: 'GET' })
       throw e
     })
     const { org, user, readOnly } = access
-    const settings = await getDb().select({ logoKey: orgSettings.logoKey }).from(orgSettings).where(eq(orgSettings.orgId, org.id)).get()
+    const db = getDb()
+    const settings = await db.select({ logoKey: orgSettings.logoKey }).from(orgSettings).where(eq(orgSettings.orgId, org.id)).get()
+    // The logo endpoint requires membership, so a staff viewer who is not a member would get a 403.
+    const canSeeLogo = !readOnly || !!(await db.select({ id: member.id }).from(member).where(and(eq(member.organizationId, org.id), eq(member.userId, user.id))).get())
     const role = 'role' in access ? (access.role.split(',').includes('owner') ? ('owner' as const) : ('admin' as const)) : null
     return {
       orgId: org.id,
       name: org.name,
       slug: org.slug,
-      // The logo endpoint requires membership, so a staff viewer who is not a member would get a 403.
-      logoUrl: readOnly ? null : companyLogoUrl(org.id, settings?.logoKey),
+      logoUrl: canSeeLogo ? companyLogoUrl(org.id, settings?.logoKey) : null,
       userName: user.name,
       role,
       readOnly,
