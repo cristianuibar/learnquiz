@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from 'react'
-import { demoTranscriptUrl, demoVideoUrl, signUpUrl } from '../../site-config'
+import { androidApkUrl, demoTranscriptUrl, demoVideoUrl, signUpUrl } from '../../site-config'
 import { Icon } from '../ui/icon'
 import { PhoneFrame } from '../ui/phone-frame'
 
@@ -121,9 +121,11 @@ function DemoVideo({ embedUrl, transcriptUrl }: { embedUrl: string; transcriptUr
 export function Hero({
   videoUrl = demoVideoUrl,
   transcriptUrl = demoTranscriptUrl,
+  apkUrl = androidApkUrl,
 }: {
   videoUrl?: string
   transcriptUrl?: string
+  apkUrl?: string
 }) {
   const embedUrl = demoEmbedUrl(videoUrl)
   const transcriptHref = httpsUrl(transcriptUrl) ? transcriptUrl : null
@@ -143,6 +145,11 @@ export function Hero({
               <a className="btn btn-accent btn-lg" href={signUpUrl}>
                 Create a company account
               </a>
+              {apkUrl ? (
+                <a className="btn btn-secondary btn-lg" href={apkUrl}>
+                  Get the Android app
+                </a>
+              ) : null}
               {embedUrl ? <DemoVideo embedUrl={embedUrl} transcriptUrl={transcriptHref} /> : null}
             </div>
           </div>

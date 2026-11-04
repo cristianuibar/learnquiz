@@ -20,7 +20,7 @@ afterEach(async () => {
   container.remove()
 })
 
-async function renderHero(props: { videoUrl?: string; transcriptUrl?: string } = {}) {
+async function renderHero(props: { videoUrl?: string; transcriptUrl?: string; apkUrl?: string } = {}) {
   await act(async () => root.render(<Hero {...props} />))
 }
 
@@ -77,7 +77,7 @@ it.each(unsafeUrls)('renders no transcript link for %s', async (transcriptUrl) =
 })
 
 it('shows only the sign-up link when no demo video is configured', async () => {
-  await renderHero()
+  await renderHero({ apkUrl: '' })
   const links = container.querySelectorAll('#lqs-hero-cta a')
   expect(links).toHaveLength(1)
   expect(links[0].textContent).toBe('Create a company account')
@@ -152,4 +152,24 @@ it('offers a transcript link only when one is configured', async () => {
   expect(link.getAttribute('href')).toBe('https://example.com/t')
   expect(link.getAttribute('target')).toBe('_blank')
   expect(link.getAttribute('rel')).toBe('noopener noreferrer')
+})
+
+const heroActions = () =>
+  [...container.querySelectorAll('#lqs-hero-cta > a, #lqs-hero-cta > button')].map((el) => [el.textContent, el.getAttribute('href')])
+
+it('offers the Android app right after the accent action, as a non-accent button, once an APK URL is set', async () => {
+  await renderHero({ videoUrl: '', apkUrl: 'https://example.test/learnquiz.apk' })
+  expect(heroActions()).toEqual([
+    ['Create a company account', signUpUrl],
+    ['Get the Android app', 'https://example.test/learnquiz.apk'],
+  ])
+  const android = [...container.querySelectorAll('#lqs-hero-cta a')].find((a) => a.textContent === 'Get the Android app')!
+  expect(android.classList.contains('btn-accent')).toBe(false)
+  expect(container.querySelectorAll('.btn-accent')).toHaveLength(1)
+})
+
+it('shows no Android button while the APK URL is empty', async () => {
+  await renderHero({ videoUrl: '', apkUrl: '' })
+  expect(heroActions()).toEqual([['Create a company account', signUpUrl]])
+  expect(container.querySelector('a[href=""]')).toBeNull()
 })

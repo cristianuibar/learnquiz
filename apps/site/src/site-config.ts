@@ -4,4 +4,5 @@ export const learnOnYourOwnUrl = 'https://app.learnquiz.com/start'
 export const githubUrl = 'https://github.com/cristianuibar/learnquiz'
 export const demoVideoUrl: string = ''
 export const demoTranscriptUrl: string = ''
-export const androidApkUrl: string = ''
+// The latest GitHub release's APK; this URL stays the same when a new build is released.
+export const androidApkUrl: string = 'https://github.com/cristianuibar/learnquiz/releases/latest/download/learnquiz.apk'
