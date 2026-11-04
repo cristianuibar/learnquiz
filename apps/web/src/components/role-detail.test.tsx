@@ -511,7 +511,7 @@ it('swaps the uploading row for the new document, announces it and moves focus t
   expect(document.activeElement).toBe(button('Replace sop'))
 })
 
-it('flags pasted text over the limit without trimming it', async () => {
+it('explains the shared text and PDF limit without trimming over-limit pasted text', async () => {
   const { container, button } = await mount(makeDetail({ documents: [pdf] }))
   await act(async () => { button('Paste text')!.click() })
   const area = container.querySelector<HTMLTextAreaElement>('#rd-paste textarea')!
@@ -520,7 +520,8 @@ it('flags pasted text over the limit without trimming it', async () => {
     setter.call(area, 'a'.repeat(60001))
     area.dispatchEvent(new Event('input', { bubbles: true }))
   })
-  expect(container.textContent).toContain('60,001 / 60,000 characters. Remove 1 or upload a PDF instead.')
+  const error = document.getElementById(area.getAttribute('aria-describedby')!)!
+  expect(error.textContent).toBe('60,001 / 60,000 characters. Shorten or split the document. The 60,000-character limit also applies to extracted PDF text.')
   expect(button('Add text')!.hasAttribute('disabled')).toBe(true)
   expect(area.value.length).toBe(60001)
 })
