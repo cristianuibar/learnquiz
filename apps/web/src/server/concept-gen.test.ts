@@ -155,6 +155,39 @@ it('fails a concept the model cannot answer, resets it on admin retry and refuse
   expect(one("SELECT COUNT(*) AS n FROM items WHERE concept_id = 'c00'")).toEqual({ n: 6 })
 })
 
+// The self-check keeps `keep` items in its first round and none after it.
+const keepFirst = (keep: number) => {
+  let checks = 0
+  return async (url: unknown, init?: RequestInit) => {
+    if (JSON.parse(init!.body as string).response_format.json_schema.name !== 'self_check') return answerModel(url, init)
+    const kept = checks++ ? 0 : keep
+    return modelReply({ results: Array.from({ length: 6 }, (_, index) => ({ index, keep: index < kept, reasons: [] })) })
+  }
+}
+
+it('marks a concept ready when only some questions passed the self-check', async () => {
+  raw.exec("DELETE FROM concepts WHERE id <> 'c00'")
+  fetchModel.mockImplementation(keepFirst(2))
+  await drainAll()
+  expect(states()).toEqual([{ id: 'c00', gen_status: 'ready', gen_error: null }])
+  expect(one("SELECT COUNT(*) AS n FROM items WHERE concept_id = 'c00' AND status = 'active'")).toEqual({ n: 2 })
+})
+
+it('keeps a concept with live questions ready when its top-up fails, and fails one with none', async () => {
+  raw.exec("DELETE FROM concepts WHERE id <> 'c00'")
+  const seed = raw.prepare("INSERT INTO items (id, concept_id, topic_id, format, payload_json, created_at) VALUES (?, 'c00', 'co-topic', 'short', ?, 1)")
+  for (const failure of [async () => new Response('Unavailable', { status: 502 }), keepFirst(0)]) {
+    for (const [have, expected] of [[5, ['ready', null]], [0, ['failed', 'Could not generate items for this concept']]] as const) {
+      raw.exec("DELETE FROM items; UPDATE concepts SET gen_status = 'pending', gen_started_at = NULL, gen_error = NULL WHERE id = 'c00'")
+      for (let i = 0; i < have; i++) seed.run(`seeded-${i}`, JSON.stringify(item()))
+      fetchModel.mockImplementation(failure)
+      await drainAll()
+      expect(states().map((c) => [c.gen_status, c.gen_error])).toEqual([expected])
+      expect(one("SELECT COUNT(*) AS n FROM items WHERE concept_id = 'c00' AND status = 'active'")).toEqual({ n: have })
+    }
+  }
+})
+
 it('defers every concept to the next UTC day once the company has spent its daily cap', async () => {
   raw.exec("DELETE FROM concepts WHERE id NOT IN ('c00', 'c01', 'c02')")
   const log = raw.prepare("INSERT INTO model_calls (id, learner_id, topic_id, purpose, model, latency_ms, ok, created_at) VALUES (?, NULL, 'co-topic', 'items', 'm', 0, 1, ?)")
