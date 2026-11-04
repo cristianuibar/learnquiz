@@ -757,6 +757,44 @@ describe('learner practice and unit unlocks', () => {
   })
 
   it.each([
+    { bad: 3, firstConcept: 'c1', basics: true },
+    { bad: 2, firstConcept: 'c2', basics: false },
+  ])('goes back to basics after $bad weak ended sessions', async ({ bad, firstConcept, basics }) => {
+    const payload = JSON.stringify({
+      format: 'cloze', stem: 'Solve x + 1 = 2: x = ____.', options: [], accepted_answers: ['1'], model_answer: '1',
+      explanation: 'Subtract 1 from both sides.', difficulty: 1, source_quote: null, grounded: false, bloom: 'apply',
+    })
+    for (const order of [0, 1]) {
+      raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run(`un${order + 1}`, 't1', order, `Unit ${order + 1}`)
+      raw.prepare('INSERT INTO learner_unit (learner_id, unit_id, unlocked_at) VALUES (?, ?, ?)').run('u1', `un${order + 1}`, 1)
+      raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(`c${order + 1}`, 't1', `un${order + 1}`, 0, `Concept ${order + 1}`, '')
+      for (let i = 0; i < 4; i++) {
+        raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+          .run(`c${order + 1}-i${i}`, `c${order + 1}`, 't1', 'cloze', payload, 1, Date.now())
+      }
+    }
+    // Unit 2 has a due review, which normally opens the session.
+    raw.prepare('INSERT INTO learner_item (learner_id, item_id, due, stability, difficulty, state) VALUES (?, ?, ?, ?, ?, ?)')
+      .run('u1', 'c2-i0', Date.now() - 86_400_000, 1, 5, 2)
+    for (let s = 0; s < bad; s++) {
+      raw.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, item_ids_json, plan_json, started_at, ended_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(`old${s}`, 'u1', 't1', 'session', '[]', '{}', 1000 + s, 2000 + s)
+      for (let a = 0; a < 10; a++) {
+        raw.prepare('INSERT INTO attempts (id, learner_id, session_id, item_id, concept_id, at, answer_json, correct, score, confidence, response_ms, rating, p_known_before, p_known_after) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+          .run(`old${s}-a${a}`, 'u1', `old${s}`, 'c1-i1', 'c1', 1000 + s, '{}', a < 3 ? 1 : 0, a < 3 ? 1 : 0, 3, 1000, 1, 0.1, 0.1)
+      }
+    }
+
+    const { sessionId } = await startSession({ data: { topicId: 't1' } })
+    const ids = JSON.parse(scalar(raw, 'SELECT item_ids_json FROM sessions WHERE id = ?', sessionId).item_ids_json as string) as string[]
+    expect(scalar(raw, 'SELECT concept_id FROM items WHERE id = ?', ids[0]).concept_id).toBe(firstConcept)
+    expect(ids.includes('c2-i0')).toBe(true)
+    expect(ids[0] === 'c2-i0').toBe(!basics)
+    expect((await getSession({ data: { sessionId } })).basics).toBe(basics)
+  })
+
+  it.each([
     { frontier: 'underfilled', itemCount: 1, hasDue: true },
     { frontier: 'seen-out', itemCount: 6, hasDue: true },
     { frontier: 'underfilled', itemCount: 1, hasDue: false },

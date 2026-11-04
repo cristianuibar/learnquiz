@@ -18,8 +18,9 @@ import { Grade, type ItemPayload } from '@/lib/llm/schemas'
 import { validateVoiceWav } from '@/lib/voice'
 import { plural } from '@/lib/utils'
 import { dueCount } from '@/server/due'
-import { asItem, chunks, ensureConceptItems, httpError, loadPKnown, mean, targetFor } from '@/server/helpers'
+import { asItem, chunks, ensureConceptItems, httpError, targetFor } from '@/server/helpers'
 import { liveConcept } from '@/server/live-concept'
+import { basicsUnits, unitMastery } from '@/server/mastery'
 import { requireLearnerId } from '@/server/session'
 import { assertWithinDailyCap } from '@/server/model-cap'
 import { learnerCanAccess, notFlaggedBy, openFlag, roleCompany, seedLearnerTopic } from '@/server/topic-access'
@@ -48,6 +49,7 @@ type QueuePlan = Plan & {
   reasons: { due: number; frontier: number; closers: number }
   unitStart: Record<string, number>
   planning?: SessionPlanning
+  basics?: boolean
 }
 
 const readPlan = (s: SessionRow) => JSON.parse(s.planJson ?? '{}') as PlacementPlan | QueuePlan
@@ -136,19 +138,6 @@ export async function loadFrontier(db: Db, learnerId: string, topicId: string) {
     .sort((a, b) => a.unitOrder - b.unitOrder || a.pKnown - b.pKnown || a.concept.order - b.concept.order)
 }
 
-async function unitMastery(db: Db, learnerId: string, topicId: string) {
-  const [unitRows, conceptRows, known] = await Promise.all([
-    db.select({ id: units.id, name: units.name }).from(units).where(eq(units.topicId, topicId)).orderBy(asc(units.order)),
-    db.select({ id: concepts.id, unitId: concepts.unitId }).from(concepts).where(eq(concepts.topicId, topicId)),
-    loadPKnown(db, learnerId, topicId),
-  ])
-  return unitRows.map((u) => ({
-    unitId: u.id,
-    unitName: u.name,
-    mastery: mean(conceptRows.filter((c) => c.unitId === u.id).map((c) => known.get(c.id) ?? 0)),
-  }))
-}
-
 async function viewOf(db: Db, session: SessionRow, topic: TopicRow, plan: PlacementPlan | QueuePlan): Promise<SessionView> {
   const ids = JSON.parse(session.itemIdsJson) as string[]
   const ended = session.endedAt !== null
@@ -173,6 +162,7 @@ async function viewOf(db: Db, session: SessionRow, topic: TopicRow, plan: Placem
     ended,
     // Role topics play without any model call, so transcription is off there.
     voiceEnabled: topic.jobRoleId === null && isVoiceEnabled(),
+    basics: 'queue' in plan && plan.basics === true,
   }
 }
 
@@ -250,7 +240,7 @@ export const startSession = createServerFn({ method: 'POST' })
       unitId = unit.id
     }
     const inUnit = unitId ? inArray(items.conceptId, db.select({ id: concepts.id }).from(concepts).where(eq(concepts.unitId, unitId))) : undefined
-    const [lt, scheduled, frontier] = await Promise.all([
+    const [lt, scheduled, frontier, weak] = await Promise.all([
       loadLearnerTopic(db, learnerId, topic.id),
       db
         .select({ row: learnerItem, conceptId: items.conceptId })
@@ -259,7 +249,9 @@ export const startSession = createServerFn({ method: 'POST' })
         .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId), inUnit,
           topic.jobRoleId !== null ? ne(items.format, 'short') : undefined)),
       loadFrontier(db, learnerId, topic.id),
+      basicsUnits(db, learnerId, topic.id),
     ])
+    const basics = weak !== null
     const targetDifficulty = targetFor(lt.level)
     const seen = new Set(scheduled.map((s) => s.row.itemId))
     const due = scheduled
@@ -272,7 +264,10 @@ export const startSession = createServerFn({ method: 'POST' })
       }))
 
     // Seen items come back through the due list, not as fresh frontier questions.
-    const top = frontier.filter((f) => !unitId || f.concept.unitId === unitId).slice(0, 4)
+    // Back to basics: concepts in weak units come first; the frontier is already in unit order.
+    const isWeak = (f: (typeof frontier)[number]) => weak?.includes(f.concept.unitId) ?? false
+    const ranked = basics ? [...frontier.filter(isWeak), ...frontier.filter((f) => !isWeak(f))] : frontier
+    const top = ranked.filter((f) => !unitId || f.concept.unitId === unitId).slice(0, 4)
     // Anything practisable stored starts the session at once (a shorter one is fine); prepareNextSession tops up during play.
     const storedRows = top.length
       ? await db.select().from(items).where(and(eq(items.topicId, topic.id), inArray(items.conceptId, top.map((f) => f.concept.id)), eq(items.status, 'active'), notFlaggedBy(db, learnerId),
@@ -306,7 +301,7 @@ export const startSession = createServerFn({ method: 'POST' })
       .sort((a, b) => Number(seen.has(a.id)) - Number(seen.has(b.id)))
       .slice(0, 2)
 
-    const rulesQueue = composeSession({ size: SESSION_SIZE, due, frontier: frontierInput, closers, targetDifficulty })
+    const rulesQueue = composeSession({ size: SESSION_SIZE, due, frontier: frontierInput, closers, targetDifficulty, basics })
     if (!rulesQueue.length) {
       if (topic.jobRoleId !== null) throw httpError(`${await preparingMessage(db, topic.jobRoleId)}. Try again in a few minutes.`, 503)
       // A join that timed out leaves generation running; that is a wait, not an empty topic.
@@ -330,7 +325,7 @@ export const startSession = createServerFn({ method: 'POST' })
     }
     try {
       const selected = jobModel('plan')
-      if (selected.provider !== 'ollama' && topic.jobRoleId === null) {
+      if (selected.provider !== 'ollama' && topic.jobRoleId === null && !basics) {
         await assertWithinDailyCap(db, learnerId)
         const candidates = await db
           .select({ itemId: items.id, concept: concepts.name, difficulty: items.difficultyPrior })
@@ -377,6 +372,7 @@ export const startSession = createServerFn({ method: 'POST' })
       },
       unitStart: Object.fromEntries((await unitMastery(db, learnerId, topic.id)).map((u) => [u.unitId, u.mastery])),
       planning,
+      ...(basics && { basics }),
     }
     await db.insert(sessions).values({
       id: sessionId,

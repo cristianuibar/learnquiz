@@ -18,18 +18,19 @@ export function composeSession(input: {
   frontier: Frontier[]
   closers: { id: string; conceptId: string }[]
   targetDifficulty: number
+  basics?: boolean // back to basics: the frontier (ranked by the caller) goes ahead of due reviews
 }): string[] {
   const closers = input.closers.slice(0, 2)
   const conceptOf = new Map<string, string>()
   const due = [...input.due]
     .sort((a, b) => Number(b.confidentError) - Number(a.confidentError) || a.retrievability - b.retrievability)
     .slice(0, DUE_CAP)
-  const concepts = [...input.frontier].sort((a, b) => a.unitOrder - b.unitOrder || a.pKnown - b.pKnown)
+  const concepts = input.basics ? input.frontier : [...input.frontier].sort((a, b) => a.unitOrder - b.unitOrder || a.pKnown - b.pKnown)
   for (const c of concepts) for (const i of c.items) conceptOf.set(i.id, c.conceptId)
   for (const d of [...due, ...closers]) conceptOf.set(d.id, d.conceptId)
 
   const picked = new Set(due.map((d) => d.id))
-  const main = due.map((d) => d.id)
+  const main = input.basics ? [] : due.map((d) => d.id)
   let covered = 0
   for (const c of concepts) {
     if (covered >= 8) break
@@ -39,6 +40,7 @@ export function composeSession(input: {
       covered++
     }
   }
+  if (input.basics) main.push(...due.map((d) => d.id))
   const room = input.size - closers.length
   // Short on items: top up from the frontier one level easier.
   const spare = concepts.flatMap((c) => c.items).filter((i) => !picked.has(i.id))

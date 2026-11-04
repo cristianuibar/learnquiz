@@ -124,14 +124,14 @@ const learn = (conceptId: string, p: number) =>
   run('INSERT INTO learner_concept (learner_id, concept_id, p_known, n_attempts, updated_at) VALUES (?, ?, ?, ?, ?)', 'u1', conceptId, p, 1, 1)
 
 let attemptSeq = 0
-function attempt(itemId: string, conceptId: string, at: number, sessionId: string | null = null) {
+function attempt(itemId: string, conceptId: string, at: number, sessionId: string | null = null, correct = 1) {
   run('INSERT INTO attempts (id, learner_id, session_id, item_id, concept_id, at, answer_json, correct, score, confidence, response_ms, rating, p_known_before, p_known_after) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    `a${attemptSeq++}`, 'u1', sessionId, itemId, conceptId, at, '{}', 1, 1, 'sure', 1000, 3, 0.1, 0.2)
+    `a${attemptSeq++}`, 'u1', sessionId, itemId, conceptId, at, '{}', correct, 1, 'sure', 1000, 3, 0.1, 0.2)
 }
 
-function session(id: string, kind: string, endedAt: number | null, attempts: number) {
+function session(id: string, kind: string, endedAt: number | null, attempts: number, correct = attempts) {
   run('INSERT INTO sessions (id, learner_id, topic_id, kind, started_at, ended_at) VALUES (?, ?, ?, ?, ?, ?)', id, 'u1', 't1', kind, DAY_START, endedAt)
-  for (let i = 0; i < attempts; i++) attempt('i1', 'c1', DAY_START + 1000 + i, id)
+  for (let i = 0; i < attempts; i++) attempt('i1', 'c1', DAY_START + 1000 + i, id, i < correct ? 1 : 0)
 }
 
 const place = () => run('INSERT INTO placements (id, learner_id, topic_id, log_json, created_at) VALUES (?, ?, ?, ?, ?)', 'p1', 'u1', 't1', '[]', 1)
@@ -307,6 +307,26 @@ describe('getToday', () => {
       place()
       session('s1', kind, endedAt, attempts)
       expect((await getToday()).plan).toMatchObject({ sessionDone: done, state: done ? 'done' : 'normal' })
+    })
+  })
+
+  describe('back to basics', () => {
+    it.each([
+      ['three weak sessions', [3, 3, 3], 'basics', 'Unit un2'],
+      ['two weak sessions', [3, 3], 'normal', 'Unit un1'],
+      ['a good recent session', [3, 3, 9], 'normal', 'Unit un1'],
+    ])('%s', async (_name, corrects, state, nextUnit) => {
+      personal()
+      unit('un1', 0)
+      unit('un2', 1)
+      concept('c1', 'un1')
+      concept('c2', 'un2')
+      item('i1', 'c1')
+      item('i2', 'c2')
+      learn('c1', 0.8)
+      place()
+      corrects.forEach((c, i) => session(`s${i}`, 'session', DAY_START - (i + 1) * DAY, 10, c))
+      expect((await getToday()).plan).toMatchObject({ start: 'session', state, nextUnit })
     })
   })
 
