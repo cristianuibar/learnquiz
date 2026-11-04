@@ -6,6 +6,7 @@ import { api, ApiError } from './api'
 import { getToken } from './auth'
 import { useSession, type Branding } from './session-store'
 import { loadTodayCache, saveTodayCache } from './today-cache'
+import { watchReachability } from './reachability'
 
 // The session Loading route makes the start call; Today only navigates there.
 export const PLAY_LOADING = '/play/loading'
@@ -90,7 +91,7 @@ export function useStreakPop(reward: boolean): boolean {
 type Identity = { id: string | null; branding: Branding | null; token: string | null }
 type Owner = { id: string; token: string | null }
 
-export function useToday(): {
+export function useToday({ monitorConnectivity = false }: { monitorConnectivity?: boolean } = {}): {
   today: Today | null
   view: TodayView | null
   status: TodayStatus
@@ -109,6 +110,10 @@ export function useToday(): {
   const [today, setToday] = useState<Today | null>(fixture)
   const [payloadDay, setPayloadDay] = useState<string | null>(null)
   const [status, setStatus] = useState<TodayStatus>(fixture ? 'ready' : 'loading')
+  const [unreachable, setUnreachable] = useState(false)
+  // Reachability is independent of payload requests: a late successful /today
+  // must not hide a newer loss of connectivity.
+  const visibleStatus = unreachable ? 'offline' : status
   const [refreshing, setRefreshing] = useState(false)
   // Keep polling a building plan through midnight until a fresh plan replaces it.
   const [building, setBuilding] = useState(false)
@@ -327,8 +332,19 @@ export function useToday(): {
     return () => clearInterval(timer)
   }, [fixture, building, focused, active, refresh])
 
+  useEffect(() => {
+    // Only the Today screen opts in; TabBar and Path also use this data hook.
+    if (!monitorConnectivity || fixture || !focused || !active) return
+    let wasOffline = false
+    return watchReachability((reachable) => {
+      setUnreachable(!reachable)
+      if (reachable && wasOffline) void refresh()
+      wasOffline = !reachable
+    })
+  }, [monitorConnectivity, fixture, focused, active, refresh])
+
   const baseView = useMemo(() => (visibleToday ? todayView(visibleToday, new Date()) : null), [visibleToday])
-  const view = useMemo(() => viewForStatus(baseView, status), [baseView, status])
+  const view = useMemo(() => viewForStatus(baseView, visibleStatus), [baseView, visibleStatus])
 
   const step = useRef<number | null>(null)
   useEffect(() => {
@@ -339,5 +355,5 @@ export function useToday(): {
     step.current = next
   }, [visibleToday, view])
 
-  return { today: visibleToday, view, status, refreshing, refresh }
+  return { today: visibleToday, view, status: visibleStatus, refreshing, refresh }
 }

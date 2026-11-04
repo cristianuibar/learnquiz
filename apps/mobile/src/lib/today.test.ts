@@ -3,7 +3,8 @@ import { AccessibilityInfo, AppState, Text, type AppStateStatus } from 'react-na
 import { act, fireEvent, render, screen } from '@testing-library/react-native'
 import { todayFixtures, todayView, type Today, type TodayView } from '@learnquiz/api/today'
 import { offlineTitle, todayError } from '@learnquiz/api/system-copy'
-import { api, ApiError } from './api'
+import { api, ApiError, checkReachability } from './api'
+import { REACHABILITY_INTERVAL_MS } from './reachability'
 import { getToken } from './auth'
 import { useSession, type Branding } from './session-store'
 import { loadTodayCache, saveTodayCache } from './today-cache'
@@ -32,7 +33,7 @@ jest.mock('./session-store', () => ({ useSession: jest.fn() }))
 jest.mock('./today-cache', () => ({ loadTodayCache: jest.fn(), saveTodayCache: jest.fn() }))
 jest.mock('./api', () => {
   const actual = jest.requireActual('./api')
-  return { ApiError: actual.ApiError, api: jest.fn() }
+  return { ApiError: actual.ApiError, api: jest.fn(), checkReachability: jest.fn() }
 })
 let mockBlurred = false
 jest.mock('expo-router', () => ({
@@ -46,6 +47,7 @@ jest.mock('expo-router', () => ({
 }))
 
 const mockApi = jest.mocked(api)
+const mockReachability = jest.mocked(checkReachability)
 const mockGetToken = jest.mocked(getToken)
 const mockSession = jest.mocked(useSession)
 const mockLoadCache = jest.mocked(loadTodayCache)
@@ -95,6 +97,7 @@ beforeEach(() => {
   mockSession.mockReturnValue(sessionFor('u1'))
   mockLoadCache.mockResolvedValue(null)
   mockSaveCache.mockResolvedValue(undefined)
+  mockReachability.mockResolvedValue(undefined)
   jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, listener) => {
     appStateListener = listener as (state: AppStateStatus) => void
     return { remove: jest.fn() }
@@ -102,6 +105,63 @@ beforeEach(() => {
   jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {})
 })
 afterEach(() => { jest.useRealTimers() })
+
+test('Today notices a connection drop without a failed Today request and clears on recovery', async () => {
+  jest.useFakeTimers()
+  mockApi.mockResolvedValue(todayFixtures.normal)
+  await render(createElement(ThemeProvider, { children: createElement(TodayScreen) }))
+  const hero = todayView(todayFixtures.normal, new Date()).hero
+  if (hero.kind !== 'normal') throw new Error('Expected normal fixture')
+  expect(screen.getByText(hero.title)).toBeOnTheScreen()
+  expect(screen.getByText(hero.meta)).toBeOnTheScreen()
+  expect(screen.queryByText(offlineTitle)).toBeNull()
+
+  // Airplane mode affects the lightweight probe, with no user action or
+  // failing /today request. The already displayed values remain visible.
+  mockReachability.mockRejectedValueOnce(new TypeError('Network request failed'))
+  await act(async () => { await jest.advanceTimersByTimeAsync(REACHABILITY_INTERVAL_MS) })
+  expect(screen.getByText(offlineTitle)).toBeOnTheScreen()
+  expect(screen.getByText(hero.title)).toBeOnTheScreen()
+  expect(screen.getByText(hero.meta)).toBeOnTheScreen()
+  expect(screen.getByRole('button', { name: hero.play.accessibleLabel })).toBeDisabled()
+  expect(mockApi).toHaveBeenCalledTimes(1)
+
+  await act(async () => { await jest.advanceTimersByTimeAsync(REACHABILITY_INTERVAL_MS) })
+  expect(screen.queryByText(offlineTitle)).toBeNull()
+  expect(screen.getByRole('button', { name: hero.play.accessibleLabel })).toBeEnabled()
+  expect(screen.getByText(hero.meta)).toBeOnTheScreen()
+  expect(mockApi).toHaveBeenCalledTimes(2)
+})
+
+test('a late Today response cannot hide a newer connectivity loss', async () => {
+  jest.useFakeTimers()
+  let finish!: (value: Today) => void
+  mockLoadCache.mockResolvedValue(cacheEntry('u1', todayFixtures.normal))
+  mockApi.mockReturnValue(new Promise<Today>((resolve) => { finish = resolve }))
+  await render(createElement(ThemeProvider, { children: createElement(TodayScreen) }))
+  mockReachability.mockRejectedValueOnce(new TypeError('Offline'))
+  await act(async () => { await jest.advanceTimersByTimeAsync(REACHABILITY_INTERVAL_MS) })
+  expect(screen.getByText(offlineTitle)).toBeOnTheScreen()
+  await act(async () => { finish(todayFixtures.normal) })
+  expect(screen.getByText(offlineTitle)).toBeOnTheScreen()
+})
+
+test('Today stops connectivity probes in the background and rechecks on return', async () => {
+  jest.useFakeTimers()
+  mockApi.mockResolvedValue(todayFixtures.normal)
+  const { unmount } = await render(createElement(ThemeProvider, { children: createElement(TodayScreen) }))
+  expect(mockReachability).toHaveBeenCalledTimes(1)
+  await act(async () => { appStateListener?.('background') })
+  await act(async () => { await jest.advanceTimersByTimeAsync(REACHABILITY_INTERVAL_MS * 2) })
+  expect(mockReachability).toHaveBeenCalledTimes(1)
+  mockReachability.mockRejectedValueOnce(new TypeError('Offline'))
+  await act(async () => { appStateListener?.('active') })
+  expect(screen.getByText(offlineTitle)).toBeOnTheScreen()
+  expect(mockReachability).toHaveBeenCalledTimes(2)
+  await unmount()
+  await act(async () => { await jest.advanceTimersByTimeAsync(REACHABILITY_INTERVAL_MS * 2) })
+  expect(mockReachability).toHaveBeenCalledTimes(2)
+})
 
 describe('pure helpers', () => {
   test('the dev fixture switch only accepts the five named fixtures in dev', () => {
