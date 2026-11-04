@@ -23,15 +23,16 @@ const STAT =
   'sm:border-r sm:border-b-0 sm:last:border-r-0 sm:[&:last-child:nth-child(odd)]:col-span-1 xl:px-6 xl:py-5'
 const VALUE = 'text-[28px]/[34px] font-bold tracking-[-0.02em] tabular-nums text-ink xl:text-[32px]/[40px]'
 
-export function Stat({ label, value, unit, to }: {
+export function Stat({ label, value, unit, link }: {
   label: string
   value: number | string | null
   unit?: string
-  to?: LinkProps['to']
+  /** Link options from usePortalLinks(); spread into the Link so params and search travel with it. */
+  link?: LinkProps
 }) {
   const body = (
     <>
-      <span className={cn('text-[14px]/[20px] font-medium text-ink-muted', to && 'group-hover/stat:text-ink group-hover/stat:underline')}>{label}</span>
+      <span className={cn('text-[14px]/[20px] font-medium text-ink-muted', link && 'group-hover/stat:text-ink group-hover/stat:underline')}>{label}</span>
       <span className={VALUE}>
         {value === null ? (
           <>
@@ -45,10 +46,10 @@ export function Stat({ label, value, unit, to }: {
       </span>
     </>
   )
-  if (to) {
+  if (link) {
     return (
       <Link
-        to={to}
+        {...link}
         className={cn(STAT, 'group/stat hover:bg-surface-page focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand')}
       >
         {body}
