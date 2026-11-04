@@ -87,7 +87,7 @@ it('names the company on Today while the role training is being prepared', async
 
 it('sends a learner with a ready topic to Today, where one tap starts the session', async () => {
   vi.mocked(getLatestTopicIdFn).mockResolvedValue('topic-1')
-  vi.mocked(getToday).mockResolvedValue({ topic: { id: 'topic-1', title: 'Biology', placed: true, placeable: true, due: 2, xp: 40, streak: 1 }, role: null, plan: { state: 'normal', start: 'session', nextUnit: null, reviewsLeft: 2, reviewsCleared: 0, sessionDone: false, sessionSize: 20, playable: true, nextReviewAt: null } })
+  vi.mocked(getToday).mockResolvedValue({ topic: { id: 'topic-1', title: 'Biology', placed: true, placeable: true, due: 2, xp: 40, streak: 1, streakEarned: false }, role: null, plan: { state: 'normal', start: 'session', nextUnit: null, reviewsLeft: 2, reviewsCleared: 0, sessionDone: false, sessionSize: 20, playable: true, nextReviewAt: null } })
   const { container, router, cleanup } = await renderStart('/me')
   try {
     const today = [...container.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Main"] a')].find((link) => link.textContent?.trim() === 'Today')!
@@ -150,7 +150,7 @@ it.each([
 
 it('shows the three tabs on Today and moves focus to the page heading on Profile', async () => {
   vi.mocked(getLatestTopicIdFn).mockResolvedValue('topic-1')
-  vi.mocked(getToday).mockResolvedValue({ topic: { id: 'topic-1', title: 'Biology', placed: true, placeable: true, due: 2, xp: 40, streak: 1 }, role: null, plan: { state: 'normal', start: 'session', nextUnit: null, reviewsLeft: 2, reviewsCleared: 0, sessionDone: false, sessionSize: 20, playable: true, nextReviewAt: null } })
+  vi.mocked(getToday).mockResolvedValue({ topic: { id: 'topic-1', title: 'Biology', placed: true, placeable: true, due: 2, xp: 40, streak: 1, streakEarned: false }, role: null, plan: { state: 'normal', start: 'session', nextUnit: null, reviewsLeft: 2, reviewsCleared: 0, sessionDone: false, sessionSize: 20, playable: true, nextReviewAt: null } })
   const { container, router, cleanup } = await renderStart('/today')
   try {
     const links = () => [...container.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Main"] a')]

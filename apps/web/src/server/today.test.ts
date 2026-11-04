@@ -27,6 +27,7 @@ vi.mock('@/server/session', () => ({
 
 vi.mock('cloudflare:workers', () => ({ env: {} }))
 
+import { todayView } from '@learnquiz/api/today'
 import { SESSION_SIZE } from './play'
 import { getToday } from './today'
 
@@ -148,7 +149,7 @@ describe('getToday', () => {
     personal(4, NOW)
     basics()
     expect(await getToday()).toEqual({
-      topic: { id: 't1', title: 'Algebra', placed: false, placeable: true, due: 0, xp: 70, streak: 4 },
+      topic: { id: 't1', title: 'Algebra', placed: false, placeable: true, due: 0, xp: 70, streak: 4, streakEarned: true },
       role: null,
       plan: {
         state: 'first', start: 'placement', nextUnit: null, reviewsLeft: 0, reviewsCleared: 0, sessionDone: false,
@@ -334,6 +335,24 @@ describe('getToday', () => {
       place()
       session('s1', kind, endedAt, attempts)
       expect((await getToday()).plan).toMatchObject({ sessionDone: done, state: done ? 'done' : 'normal' })
+    })
+  })
+
+  describe('streak reward', () => {
+    // A finished short session leaves lastSessionAt alone (streakAfter needs 10 answers); a credited day moves it to today.
+    it.each([
+      ['a finished 5-answer practice session the streak did not credit', 5, NOW - DAY, false],
+      ['a 10-answer session the streak credited', 10, DAY_START + 1, true],
+    ])('%s', async (_name, answers, lastSessionAt, earned) => {
+      personal(3, lastSessionAt)
+      basics()
+      place()
+      session('s1', 'session', DAY_START + 1, answers)
+      run('UPDATE sessions SET plan_json = ? WHERE id = ?', JSON.stringify({ completed: true }), 's1')
+      const today = await getToday()
+      expect(today.plan).toMatchObject({ sessionDone: true, state: 'done' })
+      expect(today.topic).toMatchObject({ streak: 3, streakEarned: earned })
+      expect(todayView(today, new Date(NOW)).streakReward).toBe(earned)
     })
   })
 

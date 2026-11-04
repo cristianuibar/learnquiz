@@ -119,7 +119,9 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
     })(),
   ])
   return {
-    topic: { id: topicId, title: topic.title, placed, placeable, due: dueN, xp: lt?.xp ?? 0, streak: lt ? streakShown(lt, now) : 0 },
+    topic: { id: topicId, title: topic.title, placed, placeable, due: dueN, xp: lt?.xp ?? 0, streak: lt ? streakShown(lt, now) : 0,
+      // lastSessionAt only moves when streakAfter credits the day.
+      streakEarned: (lt?.lastSessionAt ?? -1) >= dayStart },
     role,
     plan: {
       state: sessionDone ? 'done' : basics ? 'basics' : played ? 'normal' : 'first',

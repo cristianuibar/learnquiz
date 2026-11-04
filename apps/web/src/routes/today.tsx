@@ -70,7 +70,7 @@ function Today() {
 
   return (
     <main className="mx-auto w-full max-w-xl px-4 pb-16">
-      <TodayBar org={org} streak={view.streak} streakVariant={hero.kind === 'done' ? 'reward' : 'quiet'} />
+      <TodayBar org={org} streak={view.streak} streakVariant={view.streakReward ? 'reward' : 'quiet'} />
       <div className="flex flex-col gap-6">
         {!online && <OfflineNotice id={noticeId} />}
         {hero.kind === 'done' ? (
