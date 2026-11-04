@@ -14,7 +14,7 @@ afterEach(() => { jest.useRealTimers() })
 test('uncached HEAD probes require two consecutive failures and recover on the first HTTP response', async () => {
   const changes = jest.fn()
   fetchMock.mockRejectedValue(new TypeError('Offline'))
-  const stop = watchReachability(changes)
+  const { stop } = watchReachability(changes)
   await jest.advanceTimersByTimeAsync(0)
   expect(changes).not.toHaveBeenCalled()
   expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining(`${API_URL}/manifest.webmanifest?reachability=`), {
@@ -35,7 +35,7 @@ test('a stalled probe times out promptly, without overlapping requests', async (
   fetchMock.mockImplementation((_url, init) => new Promise((_resolve, reject) => {
     init?.signal?.addEventListener('abort', () => reject(new Error('Aborted')))
   }))
-  const stop = watchReachability(changes)
+  const { stop } = watchReachability(changes)
   await jest.advanceTimersByTimeAsync(REACHABILITY_TIMEOUT_MS - 1)
   expect(changes).not.toHaveBeenCalled()
   expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -54,11 +54,33 @@ test('a successful probe resets the consecutive failure count', async () => {
   fetchMock.mockRejectedValueOnce(new TypeError('Offline'))
     .mockResolvedValueOnce({ status: 200 } as Response)
     .mockRejectedValue(new TypeError('Offline'))
-  const stop = watchReachability(changes)
+  const { stop } = watchReachability(changes)
   await jest.advanceTimersByTimeAsync(REACHABILITY_INTERVAL_MS * 2)
   expect(changes.mock.calls).toEqual([[true]])
   await jest.advanceTimersByTimeAsync(REACHABILITY_INTERVAL_MS)
   expect(changes).toHaveBeenLastCalledWith(false)
+  stop()
+})
+
+test('reset ignores a stale probe failure and requires two new failures before reporting offline', async () => {
+  const changes = jest.fn()
+  let failStaleProbe!: (reason: Error) => void
+  fetchMock.mockRejectedValueOnce(new TypeError('Offline'))
+    .mockRejectedValueOnce(new TypeError('Offline'))
+    .mockImplementationOnce(() => new Promise((_resolve, reject) => { failStaleProbe = reject }))
+    .mockRejectedValue(new TypeError('Offline'))
+  const { reset, stop } = watchReachability(changes)
+  await jest.advanceTimersByTimeAsync(REACHABILITY_INTERVAL_MS * 2)
+  expect(changes.mock.calls).toEqual([[false]])
+
+  reset()
+  failStaleProbe(new TypeError('Stale offline result'))
+  await jest.advanceTimersByTimeAsync(0)
+  expect(changes.mock.calls).toEqual([[false]])
+  await jest.advanceTimersByTimeAsync(REACHABILITY_INTERVAL_MS)
+  expect(changes.mock.calls).toEqual([[false]])
+  await jest.advanceTimersByTimeAsync(REACHABILITY_INTERVAL_MS)
+  expect(changes.mock.calls).toEqual([[false], [false]])
   stop()
 })
 
@@ -67,7 +89,7 @@ test('stopping aborts an in-flight probe without publishing a false offline even
   fetchMock.mockImplementation((_url, init) => new Promise((_resolve, reject) => {
     init?.signal?.addEventListener('abort', () => reject(new Error('Aborted')))
   }))
-  const stop = watchReachability(changes)
+  const { stop } = watchReachability(changes)
   stop()
   await jest.advanceTimersByTimeAsync(REACHABILITY_TIMEOUT_MS + REACHABILITY_INTERVAL_MS)
   expect(fetchMock.mock.calls[0][1]?.signal?.aborted).toBe(true)

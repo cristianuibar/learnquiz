@@ -113,6 +113,7 @@ export function useToday({ monitorConnectivity = false }: { monitorConnectivity?
   const [unreachable, setUnreachable] = useState(false)
   // Either a successful payload request or probe proves connectivity.
   const needsRecovery = useRef(false)
+  const reachability = useRef<ReturnType<typeof watchReachability> | null>(null)
   const visibleStatus = unreachable ? 'offline' : status
   const [refreshing, setRefreshing] = useState(false)
   // Keep polling a building plan through midnight until a fresh plan replaces it.
@@ -197,6 +198,7 @@ export function useToday({ monitorConnectivity = false }: { monitorConnectivity?
         setBuilding(next.role?.building != null)
         setPayloadDay(requestDay)
         needsRecovery.current = false
+        reachability.current?.reset()
         setUnreachable(false)
         setStatus('ready')
         // Persist only the confirmed network payload, for the identity that
@@ -339,7 +341,7 @@ export function useToday({ monitorConnectivity = false }: { monitorConnectivity?
   useEffect(() => {
     // Only the Today screen opts in; TabBar and Path also use this data hook.
     if (!monitorConnectivity || fixture || !focused || !active) return
-    return watchReachability((reachable) => {
+    const watcher = watchReachability((reachable) => {
       setUnreachable(!reachable)
       if (!reachable) needsRecovery.current = true
       else if (needsRecovery.current) {
@@ -347,6 +349,11 @@ export function useToday({ monitorConnectivity = false }: { monitorConnectivity?
         void refresh()
       }
     })
+    reachability.current = watcher
+    return () => {
+      watcher.stop()
+      reachability.current = null
+    }
   }, [monitorConnectivity, fixture, focused, active, refresh])
 
   const baseView = useMemo(() => (visibleToday ? todayView(visibleToday, new Date()) : null), [visibleToday])
