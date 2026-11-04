@@ -175,6 +175,8 @@ test.each([
   expect(screen.getByRole('text', { name: stem.replace('____', 'blank') })).toBeOnTheScreen()
   expect(suffix.parent).toBe(field.parent)
   expect(field.parent).toHaveStyle({ flexDirection: 'row', flexWrap: 'nowrap', gap: 0 })
+  await fireEvent(field, 'focus')
+  expect(field).toHaveStyle({ marginHorizontal: 4, outlineWidth: 2, outlineOffset: 2, width: 88, minHeight: 36 })
 })
 
 const short: ItemView = { ...item, format: 'short', stem: 'A carton is stuck in the conveyor. What do you do?', blank: null }
