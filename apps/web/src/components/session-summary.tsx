@@ -112,6 +112,8 @@ export function MistakesDisclosure({ mistakes }: { mistakes: SummaryView['mistak
             <Link
               to="/play/quick/$itemId"
               params={{ itemId: m.itemId }}
+              // The quick route's loader starts a session, so it must run only on a real click.
+              preload={false}
               aria-label={`Review: ${m.conceptName}${m.wasSure ? '. You were sure' : ''}`}
               className={cn('flex min-h-14 items-center justify-between gap-3 rounded-md py-3', focusRing)}
             >
