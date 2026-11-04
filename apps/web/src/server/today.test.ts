@@ -163,6 +163,20 @@ describe('getToday', () => {
     expect(await getToday()).toEqual({ topic: null, role: null, plan: null })
   })
 
+  it.each(['personal', 'role'])('keeps Play enabled after one unfinished %s placement answer', async (kind) => {
+    if (kind === 'role') role()
+    else personal()
+    basics()
+    session('unfinished', 'placement', null, 1)
+
+    const today = await getToday()
+    expect(today.topic?.placed).toBe(false)
+    expect(today.plan).toMatchObject({ state: 'first', start: 'placement', playable: true, sessionDone: false })
+    expect(todayView(today, new Date(NOW)).hero).toMatchObject({
+      kind: 'first', title: 'Your first session', meta: 'Finds your starting level', play: { disabled: false },
+    })
+  })
+
   it('reports a placed personal topic with the next frontier unit and a session start', async () => {
     personal()
     basics()
@@ -310,16 +324,17 @@ describe('getToday', () => {
 
   describe('session of the day', () => {
     it.each([
-      ['a completed 6/8 placement recorded before the fix', [4, 5, 4, 3, 4, 5, 5, 5], DAY_START + 1, true],
-      ['an unfinished 8-answer placement', [4, 3, 2, 1, 2, 3, 4, 5], DAY_START + 1, false],
-      ['a completed placement ended yesterday', [4, 5, 4, 3, 4, 5, 5, 5], DAY_START - 1, false],
-      ['a completed placement still open', [4, 5, 4, 3, 4, 5, 5, 5], null, false],
-    ] as const)('%s', async (_name, levels, endedAt, done) => {
+      ['a completed 6/8 placement recorded before the fix', [4, 5, 4, 3, 4, 5, 5, 5], DAY_START + 1, true, true],
+      ['an unfinished 8-answer placement', [4, 3, 2, 1, 2, 3, 4, 5], DAY_START + 1, false, false],
+      ['a completed placement ended yesterday', [4, 5, 4, 3, 4, 5, 5, 5], DAY_START - 1, false, true],
+      ['a completed placement still open', [4, 5, 4, 3, 4, 5, 5, 5], null, false, false],
+    ] as const)('%s', async (_name, levels, endedAt, done, placed) => {
       role()
       basics()
+      if (placed) place()
       session('s1', 'placement', endedAt, 8, 6)
       run('UPDATE sessions SET plan_json = ? WHERE id = ?', JSON.stringify({ log: levels.map((level) => ({ level })) }), 's1')
-      expect((await getToday()).plan).toMatchObject({ sessionDone: done, state: done ? 'done' : 'normal' })
+      expect((await getToday()).plan).toMatchObject({ sessionDone: done, state: done ? 'done' : placed ? 'normal' : 'first' })
     })
 
     it.each([
@@ -415,6 +430,7 @@ describe('getToday', () => {
   describe('role mastery', () => {
     it('averages every concept including unmet ones as zero', async () => {
       role()
+      place()
       unit('un1', 0)
       concept('c1', 'un1')
       concept('c2', 'un1')

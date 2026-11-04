@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, count, eq, exists, getTableColumns, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql, type SQL } from 'drizzle-orm'
+import { and, asc, count, eq, exists, getTableColumns, gte, inArray, isNotNull, isNull, lt, lte, ne, notExists, or, sql, type SQL } from 'drizzle-orm'
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core'
 import { z } from 'zod'
 import { getDb, type Db } from '@/db'
@@ -190,6 +190,12 @@ export const startPlacement = createServerFn({ method: 'POST' })
     const learnerId = await requireLearnerId()
     const db = getDb()
     const topic = await ownedTopic(db, learnerId, data.topicId)
+    const openPlacement = db.select({ id: sessions.id }).from(sessions)
+      .where(and(eq(sessions.learnerId, learnerId), eq(sessions.topicId, topic.id), eq(sessions.kind, 'placement'), isNull(sessions.endedAt)))
+      .orderBy(asc(sessions.startedAt), asc(sessions.id)).limit(1)
+    const existing = await openPlacement.get()
+    if (existing) return { sessionId: existing.id }
+
     const sessionId = crypto.randomUUID()
     const [unitRows, conceptRows] = await Promise.all([
       db.select({ id: units.id }).from(units).where(eq(units.topicId, topic.id)).orderBy(asc(units.order)),
@@ -217,7 +223,8 @@ export const startPlacement = createServerFn({ method: 'POST' })
 
     const plan: PlacementPlan = { position: 0, answered: false, workingLevel: PLACEMENT.start, log: [], pool }
     // itemIdsJson holds the items served so far (the first is picked here); nextItem appends the rest.
-    await db.insert(sessions).values({
+    // Another start may finish preparing first. Insert and select atomically so both callers resume one placement.
+    const [, [active]] = await db.batch([insertIf(db, sessions, notExists(openPlacement), {
       id: sessionId,
       learnerId,
       topicId: topic.id,
@@ -225,8 +232,11 @@ export const startPlacement = createServerFn({ method: 'POST' })
       itemIdsJson: JSON.stringify([first]),
       planJson: JSON.stringify(plan),
       startedAt: Date.now(),
-    })
-    return { sessionId }
+      endedAt: null,
+      correctCount: 0,
+      xp: 0,
+    }), openPlacement])
+    return { sessionId: active.id }
   })
 
 // How many questions a session could play now, for the Loading screen while startSession prepares them. Read-only.

@@ -1071,6 +1071,49 @@ it.each([
   expect(today.quests).toContainEqual({ key: 'session', label: 'One session', count: null, done: true })
 })
 
+it.each([false, true])('resumes an open placement with prior answers intact (advanced=%s)', async (advanced) => {
+  seedTopicAndLearner(raw, 0)
+  seedFrontier(raw, 12, false)
+  const { sessionId } = await startPlacement({ data: { topicId: 't1' } })
+  const first = await getSession({ data: { sessionId } })
+  await answerItem({ data: { sessionId, itemId: first.item!.id, answer: { text: '1' }, confidence: 'sure', responseMs: 100 } })
+  if (advanced) await nextItem({ data: { sessionId } })
+  const stored = scalar(raw, 'SELECT item_ids_json, plan_json FROM sessions WHERE id = ?', sessionId)
+  // Other learners, topics, kinds and closed placements must never be resumed.
+  raw.prepare('INSERT INTO topics (id, learner_id, title, status, created_at) VALUES (?, ?, ?, ?, ?)')
+    .run('t2', 'u1', 'Other topic', 'ready', 2)
+  const decoy = raw.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, started_at, ended_at) VALUES (?, ?, ?, ?, ?, ?)')
+  decoy.run('other-learner', 'u2', 't1', 'placement', 0, null)
+  decoy.run('other-topic', 'u1', 't2', 'placement', 0, null)
+  decoy.run('other-kind', 'u1', 't1', 'session', 0, null)
+  decoy.run('closed', 'u1', 't1', 'placement', 0, 1)
+
+  expect(await startPlacement({ data: { topicId: 't1' } })).toEqual({ sessionId })
+  expect(scalar(raw, 'SELECT item_ids_json, plan_json FROM sessions WHERE id = ?', sessionId)).toEqual(stored)
+  const resumed = await getSession({ data: { sessionId } })
+  expect(resumed).toMatchObject({ id: sessionId, ended: false, progress: { position: 2 } })
+  expect(resumed.item!.id).not.toBe(first.item!.id)
+  await answerItem({ data: { sessionId, itemId: resumed.item!.id, answer: { text: '1' }, confidence: 'sure', responseMs: 100 } })
+  expect(scalar(raw, 'SELECT COUNT(*) AS n FROM attempts WHERE session_id = ?', sessionId).n).toBe(2)
+  expect(JSON.parse(scalar(raw, 'SELECT plan_json FROM sessions WHERE id = ?', sessionId).plan_json as string).log).toHaveLength(2)
+  expect(scalar(raw, "SELECT COUNT(*) AS n FROM sessions WHERE learner_id = 'u1' AND topic_id = 't1' AND kind = 'placement' AND ended_at IS NULL").n).toBe(1)
+  expect(scalar(raw, 'SELECT COUNT(*) AS n FROM placements').n).toBe(0)
+})
+
+it('creates only one open placement when two starts race', async () => {
+  seedTopicAndLearner(raw, 0)
+  seedFrontier(raw, 12, false)
+
+  const [first, second] = await Promise.all([
+    startPlacement({ data: { topicId: 't1' } }),
+    startPlacement({ data: { topicId: 't1' } }),
+  ])
+
+  expect(second).toEqual(first)
+  expect(scalar(raw, 'SELECT COUNT(*) AS n FROM sessions').n).toBe(1)
+  expect((await getSession({ data: first })).ended).toBe(false)
+})
+
 it.each(['session', 'placement'])('does not earn One session by leaving a %s after one answer', async (kind) => {
   seedTopicAndLearner(raw, 0)
   seedFrontier(raw, 12, true)

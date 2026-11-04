@@ -124,7 +124,7 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
       streakEarned: (lt?.lastSessionAt ?? -1) >= dayStart },
     role,
     plan: {
-      state: sessionDone ? 'done' : basics ? 'basics' : played ? 'normal' : 'first',
+      state: sessionDone ? 'done' : start === 'placement' ? 'first' : basics ? 'basics' : played ? 'normal' : 'first',
       start, nextUnit: unit?.name ?? null, reviewsLeft: Math.min(dueN, 8), reviewsCleared: cleared?.n ?? 0,
       sessionDone, sessionSize: SESSION_SIZE, playable, nextReviewAt: next?.at ?? null,
     },
