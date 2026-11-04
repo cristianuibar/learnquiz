@@ -284,8 +284,8 @@ const post = (body: FormData, origin = 'http://127.0.0.1:8800') => (Route.option
   params: { orgId: 'acme', roleId: 'role-a' },
 })
 
-it('stores a PDF posted to the upload route, taking the company and role from the URL', async () => {
-  const response = await post(form({ slug: 'globex', roleId: 'role-b', file: textPdf() }))
+it.each(['http://127.0.0.1:8800', 'https://app.learnquiz.com'])('stores a PDF posted to the upload route from %s, taking the company and role from the URL', async (origin) => {
+  const response = await post(form({ slug: 'globex', roleId: 'role-b', file: textPdf() }), origin)
   const result = await response.json() as { sourceId: string }
   const key = `orgs/org-a/roles/role-a/sources/${result.sourceId}.pdf`
   expect(response.status).toBe(200)

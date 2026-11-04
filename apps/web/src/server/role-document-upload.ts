@@ -5,6 +5,7 @@ import { getDb } from '@/db'
 import { concepts, items, jobRoles, sources, topics } from '@/db/schema'
 import { findSourceQuote } from '@/lib/curriculum/validate'
 import { MAX_ROLE_DOCUMENT_BYTES, MAX_ROLE_DOCUMENT_CHARS } from '@/lib/limits'
+import { APP_ORIGINS } from '@/server/auth-core'
 import { requireOrgAdmin } from '@/server/authz'
 import { drainConceptQueue } from '@/server/concept-gen'
 import { getEnv, runInBackground } from '@/server/env'
@@ -157,7 +158,9 @@ export const liveSource = (sourceId: string, topicId: string) =>
 // POST handler of the browser upload route; the company and role come from the URL, never the form.
 export async function handleRoleDocumentPost(request: Request, params: { orgId: string; roleId: string }) {
   // A multipart POST can be sent cross-site without a preflight.
-  if (request.headers.get('Origin') !== new URL(getEnv().BETTER_AUTH_URL).origin) return Response.json({ error: 'Forbidden' }, { status: 403 })
+  // The same origins Better Auth trusts: this deployment's own URL and the app hosts.
+  const origins = [new URL(getEnv().BETTER_AUTH_URL).origin, ...APP_ORIGINS]
+  if (!origins.includes(request.headers.get('Origin') ?? '')) return Response.json({ error: 'Forbidden' }, { status: 403 })
   try {
     const form = await request.formData()
     form.set('slug', params.orgId)
