@@ -43,7 +43,7 @@ function Done() {
       <p role="status" className="sr-only">
         {announcement}
       </p>
-      <h1 className="text-3xl font-bold tracking-tight">
+      <h1 className="text-title-1 text-ink">
         {placed ? `You're at level ${s.level} of 5` : `Session done, ${clock(s.durationMs)}`}
       </h1>
       {placed && s.levelLine && <p className="mt-3 text-lg text-muted-foreground">{s.levelLine}</p>}

@@ -17,11 +17,11 @@ function OrgLayout() {
   const staff = user?.role === 'admin'
   const params = { slug }
   // TanStack Link already sets aria-current="page" on the active link.
-  const active = { className: 'text-foreground underline underline-offset-4' }
-  const inactive = { className: 'text-muted-foreground hover:text-foreground' }
+  const active = { className: 'bg-brand-tint text-ink' }
+  const inactive = { className: 'text-ink-muted hover:text-ink' }
   return (
     <>
-      <div className="mx-auto w-full max-w-3xl px-4 pt-4">
+      <div className="mx-auto w-full max-w-[1120px] px-4 pt-4">
         <nav aria-label="Company">
           <ul className="-mx-3 flex flex-wrap gap-x-2">
             <li><Link to="/org/$slug" params={params} activeOptions={{ exact: true }} className={linkClass} activeProps={active} inactiveProps={inactive}>Overview</Link></li>

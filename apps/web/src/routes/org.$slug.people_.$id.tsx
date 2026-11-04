@@ -15,7 +15,7 @@ function PersonProfile() {
   return (
     <TrainingProgress
       profile={Route.useLoaderData()}
-      back={<Link to="/org/$slug/people" params={{ slug }} className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline">Back to people</Link>}
+      back={<Link to="/org/$slug/people" params={{ slug }} className="inline-flex min-h-11 items-center text-body font-medium text-primary underline">Back to people</Link>}
     />
   )
 }

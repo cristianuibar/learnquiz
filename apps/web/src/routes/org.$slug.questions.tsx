@@ -64,17 +64,17 @@ function QuestionCard({ question, slug }: { question: Question; slug: string }) 
 
   return (
     <li className="flex flex-col gap-4 rounded-lg border p-4">
-      <p className="text-sm text-muted-foreground">
+      <p className="text-caption text-ink-muted">
         {question.status === 'retired' ? 'Retired' : question.flags.length || question.status === 'reported' ? 'Flagged by learner' : question.status === 'active' ? 'Live' : 'Rejected'}
         {question.reviewedAt !== null ? ` · Approved ${new Date(question.reviewedAt).toLocaleDateString()}` : ' · Unreviewed'}
       </p>
       {question.flags.length > 0 && (
-        <ul aria-label="Learner flags" className="flex flex-col gap-1 rounded-md border p-3 text-sm">
+        <ul aria-label="Learner flags" className="flex flex-col gap-1 rounded-md border p-3 text-body">
           {question.flags.map((f, i) => (
             <li key={i}>
               <span className="font-medium">{f.label}</span>
               {f.note ? <> · {f.note}</> : null}
-              <span className="text-muted-foreground"> · {new Date(f.createdAt).toLocaleDateString()}</span>
+              <span className="text-ink-muted"> · {new Date(f.createdAt).toLocaleDateString()}</span>
             </li>
           ))}
         </ul>
@@ -110,7 +110,7 @@ function QuestionCard({ question, slug }: { question: Question; slug: string }) 
             <label className="flex flex-col gap-2">Explanation<Textarea name="explanation" defaultValue={p.explanation} maxLength={400} /></label>
             <label className="flex flex-col gap-2">Difficulty (1–5)<Input type="number" name="difficulty" min={1} max={5} defaultValue={p.difficulty} required /></label>
             <label className="flex flex-col gap-2">Source quote<Textarea name="source_quote" defaultValue={p.source_quote ?? ''} maxLength={300} /></label>
-            <p className="text-sm text-muted-foreground">Keep a supporting passage from the source. Saving clears the previous approval.</p>
+            <p className="text-caption text-ink-muted">Keep a supporting passage from the source. Saving clears the previous approval.</p>
             <div className="flex flex-wrap gap-2">
               <Button type="submit">Save changes</Button>
               <Button type="button" variant="secondary" onClick={() => { setEditing(false); setError('') }}>Cancel</Button>
@@ -119,10 +119,10 @@ function QuestionCard({ question, slug }: { question: Question; slug: string }) 
         </form>
       ) : (
         <>
-          {p.options.length > 0 && <ul className="flex flex-col gap-2">{p.options.map((o) => <li key={o.id}><p>{o.text}{o.is_correct && ' (correct)'}</p><p className="text-sm text-muted-foreground">{o.feedback}</p></li>)}</ul>}
+          {p.options.length > 0 && <ul className="flex flex-col gap-2">{p.options.map((o) => <li key={o.id}><p>{o.text}{o.is_correct && ' (correct)'}</p><p className="text-caption text-ink-muted">{o.feedback}</p></li>)}</ul>}
           {typed && <p>Answer: {p.accepted_answers.join(', ') || p.model_answer}</p>}
           <p>{p.explanation}</p>
-          {p.source_quote ? <blockquote className="border-l-2 pl-3 text-sm"><p className="font-medium">Source quote</p>{p.source_quote}</blockquote> : <p className="text-sm text-muted-foreground">No source quote</p>}
+          {p.source_quote ? <blockquote className="border-l-2 pl-3 text-body"><p className="font-medium">Source quote</p>{p.source_quote}</blockquote> : <p className="text-caption text-ink-muted">No source quote</p>}
           <div className="flex flex-wrap gap-2">
             <Button disabled={busy || question.status === 'retired'} onClick={() => void act('approve')}>Approve</Button>
             <Button variant="secondary" disabled={busy} onClick={() => { setSteps(p.options); setEditing(true); setError(''); setMessage('') }}>Edit</Button>
@@ -130,8 +130,8 @@ function QuestionCard({ question, slug }: { question: Question; slug: string }) 
           </div>
         </>
       )}
-      {error && <p role="alert" className="text-sm font-medium text-wrong">{error}</p>}
-      <p role="status" className="text-sm">{message}</p>
+      {error && <p role="alert" className="text-body font-medium text-wrong">{error}</p>}
+      <p role="status" className="text-body">{message}</p>
     </li>
   )
 }
@@ -140,20 +140,20 @@ function Questions() {
   const review = Route.useLoaderData()
   const { slug } = Route.useParams()
   return (
-    <main className="mx-auto w-full max-w-3xl px-4 pt-8 pb-16">
+    <main className="mx-auto w-full max-w-[1120px] px-4 pt-8 pb-16">
       <Link to="/org/$slug" params={{ slug }} className="underline">{review.name}</Link>
-      <h1 className="mt-4 text-3xl font-bold tracking-tight">Question review</h1>
+      <h1 className="mt-4 text-title-1 text-ink">Question review</h1>
       <nav aria-label="Topics" className="mt-6 flex flex-wrap gap-4">
         {review.topics.map((t) => <Link key={t.id} to="/org/$slug/questions" params={{ slug }} search={{ topicId: t.id }} aria-current={review.topic?.id === t.id ? 'page' : undefined} className="underline">{t.title}</Link>)}
       </nav>
       {!review.topic ? <p className="mt-8">No company topics to review yet.</p> : (
         <section className="mt-8">
-          <h2 className="text-2xl font-semibold">{review.topic.title}</h2>
+          <h2 className="text-title-2">{review.topic.title}</h2>
           {review.concepts.length === 0 && <p className="mt-4">No concepts to review yet.</p>}
           {review.concepts.map((c) => (
             <section key={c.id} className="mt-8">
-              <h3 className="text-xl font-semibold">{c.name}</h3>
-              {c.sourceQuote && <blockquote className="mt-3 border-l-2 pl-3 text-sm text-muted-foreground">{c.sourceQuote}</blockquote>}
+              <h3 className="text-title-2">{c.name}</h3>
+              {c.sourceQuote && <blockquote className="mt-3 border-l-2 pl-3 text-caption text-ink-muted">{c.sourceQuote}</blockquote>}
               {c.questions.length === 0 ? <p className="mt-4">No generated questions yet.</p> : <ul className="mt-4 flex flex-col gap-4">{c.questions.map((q) => <QuestionCard key={q.id} question={q} slug={slug} />)}</ul>}
             </section>
           ))}

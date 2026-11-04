@@ -205,6 +205,20 @@ it('shows the training figures on the overview, with a dash for unknown values',
   }
 })
 
+it('links an empty job role list on the overview to the roles page', async () => {
+  vi.mocked(getOrgOverview).mockResolvedValue({
+    id: 'org', name: 'Acme', slug: 'x', readOnly: false, roles: [],
+    training: { employees: 0, proficientEmployees: 0, daysToProficiency: null, criticalErrorsThisWeek: 0, documentsToReview: 0 },
+  } as never)
+  const { container, cleanup } = await renderAt('/org/x', { path: '/', loader: indexRoute.options.loader as (ctx: { params: { slug: string } }) => ReturnType<typeof getOrgOverview>, component: indexRoute.options.component })
+  try {
+    const link = [...container.querySelectorAll('main a')].find((a) => a.textContent === 'Create your first job role.')
+    expect(link?.getAttribute('href')).toBe('/org/x/roles')
+  } finally {
+    await cleanup()
+  }
+})
+
 it('focuses the invalid field on the invite form and ties its message to it', async () => {
   vi.mocked(getPeople).mockResolvedValue({ id: 'org', name: 'Acme', slug: 'x', baseUrl: 'http://localhost', roles: [{ id: 'r1', name: 'Cashier' }], members: [], readOnly: false, invites: [] } as never)
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })

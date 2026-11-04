@@ -48,20 +48,20 @@ function NewCompany() {
 
   return (
     <main className="mx-auto w-full max-w-xl px-4 pt-8 pb-16">
-      <h1 className="mb-8 text-3xl font-bold tracking-tight">Set up your company</h1>
+      <h1 className="mb-8 text-title-1 text-ink">Set up your company</h1>
       <form ref={formRef} className="flex flex-col gap-6" onSubmit={submit}>
         <div className="flex flex-col gap-2">
           <Label htmlFor="name">Company name</Label>
           <Input id="name" name="name" maxLength={80} required autoFocus aria-invalid={!!fields.name || undefined} aria-describedby={fields.name ? 'name-error' : undefined} />
-          {fields.name && <p id="name-error" role="alert" className="text-sm font-medium text-wrong">{fields.name}</p>}
+          {fields.name && <p id="name-error" role="alert" className="text-body font-medium text-wrong">{fields.name}</p>}
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="role">First job role</Label>
           <Input id="role" name="role" maxLength={80} required aria-invalid={!!fields.roleName || undefined} aria-describedby={fields.roleName ? 'role-error' : undefined} />
-          {fields.roleName && <p id="role-error" role="alert" className="text-sm font-medium text-wrong">{fields.roleName}</p>}
+          {fields.roleName && <p id="role-error" role="alert" className="text-body font-medium text-wrong">{fields.roleName}</p>}
         </div>
         {error && (
-          <p role="alert" className="text-sm font-medium text-wrong">
+          <p role="alert" className="text-body font-medium text-wrong">
             {error}
           </p>
         )}
