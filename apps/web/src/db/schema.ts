@@ -26,6 +26,8 @@ export const sources = sqliteTable('sources', {
   title: text('title').notNull(),
   bodyText: text('body_text').notNull(),
   r2Key: text('r2_key'), // Uploaded original file, when there is one.
+  sizeBytes: integer('size_bytes'), // Byte size of the uploaded file; null for pasted text.
+  pageCount: integer('page_count'), // PDF page count; null for pasted text.
   version: integer('version').notNull().default(1),
   uploadedBy: text('uploaded_by'),
   status: text('status', { enum: ['processing', 'ready', 'failed'] }).notNull().default('ready'),

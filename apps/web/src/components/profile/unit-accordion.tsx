@@ -1,6 +1,7 @@
 import { useId, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, CircleDashed, Shield } from 'lucide-react'
 import { percentText, type Profile } from '@learnquiz/api/progress'
+import { StatusChip } from '@/components/admin/status-chip'
 import { MasteryBar } from '@/components/mastery-bar'
 import { Badge } from '@/components/ui/badge'
 import { ConceptChips, statusWord } from '@/components/unit/concept-chips'
@@ -8,7 +9,7 @@ import { cn } from '@/lib/utils'
 
 type Unit = Profile['units'][number]
 
-function UnitItem({ unit, index, benchmark }: { unit: Unit; index: number; benchmark: number }) {
+function UnitItem({ unit, index, benchmark, portal }: { unit: Unit; index: number; benchmark: number; portal: boolean }) {
   const [open, setOpen] = useState(index === 0)
   const panelId = useId()
   const estimate = unit.state === 'estimate'
@@ -51,6 +52,28 @@ function UnitItem({ unit, index, benchmark }: { unit: Unit; index: number; bench
           {unit.concepts.map((concept) => (
             <li key={concept.id} className="flex flex-col gap-2">
               <p className="text-body">{concept.name}</p>
+              {portal && !concept.measured && (estimate || concept.pKnown > 0) ? (
+                <>
+                  <div className="flex items-center gap-3">
+                    <MasteryBar
+                      className="flex-1"
+                      label={concept.name}
+                      value={concept.pKnown}
+                      benchmark={benchmark}
+                      estimate
+                      valueText={`${percentText(concept.pKnown, true)}, placement estimate, benchmark ${percentText(benchmark)}`}
+                    />
+                    <span className="min-w-10 text-right text-label tabular-nums text-ink-muted">{percentText(concept.pKnown, true)}</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StatusChip tone="settled" icon={CircleDashed}>Placement estimate</StatusChip>
+                    {concept.critical && (
+                      <StatusChip tone="critical" icon={Shield}>Critical</StatusChip>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
               {concept.measured && (
                 <div className="flex items-center gap-3">
                   <MasteryBar
@@ -64,6 +87,8 @@ function UnitItem({ unit, index, benchmark }: { unit: Unit; index: number; bench
                 </div>
               )}
               <ConceptChips status={concept.status} critical={concept.critical} />
+                </>
+              )}
             </li>
           ))}
         </ul>
@@ -72,7 +97,8 @@ function UnitItem({ unit, index, benchmark }: { unit: Unit; index: number; bench
   )
 }
 
-export function UnitAccordion({ units, benchmark }: { units: Profile['units']; benchmark: number }) {
+// `portal` (company admin view) shows unmeasured concepts with a placement value as a dashed estimate bar.
+export function UnitAccordion({ units, benchmark, portal = false }: { units: Profile['units']; benchmark: number; portal?: boolean }) {
   const id = useId()
   if (units.length === 0) return null
   return (
@@ -82,7 +108,7 @@ export function UnitAccordion({ units, benchmark }: { units: Profile['units']; b
       </h2>
       <ul className="divide-y divide-border rounded-md border border-border bg-surface-card px-4">
         {units.map((unit, i) => (
-          <UnitItem key={unit.id} unit={unit} index={i} benchmark={benchmark} />
+          <UnitItem key={unit.id} unit={unit} index={i} benchmark={benchmark} portal={portal} />
         ))}
       </ul>
     </section>

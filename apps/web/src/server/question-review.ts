@@ -11,7 +11,7 @@ import { ItemPayload } from '@/lib/llm/schemas'
 import { requireOrgAdmin } from '@/server/authz'
 import { httpError } from '@/server/helpers'
 
-const reasonLabels: Record<string, string> = {
+export const reasonLabels: Record<string, string> = {
   ...Object.fromEntries(reportReasons.map((r) => [r.code, r.label])),
   'unfair-result': 'The result seems unfair',
 }

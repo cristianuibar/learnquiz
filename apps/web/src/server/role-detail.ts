@@ -1,8 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm'
+import { and, asc, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '@/db'
-import { concepts, jobRoles, sources, topics, units } from '@/db/schema'
+import { member, user } from '@/db/auth-schema'
+import { concepts, jobRoles, memberRoleAssignments, sources, topics, units } from '@/db/schema'
 import { requireOrgAdmin, requireOrgReader } from '@/server/authz'
 import { httpError } from '@/server/helpers'
 import { releaseStaleBuild } from '@/server/role-curriculum'
@@ -10,8 +11,20 @@ import { releaseStaleBuild } from '@/server/role-curriculum'
 export type RoleDetail = {
   org: { slug: string; name: string }
   readOnly: boolean
-  role: { id: string; name: string; benchmark: number; onboardingDays: number; topicId: string; topicStatus: typeof topics.$inferSelect.status }
-  documents: { id: string; title: string; kind: string; version: number; createdAt: number }[]
+  role: { id: string; name: string; benchmark: number; onboardingDays: number; topicId: string; topicStatus: typeof topics.$inferSelect.status; people: number }
+  documents: {
+    id: string
+    title: string
+    kind: string
+    version: number
+    createdAt: number
+    status: typeof sources.$inferSelect.status
+    error: string | null
+    sizeBytes: number | null
+    pageCount: number | null
+    chars: number
+    uploaderName: string | null
+  }[]
   units: {
     id: string
     name: string
@@ -33,9 +46,13 @@ export const getRoleDetail = createServerFn({ method: 'GET' })
     if (!role) throw httpError('Role not found', 404)
     if (role.topicStatus === 'generating' && await releaseStaleBuild(db, role.topicId)) role.topicStatus = 'failed'
 
-    const [documents, unitRows, conceptRows] = await Promise.all([
-      db.select({ id: sources.id, title: sources.title, kind: sources.kind, version: sources.version, createdAt: sources.createdAt })
+    const [documents, unitRows, conceptRows, [assigned]] = await Promise.all([
+      db.select({
+        id: sources.id, title: sources.title, kind: sources.kind, version: sources.version, createdAt: sources.createdAt, status: sources.status, error: sources.error,
+        sizeBytes: sources.sizeBytes, pageCount: sources.pageCount, chars: sql<number>`length(${sources.bodyText})`, uploaderName: user.name,
+      })
         .from(sources)
+        .leftJoin(user, eq(user.id, sources.uploadedBy))
         .where(and(eq(sources.topicId, role.topicId), isNull(sources.deletedAt), isNull(sources.retiredAt)))
         .orderBy(desc(sources.createdAt), desc(sources.id)),
       db.select({ id: units.id, name: units.name, summary: units.summary }).from(units).where(eq(units.topicId, role.topicId)).orderBy(asc(units.order)),
@@ -43,11 +60,16 @@ export const getRoleDetail = createServerFn({ method: 'GET' })
         .from(concepts)
         .where(eq(concepts.topicId, role.topicId))
         .orderBy(asc(concepts.order)),
+      // The same people rule as the company overview: assigned to this role and still a member of the company.
+      db.select({ n: count() })
+        .from(memberRoleAssignments)
+        .innerJoin(member, and(eq(member.userId, memberRoleAssignments.userId), eq(member.organizationId, memberRoleAssignments.orgId)))
+        .where(and(eq(memberRoleAssignments.jobRoleId, role.id), eq(memberRoleAssignments.orgId, org.id))),
     ])
     return {
       org: { slug: org.slug, name: org.name },
       readOnly,
-      role,
+      role: { ...role, people: assigned?.n ?? 0 },
       documents,
       units: unitRows.map((u) => ({ ...u, concepts: conceptRows.filter((c) => c.unitId === u.id).map(({ unitId: _unitId, ...c }) => c) })),
     }
