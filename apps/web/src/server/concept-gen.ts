@@ -46,9 +46,9 @@ export async function processConcept(db: Db, conceptId: string): Promise<void> {
         learnerId: null, orgId: topic.orgId,
       })
     }
-    const total = await activeItems(db, conceptId)
-    if (total >= ITEMS_PER_CONCEPT) await settle({ genStatus: 'ready', genError: null })
-    else await settle({ genStatus: 'failed', genError: `Only ${total} of ${ITEMS_PER_CONCEPT} questions passed the self-check.` })
+    // A partial set is still ready: its questions are live, and learner sessions top it up.
+    if (await activeItems(db, conceptId)) await settle({ genStatus: 'ready', genError: null })
+    else await settle({ genStatus: 'failed', genError: 'Could not generate items for this concept' })
   } catch (e) {
     const status = (e as { status?: unknown }).status
     if (status === 429 && (e as Error).message === COMPANY_CAP_MESSAGE) {
@@ -57,11 +57,12 @@ export async function processConcept(db: Db, conceptId: string): Promise<void> {
     } else if (status === 429) {
       // A provider rate limit is transient: the next drain tries again.
       await settle({ genStatus: 'pending', genError: (e as Error).message, genStartedAt: null })
-    } else if (typeof status === 'number') {
-      await settle({ genStatus: 'failed', genError: (e as Error).message })
     } else {
-      console.error('concept generation failed', e)
-      await settle({ genStatus: 'failed', genError: 'Question generation failed.' })
+      if (typeof status !== 'number') console.error('concept generation failed', e)
+      // A concept that already holds live questions stays ready; a failed re-count fails it as before.
+      const kept = await activeItems(db, conceptId).catch(() => 0)
+      if (kept) await settle({ genStatus: 'ready', genError: null })
+      else await settle({ genStatus: 'failed', genError: typeof status === 'number' ? (e as Error).message : 'Question generation failed.' })
     }
   }
 }
