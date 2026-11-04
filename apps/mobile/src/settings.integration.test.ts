@@ -1,4 +1,4 @@
-import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library'
+import { act, fireEvent, renderRouter, screen, within } from 'expo-router/testing-library'
 import * as SecureStore from 'expo-secure-store'
 import { todayFixtures } from '@learnquiz/api/today'
 import type { PushSettings } from './lib/settings-rules'
@@ -37,6 +37,11 @@ jest.mock('expo-notifications', () => ({
   DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
   getLastNotificationResponseAsync: jest.fn(async () => null),
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+}))
+// The selected-option check is decorative (hidden from TalkBack); a tagged stand-in lets tests find it.
+jest.mock('lucide-react-native', () => ({
+  ...jest.requireActual('lucide-react-native'),
+  Check: () => require('react').createElement(require('react-native').View, { testID: 'selected-check' }),
 }))
 jest.mock('react-native-gesture-handler', () => ({ GestureHandlerRootView: 'View' }))
 jest.mock('react-native-keyboard-controller', () => ({
@@ -245,6 +250,29 @@ test.each(['pause', 'day', 'from', 'to'])('a %s change saves inside narrowed com
   expect(body.endMinute - body.startMinute).toBeGreaterThanOrEqual(30)
 })
 
+test('a learner whose company dropped every chosen day can still pause and change hours (#669)', async () => {
+  const { settingsSaveFailed } = require('@learnquiz/api/system-copy')
+  const settings = replies['/api/v1/push/settings'].data as PushSettings
+  settings.prefs.days = []
+  // Mirrors the bearer PUT validator on main: an empty days array is a 400, an omitted one is accepted.
+  saveReply = async (init) => {
+    const body = JSON.parse(String(init?.body))
+    const rejected = Array.isArray(body.days) && body.days.length === 0
+    return { ok: !rejected, status: rejected ? 400 : 200, headers: { get: () => null },
+      text: async () => JSON.stringify(rejected ? { error: 'Choose days inside Mon–Fri' } : {}) } as unknown as Response
+  }
+  await renderRouter('src/app', { initialUrl: '/settings' })
+  await screen.findByText('ana@example.com')
+  await fireEvent.press(screen.getByRole('switch', { name: 'Send me questions' }))
+  expect(screen.getByRole('switch', { name: 'Send me questions' })).not.toBeChecked()
+  await fireEvent.press(screen.getByRole('button', { name: 'To 3:30 PM' }))
+  await fireEvent.press(screen.getByRole('radio', { name: '4:00 PM' }))
+  expect(screen.getByRole('button', { name: 'To 4:00 PM' })).toBeOnTheScreen()
+  expect(screen.queryByText(settingsSaveFailed)).toBeNull()
+  expect(saves).toEqual([expect.objectContaining({ paused: true }), expect.objectContaining({ paused: true, endMinute: 960 })])
+  expect(saves.every((body) => !Object.hasOwn(body as object, 'days'))).toBe(true)
+})
+
 test('enabling notifications without a company keeps the device timezone in the preference PUT', async () => {
   const settings = replies['/api/v1/push/settings'].data as PushSettings
   settings.company = null
@@ -306,15 +334,38 @@ test('at font scale 2, full day labels have room to wrap as controls and keep th
   jest.spyOn(Native, 'useWindowDimensions').mockReturnValue({ width: 360, height: 740, scale: 1, fontScale: 2 })
   await renderRouter('src/app', { initialUrl: '/settings' })
   await screen.findByText('ana@example.com')
-  const monday = screen.getByRole('togglebutton', { name: 'Monday' })
-  const label = screen.getByText('Mon')
+  const wednesday = screen.getByRole('togglebutton', { name: 'Wednesday' })
+  const label = screen.getByText('Wed')
   expect(label).toHaveStyle({ fontSize: 14, lineHeight: 20, fontFamily: 'Inter_600SemiBold', flexShrink: 0 })
-  expect(monday).toHaveStyle({ flexShrink: 0, flexWrap: 'nowrap' })
-  expect(monday.parent).toHaveStyle({ flexWrap: 'wrap' })
-  const width = Native.StyleSheet.flatten(monday.props.style).minWidth
+  expect(wednesday).toHaveStyle({ flexShrink: 0, flexWrap: 'nowrap' })
+  expect(wednesday.parent).toHaveStyle({ flexWrap: 'wrap' })
+  const width = Native.StyleSheet.flatten(wednesday.props.style).minWidth
   // At a 360 dp viewport, three complete controls fit per row and four don't.
   // A 48 dp control would wrap a scaled label inside the control instead.
   expect(width * 3 + 16).toBeLessThanOrEqual(328)
   expect(width * 4 + 24).toBeGreaterThan(328)
   expect(screen.getByText('7:00 AM')).toHaveStyle({ fontSize: 17, lineHeight: 24 })
+})
+
+test('at font scale 2, selected days, Appearance and time options show the check and keep room for the label (#669)', async () => {
+  const Native: typeof import('react-native') = require('react-native')
+  jest.spyOn(Native, 'useWindowDimensions').mockReturnValue({ width: 360, height: 740, scale: 1, fontScale: 2 })
+  await renderRouter('src/app', { initialUrl: '/settings' })
+  await screen.findByText('ana@example.com')
+  const minWidth = (node: ReturnType<typeof screen.getByRole>) => Native.StyleSheet.flatten(node.props.style).minWidth
+  const monday = screen.getByRole('togglebutton', { name: 'Monday' })
+  const wednesday = screen.getByRole('togglebutton', { name: 'Wednesday' })
+  expect(within(monday).getByTestId('selected-check')).toBeOnTheScreen()
+  expect(within(wednesday).queryByTestId('selected-check')).toBeNull()
+  // Same-length labels: the selected control adds the 16 dp check and its 4 dp gap, so "Mon" never squeezes.
+  expect(minWidth(monday)).toBe(minWidth(wednesday) + 20)
+  expect(within(monday).getByText('Mon')).toHaveStyle({ flexShrink: 0 })
+  expect(monday).toHaveStyle({ flexWrap: 'nowrap' })
+  expect(within(screen.getByRole('radio', { name: 'System' })).getByTestId('selected-check')).toBeOnTheScreen()
+  expect(within(screen.getByRole('radio', { name: 'Light' })).queryByTestId('selected-check')).toBeNull()
+  await fireEvent.press(screen.getByRole('button', { name: 'To 3:30 PM' }))
+  const selectedTime = screen.getByRole('radio', { name: '3:30 PM' })
+  expect(within(selectedTime).getByTestId('selected-check')).toBeOnTheScreen()
+  expect(within(screen.getByRole('radio', { name: '4:00 PM' })).queryByTestId('selected-check')).toBeNull()
+  expect(minWidth(selectedTime)).toBe(minWidth(screen.getByRole('radio', { name: '4:00 PM' })) + 20)
 })
