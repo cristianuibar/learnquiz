@@ -10,7 +10,6 @@ const countText = (n: number, mode: Mode) => (mode === 'all' ? String(n) : `${n}
 
 export function ReviewLayout({ units, mode, children }: { units: Review['units']; mode: Mode; children: ReactNode }) {
   const ids = units.flatMap((u) => u.concepts.map((c) => c.id))
-  const key = ids.join('|')
   const [active, setActive] = useState<string>()
   const current = active !== undefined && ids.includes(active) ? active : ids[0]
   const clicked = useRef<string>(undefined)
@@ -18,9 +17,10 @@ export function ReviewLayout({ units, mode, children }: { units: Review['units']
   // The current concept is the last one whose heading has passed the reading line (40% down the
   // viewport). At the end of the page the last headings can never reach that line, so the last
   // heading in view is current. A clicked concept stays current while its heading is in view,
-  // until the reader scrolls on their own.
+  // until the reader scrolls on their own. It is measured on load and whenever the filtered list
+  // changes, since either can move headings past the line without a scroll.
   useEffect(() => {
-    const list = key ? key.split('|') : []
+    const list = units.flatMap((u) => u.concepts.map((c) => c.id))
     const top = (id: string) => document.getElementById(`concept-${id}`)?.getBoundingClientRect().top
     const update = () => {
       const h = window.innerHeight
@@ -30,17 +30,18 @@ export function ReviewLayout({ units, mode, children }: { units: Review['units']
       const end = window.scrollY > 0 && h + window.scrollY >= document.documentElement.scrollHeight - 1
       const line = end ? h : h * 0.4
       const next = [...list].reverse().find((id) => (top(id) ?? Infinity) < line)
-      if (next) setActive(next)
+      setActive(next)
     }
     const release = () => {
       clicked.current = undefined
     }
     const events = [['scroll', update], ['resize', update], ['wheel', release], ['touchmove', release], ['keydown', release]] as const
     for (const [type, fn] of events) window.addEventListener(type, fn, { passive: true })
+    update()
     return () => {
       for (const [type, fn] of events) window.removeEventListener(type, fn)
     }
-  }, [key])
+  }, [units])
 
   const go = (id: string) => (e: MouseEvent) => {
     e.preventDefault()
