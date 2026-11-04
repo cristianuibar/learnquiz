@@ -83,7 +83,7 @@ export function SessionLoading({ topicId, start, unitId }: { topicId: string; st
         </div>
       )}
       <div className="mt-auto flex flex-col gap-3 pb-6 pt-6">
-        <h1 ref={heading} tabIndex={-1} className="text-title-2 text-ink text-center outline-none">{loadingTitle}</h1>
+        <h1 ref={heading} tabIndex={-1} className="text-title-2 text-ink text-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">{loadingTitle}</h1>
         {failure ? (
           <>
             <ErrorRow message={failure.message} />

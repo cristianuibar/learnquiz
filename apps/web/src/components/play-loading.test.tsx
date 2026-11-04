@@ -55,12 +55,15 @@ const status = (c: HTMLElement) => c.querySelector('[role=status]')!.textContent
 const tryAgain = (c: HTMLElement) => [...c.querySelectorAll('button')].find((b) => b.textContent === 'Try again')
 
 describe('session Loading screen', () => {
-  it('focuses the title, shows no progress and offers Cancel back to Today', async () => {
+  it('focuses the title with a visible ring, shows no progress and offers Cancel back to Today', async () => {
     vi.mocked(startSession).mockReturnValue(new Promise(() => {}))
     const { container } = await renderLoading()
     const h1 = container.querySelector('h1')!
     expect(h1.textContent).toBe(loadingTitle)
     expect(document.activeElement).toBe(h1)
+    // Keyboard users who start with Play land here; the focused title must keep the brand ring.
+    expect(h1.classList).not.toContain('outline-none')
+    expect([...h1.classList]).toEqual(expect.arrayContaining(['focus-visible:outline-2', 'focus-visible:outline-offset-2', 'focus-visible:outline-brand']))
     expect(container.querySelector('[role=progressbar]')).toBeNull()
     expect(container.querySelector('a[aria-label="Cancel"]')!.getAttribute('href')).toBe('/today')
   })
