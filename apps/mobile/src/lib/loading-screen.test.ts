@@ -1,17 +1,18 @@
 import { createElement as h } from 'react'
 import { AccessibilityInfo, BackHandler } from 'react-native'
 import { act, fireEvent, render, screen } from '@testing-library/react-native'
-import { startFailed } from '@learnquiz/api/system-copy'
+import { offlineBody, offlineTitle, startFailed, startSlow } from '@learnquiz/api/system-copy'
 import LoadingScreen from '../app/play/loading'
 import { ThemeProvider } from '../theme/ThemeProvider'
 
 const mockRouter = { replace: jest.fn(), dismissAll: jest.fn() }
 const mockFetch = jest.fn()
 let mockBack: () => boolean
+let mockStart: 'session' | 'placement' = 'session'
 
 jest.mock('expo-router', () => ({
   useRouter: () => mockRouter,
-  useLocalSearchParams: () => ({ topicId: 't1', start: 'session' }),
+  useLocalSearchParams: () => ({ topicId: 't1', start: mockStart }),
   useFocusEffect: (effect: () => () => void) => require('react').useEffect(effect, [effect]),
 }))
 jest.mock('./auth', () => ({ getToken: () => null, handleUnauthorized: jest.fn() }))
@@ -41,6 +42,8 @@ async function frame() {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  mockFetch.mockReset()
+  mockStart = 'session'
   frames = new Map()
   nextFrame = 0
   globalThis.fetch = mockFetch
@@ -113,4 +116,39 @@ test('leaving Loading cancels its pending open announcement', async () => {
   await view.unmount()
   await frame()
   expect(AccessibilityInfo.announceForAccessibility).not.toHaveBeenCalled()
+})
+
+
+test.each(['session', 'placement'] as const)('%s keeps loading for 250s, then offers Retry without claiming offline', async (start) => {
+  jest.useFakeTimers()
+  mockStart = start
+  mockFetch.mockImplementation((_url, init: RequestInit) => new Promise((_resolve, reject) => {
+    init.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))
+  }))
+  try {
+    const view = await render(h(ThemeProvider, { children: h(LoadingScreen) }))
+    expect(screen.getByText('Getting your questions ready.')).toBeOnTheScreen()
+    await act(async () => { await jest.advanceTimersByTimeAsync(249_999) })
+    expect(screen.getByText(startSlow)).toBeOnTheScreen()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(mockFetch.mock.calls[0][1].signal.aborted).toBe(false)
+    await act(async () => { await jest.advanceTimersByTimeAsync(1) })
+    expect(screen.getByRole('alert', { name: 'Still preparing\nYour questions are taking longer than usual. Try again in a moment.' })).toBeOnTheScreen()
+    expect(screen.queryByText(new RegExp(offlineTitle))).toBeNull()
+    mockFetch.mockResolvedValueOnce(response({ sessionId: 'retry-session' }))
+    await fireEvent.press(screen.getByRole('button', { name: 'Retry' }))
+    expect(mockFetch).toHaveBeenCalledTimes(2)
+    expect(mockRouter.replace).toHaveBeenCalledWith('/play/retry-session?announceReady=1')
+    await view.unmount()
+  } finally { jest.useRealTimers() }
+})
+
+test('a real network failure still shows offline and can retry', async () => {
+  mockFetch.mockRejectedValueOnce(new TypeError('Network request failed'))
+    .mockResolvedValueOnce(response({ sessionId: 'back-online' }))
+  await render(h(ThemeProvider, { children: h(LoadingScreen) }))
+  expect(screen.getByRole('alert', { name: `${offlineTitle}\n${offlineBody}` })).toBeOnTheScreen()
+  expect(screen.queryByText(/Still preparing/)).toBeNull()
+  await fireEvent.press(screen.getByRole('button', { name: 'Try again' }))
+  expect(mockRouter.replace).toHaveBeenCalledWith('/play/back-online?announceReady=1')
 })

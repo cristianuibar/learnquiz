@@ -15,6 +15,7 @@ export interface StartFailure {
   title?: string
   message: string
   retry: boolean
+  retryLabel?: 'Retry'
 }
 
 export interface StartPlayEffects {
@@ -31,7 +32,7 @@ export interface StartPlayHandle {
   done: Promise<void>
 }
 
-const START_TIMEOUT_MS = 90_000
+const START_TIMEOUT_MS = 250_000
 
 export async function startPlay(params: StartPlayParams, signal?: AbortSignal): Promise<string | undefined> {
   if (signal?.aborted) return undefined
@@ -58,6 +59,14 @@ export async function startPlay(params: StartPlayParams, signal?: AbortSignal): 
 }
 
 export function describeStartFailure(error: unknown): StartFailure {
+  if (error instanceof ApiError && error.reason === 'timeout') {
+    return {
+      title: 'Still preparing',
+      message: 'Your questions are taking longer than usual. Try again in a moment.',
+      retry: true,
+      retryLabel: 'Retry',
+    }
+  }
   if (error instanceof ApiError && error.status !== null) {
     if (error.status >= 500 || (error.status >= 200 && error.status < 300)) {
       return { message: startFailed, retry: true }
