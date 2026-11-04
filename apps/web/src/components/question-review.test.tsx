@@ -243,6 +243,16 @@ describe('question review outline', () => {
     expect(current(c)).toBe('Energy')
   })
 
+  it('releases a clicked concept when the reader drags the scrollbar with its heading still in view', async () => {
+    place(0, 983, [300, 450, 600])
+    const { c } = await mountReview('/org/x/questions')
+    const link = [...c.querySelectorAll('nav[aria-label="Question outline"] a')].find((a) => a.textContent!.startsWith('Energy')) as HTMLElement
+    await act(async () => link.click())
+    expect(current(c)).toBe('Energy')
+    await scrollTo(183, 983, [117, 267, 417])
+    expect(current(c)).toBe('Division')
+  })
+
   it('measures a restored scroll position on load, before any scroll event', async () => {
     place(600, 4000, [-400, 200, 900])
     const { c } = await mountReview('/org/x/questions#concept-c2')

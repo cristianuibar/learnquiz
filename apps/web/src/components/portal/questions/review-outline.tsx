@@ -12,30 +12,28 @@ export function ReviewLayout({ units, mode, children }: { units: Review['units']
   const ids = units.flatMap((u) => u.concepts.map((c) => c.id))
   const [active, setActive] = useState<string>()
   const current = active !== undefined && ids.includes(active) ? active : ids[0]
-  const clicked = useRef<string>(undefined)
+  const clicked = useRef<{ id: string; top: number }>(undefined)
 
   // The current concept is the last one whose heading has passed the reading line (40% down the
   // viewport). At the end of the page the last headings can never reach that line, so the last
-  // heading in view is current. A clicked concept stays current while its heading is in view,
-  // until the reader scrolls on their own. It is measured on load and whenever the filtered list
-  // changes, since either can move headings past the line without a scroll.
+  // heading in view is current. A clicked concept stays current while its heading stays where the
+  // click scrolled it, so any scroll of the reader's own (wheel, keys, touch, scrollbar) releases
+  // it. It is measured on load and whenever the filtered list changes, since either can move
+  // headings past the line without a scroll.
   useEffect(() => {
     const list = units.flatMap((u) => u.concepts.map((c) => c.id))
     const top = (id: string) => document.getElementById(`concept-${id}`)?.getBoundingClientRect().top
     const update = () => {
-      const h = window.innerHeight
-      const pin = clicked.current === undefined ? undefined : top(clicked.current)
-      if (pin !== undefined && pin >= 0 && pin < h) return
+      const pin = clicked.current
+      if (pin && Math.abs((top(pin.id) ?? Infinity) - pin.top) < 1) return
       clicked.current = undefined
+      const h = window.innerHeight
       const end = window.scrollY > 0 && h + window.scrollY >= document.documentElement.scrollHeight - 1
       const line = end ? h : h * 0.4
       const next = [...list].reverse().find((id) => (top(id) ?? Infinity) < line)
       setActive(next)
     }
-    const release = () => {
-      clicked.current = undefined
-    }
-    const events = [['scroll', update], ['resize', update], ['wheel', release], ['touchmove', release], ['keydown', release]] as const
+    const events = [['scroll', update], ['resize', update]] as const
     for (const [type, fn] of events) window.addEventListener(type, fn, { passive: true })
     update()
     return () => {
@@ -49,7 +47,7 @@ export function ReviewLayout({ units, mode, children }: { units: Review['units']
     if (!el) return
     if (typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'start' })
     el.focus()
-    clicked.current = id
+    clicked.current = { id, top: el.getBoundingClientRect().top }
     setActive(id)
   }
 
