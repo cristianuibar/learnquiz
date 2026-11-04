@@ -2,7 +2,7 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { RouteError } from '@/components/inline-error'
 import { TRAINING_STATUS } from '@/lib/training-status'
 import { plural } from '@/lib/utils'
-import { getCompany } from '@/server/admin'
+import { getCompany } from '@/server/admin-companies'
 
 export const Route = createFileRoute('/admin/companies_/$slug')({
   loader: ({ params }) => getCompany({ data: { slug: params.slug } }),
