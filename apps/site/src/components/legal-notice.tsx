@@ -2,7 +2,8 @@ import type { ReactNode } from 'react'
 import { SiteFooter } from './site-footer'
 import { SiteHeader } from './site-header'
 
-export type LegalBlock = string | { items: string[] }
+// A paragraph with an id is a link target, e.g. /privacy#delete for the data deletion instructions.
+export type LegalBlock = string | { items: string[] } | { id: string; text: string }
 
 export type LegalSection = {
   id: string
@@ -61,6 +62,10 @@ export function LegalNotice({
                     {section.blocks.map((block, index) =>
                       typeof block === 'string' ? (
                         <p key={index}>{withPlaceholders(block)}</p>
+                      ) : 'text' in block ? (
+                        <p key={index} id={block.id}>
+                          {withPlaceholders(block.text)}
+                        </p>
                       ) : (
                         <ul key={index}>
                           {block.items.map((item) => (
