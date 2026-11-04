@@ -1,6 +1,7 @@
 import { RotateCw } from 'lucide-react'
 import type { Confidence } from '@learnquiz/api'
 import { ConfidencePicker } from '@/components/confidence-picker'
+import { ErrorRow } from '@/components/question/error-row'
 import { Button } from '@/components/ui/button'
 
 export function QuestionDock({
@@ -8,14 +9,14 @@ export function QuestionDock({
   onConfidence,
   locked,
   canCheck,
-  failed,
+  error,
   onRetry,
 }: {
   confidence: Confidence | null
   onConfidence: (c: Confidence) => void
   locked: boolean
   canCheck: boolean
-  failed: boolean
+  error: string | null
   onRetry: () => void
 }) {
   return (
@@ -24,7 +25,9 @@ export function QuestionDock({
       <fieldset disabled={locked} aria-busy={locked} className="min-w-0">
         <ConfidencePicker value={confidence} onChange={onConfidence} />
       </fieldset>
-      {failed ? (
+      {/* The failure sits in the dock beside Try again, so it stays on screen however long the question is. */}
+      {error !== null && <ErrorRow message={error} />}
+      {error !== null ? (
         <Button key="retry" type="button" size="lg" autoFocus className="w-full" onClick={onRetry}>
           <RotateCw aria-hidden /> Try again
         </Button>

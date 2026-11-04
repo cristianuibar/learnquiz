@@ -31,10 +31,11 @@ function mockProfile() {
   const start = Date.UTC(2026, 10, 2)
   vi.mocked(getProfile).mockResolvedValue({
     name: 'Dana Learner', topic: { id: 'training', title: 'Workplace safety' }, role: null, benchmark: 0.85, started: true, onboarding: null,
-    units: [{ id: 'unit', name: 'Foundations', concepts: [{ id: 'concept', unitId: 'unit', name: 'Emergency exits', critical: true, pKnown: 0.7 }] }],
+    mastery: 0.7,
+    units: [{ id: 'unit', name: 'Foundations', mastery: 0.7, state: 'learning', concepts: [{ id: 'concept', unitId: 'unit', name: 'Emergency exits', critical: true, pKnown: 0.7, measured: true, status: 'learning' }] }],
     proficiency: { achievedAt: null, days: null, estimatedDays: 2, projectedAt: start + 8 * day },
     confidentErrors: [{ id: 'error', conceptId: 'concept', concept: 'Emergency exits', at: start, correctedAt: start + day }],
-    weekly: Array.from({ length: 7 }, (_, i) => ({ date: start + i * day, mastery: 0.1 * (i + 1), attempts: 1, sessions: 1 })),
+    weeks: [{ start: start - 7 * day, mastery: 0.4, sessions: 3, partial: false }, { start, mastery: 0.7, sessions: 4, partial: true }],
     sessionCounts: { week: 7, total: 7 },
   })
 }
@@ -73,6 +74,7 @@ it.each(['user', 'admin'])('opens training progress for %s, preserves staff acce
     expect(container.textContent).toContain('Workplace safety')
     expect(container.textContent).toContain('Corrected: 3 Nov 2026')
     expect(container.textContent).toContain('7 completed sessions this week')
+    expect([...container.querySelectorAll('figure tbody tr')].map((r) => r.textContent)).toEqual(['26 Oct 202640%3', '2 Nov 202670%4'])
     user = null
     await act(async () => { await router.invalidate() })
     expect(router.state.location.pathname).toBe('/')

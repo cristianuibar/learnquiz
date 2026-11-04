@@ -45,10 +45,13 @@ export const PUSH_SECURE_KEY = PUSH_TOKEN_KEY.replace(/:/g, '.')
 export const PUSH_CHANNEL_ID = 'questions'
 const ENABLE_TIMEOUT_MS = 15_000
 const MAX_FOREGROUND_RETRIES = 3
+const RETRY_WINDOW_MS = 60 * 60_000
+const RETRY_BACKOFF_MS = 15_000
 let generation = 0
 let cachedToken: string | null | undefined
 // Keep only in memory after a 401; local storage still clears immediately.
-let unregisterToken: string | null = null
+let unregisterToken: { endpoint: string; userId: string | null } | null = null
+let pushUserId: string | null = null
 let writes: Promise<unknown> = Promise.resolve()
 const registrations = new Set<Promise<unknown>>()
 
@@ -81,7 +84,7 @@ function current(deps: PushDeps, gen: number, bearer: string | null): boolean {
 async function removeMarker(deps: PushDeps): Promise<void> {
   try { await store(deps).remove?.(PUSH_TOKEN_KEY) } catch { /* Best effort on logout. */ }
 }
-async function forget(deps: PushDeps, hadToken: boolean, keepForUnregister = false): Promise<void> {
+async function forget(deps: PushDeps, hadToken: boolean, keepForUnregister = false, userId: string | null = pushUserId): Promise<void> {
   await persist(async () => {
     // A native write may have finished while cleanup waited for this queue.
     let shouldDelete = hadToken || cachedToken != null
@@ -89,8 +92,8 @@ async function forget(deps: PushDeps, hadToken: boolean, keepForUnregister = fal
     catch { /* Continue with what is already known. */ }
     if (shouldDelete) {
       if (keepForUnregister) {
-        unregisterToken = cachedToken ?? unregisterToken
-        try { unregisterToken = await secure(deps).getItemAsync(PUSH_SECURE_KEY) ?? unregisterToken }
+        rememberForUnregister(userId, cachedToken)
+        try { rememberForUnregister(userId, await secure(deps).getItemAsync(PUSH_SECURE_KEY)) }
         catch { /* Keep any endpoint already known in memory. */ }
       }
       try { await secure(deps).deleteItemAsync(PUSH_SECURE_KEY) } catch { /* Logout still completes. */ }
@@ -99,8 +102,23 @@ async function forget(deps: PushDeps, hadToken: boolean, keepForUnregister = fal
     await removeMarker(deps)
   })
 }
+// Called for a confirmed session and before publishing a sign-in bearer. An
+// endpoint survives token renewal only for the same learner; an unknown owner
+// is cleared rather than attributed to a newly signed-in learner.
+export function setPushUser(userId: string | null): void {
+  if (unregisterToken && (userId === null || unregisterToken.userId !== userId)) unregisterToken = null
+  if (pushUserId !== null && pushUserId !== userId) {
+    generation++
+    cachedToken = null
+  }
+  pushUserId = userId
+}
+
+function rememberForUnregister(userId: string | null, endpoint: string | null | undefined): void {
+  if (endpoint) unregisterToken = { endpoint, userId }
+}
 async function postToken(deps: PushDeps, token: string): Promise<void> {
-  unregisterToken = token
+  rememberForUnregister(pushUserId, token)
   const body = { token, timezone: timezone(deps) }
   const request = Promise.resolve().then(() => deps.putExpoToken
     ? deps.putExpoToken(body)
@@ -128,18 +146,22 @@ async function fetchAndSaveToken(deps: PushDeps, gen: number, bearer: string | n
   return !signal?.aborted && current(deps, gen, bearer) ? token : null
 }
 
-export async function enablePush(deps: PushDeps = {}): Promise<EnableResult> {
-  const gen = generation
+async function beforeDeadline<T extends RetryResult>(run: (signal: AbortSignal) => Promise<T>): Promise<T | 'unavailable'> {
   const controller = new AbortController()
   let timer: ReturnType<typeof setTimeout> | undefined
-  const deadline = new Promise<EnableResult>((resolve) => {
+  const deadline = new Promise<'unavailable'>((resolve) => {
     timer = setTimeout(() => {
       controller.abort()
       resolve('unavailable')
     }, ENABLE_TIMEOUT_MS)
   })
-  try { return await Promise.race([enableBeforeDeadline(deps, gen, controller.signal), deadline]) }
+  try { return await Promise.race([run(controller.signal), deadline]) }
   finally { clearTimeout(timer) }
+}
+
+export async function enablePush(deps: PushDeps = {}): Promise<EnableResult> {
+  const gen = generation
+  return beforeDeadline((signal) => enableBeforeDeadline(deps, gen, signal))
 }
 
 async function enableBeforeDeadline(deps: PushDeps, gen: number, signal: AbortSignal): Promise<EnableResult> {
@@ -193,29 +215,67 @@ export async function pushStatus(deps: PushDeps = {}): Promise<PushState> {
   return { permission, registered: token != null, token }
 }
 
+type PendingRetry = { pending: true; attempts: number; resetAt: number; networkFailures: number; retryAt: number }
+
 export async function retryPendingPush(deps: PushDeps = {}): Promise<RetryResult> {
   const gen = generation
+  return beforeDeadline((signal) => retryBeforeDeadline(deps, gen, signal))
+}
+
+async function retryBeforeDeadline(deps: PushDeps, gen: number, signal: AbortSignal): Promise<RetryResult> {
   try {
     const bearer = authToken(deps)
     if (!bearer) return 'idle'
+    const live = () => !signal.aborted && current(deps, gen, bearer)
     const retry = await persist(async () => {
-      if (!current(deps, gen, bearer)) return false
-      const marker = await store(deps).getJSON<unknown>(PUSH_TOKEN_KEY)
-      if (!enrolled(marker) || marker === true) return false
-      const count = (marker as { attempts?: unknown }).attempts
-      const attempts = typeof count === 'number' && Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0
-      if (attempts >= MAX_FOREGROUND_RETRIES) return false
-      await store(deps).setJSON(PUSH_TOKEN_KEY, { pending: true, attempts: attempts + 1 })
-      return true
+      if (!live()) return null
+      const marker = await store(deps).getJSON<Partial<PendingRetry> | true>(PUSH_TOKEN_KEY)
+      if (!enrolled(marker) || marker === true) return null
+      const pending = marker as Partial<PendingRetry>
+      const number = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : 0
+      const now = Date.now()
+      // Old markers have no window; start a fresh budget on migration.
+      const resetAt = number(pending.resetAt) || now
+      const attempts = resetAt <= now ? 0 : Math.floor(number(pending.attempts))
+      if (number(pending.retryAt) > now) return null
+      const token = await secure(deps).getItemAsync(PUSH_SECURE_KEY)
+      if (!live() || (!token && attempts >= MAX_FOREGROUND_RETRIES)) return null
+      const next: PendingRetry = {
+        pending: true,
+        // Only native token acquisition consumes the bounded budget. A cached
+        // token can keep retrying PUT after arbitrarily many offline foregrounds.
+        attempts: token ? 0 : attempts + 1,
+        resetAt: resetAt <= now ? now + RETRY_WINDOW_MS : resetAt,
+        networkFailures: number(pending.networkFailures),
+        retryAt: 0,
+      }
+      await store(deps).setJSON(PUSH_TOKEN_KEY, next)
+      return { token, marker: next }
     })
-    if (!retry || !current(deps, gen, bearer)) return 'idle'
-    let token = await secure(deps).getItemAsync(PUSH_SECURE_KEY)
-    if (!current(deps, gen, bearer)) return 'idle'
-    if (!token) token = await fetchAndSaveToken(deps, gen, bearer)
-    if (!token) return 'unavailable'
+    if (!retry || !live()) return 'idle'
+    let token = retry.token
+    if (!token) token = await fetchAndSaveToken(deps, gen, bearer, signal)
+    if (!token || !live()) return 'unavailable'
     cachedToken = token
-    try { await postToken(deps, token) } catch { return 'granted' }
-    await confirm(deps, gen, bearer)
+    // A working token resets native failures, regardless of network availability.
+    const marker = { ...retry.marker, attempts: 0, resetAt: Date.now() + RETRY_WINDOW_MS }
+    await persist(async () => {
+      if (live()) await store(deps).setJSON(PUSH_TOKEN_KEY, marker)
+    })
+    if (!live()) return 'idle'
+    try { await postToken(deps, token) }
+    catch {
+      await persist(async () => {
+        if (!live()) return
+        const networkFailures = marker.networkFailures + 1
+        await store(deps).setJSON(PUSH_TOKEN_KEY, {
+          ...marker, networkFailures,
+          retryAt: Date.now() + Math.min(15 * 60_000, RETRY_BACKOFF_MS * 2 ** Math.min(networkFailures - 1, 6)),
+        })
+      })
+      return 'granted'
+    }
+    if (live()) await confirm(deps, gen, bearer)
     return 'granted'
   } catch {
     return 'unavailable'
@@ -242,7 +302,10 @@ export function observePushForeground(
 // A synchronous empty result preserves immediate logout when storage is absent.
 // Otherwise auth awaits this before clearing its bearer, including a cold restart.
 export function unregisterPush(deps: PushDeps = {}): Promise<void> | null {
-  const knownToken = cachedToken ?? unregisterToken ?? cachedToken
+  const userId = pushUserId
+  // Ownership follows the learner across renewed bearers, never the token.
+  if (unregisterToken && unregisterToken.userId !== pushUserId) unregisterToken = null
+  const knownToken = cachedToken ?? unregisterToken?.endpoint ?? cachedToken
   generation++
   cachedToken = null
   if (knownToken === null) return null
@@ -258,7 +321,7 @@ export function unregisterPush(deps: PushDeps = {}): Promise<void> | null {
       await Promise.allSettled([...registrations])
       await writes
       if (!endpoint && enrolledHere) endpoint = await secure(deps).getItemAsync(PUSH_SECURE_KEY)
-      if (endpoint && authToken(deps)) {
+      if (endpoint && pushUserId === userId && authToken(deps)) {
         attemptedDelete = true
         try {
           const body = { endpoint }
@@ -270,7 +333,7 @@ export function unregisterPush(deps: PushDeps = {}): Promise<void> | null {
     } catch {
       await forget(deps, endpoint != null)
     } finally {
-      if (attemptedDelete && unregisterToken === endpoint) unregisterToken = null
+      if (attemptedDelete && unregisterToken?.endpoint === endpoint) unregisterToken = null
     }
   })()
 }
@@ -278,11 +341,21 @@ export function unregisterPush(deps: PushDeps = {}): Promise<void> | null {
 // Network-free, so a registration/DELETE 401 cannot deadlock its own cleanup.
 export async function clearPushLocal(deps: PushDeps = {}): Promise<void> {
   const knownToken = cachedToken
-  unregisterToken = knownToken ?? unregisterToken
+  let userId = pushUserId
+  rememberForUnregister(userId, knownToken)
   generation++
   cachedToken = null
   let hadToken = knownToken != null
   try { hadToken ||= enrolled(await store(deps).getJSON<unknown>(PUSH_TOKEN_KEY)) }
   catch { /* Missing or unreadable storage must not block auth cleanup. */ }
-  await forget(deps, hadToken, true)
+  // Cold startup may not have rendered SessionProvider yet. Capture the last
+  // confirmed learner before auth erases lq:session, even though its bearer is
+  // already null. Only the endpoint and learner id remain, in memory.
+  if (userId === null) {
+    try {
+      const saved = await store(deps).getJSON<{ user?: { id?: unknown } }>('lq:session')
+      if (typeof saved?.user?.id === 'string') userId = saved.user.id
+    } catch { /* An unknown owner cannot be reassigned on the next sign-in. */ }
+  }
+  await forget(deps, hadToken, true, userId)
 }

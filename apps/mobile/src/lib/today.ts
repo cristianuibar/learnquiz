@@ -110,6 +110,8 @@ export function useToday(): {
   const [payloadDay, setPayloadDay] = useState<string | null>(null)
   const [status, setStatus] = useState<TodayStatus>(fixture ? 'ready' : 'loading')
   const [refreshing, setRefreshing] = useState(false)
+  // Keep polling a building plan through midnight until a fresh plan replaces it.
+  const [building, setBuilding] = useState(false)
   // Which identity's payload is on screen. Compared during render so an
   // identity change hides the old data on the very first committed render,
   // before any effect runs.
@@ -169,21 +171,30 @@ export function useToday(): {
       return inFlight.current
     }
     const requestToken = getToken()
+    const sentAt = Date.now()
+    const requestDay = utcDay(sentAt)
     const sequence = ++issued.current
     setRefreshing(true)
+    let refreshForNewDay = false
     const ownerForRun: Owner | null = captured.id == null ? null : { id: captured.id, token: requestToken }
     const run: Promise<void> = api<Today>('/today').then(
       (next) => {
         if (!stillCurrent(captured, requestToken, sequence)) return
+        // A plan belongs to the UTC day on which it was requested.
+        if (utcDay(Date.now()) !== requestDay) {
+          refreshForNewDay = true
+          return
+        }
         applied.current = sequence
         freshOwner.current = ownerForRun
         setOwner(ownerForRun)
         setToday(next)
-        setPayloadDay(utcDay(Date.now()))
+        setBuilding(next.role?.building != null)
+        setPayloadDay(requestDay)
         setStatus('ready')
         // Persist only the confirmed network payload, for the identity that
         // fetched it. Storage failure is contained inside saveTodayCache.
-        if (captured.id != null) void saveTodayCache(captured.id, next, captured.branding)
+        if (captured.id != null) void saveTodayCache(captured.id, next, captured.branding, sentAt)
       },
       (error: unknown) => {
         // Keep the last value on screen; only the status changes. A 401 is
@@ -196,6 +207,9 @@ export function useToday(): {
       if (inFlight.current === run) {
         inFlight.current = null
         inFlightOwner.current = null
+        // Start exactly one new-day request after releasing deduplication.
+        // Returning it also keeps a learner retry busy through the recovery.
+        if (refreshForNewDay && stillCurrent(captured, requestToken, sequence)) return refresh()
         if (mounted.current) setRefreshing(false)
       }
     })
@@ -229,6 +243,7 @@ export function useToday(): {
     freshOwner.current = null
     setOwner(null)
     setToday(null)
+    setBuilding(false)
     setPayloadDay(null)
     setStatus('loading')
     if (!idChanged) {
@@ -269,6 +284,7 @@ export function useToday(): {
       if (freshOwner.current?.id === capturedId && freshOwner.current?.token === requestToken) return
       setOwner({ id: capturedId, token: requestToken })
       setToday(entry.today)
+      setBuilding(entry.today.role?.building != null)
       setPayloadDay(entry.day)
     })
   }, [fixture, userId, token])
@@ -305,7 +321,6 @@ export function useToday(): {
     return () => subscription.remove()
   }, [refresh])
 
-  const building = visibleToday?.role?.building != null
   useEffect(() => {
     if (fixture || !building || !focused || !active) return
     const timer = setInterval(() => { void refresh() }, BUILDING_POLL_MS)

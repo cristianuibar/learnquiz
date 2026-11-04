@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store'
 import { authCall } from './api'
 import * as kv from './kv'
-import { clearPushLocal, observePushForeground, unregisterPush } from './push'
+import { clearPushLocal, observePushForeground, setPushUser, unregisterPush } from './push'
 
 const TOKEN_KEY = 'lq.token'
 let token: string | null = null
@@ -44,10 +44,11 @@ export async function loadToken(): Promise<string | null> {
   return loading
 }
 
-async function storeToken(value: string, current: number) {
+async function storeToken(value: string, current: number, userId: string | null) {
   // Publish only after the token is safely persisted.
   await persist(() => SecureStore.setItemAsync(TOKEN_KEY, value))
   if (current !== revision) return false
+  setPushUser(userId)
   token = value
   loaded = true
   unauthorized = undefined
@@ -80,7 +81,9 @@ async function authenticate(path: string, body: Record<string, string>) {
   if (current !== revision) return data
   const nextToken = responseToken ?? data.token
   if (!nextToken) throw new Error('The server did not return a sign-in token.')
-  if (await storeToken(nextToken, current)) emit('changed')
+  const user = data.user as { id?: unknown } | null | undefined
+  const userId = typeof user?.id === 'string' ? user.id : null
+  if (await storeToken(nextToken, current, userId)) emit('changed')
   return data
 }
 
