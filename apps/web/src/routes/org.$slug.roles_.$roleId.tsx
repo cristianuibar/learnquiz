@@ -11,6 +11,8 @@ import { plural } from '@/lib/utils'
 import { generateRoleCurriculum, retryConceptGeneration } from '@/server/curriculum'
 import { retireRoleDocument } from '@/server/role-documents'
 import { getRoleDetail, updateRoleConcept } from '@/server/role-detail'
+import { Page, PageHeader } from '@/components/admin/page'
+import { usePortalLinks } from '@/components/portal/portal-context'
 
 export const Route = createFileRoute('/org/$slug/roles_/$roleId')({
   loader: ({ params }) => getRoleDetail({ data: { slug: params.slug, roleId: params.roleId } }),
@@ -29,6 +31,7 @@ function RoleDetail() {
   const detail = Route.useLoaderData()
   const { slug } = Route.useParams()
   const router = useRouter()
+  const links = usePortalLinks()
   const build = useServerFn(generateRoleCurriculum)
   const [building, setBuilding] = useState(false)
   const [buildError, setBuildError] = useState('')
@@ -58,15 +61,17 @@ function RoleDetail() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-[1120px] px-4 pt-8 pb-16">
-      <Link to="/org/$slug/roles" params={{ slug }} className={`inline-flex min-h-11 items-center font-medium underline ${ring}`}>
-        Job roles
-      </Link>
-      <h1 className="mt-4 text-title-1 text-ink">{role.name}</h1>
-      <p className="mt-2 text-caption text-ink-muted">
-        Benchmark: {Math.round(role.benchmark * 100)}% · Onboarding: {plural(role.onboardingDays, 'day', 'days')} · Training: {TRAINING_STATUS[role.topicStatus]}
-      </p>
-      <div className="mt-8 flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-8">
+    <Page capped>
+      <PageHeader
+        crumbs={<Link {...links.roles} className={`inline-flex min-h-11 items-center font-medium underline ${ring}`}>
+          Job roles
+        </Link>}
+        title={role.name}
+        meta={<span className="text-caption">
+          Benchmark: {Math.round(role.benchmark * 100)}% · Onboarding: {plural(role.onboardingDays, 'day', 'days')} · Training: {TRAINING_STATUS[role.topicStatus]}
+        </span>}
+      />
+      <div className="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-8">
         <section aria-labelledby="curriculum-heading" className="lg:order-1">
           <h2 id="curriculum-heading" className="text-title-2">Curriculum</h2>
           {concepts.length > 0 && (
@@ -118,7 +123,7 @@ function RoleDetail() {
           )}
         </section>
       </div>
-    </main>
+    </Page>
   )
 }
 

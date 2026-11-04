@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import type { ItemPayload } from '@/lib/llm/schemas'
 import { getQuestionReview, reviewQuestion } from '@/server/question-review'
+import { Page, PageHeader } from '@/components/admin/page'
+import { usePortalLinks } from '@/components/portal/portal-context'
 
 export const Route = createFileRoute('/org/$slug/questions')({
   validateSearch: (search: Record<string, unknown>): { topicId?: string } => ({ topicId: typeof search.topicId === 'string' ? search.topicId : undefined }),
@@ -139,15 +141,15 @@ function QuestionCard({ question, slug }: { question: Question; slug: string }) 
 function Questions() {
   const review = Route.useLoaderData()
   const { slug } = Route.useParams()
+  const links = usePortalLinks()
   return (
-    <main className="mx-auto w-full max-w-[1120px] px-4 pt-8 pb-16">
-      <Link to="/org/$slug" params={{ slug }} className="underline">{review.name}</Link>
-      <h1 className="mt-4 text-title-1 text-ink">Question review</h1>
-      <nav aria-label="Topics" className="mt-6 flex flex-wrap gap-4">
-        {review.topics.map((t) => <Link key={t.id} to="/org/$slug/questions" params={{ slug }} search={{ topicId: t.id }} aria-current={review.topic?.id === t.id ? 'page' : undefined} className="underline">{t.title}</Link>)}
+    <Page>
+      <PageHeader crumbs={<Link {...links.overview} className="underline">{review.name}</Link>} title="Question review" />
+      <nav aria-label="Topics" className="flex flex-wrap gap-4">
+        {review.topics.map((t) => <Link key={t.id} {...links.questions({ topicId: t.id })} aria-current={review.topic?.id === t.id ? 'page' : undefined} className="underline">{t.title}</Link>)}
       </nav>
-      {!review.topic ? <p className="mt-8">No company topics to review yet.</p> : (
-        <section className="mt-8">
+      {!review.topic ? <p>No company topics to review yet.</p> : (
+        <section>
           <h2 className="text-title-2">{review.topic.title}</h2>
           {review.concepts.length === 0 && <p className="mt-4">No concepts to review yet.</p>}
           {review.concepts.map((c) => (
@@ -159,6 +161,6 @@ function Questions() {
           ))}
         </section>
       )}
-    </main>
+    </Page>
   )
 }

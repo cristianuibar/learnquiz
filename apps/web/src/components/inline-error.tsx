@@ -48,11 +48,31 @@ export function InlineError({ message, onRetry }: { message: string; onRetry: ()
   )
 }
 
-// 401 and 403 can never succeed on retry for the same account, so they offer a way out instead.
-function PermissionError({ message }: { message: string }) {
+// Signs out and sends the person to sign-in, coming back to the current page afterwards.
+export function useSignOut() {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const signOut = async () => {
+    setBusy(true)
+    setError('')
+    const redirect = router.state.location.href
+    // Offline, signOut rejects instead of resolving with an error; both must re-enable the button.
+    const { error } = await authClient.signOut().catch(() => ({ error: { message: 'Could not sign out' } }))
+    if (error) {
+      setError(error.message ?? 'Could not sign out')
+      setBusy(false)
+      return
+    }
+    await router.invalidate()
+    await router.navigate({ to: '/sign-in', search: { redirect } })
+  }
+  return { busy, error, signOut }
+}
+
+// 401 and 403 can never succeed on retry for the same account, so they offer a way out instead.
+function PermissionError({ message }: { message: string }) {
+  const { busy, error, signOut } = useSignOut()
   return (
     <div role="alert" className="flex flex-col gap-3">
       <p className="text-sm font-medium text-wrong">{message}</p>
@@ -60,25 +80,7 @@ function PermissionError({ message }: { message: string }) {
         <Button asChild className="px-6">
           <Link to="/today">Go to Today</Link>
         </Button>
-        <Button
-          variant="secondary"
-          className="px-6"
-          disabled={busy}
-          onClick={async () => {
-            setBusy(true)
-            setError('')
-            const redirect = router.state.location.href
-            // Offline, signOut rejects instead of resolving with an error; both must re-enable the button.
-            const { error } = await authClient.signOut().catch(() => ({ error: { message: 'Could not sign out' } }))
-            if (error) {
-              setError(error.message ?? 'Could not sign out')
-              setBusy(false)
-              return
-            }
-            await router.invalidate()
-            await router.navigate({ to: '/sign-in', search: { redirect } })
-          }}
-        >
+        <Button variant="secondary" className="px-6" disabled={busy} onClick={() => void signOut()}>
           Sign in as someone else
         </Button>
       </div>

@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import { type RouteComponent, createMemoryHistory, createRootRoute, createRoute, createRouter, RouterProvider } from '@tanstack/react-router'
+import { type RouteComponent, createMemoryHistory, createRootRoute, createRoute, createRouter, RouterProvider, Outlet, useParams } from '@tanstack/react-router'
+import { PortalProvider } from '@/components/portal/portal-context'
 import { afterEach, expect, it, vi } from 'vitest'
 import { Route as newRoute } from '@/routes/org.new'
 import { Route as rolesRoute } from '@/routes/org.$slug.roles'
@@ -21,9 +22,15 @@ afterEach(async () => {
   vi.clearAllMocks()
 })
 
+// The portal layout provides the link context; screens are rendered under it here.
+function PortalRoot() {
+  const { slug } = useParams({ strict: false })
+  return <PortalProvider slug={slug ?? ''} base="org" readOnly={false}><Outlet /></PortalProvider>
+}
+
 async function mount(path: string, component: RouteComponent, init: string, loader?: () => unknown) {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
-  const rootRoute = createRootRoute()
+  const rootRoute = createRootRoute({ component: PortalRoot })
   const route = createRoute({ getParentRoute: () => rootRoute, path, component, loader })
   const router = createRouter({ routeTree: rootRoute.addChildren([route]), history: createMemoryHistory({ initialEntries: [init] }) })
   const container = document.createElement('div')

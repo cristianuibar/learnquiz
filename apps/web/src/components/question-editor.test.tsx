@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import { createMemoryHistory, createRootRoute, createRoute, createRouter, RouterProvider } from '@tanstack/react-router'
+import { createMemoryHistory, createRootRoute, createRoute, createRouter, RouterProvider, Outlet, useParams } from '@tanstack/react-router'
+import { PortalProvider } from '@/components/portal/portal-context'
 import { afterEach, expect, it, vi } from 'vitest'
 import { Route as questionsRoute } from '@/routes/org.$slug.questions'
 import { reviewQuestion } from '@/server/question-review'
@@ -25,10 +26,16 @@ const payload = (format: string, correct: boolean[]) => ({
   options: correct.map((c, i) => opt('abcde'[i]!, c)),
 })
 
+// The portal layout provides the link context; screens are rendered under it here.
+function PortalRoot() {
+  const { slug } = useParams({ strict: false })
+  return <PortalProvider slug={slug ?? ''} base="org" readOnly={false}><Outlet /></PortalProvider>
+}
+
 async function mount(p: unknown) {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   const review = { name: 'Acme', topics: [], topic: { id: 't', title: 'Topic' }, concepts: [{ id: 'c', name: 'Concept', sourceQuote: null, questions: [{ id: 'q1', status: 'active', reviewedAt: null, flags: [], payload: p }] }] }
-  const rootRoute = createRootRoute()
+  const rootRoute = createRootRoute({ component: PortalRoot })
   const route = createRoute({ getParentRoute: () => rootRoute, path: '/org/$slug/questions', component: questionsRoute.options.component, loader: () => review })
   const router = createRouter({ routeTree: rootRoute.addChildren([route]), history: createMemoryHistory({ initialEntries: ['/org/x/questions'] }) })
   const container = document.createElement('div')

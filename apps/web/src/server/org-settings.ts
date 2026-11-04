@@ -78,6 +78,10 @@ export const saveCompanySettings = createServerFn({ method: 'POST' })
     if (previous?.logoKey && previous.logoKey !== logoKey) await bucket.delete(previous.logoKey).catch(() => {})
   })
 
+export function companyLogoUrl(orgId: string, logoKey: string | null | undefined) {
+  return logoKey ? `/api/org/${encodeURIComponent(orgId)}/logo?v=${encodeURIComponent(logoKey)}` : null
+}
+
 export const getCompanyBranding = createServerFn({ method: 'GET' }).handler(async (): Promise<Branding | null> => {
   const session = await getAuth().api.getSession({ headers: getRequestHeaders() })
   if (!session || session.user.isAnonymous) return null
@@ -91,5 +95,5 @@ export const getCompanyBranding = createServerFn({ method: 'GET' }).handler(asyn
     .orderBy(asc(member.createdAt), asc(member.id))
     .limit(1).get()
   if (!row) return null
-  return { name: row.name, logoUrl: row.logoKey ? `/api/org/${encodeURIComponent(row.orgId)}/logo?v=${encodeURIComponent(row.logoKey)}` : null, accent: row.accent && accessibleAccent(row.accent) ? row.accent : null }
+  return { name: row.name, logoUrl: companyLogoUrl(row.orgId, row.logoKey), accent: row.accent && accessibleAccent(row.accent) ? row.accent : null }
 })

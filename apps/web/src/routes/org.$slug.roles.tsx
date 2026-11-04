@@ -9,6 +9,8 @@ import { Label } from '@/components/ui/label'
 import { TRAINING_STATUS } from '@/lib/training-status'
 import { plural } from '@/lib/utils'
 import { createRole, listRoles } from '@/server/org'
+import { Page, PageHeader } from '@/components/admin/page'
+import { usePortalLinks } from '@/components/portal/portal-context'
 
 export const Route = createFileRoute('/org/$slug/roles')({
   loader: ({ params }) => listRoles({ data: { slug: params.slug } }),
@@ -18,6 +20,7 @@ export const Route = createFileRoute('/org/$slug/roles')({
 
 function Roles() {
   const org = Route.useLoaderData()
+  const links = usePortalLinks()
   const router = useRouter()
   const create = useServerFn(createRole)
   const [error, setError] = useState('')
@@ -51,16 +54,18 @@ function Roles() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-[1120px] px-4 pt-8 pb-16">
-      <Link to="/org/$slug" params={{ slug: org.slug }} className="inline-flex min-h-11 items-center font-medium underline outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
-        {org.name}
-      </Link>
-      <h1 className="mt-4 text-title-1 text-ink">Job roles</h1>
+    <Page capped>
+      <PageHeader
+        crumbs={<Link {...links.overview} className="inline-flex min-h-11 items-center font-medium underline outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
+          {org.name}
+        </Link>}
+        title="Job roles"
+      />
       {org.roles.length > 0 ? (
-        <ul className="mt-6 flex flex-col gap-3">
+        <ul className="flex flex-col gap-3">
           {org.roles.map((role) => (
             <li key={role.id} className="rounded-lg border p-4">
-              <Link to="/org/$slug/roles/$roleId" params={{ slug: org.slug, roleId: role.id }} className="inline-flex min-h-11 max-w-full items-center font-medium underline outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
+              <Link {...links.role(role.id)} className="inline-flex min-h-11 max-w-full items-center font-medium underline outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
                 <span className="line-clamp-2 min-w-0 break-words">{role.name}</span>
               </Link>
               <p className="text-caption text-ink-muted">Benchmark: {Math.round(role.benchmark * 100)}% · Onboarding: {plural(role.onboardingDays, 'day', 'days')} · {TRAINING_STATUS[role.topicStatus]}</p>
@@ -71,9 +76,9 @@ function Roles() {
           ))}
         </ul>
       ) : (
-        <p className="mt-6 text-body text-ink-muted">Create your first job role.</p>
+        <p className="text-body text-ink-muted">Create your first job role.</p>
       )}
-      <section className="mt-8">
+      <section>
         <h2 className="text-title-2">Create a job role</h2>
         <form ref={formRef} className="mt-6 flex max-w-xl flex-col gap-6" onSubmit={submit}>
           <div className="flex flex-col gap-2">
@@ -97,6 +102,6 @@ function Roles() {
           </Button>
         </form>
       </section>
-    </main>
+    </Page>
   )
 }

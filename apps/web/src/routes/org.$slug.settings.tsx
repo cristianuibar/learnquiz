@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { getCompanySettings, saveCompanySettings } from '@/server/org-settings'
+import { Page, PageHeader } from '@/components/admin/page'
 
 export const Route = createFileRoute('/org/$slug/settings')({
   loader: ({ params }) => getCompanySettings({ data: { slug: params.slug } }),
@@ -40,9 +41,9 @@ function Settings() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-[1120px] px-4 pt-8 pb-16">
-      <h1 className="text-title-1 text-ink">Company settings</h1>
-      <form className="mt-8 flex max-w-xl flex-col gap-6" onSubmit={save} onChange={() => setSaved(false)}>
+    <Page capped>
+      <PageHeader title="Company settings" />
+      <form className="flex max-w-xl flex-col gap-6" onSubmit={save} onChange={() => setSaved(false)}>
         <input type="hidden" name="slug" value={settings.slug} />
         <div className="flex flex-col gap-2">
           <Label htmlFor="name">Company name</Label>
@@ -90,6 +91,6 @@ function Settings() {
         {saved && <p role="status" className="text-body">Settings saved.</p>}
         <Button type="submit" className="self-end px-6" disabled={busy}>{busy ? 'Saving…' : 'Save settings'}</Button>
       </form>
-    </main>
+    </Page>
   )
 }
