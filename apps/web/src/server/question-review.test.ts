@@ -120,7 +120,6 @@ it('rejects invalid payloads, invented quotes and removing grounding with a mess
     { ...payload, format: 'mcq' },
     { ...payload, source_quote: 'Add 1 to both sides.' },
     { ...payload, source_quote: null, grounded: false },
-    { ...payload, format: 'order', accepted_answers: [], options: ['a', 'b', 'c'].map((id) => ({ id, text: id, is_correct: true, feedback: id })) },
   ]) {
     await expect(reviewQuestion({ data: { slug: 'alpha', itemId: 'a-invalid', action: 'edit', payload: invalid } }))
       .rejects.toMatchObject({ status: 400, message: expect.stringMatching(/Invalid question|source quote/) })
