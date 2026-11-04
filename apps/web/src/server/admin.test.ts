@@ -7,7 +7,7 @@ import { dbSchema } from '@/db'
 import { getAuth } from '@/server/auth'
 import { getSessionUser } from '@/server/session'
 import { createRole, getPeople, getOrgOverview, listRoles } from '@/server/org'
-import { getCompanies, getCompany, getContentFlags, getGenerationJobs, getStaffSession, listUsers, resolveFlag, retryJobConcept, setUserBan } from './admin'
+import { getContentFlags, getGenerationJobs, getStaffSession, listUsers, resolveFlag, retryJobConcept, setUserBan } from './admin'
 
 const boundary = vi.hoisted(() => ({ db: null as unknown, headers: new Headers(), status: 200, background: [] as unknown[] }))
 
@@ -101,8 +101,6 @@ it('refuses every admin function for non-staff, including a company owner', asyn
   boundary.headers = new Headers({ cookie: accounts.get('learner')!.cookie })
   for (const call of [
     () => getStaffSession(),
-    () => getCompanies(),
-    () => getCompany({ data: { slug: 'alpha' } }),
     () => listUsers({ data: { search: '', field: 'email', offset: 0 } }),
     () => setUserBan({ data: { userId: accounts.get('outsider')!.id, banned: true } }),
     () => setUserBan({ data: { userId: accounts.get('outsider')!.id, banned: false } }),
@@ -117,26 +115,6 @@ it('refuses every admin function for non-staff, including a company owner', asyn
   }
   boundary.headers = new Headers()
   await expect(getStaffSession()).rejects.toMatchObject({ status: 401 })
-})
-
-it('returns company members, roles, documents, distinct active learners and scoped spend for staff', async () => {
-  await expect(getStaffSession()).resolves.toMatchObject({ id: accounts.get('staff')!.id })
-  await expect(getCompanies()).resolves.toEqual([
-    { id: 'alpha', name: 'alpha', slug: 'alpha', members: 1, roles: 1, documents: 1, activeLearners: 1, modelSpend: 0.125 },
-    { id: 'beta', name: 'beta', slug: 'beta', members: 1, roles: 1, documents: 0, activeLearners: 0, modelSpend: 9 },
-    { id: 'empty', name: 'empty', slug: 'empty', members: 0, roles: 0, documents: 0, activeLearners: 0, modelSpend: 0 },
-  ])
-  await expect(getCompany({ data: { slug: 'alpha' } })).resolves.toMatchObject({
-    members: [{ name: 'learner', role: 'owner', jobRole: 'alpha role' }],
-    roles: [{ id: 'alpha', name: 'alpha role', status: 'active', topicStatus: 'draft' }],
-    documents: [{ id: 'alpha-sop', title: 'alpha SOP', role: 'alpha role' }],
-    activeLearners: 1, modelSpend: 0.125,
-  })
-  sqlite.prepare('INSERT INTO job_roles (id, org_id, name, created_at) VALUES (?, ?, ?, ?)').run('ready-role', 'empty', 'Ready role', NOW)
-  sqlite.prepare('INSERT INTO topics (id, job_role_id, title, status, created_at) VALUES (?, ?, ?, ?, ?)').run('ready-topic', 'ready-role', 'Ready role', 'ready', NOW)
-  await expect(getCompany({ data: { slug: 'empty' } })).resolves.toMatchObject({ roles: [{ id: 'ready-role', status: 'active', topicStatus: 'ready' }] })
-  await expect(getCompany({ data: { slug: 'beta' } })).resolves.toMatchObject({ documents: [] })
-  await expect(getCompany({ data: { slug: 'missing' } })).rejects.toMatchObject({ status: 404 })
 })
 
 it('allows staff to read the company portal without invite secrets or company write access', async () => {
