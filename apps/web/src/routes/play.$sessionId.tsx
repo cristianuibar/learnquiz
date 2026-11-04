@@ -303,6 +303,7 @@ function Play({ initial }: { initial: SessionView }) {
           item={revealed.item}
           answer={answer}
           hasCompany={false}
+          basics={view.basics === true}
           company={null}
           busy={busy}
           error={error?.message ?? null}

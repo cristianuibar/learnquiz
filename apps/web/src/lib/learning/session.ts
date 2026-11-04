@@ -18,7 +18,7 @@ export function composeSession(input: {
   frontier: Frontier[]
   closers: { id: string; conceptId: string }[]
   targetDifficulty: number
-  basics?: boolean // back to basics: the frontier (ranked by the caller) goes ahead of due reviews
+  basics?: Map<string, number> // back to basics: concept id -> weak-unit rank; lower ranks open the session, due or fresh
 }): string[] {
   const closers = input.closers.slice(0, 2)
   const conceptOf = new Map<string, string>()
@@ -30,7 +30,7 @@ export function composeSession(input: {
   for (const d of [...due, ...closers]) conceptOf.set(d.id, d.conceptId)
 
   const picked = new Set(due.map((d) => d.id))
-  const main = input.basics ? [] : due.map((d) => d.id)
+  const main = due.map((d) => d.id)
   let covered = 0
   for (const c of concepts) {
     if (covered >= 8) break
@@ -40,11 +40,13 @@ export function composeSession(input: {
       covered++
     }
   }
-  if (input.basics) main.push(...due.map((d) => d.id))
   const room = input.size - closers.length
   // Short on items: top up from the frontier one level easier.
   const spare = concepts.flatMap((c) => c.items).filter((i) => !picked.has(i.id))
   main.push(...nearest(spare, input.targetDifficulty - 1).map((i) => i.id))
+  // Back to basics: the earliest weak unit goes first, due or fresh; the sort is stable.
+  const basics = input.basics
+  if (basics) main.sort((a, b) => (basics.get(conceptOf.get(a) ?? '') ?? Infinity) - (basics.get(conceptOf.get(b) ?? '') ?? Infinity))
 
   // Greedy: take the first queued item whose concept differs from the previous one.
   const queue = main.slice(0, room)

@@ -45,7 +45,8 @@ export type RevealModel = {
   partialLines: { id: string; icon: 'check' | 'x'; text: string }[]
 }
 
-export function revealModel(reveal: Reveal, { hasCompany }: { hasCompany: boolean }): RevealModel {
+// basics: a back-to-basics session (SessionView.basics) opens every explanation without asking.
+export function revealModel(reveal: Reveal, { hasCompany, basics = false }: { hasCompany: boolean; basics?: boolean }): RevealModel {
   const { tone, heading } = states[reveal.state]
   const correct = tone === 'correct'
   const variant = correct && reveal.sourceQuote === null ? 'noSource' : states[reveal.state].variant
@@ -63,7 +64,7 @@ export function revealModel(reveal: Reveal, { hasCompany }: { hasCompany: boolea
     announcement: [heading, ...(xpText ? [`${reveal.xp} XP`] : countParts)].join(', '),
     continueLabel: reveal.state === 'D' ? revealCopy.gotIt : revealCopy.continue,
     showWhy: variant === 'correctSure',
-    openByDefault: variant !== 'correctSure',
+    openByDefault: basics || variant !== 'correctSure',
     noQuoteLine: variant === 'noSource' ? (hasCompany ? 'Not quoted from your SOP' : 'Not quoted from a source') : null,
     partialLines: partial?.options.flatMap((option) => {
       if (option.correct === option.chosen) return []

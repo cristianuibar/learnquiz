@@ -305,7 +305,11 @@ export const startSession = createServerFn({ method: 'POST' })
       .sort((a, b) => Number(seen.has(a.id)) - Number(seen.has(b.id)))
       .slice(0, 2)
 
-    const rulesQueue = composeSession({ size: SESSION_SIZE, due, frontier: frontierInput, closers, targetDifficulty, basics })
+    // Back to basics: rank each concept by its weak unit's place, so the earliest weak unit opens the session.
+    const basicsRank = weak
+      ? new Map((await db.select({ id: concepts.id, unitId: concepts.unitId }).from(concepts).where(inArray(concepts.unitId, weak))).map((c) => [c.id, weak.indexOf(c.unitId)]))
+      : undefined
+    const rulesQueue = composeSession({ size: SESSION_SIZE, due, frontier: frontierInput, closers, targetDifficulty, basics: basicsRank })
     if (!rulesQueue.length) {
       if (topic.jobRoleId !== null) throw httpError(`${await preparingMessage(db, topic.jobRoleId)}. Try again in a few minutes.`, 503)
       // A join that timed out leaves generation running; that is a wait, not an empty topic.

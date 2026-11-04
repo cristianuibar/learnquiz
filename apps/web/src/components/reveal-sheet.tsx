@@ -60,6 +60,7 @@ export function RevealSheet({
   item,
   answer,
   hasCompany,
+  basics,
   onContinue,
   onReport,
   busy,
@@ -72,6 +73,7 @@ export function RevealSheet({
   item: ItemView
   answer: Answer
   hasCompany: boolean
+  basics?: boolean
   onContinue(reflection: string): void
   onReport?(reflection: string): void // absent once a report has been sent
   busy?: boolean
@@ -80,7 +82,7 @@ export function RevealSheet({
   headingRef: Ref<HTMLHeadingElement>
   reportRef: Ref<HTMLButtonElement>
 }) {
-  const model = revealModel(reveal, { hasCompany })
+  const model = revealModel(reveal, { hasCompany, basics })
   const { variant } = model
   const tone = TONE[model.tone]
   const reflectionId = useId()

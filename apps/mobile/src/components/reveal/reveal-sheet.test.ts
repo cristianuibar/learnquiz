@@ -70,6 +70,16 @@ test('hasCompany comes from branding and noSource is chosen without a quote', as
   spy.mockRestore()
 })
 
+test('a back-to-basics session opens the explanation on a correct, sure result; otherwise Why stays closed', async () => {
+  const view = await render(sheet({ basics: true }))
+  expect(screen.getByRole('button', { name: 'Why', expanded: true })).toBeOnTheScreen()
+  expect(screen.getByText('Record before moving.')).toBeOnTheScreen()
+  await view.unmount()
+  await render(sheet())
+  expect(screen.getByRole('button', { name: 'Why', expanded: false })).toBeOnTheScreen()
+  expect(screen.queryByText('Record before moving.')).toBeNull()
+})
+
 test('wrong states render through the wrong body and partial through the partial body', async () => {
   const wrong = jest.spyOn(require('./wrong-body') as typeof import('./wrong-body'), 'WrongBody')
   const partial = jest.spyOn(require('./partial-body') as typeof import('./partial-body'), 'PartialBody')

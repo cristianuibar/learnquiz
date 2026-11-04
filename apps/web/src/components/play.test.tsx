@@ -31,7 +31,7 @@ beforeEach(() => {
 })
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); finishPermission = undefined; sessionStorage.clear() })
 
-async function renderPlay(voiceEnabled: boolean | null = true, permissionPending = false, format: 'cloze' | 'short' | 'mcq' = 'cloze', fromToday = false, overrides: Partial<ItemView> = {}) {
+async function renderPlay(voiceEnabled: boolean | null = true, permissionPending = false, format: 'cloze' | 'short' | 'mcq' = 'cloze', fromToday = false, overrides: Partial<ItemView> = {}, basics = false) {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   stopTrack = vi.fn()
   const mic = { getTracks: () => [{ stop: stopTrack }] } as unknown as MediaStream
@@ -63,6 +63,7 @@ async function renderPlay(voiceEnabled: boolean | null = true, permissionPending
   const initial: SessionView = {
     id: 's1', kind: 'session', topicId: 't1', topicTitle: 'Algebra', progress: { position: 1, total: 1 }, ended: false,
     ...(voiceEnabled === null ? {} : { voiceEnabled }),
+    ...(basics ? { basics } : {}),
     item: {
       id: 'i1', conceptId: 'c1', conceptName: 'Variables', format, difficulty: 1, generatedBy: 'gpt-test', image: null,
       stem: format === 'short' ? 'Explain why subtracting one preserves equality.' : format === 'mcq' ? 'x + 1 = 2; what is x?' : 'x + 1 = 2; x = ____',
@@ -585,8 +586,8 @@ describe('reveal overlay', () => {
   } as unknown as Reveal
   const sureCorrect = { ...sureWrong, state: 'A', correct: true, xp: 10, sourceQuote: 'Quote', sourceTitle: 'Notes' } as unknown as Reveal
 
-  async function check(reveal: Reveal) {
-    const view = await renderPlay(false, false, 'mcq')
+  async function check(reveal: Reveal, basics = false) {
+    const view = await renderPlay(false, false, 'mcq', false, {}, basics)
     vi.mocked(answerItem).mockResolvedValueOnce(reveal)
     await act(async () => {
       view.container.querySelector<HTMLInputElement>('input[name="answer"]')!.click()
@@ -629,6 +630,14 @@ describe('reveal overlay', () => {
       await click(document.querySelector<HTMLElement>('button[aria-label="Back to result"]'))
       expect(linkByText('Why').getAttribute('aria-expanded')).toBe('true')
       expect(document.activeElement).toBe(linkByText('Report this question'))
+    } finally { await cleanup() }
+  })
+
+  it('opens the Why disclosure immediately for a back-to-basics session', async () => {
+    const { cleanup } = await check(sureCorrect, true)
+    try {
+      expect(linkByText('Why').getAttribute('aria-expanded')).toBe('true')
+      expect(dialog()!.textContent).toContain('Add, then compare.')
     } finally { await cleanup() }
   })
 
