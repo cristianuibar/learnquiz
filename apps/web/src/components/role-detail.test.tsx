@@ -162,3 +162,9 @@ it('shows no editing controls when read-only', async () => {
   expect(button('More actions for Till handbook')).toBeUndefined()
   expect(container.querySelector('[data-variant="accent"]')).toBeNull()
 })
+
+it('links Review questions to the questions of this role', async () => {
+  const { container } = await mount(makeDetail({ status: 'ready', documents: [pdf] }))
+  const link = [...container.querySelectorAll('a')].find((a) => a.textContent === 'Review questions')!
+  expect(link.getAttribute('href')).toBe('/org/x/questions?role=r1')
+})

@@ -86,7 +86,7 @@ it('loads defaults, upserts settings for owners and admins, and returns branding
   await saveCompanySettings({ data: input })
   const key = state.bucket.put.mock.calls[0][0]
   expect(key).toMatch(/^org-logos\/org-a\//)
-  expect(await settings()).toEqual({ slug: 'alpha', name: 'Alpha Training', timezone: 'Europe/London', workingHours: { days: [1, 2, 3, 4, 5], start: '08:30', end: '17:30' }, accent: '#543189', hasLogo: true })
+  expect(await settings()).toEqual({ slug: 'alpha', name: 'Alpha Training', timezone: 'Europe/London', workingHours: { days: [1, 2, 3, 4, 5], start: '08:30', end: '17:30' }, accent: '#543189', hasLogo: true, logoUrl: `/api/org/org-a/logo?v=${encodeURIComponent(key)}` })
   state.user = 'admin-a'
   input.delete('logo')
   input.set('timezone', 'America/New_York')
