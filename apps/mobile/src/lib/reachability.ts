@@ -10,14 +10,18 @@ export function watchReachability(onChange: (reachable: boolean) => void): () =>
   let controller: AbortController | undefined
   let timeout: ReturnType<typeof setTimeout> | undefined
   let next: ReturnType<typeof setTimeout> | undefined
+  let failures = 0
   const check = async () => {
     controller = new AbortController()
     timeout = setTimeout(() => controller?.abort(), REACHABILITY_TIMEOUT_MS)
     try {
       await checkReachability(controller.signal)
-      if (!stopped) onChange(true)
+      if (!stopped) {
+        failures = 0
+        onChange(true)
+      }
     } catch {
-      if (!stopped) onChange(false)
+      if (!stopped && ++failures >= 2) onChange(false)
     } finally {
       clearTimeout(timeout)
       if (!stopped) next = setTimeout(() => { void check() }, REACHABILITY_INTERVAL_MS)

@@ -111,8 +111,8 @@ export function useToday({ monitorConnectivity = false }: { monitorConnectivity?
   const [payloadDay, setPayloadDay] = useState<string | null>(null)
   const [status, setStatus] = useState<TodayStatus>(fixture ? 'ready' : 'loading')
   const [unreachable, setUnreachable] = useState(false)
-  // Reachability is independent of payload requests: a late successful /today
-  // must not hide a newer loss of connectivity.
+  // Either a successful payload request or probe proves connectivity.
+  const needsRecovery = useRef(false)
   const visibleStatus = unreachable ? 'offline' : status
   const [refreshing, setRefreshing] = useState(false)
   // Keep polling a building plan through midnight until a fresh plan replaces it.
@@ -196,6 +196,8 @@ export function useToday({ monitorConnectivity = false }: { monitorConnectivity?
         setToday(next)
         setBuilding(next.role?.building != null)
         setPayloadDay(requestDay)
+        needsRecovery.current = false
+        setUnreachable(false)
         setStatus('ready')
         // Persist only the confirmed network payload, for the identity that
         // fetched it. Storage failure is contained inside saveTodayCache.
@@ -206,7 +208,9 @@ export function useToday({ monitorConnectivity = false }: { monitorConnectivity?
         // owned by auth (it signs out); it never surfaces as an error here.
         if (error instanceof ApiError && error.status === 401) return
         if (!stillCurrent(captured, requestToken, sequence)) return
-        setStatus(failureStatus(error))
+        const failedStatus = failureStatus(error)
+        if (failedStatus === 'offline') needsRecovery.current = true
+        setStatus(failedStatus)
       },
     ).finally(() => {
       if (inFlight.current === run) {
@@ -335,11 +339,13 @@ export function useToday({ monitorConnectivity = false }: { monitorConnectivity?
   useEffect(() => {
     // Only the Today screen opts in; TabBar and Path also use this data hook.
     if (!monitorConnectivity || fixture || !focused || !active) return
-    let wasOffline = false
     return watchReachability((reachable) => {
       setUnreachable(!reachable)
-      if (reachable && wasOffline) void refresh()
-      wasOffline = !reachable
+      if (!reachable) needsRecovery.current = true
+      else if (needsRecovery.current) {
+        needsRecovery.current = false
+        void refresh()
+      }
     })
   }, [monitorConnectivity, fixture, focused, active, refresh])
 
