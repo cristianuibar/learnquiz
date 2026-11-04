@@ -15,3 +15,13 @@ export function DashedCircle({ className }: { className?: string }) {
     </svg>
   )
 }
+
+export function DashedAlert({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="12" cy="12" r="9" strokeDasharray="2 3.2" />
+      <path d="M12 8v4" />
+      <path d="M12 16h.01" />
+    </svg>
+  )
+}
