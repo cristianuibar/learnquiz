@@ -52,6 +52,8 @@ function SessionRoutes({ fontsLoaded }: { fontsLoaded: boolean }) {
   const url = useURL()
   const lastURL = useRef<string | null>(null)
   const mounted = useRef(false)
+  // Set while the resolved stack shows sign-in, until the next resolved screen.
+  const fromSignIn = useRef(false)
   // Set once the first session resolved. A later loading (a new bearer waiting
   // for /session) keeps the stack, so an open invitation stays mounted.
   const [booted, setBooted] = useState(false)
@@ -65,6 +67,16 @@ function SessionRoutes({ fontsLoaded }: { fontsLoaded: boolean }) {
       lastURL.current = url
       const target = targetFromURL(url)
       if (target && !canOpenTarget(target, session)) holdTarget(target)
+    }
+    // Sign-in over Join: removing the protected sign-in screen uncovers Join, not
+    // index. Hand the post-auth decision to index, as when sign-in sits over it.
+    if (resolved) {
+      const signedInOverJoin = fromSignIn.current && session.status === 'ready' && pathname.startsWith('/join/')
+      fromSignIn.current = pathname === '/sign-in'
+      if (signedInOverJoin) {
+        router.replace('/')
+        return
+      }
     }
     // The native router handles open links. Only replay links held by a gate.
     // index owns the gate's destination, including the protected sign-in screen
