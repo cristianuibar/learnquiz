@@ -64,14 +64,30 @@ async function click(el: HTMLElement) {
 
 const sent = (n: number) => (vi.mocked(saveCompanySettings).mock.calls[n][0] as unknown as { data: FormData }).data
 
-it('blocks saving a low-contrast accent and focuses the field', async () => {
+it('previews well-formed accents while blocking low-contrast saves and focusing the field', async () => {
   const c = await mount()
+  expect(c.querySelector('figure')).toBeNull()
   await setValue(field(c, '#accent'), '#F4C430')
   expect(alerts(c).join(' ')).toContain('1.6:1 on white. Pick a darker color that reaches 4.5:1.')
   expect(field(c, '#accent').getAttribute('aria-invalid')).toBe('true')
+  expect(c.querySelector('figure span')?.textContent).toBe('Start quiz')
+  expect(field(c, 'figure span').style.backgroundColor).toBe('#F4C430')
+  expect(field(c, '[aria-label="Choose accent color"]').style.backgroundColor).toBe('#F4C430')
+  expect(c.querySelector('figcaption')?.textContent).toBe('Learner app button preview')
+  expect(c.querySelector('figure button, figure a, figure [tabindex]')).toBeNull()
   await click(button(c, 'Save changes'))
   expect(saveCompanySettings).not.toHaveBeenCalled()
   expect(document.activeElement).toBe(field(c, '#accent'))
+
+  await setValue(field(c, '#accent'), '#0E5A73')
+  expect(c.querySelector('figure span')?.textContent).toBe('Start quiz')
+  expect(c.querySelector('figcaption')?.textContent).toBe('Learner app button preview: 7.7:1 on white · passes AA')
+  expect(alerts(c)).toEqual([])
+
+  for (const value of ['', '#oops']) {
+    await setValue(field(c, '#accent'), value)
+    expect(c.querySelector('figure')).toBeNull()
+  }
 })
 
 it('keeps edits after a failed save and Try again resends the form', async () => {
