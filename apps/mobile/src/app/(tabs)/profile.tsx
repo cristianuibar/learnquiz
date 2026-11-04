@@ -18,6 +18,7 @@ import { endSession, useSession } from '@/lib/session-store'
 import { api, ApiError } from '@/lib/api'
 import { getToken } from '@/lib/auth'
 import { firstSessionParams } from '@/lib/profile-progress'
+import { takeFlagSent } from '@/lib/profile-announcement'
 import { useTheme } from '@/theme/ThemeProvider'
 
 type ProgressState = {
@@ -68,11 +69,21 @@ export default function Profile() {
   // A tab screen stays mounted, so focus the heading on every arrival (for
   // example from the Today role card), not only on the first mount.
   useFocusEffect(useCallback(() => {
-    const frame = requestAnimationFrame(() => {
+    const owner = getToken()
+    let frame = requestAnimationFrame(() => {
+      if (getToken() !== owner) return
       const target = returningFromSettings.current ? settingsRef.current : headingRef.current
       returningFromSettings.current = false
       const tag = target && findNodeHandle(target)
-      if (tag != null) AccessibilityInfo.setAccessibilityFocus(tag)
+      if (tag != null) {
+        AccessibilityInfo.setAccessibilityFocus(tag)
+        if (takeFlagSent(owner)) {
+          // TalkBack focus interrupts speech, so announce on the next frame.
+          frame = requestAnimationFrame(() => {
+            if (getToken() === owner) AccessibilityInfo.announceForAccessibility('Flag sent')
+          })
+        }
+      }
     })
     return () => {
       cancelAnimationFrame(frame)
