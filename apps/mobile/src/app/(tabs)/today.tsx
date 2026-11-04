@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AccessibilityInfo, findNodeHandle, ScrollView, View, type Text as NativeText } from 'react-native'
 import { useFocusEffect, useRouter, useScrollToTop } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -19,6 +19,7 @@ export default function TodayScreen() {
   const router = useRouter()
   const heading = useRef<NativeText>(null)
   const scroll = useRef<ScrollView>(null)
+  const [retrying, setRetrying] = useState(false)
   const retryHadFocus = useRef(false)
   const retryStartedWithFocus = useRef(false)
   const prevStatus = useRef(status)
@@ -61,7 +62,8 @@ export default function TodayScreen() {
   const retry = useCallback(() => {
     // Activating either retry owns focus; busy may blur it before success.
     retryStartedWithFocus.current = true
-    void refresh()
+    setRetrying(true)
+    void refresh().finally(() => { setRetrying(false) })
   }, [refresh])
 
   const notice = status === 'offline' || status === 'error'
@@ -80,10 +82,10 @@ export default function TodayScreen() {
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingTop: space[2], paddingHorizontal: space[4], paddingBottom: space[6], gap: space[6] }}
       >
-        {notice && (
+        {notice && view?.hero.kind !== 'empty' && (
           <TodayNotice
             status={status}
-            refreshing={refreshing}
+            refreshing={retrying}
             onRetry={retry}
             onRetryFocus={() => { retryHadFocus.current = true }}
             onRetryBlur={() => { retryHadFocus.current = false }}

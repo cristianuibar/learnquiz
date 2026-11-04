@@ -3,31 +3,31 @@ import { clozeAnswer, clozeMaxLength, splitClozeStem } from './cloze'
 test('splits words around the first marker', () => {
   expect(splitClozeStem('The quick ____ jumps high')).toEqual({
     before: ['The', 'quick'],
-    suffix: '',
+    prefix: '', suffix: '',
     after: ['jumps', 'high'],
   })
 })
 
 test('marker at the start leaves before empty', () => {
-  expect(splitClozeStem('____ jumps high')).toEqual({ before: [], suffix: '', after: ['jumps', 'high'] })
+  expect(splitClozeStem('____ jumps high')).toEqual({ before: [], prefix: '', suffix: '', after: ['jumps', 'high'] })
 })
 
 test('marker at the end leaves after empty', () => {
-  expect(splitClozeStem('The quick ____')).toEqual({ before: ['The', 'quick'], suffix: '', after: [] })
+  expect(splitClozeStem('The quick ____')).toEqual({ before: ['The', 'quick'], prefix: '', suffix: '', after: [] })
 })
 
 test('missing marker keeps every word before the blank', () => {
-  expect(splitClozeStem('No blank here')).toEqual({ before: ['No', 'blank', 'here'], suffix: '', after: [] })
+  expect(splitClozeStem('No blank here')).toEqual({ before: ['No', 'blank', 'here'], prefix: '', suffix: '', after: [] })
 })
 
 test('only the first marker splits; later markers stay literal', () => {
-  expect(splitClozeStem('a ____ b ____ c')).toEqual({ before: ['a'], suffix: '', after: ['b', '____', 'c'] })
+  expect(splitClozeStem('a ____ b ____ c')).toEqual({ before: ['a'], prefix: '', suffix: '', after: ['b', '____', 'c'] })
 })
 
 test('extra whitespace is ignored but punctuation is preserved', () => {
   expect(splitClozeStem('  Hello,   world  ____  again!  ')).toEqual({
     before: ['Hello,', 'world'],
-    suffix: '',
+    prefix: '', suffix: '',
     after: ['again!'],
   })
 })
@@ -67,4 +67,16 @@ test('answer is always a text object, including empty and zero values', () => {
   expect(clozeAnswer('', false)).toEqual({ text: '' })
   expect(clozeAnswer('0', true)).toEqual({ text: '0' })
   expect(clozeAnswer('007', true)).toEqual({ text: '007' })
+})
+
+
+test.each([
+  ['costs $____.', ['costs'], '$', '.', []],
+  ['(____) items', [], '(', ')', ['items']],
+  ['the "____" sign', ['the'], '"', '"', ['sign']],
+  ['a ____kg load', ['a'], '', 'kg', ['load']],
+  ["the ____'s door", ['the'], '', "'s", ['door']],
+  ['a pre____post word', ['a'], 'pre', 'post', ['word']],
+])('keeps all attached characters beside the field in %s', (stem, before, prefix, suffix, after) => {
+  expect(splitClozeStem(stem as string)).toEqual({ before, prefix, suffix, after })
 })

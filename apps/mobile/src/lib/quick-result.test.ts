@@ -186,7 +186,7 @@ test('load sends the push id when the session comes from a notification', async 
 test.each([
   { name: 'a missing question on create', failAt: '/sessions/quick', error: new ApiError(404, 'Question not found'), status: 'unavailable' },
   { name: 'a missing session on read', failAt: '/sessions/session-1', error: new ApiError(404, 'Not found'), status: 'unavailable' },
-  { name: 'a conflict on read', failAt: '/sessions/session-1', error: new ApiError(409, 'Ended'), status: 'answered' },
+  { name: 'a conflict on read', failAt: '/sessions/session-1', error: new ApiError(409, 'This session has ended'), status: 'answered' },
   { name: 'a network failure', failAt: '/sessions/session-1', error: new ApiError(null, 'Network request failed'), status: 'error' },
 ] as const)('load maps $name to $status', async ({ failAt, error, status }) => {
   const { handle, states, request , onRequest} = setup()
@@ -206,6 +206,7 @@ test.each([
   const { handle, states, request , onRequest} = setup()
   onRequest(async (path: string) => {
     if (path === '/sessions/quick') return { sessionId: 'session-1' }
+    if (path.endsWith('/end')) return { total: 1 }
     return view
   })
   await handle.load()
@@ -496,11 +497,12 @@ test.each([
   const { handle, calls, onRequest } = await loadQuestion(setup())
   onRequest(async (path) => {
     if (path.endsWith('/answer')) throw new ApiError(409, 'Already answered')
+    if (path.endsWith('/end')) return { total: 1 }
     return view
   })
   handle.changeDraft({ answer: { optionId: 'a' }, confidence: 'sure' })
   await handle.check()
-  expect(calls[calls.length - 1].path).toBe('/sessions/session-1')
+  expect(calls[calls.length - 1].path).toBe('/sessions/session-1/end')
   expect(handle.getState()).toEqual({ status: 'answered' })
 })
 
@@ -584,4 +586,46 @@ test('dispose lets the end call finish and suppresses its late counter', async (
   await Promise.resolve()
   expect(states.length).toBe(emitted)
   expect(handle.getState()).toMatchObject({ status: 'done', reviewsLeft: null })
+})
+
+
+test.each([
+  ['retired', 'This question has been retired'],
+  ['flagged', 'Question not found'],
+  ['unready topic', 'This topic is not ready yet'],
+  ['answered', 'Already answered. Continue to the next question.'],
+])('quick creation reports the correct state for %s', async (reason, message) => {
+  const { handle, onRequest } = setup()
+  onRequest(async () => { throw new ApiError(409, message) })
+  await handle.load()
+  expect(handle.getState()).toEqual({ status: reason === 'answered' ? 'answered' : 'unavailable' })
+})
+
+test.each([
+  ['retired', 'This question has been retired', 0, 'unavailable'],
+  ['flagged', 'That is not the current question', 0, 'unavailable'],
+  ['answered', 'Already answered. Continue to the next question.', 1, 'answered'],
+])('check distinguishes a %s auto-ended session using its answer count', async (_reason, message, total, status) => {
+  const { handle, calls, onRequest } = await loadQuestion(setup())
+  const ended = sessionWith(null, true)
+  onRequest(async (path) => {
+    if (path.endsWith('/answer')) throw new ApiError(409, message)
+    if (path.endsWith('/end')) return { total, reviewsLeft: 0 }
+    return ended
+  })
+  handle.changeDraft({ answer: { optionId: 'a' }, confidence: 'sure' })
+  await handle.check()
+  expect(calls.slice(-2).map(({ path }) => path)).toEqual(['/sessions/session-1', '/sessions/session-1/end'])
+  expect(handle.getState()).toEqual({ status })
+})
+
+test('an unavailable question auto-ended before load is not labelled answered', async () => {
+  const { handle, onRequest } = setup()
+  onRequest(async (path) => {
+    if (path === '/sessions/quick') return { sessionId: 'session-1' }
+    if (path.endsWith('/end')) return { total: 0 }
+    return sessionWith(null, true)
+  })
+  await handle.load()
+  expect(handle.getState()).toEqual({ status: 'unavailable' })
 })

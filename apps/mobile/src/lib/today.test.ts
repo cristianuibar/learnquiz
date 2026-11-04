@@ -1,11 +1,13 @@
-import { createElement } from 'react'
+import { createElement, useLayoutEffect } from 'react'
 import { AccessibilityInfo, AppState, Text, type AppStateStatus } from 'react-native'
-import { act, render, screen } from '@testing-library/react-native'
+import { act, fireEvent, render, screen } from '@testing-library/react-native'
 import { todayFixtures, todayView, type Today, type TodayView } from '@learnquiz/api/today'
 import { api, ApiError } from './api'
 import { getToken } from './auth'
 import { useSession, type Branding } from './session-store'
 import { loadTodayCache, saveTodayCache } from './today-cache'
+import TodayScreen from '../app/(tabs)/today'
+import { ThemeProvider } from '../theme/ThemeProvider'
 import type { TodayCache } from './today-cache'
 import {
   BUILDING_POLL_MS,
@@ -21,6 +23,9 @@ import {
   viewForStatus,
 } from './today'
 
+jest.mock('expo-image', () => ({ Image: require('react-native').Image }))
+jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }))
+
 jest.mock('./auth', () => ({ getToken: jest.fn(), handleUnauthorized: jest.fn(() => Promise.resolve()) }))
 jest.mock('./session-store', () => ({ useSession: jest.fn() }))
 jest.mock('./today-cache', () => ({ loadTodayCache: jest.fn(), saveTodayCache: jest.fn() }))
@@ -30,6 +35,8 @@ jest.mock('./api', () => {
 })
 let mockBlurred = false
 jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: jest.fn(), navigate: jest.fn() }),
+  useScrollToTop: jest.fn(),
   // Focus runs like an effect; tests can blur by unmounting the probe.
   useFocusEffect: (effect: () => void | (() => void)) => {
     const { useEffect: useMountEffect } = jest.requireActual('react')
@@ -63,9 +70,11 @@ function cacheEntry(userId: string, today: Today, day?: string): TodayCache {
   return { userId, day: day ?? utcDay(Date.now()), today, branding: null }
 }
 
+const committed: Array<ReturnType<typeof useToday>> = []
 let current: ReturnType<typeof useToday>
 function Probe() {
   current = useToday()
+  useLayoutEffect(() => { committed.push(current) })
   return createElement(Text, null, `${current.status}:${current.view?.hero.kind ?? '-'}`)
 }
 
@@ -78,6 +87,7 @@ function heroPlayDisabled(): boolean | undefined {
 let appStateListener: ((state: AppStateStatus) => void) | undefined
 beforeEach(() => {
   jest.resetAllMocks()
+  committed.length = 0
   mockBlurred = false
   appStateListener = undefined
   mockGetToken.mockReturnValue(null)
@@ -233,22 +243,33 @@ describe('useToday', () => {
   })
 
   test('a 20 s response still lands while polls arrive every 15 s', async () => {
-    jest.useFakeTimers()
+    // Pin wall time away from UTC midnight: the expiry timer is independent
+    // of request deduplication and must not enter this test's 35-second window.
+    jest.useFakeTimers({ now: Date.UTC(2035, 1, 4, 12) })
+    async function advance(ms: number) {
+      await act(async () => {
+        jest.advanceTimersByTime(ms)
+        for (let i = 0; i < 10; i++) await Promise.resolve()
+      })
+    }
     mockApi.mockResolvedValueOnce(building(28))
     await render(createElement(Probe))
+    await advance(0)
     expect(current.view?.hero).toMatchObject({ status: '28 of 42 topics ready' })
+    expect(mockApi).toHaveBeenCalledTimes(1)
 
     mockApi.mockImplementation(() => new Promise((resolve) => { setTimeout(() => resolve(building(35)), 20_000) }))
-    await act(async () => { await jest.advanceTimersByTimeAsync(BUILDING_POLL_MS) })
+    await advance(15_000)
     expect(mockApi).toHaveBeenCalledTimes(2)
-    // The next poll and a manual refresh join the request still in flight.
-    await act(async () => { await jest.advanceTimersByTimeAsync(BUILDING_POLL_MS) })
-    // Joins the in-flight request, so no new network call and no state write
-    // outside act.
+    // At t=30 the next poll and a manual refresh join the t=15 request.
+    await advance(15_000)
     expect(current.refresh()).toBeDefined()
+    await advance(0)
     expect(mockApi).toHaveBeenCalledTimes(2)
-    await act(async () => { await jest.advanceTimersByTimeAsync(5_000) })
+    await advance(5_000)
     expect(current.view?.hero).toMatchObject({ status: '35 of 42 topics ready' })
+    expect(current.refreshing).toBe(false)
+    expect(mockApi).toHaveBeenCalledTimes(2)
   })
 
   test('a busy refresh joins the in-flight request and reports refreshing', async () => {
@@ -309,7 +330,7 @@ describe('useToday', () => {
     mockApi.mockResolvedValueOnce(todayFixtures.normal)
     await act(async () => { appStateListener?.('active') })
     expect(screen.getByText('ready:normal')).toBeOnTheScreen()
-    expect(mockSaveCache).toHaveBeenCalledWith('u1', todayFixtures.normal, null)
+    expect(mockSaveCache).toHaveBeenCalledWith('u1', todayFixtures.normal, null, expect.any(Number))
   })
 
   test('a token change drops the stale network completion', async () => {
@@ -381,7 +402,7 @@ describe('useToday', () => {
     await act(async () => { resolvers[2](todayFixtures.normal) })
     expect(screen.getByText('ready:normal')).toBeOnTheScreen()
     expect(mockSaveCache).toHaveBeenCalledTimes(2)
-    expect(mockSaveCache).toHaveBeenLastCalledWith('u2', todayFixtures.normal, null)
+    expect(mockSaveCache).toHaveBeenLastCalledWith('u2', todayFixtures.normal, null, expect.any(Number))
   })
 
   test('a re-resolved session lifts the suspension for the same user', async () => {
@@ -403,7 +424,7 @@ describe('useToday', () => {
     expect(mockApi).toHaveBeenCalledTimes(2)
     await act(async () => { resolvers[1](todayFixtures.basics) })
     expect(screen.getByText('ready:basics')).toBeOnTheScreen()
-    expect(mockSaveCache).toHaveBeenLastCalledWith('u1', todayFixtures.basics, null)
+    expect(mockSaveCache).toHaveBeenLastCalledWith('u1', todayFixtures.basics, null, expect.any(Number))
   })
 })
 
@@ -428,7 +449,7 @@ describe('useToday per-user cache', () => {
     expect(current.today).toBe(todayFixtures.normal)
     expect(current.status).toBe('ready')
     expect(heroPlayDisabled()).toBe(false)
-    expect(mockSaveCache).toHaveBeenCalledWith('u1', todayFixtures.normal, null)
+    expect(mockSaveCache).toHaveBeenCalledWith('u1', todayFixtures.normal, null, expect.any(Number))
   })
 
   test('a late cache read never overwrites fresh network data', async () => {
@@ -519,7 +540,7 @@ describe('useToday per-user cache', () => {
     const mounted = await render(createElement(Probe))
     await act(async () => { resolvers[0](todayFixtures.basics) })
     expect(screen.getByText('ready:basics')).toBeOnTheScreen()
-    expect(mockSaveCache).toHaveBeenCalledWith('u1', todayFixtures.basics, null)
+    expect(mockSaveCache).toHaveBeenCalledWith('u1', todayFixtures.basics, null, expect.any(Number))
 
     // A second request for u1 is still pending when the identity switches:
     // the old render disappears and the new user starts its own request.
@@ -540,7 +561,7 @@ describe('useToday per-user cache', () => {
     // The new user's own response lands and saves under the new identity.
     await act(async () => { resolvers[2](todayFixtures.normal) })
     expect(screen.getByText('ready:normal')).toBeOnTheScreen()
-    expect(mockSaveCache).toHaveBeenLastCalledWith('u2', todayFixtures.normal, null)
+    expect(mockSaveCache).toHaveBeenLastCalledWith('u2', todayFixtures.normal, null, expect.any(Number))
   })
 
   test('successful payloads save the captured branding', async () => {
@@ -548,7 +569,7 @@ describe('useToday per-user cache', () => {
     mockSession.mockReturnValue(sessionFor('u1', branding))
     mockApi.mockResolvedValueOnce(todayFixtures.normal)
     await render(createElement(Probe))
-    expect(mockSaveCache).toHaveBeenCalledWith('u1', todayFixtures.normal, branding)
+    expect(mockSaveCache).toHaveBeenCalledWith('u1', todayFixtures.normal, branding, expect.any(Number))
   })
 })
 
@@ -572,4 +593,81 @@ describe('useStreakPop', () => {
     await view.rerender(createElement(PopProbe, { reward: true }))
     expect(pop).toBe(true)
   })
+})
+
+
+test.each(['user', 'token', 'day'] as const)('first committed render hides the previous payload after a %s change', async (change) => {
+  jest.useFakeTimers({ now: Date.UTC(2035, 1, 4, 23, 59) })
+  mockApi.mockResolvedValueOnce(todayFixtures.normal)
+  const mounted = await render(createElement(Probe))
+  expect(current.today).toBe(todayFixtures.normal)
+  mockApi.mockReturnValue(new Promise<Today>(() => {}))
+  committed.length = 0
+  if (change === 'user') mockSession.mockReturnValue(sessionFor('u2'))
+  if (change === 'token') mockGetToken.mockReturnValue('new-bearer')
+  // Move wall time without firing the expiry effect's timer.
+  if (change === 'day') jest.setSystemTime(Date.UTC(2035, 1, 5))
+  await mounted.rerender(createElement(Probe))
+  expect(committed.length).toBeGreaterThan(0)
+  expect(committed[0].today).toBeNull()
+  expect(committed[0].view).toBeNull()
+})
+
+test('a response crossing UTC midnight never paints or saves yesterday as today', async () => {
+  jest.useFakeTimers({ now: Date.UTC(2035, 1, 4, 23, 59, 30) })
+  let resolve!: (today: Today) => void
+  mockApi.mockReturnValueOnce(new Promise<Today>((done) => { resolve = done }))
+  await render(createElement(Probe))
+  jest.setSystemTime(Date.UTC(2035, 1, 5, 0, 0, 10))
+  await act(async () => { resolve(todayFixtures.normal) })
+  expect(current.today).toBeNull()
+  expect(mockSaveCache).not.toHaveBeenCalled()
+  mockApi.mockRejectedValueOnce(new ApiError(null, 'Offline'))
+  await act(async () => { await current.refresh() })
+  expect(current.status).toBe('offline')
+  expect(current.today).toBeNull()
+})
+
+test('cache timestamp is captured at request send, before a same-day response', async () => {
+  const sentAt = Date.UTC(2035, 1, 4, 12)
+  jest.useFakeTimers({ now: sentAt })
+  let resolve!: (today: Today) => void
+  mockApi.mockReturnValueOnce(new Promise<Today>((done) => { resolve = done }))
+  await render(createElement(Probe))
+  jest.setSystemTime(sentAt + 40_000)
+  await act(async () => { resolve(todayFixtures.normal) })
+  expect(mockSaveCache).toHaveBeenCalledWith('u1', todayFixtures.normal, null, sentAt)
+})
+
+test('Today retry stays enabled during building polls and is busy for a learner retry', async () => {
+  jest.useFakeTimers()
+  mockLoadCache.mockResolvedValue(cacheEntry('u1', building(10)))
+  mockApi.mockRejectedValueOnce(new ApiError(null, 'Offline'))
+  await render(createElement(ThemeProvider, { children: createElement(TodayScreen) }))
+  expect(screen.getByRole('button', { name: 'Try again' })).toBeEnabled()
+  let reject!: (error: Error) => void
+  mockApi.mockReturnValueOnce(new Promise((_resolve, fail) => { reject = fail }))
+  await act(async () => { await jest.advanceTimersByTimeAsync(BUILDING_POLL_MS) })
+  expect(mockApi).toHaveBeenCalledTimes(2)
+  expect(screen.getByRole('button', { name: 'Try again' })).toBeEnabled()
+  expect(screen.getByRole('button', { name: 'Try again' })).toHaveProp('accessibilityState', { disabled: false, busy: false })
+  // A tap joins the poll, and owns the busy state until that request finishes.
+  await fireEvent.press(screen.getByRole('button', { name: 'Try again' }))
+  expect(screen.getByRole('button', { name: 'Try again' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Try again' })).toHaveProp('accessibilityState', { disabled: true, busy: true })
+  await act(async () => { reject(new ApiError(null, 'Offline')) })
+  expect(screen.getByRole('button', { name: 'Try again' })).toBeEnabled()
+})
+
+test.each(['offline', 'error'] as const)('empty Today has one working retry in %s', async (status) => {
+  const empty: Today = { topic: null, role: null, plan: null }
+  mockLoadCache.mockResolvedValue(cacheEntry('u1', empty))
+  mockApi.mockRejectedValueOnce(new ApiError(status === 'offline' ? null : 500, 'Failed'))
+  await render(createElement(ThemeProvider, { children: createElement(TodayScreen) }))
+  expect(screen.getByText('No training yet')).toBeOnTheScreen()
+  expect(screen.getAllByRole('button', { name: 'Try again' })).toHaveLength(1)
+  mockApi.mockResolvedValueOnce(todayFixtures.normal)
+  await fireEvent.press(screen.getByRole('button', { name: 'Try again' }))
+  expect(mockApi).toHaveBeenCalledTimes(2)
+  expect(screen.queryByText('No training yet')).toBeNull()
 })

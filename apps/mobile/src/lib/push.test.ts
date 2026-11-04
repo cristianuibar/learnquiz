@@ -595,7 +595,7 @@ test('enable deadline stops native work but keeps a late permission grant for re
   expect(s.store.data.get(PUSH_TOKEN_KEY)).toEqual({ pending: true })
 })
 
-test('signOut can unregister after 401 cleanup and reauthentication', async () => {
+test('signOut never deletes a retained token under a new bearer after 401 cleanup', async () => {
   const s = authHarness()
   await s.auth.loadToken()
   s.fetch.mockImplementation(async () => jsonResponse(401, { error: 'Expired' }))
@@ -606,9 +606,103 @@ test('signOut can unregister after 401 cleanup and reauthentication', async () =
   await s.auth.signIn('learner@example.com', 'password')
   await s.auth.signOut()
   const deletion = s.fetch.mock.calls.find(([, init]) => init.method === 'DELETE')
-  expect(deletion).toBeDefined()
-  expect(deletion![0]).toMatch(/\/api\/v1\/push\/expo$/)
-  expect(deletion![1].headers).toMatchObject({ Authorization: 'Bearer renewed-bearer' })
-  expect(JSON.parse(deletion![1].body as string)).toEqual({ endpoint: 'ExponentPushToken[abc]' })
+  expect(deletion).toBeUndefined()
   expect(s.secure.data.size).toBe(0)
+})
+
+
+test('network PUT failures back off and remain retryable beyond the token budget', async () => {
+  jest.useFakeTimers({ now: Date.UTC(2035, 1, 4, 12) })
+  const s = setup({ putFails: true })
+  await s.push.enablePush(s.deps)
+  expect(s.notifications.getExpoPushTokenAsync).toHaveBeenCalledTimes(1)
+  for (const delay of [15_000, 30_000, 60_000, 120_000]) {
+    await expect(s.push.retryPendingPush(s.deps)).resolves.toBe('granted')
+    expect(s.store.data.get(PUSH_TOKEN_KEY)).toMatchObject({ pending: true, attempts: 0 })
+    const count = s.putExpoToken.mock.calls.length
+    await expect(s.push.retryPendingPush(s.deps)).resolves.toBe('idle')
+    expect(s.putExpoToken).toHaveBeenCalledTimes(count)
+    await jest.advanceTimersByTimeAsync(delay)
+  }
+  expect(s.putExpoToken).toHaveBeenCalledTimes(5)
+  s.putExpoToken.mockResolvedValueOnce({ subscribed: true })
+  await expect(s.push.retryPendingPush(s.deps)).resolves.toBe('granted')
+  expect(s.putExpoToken).toHaveBeenCalledTimes(6)
+  expect(s.notifications.getExpoPushTokenAsync).toHaveBeenCalledTimes(1)
+  expect(s.store.data.get(PUSH_TOKEN_KEY)).toBe(true)
+})
+
+test('token failure budget resets after its time window, even across restart', async () => {
+  jest.useFakeTimers({ now: Date.UTC(2035, 1, 4, 12) })
+  const s = setup()
+  s.notifications.getExpoPushTokenAsync.mockRejectedValue(new Error('FCM unavailable'))
+  await s.push.enablePush(s.deps)
+  for (let i = 0; i < 3; i++) await s.push.retryPendingPush(s.deps)
+  await expect(s.push.retryPendingPush(s.deps)).resolves.toBe('idle')
+  const restarted = setup({ storeInitial: Object.fromEntries(s.store.data) })
+  await expect(restarted.push.retryPendingPush(restarted.deps)).resolves.toBe('idle')
+  await jest.advanceTimersByTimeAsync(60 * 60_000)
+  await expect(restarted.push.retryPendingPush(restarted.deps)).resolves.toBe('granted')
+  expect(restarted.notifications.getExpoPushTokenAsync).toHaveBeenCalledTimes(1)
+  expect(restarted.store.data.get(PUSH_TOKEN_KEY)).toBe(true)
+})
+
+test('a working token resets token failures before an offline PUT', async () => {
+  const s = setup({ putFails: true, storeInitial: { [PUSH_TOKEN_KEY]: { pending: true, attempts: 2 } } })
+  await expect(s.push.retryPendingPush(s.deps)).resolves.toBe('granted')
+  expect(s.store.data.get(PUSH_TOKEN_KEY)).toMatchObject({ pending: true, attempts: 0, networkFailures: 1 })
+})
+
+test('foreground token hangs time out and a later foreground retries successfully', async () => {
+  jest.useFakeTimers({ now: Date.UTC(2035, 1, 4, 12) })
+  const s = setup({ storeInitial: { [PUSH_TOKEN_KEY]: { pending: true } } })
+  let finishToken!: (value: { data: string }) => void
+  s.notifications.getExpoPushTokenAsync.mockImplementationOnce(() => new Promise((resolve) => { finishToken = resolve }))
+  let active!: (state: string) => void
+  s.push.observePushForeground({ addEventListener: (_event, listener) => {
+    active = listener
+    return { remove: jest.fn() }
+  } }, s.deps)
+  active('active')
+  await flush()
+  expect(s.notifications.getExpoPushTokenAsync).toHaveBeenCalledTimes(1)
+  await jest.advanceTimersByTimeAsync(15_000)
+  active('active')
+  await flush()
+  expect(s.notifications.getExpoPushTokenAsync).toHaveBeenCalledTimes(2)
+  expect(s.putExpoToken).toHaveBeenCalledTimes(1)
+  expect(s.store.data.get(PUSH_TOKEN_KEY)).toBe(true)
+  finishToken({ data: 'ExponentPushToken[stale]' })
+  await flush()
+  expect(s.secure.data.get(s.push.PUSH_SECURE_KEY)).toBe('ExponentPushToken[abc]')
+  expect(s.putExpoToken).toHaveBeenCalledTimes(1)
+})
+
+test.each([false, true])('retained unregister endpoint cannot move to another bearer (warm: %s)', async (warm) => {
+  const s = setup()
+  if (warm) await s.push.enablePush(s.deps)
+  else {
+    s.secure.data.set(s.push.PUSH_SECURE_KEY, 'ExponentPushToken[abc]')
+    s.store.data.set(PUSH_TOKEN_KEY, true)
+  }
+  await s.push.clearPushLocal(s.deps)
+  await s.push.unregisterPush({ ...s.deps, getAuthToken: () => 'another-users-bearer' })
+  expect(s.deleteExpoToken).not.toHaveBeenCalled()
+  expect(s.secure.data.size).toBe(0)
+})
+
+test('retained endpoint can still unregister with the original bearer', async () => {
+  const s = setup()
+  await s.push.enablePush(s.deps)
+  await s.push.clearPushLocal(s.deps)
+  await s.push.unregisterPush(s.deps)
+  expect(s.deleteExpoToken).toHaveBeenCalledWith({ endpoint: 'ExponentPushToken[abc]' }, 5000)
+})
+
+
+test('a legacy exhausted marker gets a fresh bounded token retry window', async () => {
+  const s = setup({ storeInitial: { [PUSH_TOKEN_KEY]: { pending: true, attempts: 3 } } })
+  await expect(s.push.retryPendingPush(s.deps)).resolves.toBe('granted')
+  expect(s.notifications.getExpoPushTokenAsync).toHaveBeenCalledTimes(1)
+  expect(s.store.data.get(PUSH_TOKEN_KEY)).toBe(true)
 })

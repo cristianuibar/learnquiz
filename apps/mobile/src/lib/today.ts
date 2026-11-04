@@ -169,21 +169,25 @@ export function useToday(): {
       return inFlight.current
     }
     const requestToken = getToken()
+    const sentAt = Date.now()
+    const requestDay = utcDay(sentAt)
     const sequence = ++issued.current
     setRefreshing(true)
     const ownerForRun: Owner | null = captured.id == null ? null : { id: captured.id, token: requestToken }
     const run: Promise<void> = api<Today>('/today').then(
       (next) => {
         if (!stillCurrent(captured, requestToken, sequence)) return
+        // A plan belongs to the UTC day on which it was requested.
+        if (utcDay(Date.now()) !== requestDay) return
         applied.current = sequence
         freshOwner.current = ownerForRun
         setOwner(ownerForRun)
         setToday(next)
-        setPayloadDay(utcDay(Date.now()))
+        setPayloadDay(requestDay)
         setStatus('ready')
         // Persist only the confirmed network payload, for the identity that
         // fetched it. Storage failure is contained inside saveTodayCache.
-        if (captured.id != null) void saveTodayCache(captured.id, next, captured.branding)
+        if (captured.id != null) void saveTodayCache(captured.id, next, captured.branding, sentAt)
       },
       (error: unknown) => {
         // Keep the last value on screen; only the status changes. A 401 is
