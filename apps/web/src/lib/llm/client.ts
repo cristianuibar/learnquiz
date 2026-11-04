@@ -31,6 +31,13 @@ export class DailyCapError extends LlmError {
 type Usage = { prompt_tokens?: number; completion_tokens?: number; completion_tokens_details?: { reasoning_tokens?: number } }
 type Message = { role: 'system' | 'user' | 'assistant'; content: string }
 
+const PURPOSE_TIMEOUT_MS: Partial<Record<ModelJob, number>> = {
+  curriculum: 240_000,
+  items: 240_000,
+  self_check: 180_000,
+  procedure: 180_000,
+}
+
 // `fallback` resolves the Meta model that backs up a failed Fireworks call.
 export function jobModel(job: ModelJob, fallback = false) {
   const env = getEnv()
@@ -158,7 +165,7 @@ async function callJson<T>(opts: ChatJsonOpts<T>, selected: ReturnType<typeof jo
               ? { type: 'json_schema', json_schema: { name: opts.schemaName, strict: true, schema: jsonSchema } }
               : { type: 'json_object' },
           }),
-          signal: AbortSignal.timeout(opts.timeoutMs ?? 120_000),
+          signal: AbortSignal.timeout(opts.timeoutMs ?? PURPOSE_TIMEOUT_MS[opts.purpose] ?? 120_000),
         })
       } catch (e) {
         throw new LlmError(`network: ${e instanceof Error ? e.message : e}`, 502)
