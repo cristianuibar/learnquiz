@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
-import { drizzle } from 'drizzle-orm/sqlite-proxy'
+import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { dbSchema } from '@/db'
@@ -46,12 +46,7 @@ beforeAll(async () => {
   for (const file of readdirSync('drizzle').filter((file) => file.endsWith('.sql')).sort()) {
     sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8').replaceAll('--> statement-breakpoint', ''))
   }
-  const run = (query: string, params: unknown[], method: string) => {
-    const statement = sqlite.prepare(query)
-    statement.setReturnArrays(true)
-    if (method === 'run') { statement.run(...params as never[]); return { rows: [] } }
-    return { rows: (method === 'get' ? statement.get(...params as never[]) : statement.all(...params as never[])) as never }
-  }
+  // A minimal D1 binding over node:sqlite, so the real drizzle-orm/d1 session (including batch binding) runs.
   // A concurrent writer lands between round trips that read model_calls, as another Worker could on D1.
   const afterUsageRead = (query: string) => {
     if (!query.includes('model_calls')) return
@@ -59,18 +54,33 @@ beforeAll(async () => {
     boundary.concurrentWrite = null
     write?.()
   }
-  boundary.db = drizzle(async (query, params, method) => {
-    const result = run(query, params, method)
-    afterUsageRead(query)
-    return result
-  }, async (batch) => {
+  type Statement = { sql: string; params: unknown[] }
+  const read = ({ sql, params }: Statement, arrays: boolean) => {
+    const statement = sqlite.prepare(sql)
+    statement.setReturnArrays(arrays)
+    return statement.all(...params as never[])
+  }
+  const exec = (stmt: Statement) => ({ results: read(stmt, false), success: true, meta: {} })
+  const statement = (stmt: Statement) => ({
+    ...stmt,
+    bind: (...params: unknown[]) => statement({ sql: stmt.sql, params }),
+    all: async () => { const result = exec(stmt); afterUsageRead(stmt.sql); return result },
+    run: async () => { const result = exec(stmt); afterUsageRead(stmt.sql); return result },
+    first: async () => { const [row] = read(stmt, false); afterUsageRead(stmt.sql); return row ?? null },
+    raw: async () => { const rows = read(stmt, true); afterUsageRead(stmt.sql); return rows },
+  })
+  const d1 = {
+    prepare: (sql: string) => statement({ sql, params: [] }),
     // A D1 batch runs as one implicit transaction, so every statement reads the same snapshot.
-    sqlite.exec('BEGIN')
-    const results = batch.map((q) => run(q.sql, q.params, q.method))
-    sqlite.exec('COMMIT')
-    batch.forEach((q) => afterUsageRead(q.sql))
-    return results
-  }, { schema: dbSchema })
+    batch: async (statements: Statement[]) => {
+      sqlite.exec('BEGIN')
+      const results = statements.map(exec)
+      sqlite.exec('COMMIT')
+      statements.forEach((stmt) => afterUsageRead(stmt.sql))
+      return results
+    },
+  }
+  boundary.db = drizzle(d1 as never, { schema: dbSchema })
 
   for (const name of ['staff', 'learner']) {
     const password = crypto.randomUUID()

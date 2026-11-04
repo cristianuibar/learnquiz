@@ -32,24 +32,33 @@ const settled = sql`not (${modelCalls.ok} = 0 and coalesce(${modelCalls.error}, 
 
 // Latency percentiles are nearest-rank, computed per group with window functions (portable to D1 and node:sqlite).
 // `keys` maps output names to constant SQL expressions over model_calls that define the group.
-// Returns the unexecuted query and a row mapper so every read can share one db.batch() snapshot.
+// Built with the select builder (not db.all) because Drizzle's D1 batch can only bind prepared builder queries.
 function usageBy<K extends string>(db: ReturnType<typeof getDb>, start: number, end: number, keys: Record<K, SQL>, where?: SQL) {
   const names = Object.keys(keys) as K[]
   const partition = sql.join(Object.values(keys), sql`, `)
-  const select = sql.join(names.map((name) => sql`${keys[name]} as ${sql.raw(name)}`), sql`, `)
-  const inner = sql`select ${select}, ${modelCalls.latencyMs} as latency_ms, ${modelCalls.ok} as ok, ${modelCalls.costUsd} as cost_usd,
-    row_number() over (partition by ${partition} order by ${modelCalls.latencyMs}) as rn, count(*) over (partition by ${partition}) as n
-    from ${modelCalls} where ${modelCalls.createdAt} >= ${start} and ${modelCalls.createdAt} < ${end} and ${settled}${where ? sql` and ${where}` : sql``}`
-  const aggregates = sql`count(*) as calls, sum(case when ok = 0 then 1 else 0 end) as failures,
-    min(case when rn * 100 >= 50 * n then latency_ms end) as p50, min(case when rn * 100 >= 95 * n then latency_ms end) as p95,
-    sum(cost_usd) as cost, sum(case when cost_usd is null then 1 else 0 end) as unpriced`
-  const columns = [...names, 'calls', 'failures', 'p50', 'p95', 'cost', 'unpriced']
-  const query = db.all<Record<string, unknown> | unknown[]>(sql`select ${sql.join(names.map((name) => sql.raw(name)), sql`, `)}, ${aggregates}
-    from (${inner}) group by ${sql.join(names.map((name) => sql.raw(name)), sql`, `)}`)
-  // D1 returns objects; the sqlite-proxy test driver returns positional arrays.
-  const rows = (result: unknown) => (result as (Record<string, unknown> | unknown[])[])
-    .map((row) => (Array.isArray(row) ? Object.fromEntries(columns.map((name, i) => [name, row[i]])) : row) as Row<K>)
-  return { query, rows }
+  const inner = db.select({
+    ...Object.fromEntries(names.map((name) => [name, sql<string | null>`${keys[name]}`.as(name)])),
+    latency_ms: sql<number>`${modelCalls.latencyMs}`.as('latency_ms'),
+    ok: sql<number>`${modelCalls.ok}`.as('ok'),
+    cost_usd: sql<number | null>`${modelCalls.costUsd}`.as('cost_usd'),
+    rn: sql<number>`row_number() over (partition by ${partition} order by ${modelCalls.latencyMs})`.as('rn'),
+    n: sql<number>`count(*) over (partition by ${partition})`.as('n'),
+  }).from(modelCalls)
+    .where(and(gte(modelCalls.createdAt, start), lt(modelCalls.createdAt, end), settled, where))
+    .as('usage')
+  const keyColumns = inner as unknown as Record<K, SQL.Aliased<string | null>>
+  const groups = names.map((name) => sql`${keyColumns[name]}`)
+  const query = db.select({
+    ...Object.fromEntries(names.map((name) => [name, sql<string | null>`${keyColumns[name]}`])),
+    calls: sql<number>`count(*)`,
+    failures: sql<number>`sum(case when ${inner.ok} = 0 then 1 else 0 end)`,
+    p50: sql<number | null>`min(case when ${inner.rn} * 100 >= 50 * ${inner.n} then ${inner.latency_ms} end)`,
+    p95: sql<number | null>`min(case when ${inner.rn} * 100 >= 95 * ${inner.n} then ${inner.latency_ms} end)`,
+    cost: sql<number | null>`sum(${inner.cost_usd})`,
+    unpriced: sql<number>`sum(case when ${inner.cost_usd} is null then 1 else 0 end)`,
+  }).from(inner).groupBy(...groups)
+  // Returned unexecuted so every read can share one db.batch() snapshot.
+  return { query, rows: (result: unknown) => result as Row<K>[] }
 }
 type Row<K extends string> = UsageStats & Record<K, string | null>
 
