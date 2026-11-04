@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import { Check, Lock, Shield } from 'lucide-react'
 import { percentText, unitAriaLabel, type TopicPath } from '@learnquiz/api/progress'
 import { MasteryBar } from '@/components/mastery-bar'
@@ -8,11 +9,13 @@ import { PathNode } from './path-node'
 const muted = 'border-border bg-surface-sunken text-ink-muted'
 
 export function UnitRow({
+  topicId,
   unit,
   index,
   isNext,
   benchmark,
 }: {
+  topicId: string
   unit: TopicPath['units'][number]
   index: number
   isNext: boolean
@@ -39,14 +42,11 @@ export function UnitRow({
         Locked
       </Badge>
     ) : null
-  return (
-    <li
-      id={`unit-${unit.id}`}
-      tabIndex={-1}
-      aria-label={unitAriaLabel(unit, index, isNext)}
-      className="group relative flex min-h-12 items-center gap-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-    >
-      <span aria-hidden className="absolute top-0 -bottom-2 left-[15px] w-0.5 bg-border group-first:top-1/2 group-last:bottom-1/2" />
+  const locked = unit.state === 'locked'
+  const label = unitAriaLabel(unit, index, isNext)
+  const rowClass = 'relative flex min-h-12 items-center gap-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand'
+  const body = (
+    <>
       <PathNode state={unit.state} number={index + 1} isNext={isNext} />
       <div className="flex min-w-0 flex-1 flex-col gap-2 rounded-md border border-border bg-surface-card px-4 py-3">
         <div className="flex items-baseline justify-between gap-2">
@@ -71,6 +71,27 @@ export function UnitRow({
           </div>
         )}
       </div>
+    </>
+  )
+  return (
+    <li
+      {...(locked ? { id: `unit-${unit.id}`, tabIndex: -1, 'aria-label': label } : {})}
+      className={cn('group relative', locked && rowClass)}
+    >
+      <span aria-hidden className="absolute top-0 -bottom-2 left-[15px] w-0.5 bg-border group-first:top-1/2 group-last:bottom-1/2" />
+      {locked ? (
+        body
+      ) : (
+        <Link
+          to="/t/$topicId/u/$unitId"
+          params={{ topicId, unitId: unit.id }}
+          id={`unit-${unit.id}`}
+          aria-label={label}
+          className={cn(rowClass, 'w-full')}
+        >
+          {body}
+        </Link>
+      )}
     </li>
   )
 }

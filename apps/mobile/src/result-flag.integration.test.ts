@@ -3,6 +3,7 @@ import { todayFixtures } from '@learnquiz/api/today'
 import { AccessibilityInfo } from 'react-native'
 import { router } from 'expo-router'
 import { signIn } from './lib/auth'
+import { takeFlagSent } from './lib/profile-announcement'
 
 const Native: typeof import('react-native') = require('react-native')
 
@@ -64,6 +65,7 @@ const flagRequests = () => jest.mocked(fetch).mock.calls.filter(([url]) => Strin
 
 beforeEach(async () => {
   jest.clearAllMocks()
+  takeFlagSent(null)
   signInToken = 'token-a'
   flagReply = async () => ({ status: 200, data: { ok: true } })
   globalThis.fetch = jest.fn(async (input: RequestInfo | URL) => {
@@ -95,12 +97,25 @@ async function openFlag() {
 
 test('opens the concept flag from Profile, sends the note, returns and announces success', async () => {
   jest.spyOn(Native, 'findNodeHandle').mockReturnValue(42)
-  const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => {})
+  // Number each animation frame callback, so a focus and an announcement can
+  // tell whether they ran in the same frame.
+  let frame = 0
+  const focusedIn: number[] = []
+  const announcedIn: number[] = []
+  const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus')
+    .mockImplementation(() => { focusedIn.push(frame) })
+  jest.mocked(AccessibilityInfo.announceForAccessibility).mockImplementation(() => { announcedIn.push(frame) })
   const { navigation } = await openFlag()
   await act(async () => { await jest.advanceTimersByTimeAsync(100) })
   expect(focus).toHaveBeenCalledWith(42)
   expect(screen.getByRole('header', { name: 'Flag an unfair result' })).toBeVisible()
   focus.mockClear()
+  focusedIn.length = 0
+  const runFrame = globalThis.requestAnimationFrame
+  jest.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((callback) => runFrame((time) => {
+    frame += 1
+    callback(time)
+  }))
   const note = screen.getByLabelText('Note')
   expect(note.props.multiline).toBe(true)
   expect(note.props.maxLength).toBe(500)
@@ -119,11 +134,15 @@ test('opens the concept flag from Profile, sends the note, returns and announces
   expect(flagRequests()[0][1]).toMatchObject({ method: 'POST', headers: { Authorization: 'Bearer token-a' },
     body: JSON.stringify({ conceptId: 'concept-1', note: 'My answer followed the procedure.' }) })
   expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledWith('Flag sent')
-  // Only the arrival focus remains after mockClear above. The old same-tick
-  // announcement ran before this focus and was interrupted by TalkBack.
+  // Only the arrival focus remains after mockClear above. TalkBack's focus
+  // event interrupts speech in its own frame, so the announcement must wait
+  // for a later frame, not just follow the focus call.
   expect(focus.mock.invocationCallOrder.at(-1)).toBeLessThan(
     jest.mocked(AccessibilityInfo.announceForAccessibility).mock.invocationCallOrder[0],
   )
+  expect(focusedIn).toHaveLength(1)
+  expect(announcedIn).toHaveLength(1)
+  expect(announcedIn[0]).toBeGreaterThan(focusedIn[0])
 })
 
 test('keeps the note on failure, and allows a retry', async () => {

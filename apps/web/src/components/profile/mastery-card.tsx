@@ -26,7 +26,7 @@ export function MasteryCard({ profile }: { profile: Profile }) {
         <span className="text-display tabular-nums">{m}</span>
         <span className="text-body text-ink-muted">of {b} benchmark</span>
       </p>
-      <MasteryBar size="lg" label="Role mastery" value={profile.mastery} benchmark={profile.benchmark} valueText={`${m}, benchmark ${b}`} />
+      <MasteryBar barClassName="h-3" label="Role mastery" value={profile.mastery} benchmark={profile.benchmark} valueText={`${m}, benchmark ${b}`} />
       {(onboarding || fact) && (
         <div className="grid grid-cols-2 gap-4 border-t border-border pt-4">
           {onboarding && (
@@ -50,7 +50,7 @@ export function EmptyMasteryCard({ profile }: { profile: Profile }) {
         Role mastery
       </h2>
       <p className="text-title-2 tabular-nums">{view.heading}</p>
-      <MasteryBar size="lg" label="Role mastery" value={0} benchmark={profile.benchmark} valueText={view.barValueText} />
+      <MasteryBar barClassName="h-3" label="Role mastery" value={0} benchmark={profile.benchmark} valueText={view.barValueText} />
       <p className="text-body">{view.body}</p>
     </section>
   )

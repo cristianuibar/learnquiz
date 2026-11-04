@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 export function StartButton({
   topicId,
   placement,
+  unitId,
   variant,
   size,
   label,
@@ -16,6 +17,7 @@ export function StartButton({
 }: {
   topicId: string
   placement?: boolean
+  unitId?: string
   variant?: 'primary' | 'accent' | 'secondary' | 'ghost' | 'link'
   size?: 'default' | 'lg'
   label?: string
@@ -27,7 +29,7 @@ export function StartButton({
   const navigate = useNavigate()
 
   function go() {
-    void navigate({ to: '/play/loading', search: { topicId, start: placement ? 'placement' : 'session' } })
+    void navigate({ to: '/play/loading', search: { topicId, start: placement ? 'placement' : 'session', unitId } })
   }
 
   return (
