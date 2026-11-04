@@ -1,3 +1,4 @@
+import { handleMobileFacebook } from '@/server/mobile-facebook'
 import { getConceptItems, getTopicPath } from '@/server/curriculum'
 import { generateConceptDiagram } from '@/server/diagrams'
 import { flagResult } from '@/server/flags'
@@ -82,6 +83,7 @@ const json = (body: unknown, status = 200) => Response.json(body ?? null, { stat
 export async function handleV1(request: Request): Promise<Response> {
   const url = new URL(request.url)
   const path = url.pathname.slice(V1_PREFIX.length).replace(/\/+$/, '') || '/'
+  if (path.startsWith('/auth/')) return handleMobileFacebook(request)
   let route: V1Route | undefined
   let params: Record<string, string> | null = null
   for (const r of v1Routes) {

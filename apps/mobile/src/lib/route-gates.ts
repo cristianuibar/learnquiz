@@ -7,6 +7,9 @@ export function targetFromURL(url: string): string | null {
     const path = parsed.protocol === 'learnquiz:'
       ? (parsed.hostname ? `/${parsed.hostname}${parsed.pathname}` : parsed.pathname)
       : parsed.pathname.replace(/^\/--\//, '/')
+    // OAuth return parameters are an auth response, never a destination to
+    // replay after sign-in (including a cold start while /session is loading).
+    if (path === '/sign-in' && parsed.searchParams.has('facebookState')) return null
     const target = `${path}${parsed.search}`
     return routeGate(target) === null ? null : target
   } catch { return null }

@@ -1,9 +1,15 @@
 import * as SecureStore from 'expo-secure-store'
-import { authCall } from './api'
+import { Linking } from 'react-native'
+import { MOBILE_AUTH_REDIRECT, type FacebookExchange, type FacebookStart } from '@learnquiz/api/mobile-auth'
+import { api, authCall } from './api'
+import { holdTarget, peekHeldTarget } from './held-target'
 import * as kv from './kv'
 import { clearPushLocal, observePushForeground, setPushUser, unregisterPush } from './push'
 
 const TOKEN_KEY = 'lq.token'
+const FACEBOOK_KEY = 'lq.facebook.pending'
+type PendingFacebook = FacebookStart & { invitationId?: string; target: string | null }
+let facebookCompletion: { state: string; promise: Promise<void> } | undefined
 let token: string | null = null
 let revision = 0
 let loaded = false
@@ -63,6 +69,7 @@ async function clearLocalSession() {
   // Includes drafts, cached Today data, prompts and the locally stored push token.
   await Promise.all([
     persist(() => SecureStore.deleteItemAsync(TOKEN_KEY)),
+    persist(() => SecureStore.deleteItemAsync(FACEBOOK_KEY)),
     clearPushLocal().then(() => kv.clearPrefix('lq:')),
   ])
 }
@@ -77,6 +84,8 @@ type AuthResult = { token?: string; user?: unknown; [key: string]: unknown }
 
 async function authenticate(path: string, body: Record<string, string>) {
   const current = ++revision
+  await persist(() => SecureStore.deleteItemAsync(FACEBOOK_KEY))
+  if (current !== revision) return {}
   const { data, token: responseToken } = await authCall<AuthResult>(path, body)
   if (current !== revision) return data
   const nextToken = responseToken ?? data.token
@@ -111,4 +120,62 @@ export async function signOut() {
   // for the network. Failed revocation does not leave private data on this phone.
   if (token) void authCall('/sign-out', {}, { authenticated: true, timeoutMs: 5_000 }).catch(() => {})
   await clearLocalSession()
+}
+
+export async function startFacebookSignIn(invitationId?: string) {
+  const current = ++revision
+  await persist(() => SecureStore.deleteItemAsync(FACEBOOK_KEY))
+  if (current !== revision) return
+  const start = await api<FacebookStart>('/auth/facebook/prepare', { body: { redirectUri: MOBILE_AUTH_REDIRECT } })
+  if (current !== revision) return
+  const pending: PendingFacebook = { ...start, invitationId, target: peekHeldTarget() }
+  await persist(() => SecureStore.setItemAsync(FACEBOOK_KEY, JSON.stringify(pending)))
+  if (current !== revision) return
+  try { await Linking.openURL(start.url) }
+  catch (error) {
+    await persist(() => SecureStore.deleteItemAsync(FACEBOOK_KEY))
+    throw error
+  }
+}
+
+// Both warm links and a process restarted by the browser land on sign-in. The
+// pending proof survives that restart, but never survives logout or email login.
+export function finishFacebookSignIn(state: string, code?: string, error?: string): Promise<void> {
+  if (facebookCompletion?.state === state) return facebookCompletion.promise
+  const promise = completeFacebook(state, code, error).finally(() => {
+    if (facebookCompletion?.promise === promise) facebookCompletion = undefined
+  })
+  facebookCompletion = { state, promise }
+  return promise
+}
+
+async function completeFacebook(state: string, code?: string, error?: string) {
+  const observed = revision
+  const stored = await SecureStore.getItemAsync(FACEBOOK_KEY)
+  if (observed !== revision) return
+  const pending: PendingFacebook | null = stored ? JSON.parse(stored) : null
+  if (!pending || pending.state !== state || pending.expiresAt <= Date.now()) {
+    throw new Error('This Facebook sign-in has expired. Please try again.')
+  }
+  const current = ++revision
+  await persist(() => SecureStore.deleteItemAsync(FACEBOOK_KEY))
+  if (current !== revision) return
+  if (error || !code) throw new Error('Facebook sign-in was cancelled. Please try again.')
+  const result = await api<FacebookExchange>('/auth/facebook/exchange', {
+    body: { code, verifier: pending.verifier, redirectUri: MOBILE_AUTH_REDIRECT },
+  })
+  if (current !== revision) return
+  if (!result.token) throw new Error('The server did not return a sign-in token.')
+  if (!await storeToken(result.token, current, result.user.id)) return
+  if (pending.target) holdTarget(pending.target)
+  if (pending.invitationId) {
+    try {
+      // Publish the new session only after invite acceptance, as the email flow
+      // does. On a mismatch or failed accept, Join explains the next action.
+      await authCall('/organization/accept-invitation', { invitationId: pending.invitationId }, { authenticated: true })
+    } catch {
+      if (current === revision) holdTarget(`/join/${encodeURIComponent(pending.invitationId)}`)
+    }
+  }
+  if (current === revision) emit('changed')
 }

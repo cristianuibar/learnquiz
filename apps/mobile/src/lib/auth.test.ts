@@ -1,9 +1,9 @@
 import * as SecureStore from 'expo-secure-store'
-import { authCall } from './api'
+import { api, authCall } from './api'
 import * as kv from './kv'
 
 jest.mock('expo-secure-store', () => ({ getItemAsync: jest.fn(), setItemAsync: jest.fn(), deleteItemAsync: jest.fn() }))
-jest.mock('./api', () => ({ authCall: jest.fn() }))
+jest.mock('./api', () => ({ api: jest.fn(), authCall: jest.fn() }))
 jest.mock('./kv', () => ({ clearPrefix: jest.fn() }))
 
 let auth: typeof import('./auth')
@@ -69,10 +69,10 @@ test('parallel and late unauthorized responses reset once until the next login',
   await Promise.all([auth.handleUnauthorized(), auth.handleUnauthorized()])
   await auth.handleUnauthorized()
   expect(listener).toHaveBeenCalledTimes(1)
-  expect(SecureStore.deleteItemAsync).toHaveBeenCalledTimes(1)
+  expect(jest.mocked(SecureStore.deleteItemAsync).mock.calls.filter(([key]) => key === 'lq.token')).toHaveLength(1)
   await auth.signIn('learner@example.com', 'password')
   await auth.handleUnauthorized()
-  expect(SecureStore.deleteItemAsync).toHaveBeenCalledTimes(2)
+  expect(jest.mocked(SecureStore.deleteItemAsync).mock.calls.filter(([key]) => key === 'lq.token')).toHaveLength(2)
 })
 
 test('a pending secure-store read cannot restore the token after sign-out', async () => {
@@ -94,4 +94,35 @@ test('a pending sign-in response cannot restore the token after sign-out', async
   await login
   expect(auth.getToken()).toBeNull()
   expect(SecureStore.setItemAsync).not.toHaveBeenCalled()
+})
+
+test('a Facebook exchange arriving after logout cannot restore the session', async () => {
+  jest.mocked(SecureStore.getItemAsync).mockResolvedValue(JSON.stringify({ state: 'state', verifier: 'proof', expiresAt: Date.now() + 300_000 }))
+  let resolve!: (value: unknown) => void
+  jest.mocked(api).mockReturnValue(new Promise((done) => { resolve = done }))
+  const completing = auth.finishFacebookSignIn('state', 'code')
+  for (let i = 0; i < 10; i++) await Promise.resolve()
+  expect(api).toHaveBeenCalled()
+  await auth.signOut()
+  resolve({ token: 'late-facebook-token', user: { id: 'u1' } })
+  await completing
+  expect(auth.getToken()).toBeNull()
+  expect(SecureStore.setItemAsync).not.toHaveBeenCalled()
+})
+
+test('an unsolicited Facebook return cannot exchange or store a bearer', async () => {
+  await expect(auth.finishFacebookSignIn('unsolicited', 'code')).rejects.toThrow('expired')
+  expect(api).not.toHaveBeenCalled()
+  expect(SecureStore.setItemAsync).not.toHaveBeenCalled()
+})
+
+test('Facebook never publishes a bearer if SecureStore persistence fails', async () => {
+  jest.mocked(SecureStore.getItemAsync).mockResolvedValue(JSON.stringify({ state: 'state', verifier: 'proof', expiresAt: Date.now() + 300_000 }))
+  jest.mocked(api).mockResolvedValue({ token: 'facebook-token', user: { id: 'u1' } })
+  jest.mocked(SecureStore.setItemAsync).mockRejectedValue(new Error('Storage unavailable'))
+  const listener = jest.fn()
+  auth.subscribeAuth(listener)
+  await expect(auth.finishFacebookSignIn('state', 'code')).rejects.toThrow('Storage unavailable')
+  expect(auth.getToken()).toBeNull()
+  expect(listener).not.toHaveBeenCalledWith('changed')
 })
