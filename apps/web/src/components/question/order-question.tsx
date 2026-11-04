@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import type { QuestionProps } from '@/components/question/question-screen'
+import { cn } from '@/lib/utils'
 
 // Tap the steps in order: a tap appends an unplaced step or removes a placed one.
 export function OrderQuestion({ item, choice, onChoice }: QuestionProps) {
@@ -41,7 +42,10 @@ export function OrderQuestion({ item, choice, onChoice }: QuestionProps) {
                 type="button"
                 aria-label={at === -1 ? `${o.text}, not placed yet` : `${o.text}, position ${at + 1}`}
                 onClick={() => tap(o.id, o.text)}
-                className="flex min-h-14 w-full items-center gap-3 rounded-md border-2 border-border-strong bg-surface-card px-4 py-3 text-left text-body-lg text-ink hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+                className={cn(
+                  'flex min-h-14 w-full items-center gap-3 rounded-md border-2 px-4 py-3 text-left text-body-lg text-ink hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2',
+                  at !== -1 ? 'border-brand bg-brand-tint' : 'border-border-strong bg-surface-card',
+                )}
               >
                 <span
                   aria-hidden
