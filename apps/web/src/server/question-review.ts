@@ -123,7 +123,7 @@ export const reviewQuestion = createServerFn({ method: 'POST' })
       // Approval clears a learner flag so the question returns to sessions, which only serve 'active' items.
       changes = { status: 'active', reviewedBy: user.id, reviewedAt: Date.now() }
     } else {
-      changes = { status: 'retired' }
+      changes = { status: 'retired', retiredAt: Date.now(), retiredBy: user.id }
     }
     const update = db.update(items).set(changes)
       .where(and(scope, data.action === 'approve' ? ne(items.status, 'retired') : undefined)).returning({ id: items.id })

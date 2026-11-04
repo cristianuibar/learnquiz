@@ -9,7 +9,9 @@ import { getAuth } from '@/server/auth'
 import { getSessionUser } from '@/server/session'
 import { createRole, getOrgOverview, listRoles } from '@/server/org'
 import { getPeople } from '@/server/people'
-import { getContentFlags, getStaffSession, resolveFlag } from './admin'
+import { getStaffSession } from './admin'
+import { getContentFlags } from './admin-flags'
+import { reviewQuestion } from './question-review'
 import { getGenerationJobs, retryJobs } from './admin-jobs'
 import { listUsers, setUserBan } from './admin-users'
 
@@ -116,7 +118,6 @@ it('refuses every admin function for non-staff, including a company owner', asyn
     () => getGenerationJobs({ data: { filter: 'notReady', offset: 0 } }),
     () => retryJobs({ data: { ids: ['concept:x'] } }),
     () => getContentFlags(),
-    () => resolveFlag({ data: { flagId: 'x' } }),
   ]) {
     boundary.status = 200
     await expect(call()).rejects.toMatchObject({ status: 403, message: 'Staff only' })
@@ -347,17 +348,37 @@ it('skips a failed role build without usable documents or an owner', async () =>
   expect(boundary.background).toHaveLength(0)
 })
 
-it('lists open question reports, resolves them once and lists retired questions', async () => {
+it('includes resolved learner reports in the staff content list', async () => {
   seedContent()
-  await expect(getContentFlags()).resolves.toEqual({
-    flags: [{ id: 'flag-1', stem: 'What do you scan first?', concept: 'Seal the box', company: 'beta', reason: 'wrong', note: 'Answer is off', createdAt: NOW - 1000 }],
-    retired: [{ id: 'i-retired', stem: 'Which tape seals a box?', concept: 'Seal the box', company: 'beta', role: 'Picker' }],
+  sqlite.prepare('UPDATE item_flags SET resolved_at = ? WHERE id = ?').run(NOW, 'flag-1')
+  const result = await getContentFlags()
+  expect(result).toMatchObject({ rows: expect.arrayContaining([expect.objectContaining({ id: 'flag-1', resolvedAt: NOW })]) })
+})
+
+it('lists company reports and retirements newest first with partner audit details and counts', async () => {
+  seedContent()
+  sqlite.prepare("UPDATE items SET created_at = ? WHERE id = 'i-retired'").run(NOW - 3000)
+  for (const [topic, suffix] of [['role-alpha', 'company'], ['alpha', 'personal']]) {
+    sqlite.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, 0, ?)').run(suffix, topic, 'Receiving')
+    sqlite.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, 0, ?, ?)').run(suffix, topic, suffix, 'Scan', '')
+    sqlite.prepare("INSERT INTO items (id, topic_id, concept_id, format, payload_json, status, created_at) VALUES (?, ?, ?, 'short', ?, 'retired', ?)")
+      .run(suffix, topic, suffix, JSON.stringify({ stem: `${suffix} question` }), NOW - 4000)
+    sqlite.prepare('INSERT INTO item_flags (id, item_id, user_id, reason, created_at, resolved_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(suffix, suffix, accounts.get('learner')!.id, 'unclear', NOW - 2000, NOW - 500)
+  }
+  boundary.headers = new Headers({ cookie: accounts.get('learner')!.cookie })
+  await reviewQuestion({ data: { slug: 'alpha', itemId: 'company', action: 'retire' } })
+  expect(sqlite.prepare("SELECT status, retired_at, retired_by FROM items WHERE id = 'company'").get()).toEqual({
+    status: 'retired', retired_at: NOW, retired_by: accounts.get('learner')!.id,
   })
-  await expect(resolveFlag({ data: { flagId: 'flag-1' } })).resolves.toEqual({ ok: true })
-  expect(sqlite.prepare('SELECT resolved_at FROM item_flags WHERE id = ?').get('flag-1')).toEqual({ resolved_at: NOW })
-  await expect(getContentFlags()).resolves.toMatchObject({ flags: [] })
-  vi.setSystemTime(NOW + 60_000)
-  await expect(resolveFlag({ data: { flagId: 'flag-1' } })).resolves.toEqual({ ok: true })
-  expect(sqlite.prepare('SELECT resolved_at FROM item_flags WHERE id = ?').get('flag-1')).toEqual({ resolved_at: NOW })
-  await expect(resolveFlag({ data: { flagId: 'missing' } })).rejects.toMatchObject({ status: 404, message: 'Flag not found' })
+  boundary.headers = new Headers({ cookie: accounts.get('staff')!.cookie })
+  const result = await getContentFlags()
+  expect(result.counts).toEqual({ all: 4, learner: 2, partner: 2 })
+  expect(result.companies).toEqual([{ name: 'alpha', slug: 'alpha' }, { name: 'beta', slug: 'beta' }, { name: 'empty', slug: 'empty' }])
+  expect(result.rows).toMatchObject([
+    { id: 'company', type: 'partner', stem: 'company question', company: 'alpha', slug: 'alpha', roleId: 'alpha', itemId: 'company', unit: 'Receiving', retiredAt: NOW, createdAt: NOW, personName: 'learner', reason: null, note: null },
+    { id: 'flag-1', type: 'learner', company: 'beta', slug: 'beta', roleId: 'gen-role', itemId: 'i-flagged', unit: 'Unit', stem: 'What do you scan first?', reason: 'wrong', note: 'Answer is off', personName: 'outsider', resolvedAt: null },
+    { id: 'company', type: 'learner', company: 'alpha', resolvedAt: NOW - 500 },
+    { id: 'i-retired', type: 'partner', company: 'beta', retiredAt: null, personName: null, createdAt: NOW - 3000 },
+  ])
 })

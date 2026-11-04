@@ -98,6 +98,8 @@ export const items = sqliteTable('items', {
   status: text('status', { enum: ['active', 'rejected', 'reported', 'retired'] }).notNull().default('active'),
   reviewedBy: text('reviewed_by'),
   reviewedAt: integer('reviewed_at'),
+  retiredAt: integer('retired_at'),
+  retiredBy: text('retired_by'),
   createdAt: integer('created_at').notNull(),
 })
 
