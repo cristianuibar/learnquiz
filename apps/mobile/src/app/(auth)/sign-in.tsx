@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { View, type Text as NativeText } from 'react-native'
 import { useKeyboardState } from 'react-native-keyboard-controller'
 import { useIsFocused, useLocalSearchParams } from 'expo-router'
+import { FacebookSignIn } from '@/components/facebook-sign-in'
+import { AlertRow } from '@/components/ui/AlertRow'
 import { AccountForm, type AccountFormValues } from '@/components/account-form'
 import { Mark } from '@/components/ui/Mark'
 import { Screen, useHeadingFocus } from '@/components/ui/Screen'
 import { Text } from '@/components/ui/Text'
 import { api } from '@/lib/api'
-import { acceptInvitation, signIn, signUp, subscribeAuth } from '@/lib/auth'
+import { acceptInvitation, finishFacebookSignIn, signIn, signUp, subscribeAuth } from '@/lib/auth'
 import { useSession } from '@/lib/session-store'
 import { createSignInFlow, type SignInState } from '@/lib/sign-in'
 import { useReplayHold } from '@/lib/use-replay-hold'
@@ -21,7 +23,10 @@ const accountApi = {
 }
 
 export default function SignInScreen() {
-  const { email } = useLocalSearchParams<{ email?: string | string[] }>()
+  const { email, facebookState, facebookCode, facebookError } = useLocalSearchParams<{ email?: string | string[]; facebookState?: string; facebookCode?: string; facebookError?: string }>()
+  const [socialBusy, setSocialBusy] = useState(false)
+  const [socialError, setSocialError] = useState<string | null>(null)
+  const lastFacebook = useRef<string | null>(null)
   const { space } = useTheme()
   const session = useSession()
   const { refresh } = session
@@ -57,6 +62,17 @@ export default function SignInScreen() {
 
   useEffect(() => { flow.current?.update({ focused, session }) }, [focused, session, settled])
 
+  useEffect(() => {
+    if (!focused || !facebookState || lastFacebook.current === facebookState) return
+    lastFacebook.current = facebookState
+    setSocialBusy(true)
+    setSocialError(null)
+    holdReplay()
+    void finishFacebookSignIn(facebookState, facebookCode, facebookError).catch((error: unknown) => {
+      setSocialError(error instanceof Error ? error.message : 'Facebook sign-in could not finish. Please try again.')
+    }).finally(() => setSocialBusy(false))
+  }, [focused, facebookState, facebookCode, facebookError, holdReplay])
+
   async function submit({ email, password }: AccountFormValues) {
     await flow.current?.submit(email, password)
   }
@@ -72,12 +88,14 @@ export default function SignInScreen() {
       )}
     >
       <Text ref={heading} variant="title1" header>Sign in</Text>
+      {socialError && <AlertRow>{socialError}</AlertRow>}
+      <FacebookSignIn disabled={state.busy || socialBusy} />
       <AccountForm
         mode="signIn"
         onModeChange={() => {}}
         defaultEmail={Array.isArray(email) ? email[0] : email}
         showModeLink={false}
-        busy={state.busy}
+        busy={state.busy || socialBusy}
         error={state.error}
         onSubmit={submit}
       />

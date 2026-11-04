@@ -4,6 +4,7 @@ import { useKeyboardState } from 'react-native-keyboard-controller'
 import { useIsFocused, useLocalSearchParams, useRouter, type Href } from 'expo-router'
 import { roleHeadline, type InviteView } from '@learnquiz/api/invite'
 import { networkError } from '@learnquiz/api/system-copy'
+import { FacebookSignIn } from '@/components/facebook-sign-in'
 import { AccountForm, type AccountFormValues } from '@/components/account-form'
 import { AlertRow } from '@/components/ui/AlertRow'
 import { Button } from '@/components/ui/Button'
@@ -241,6 +242,7 @@ function Invite({ invitationId, invite }: { invitationId: string; invite: Invite
         </View>
         <Heading title={view.title} body={view.body} />
       </View>
+      {!viewer && (formOpen || action.kind === 'signIn') && <FacebookSignIn disabled={busy} invitationId={action.kind === 'signIn' ? undefined : invitationId} />}
       {formOpen ? (
         <AccountForm
           mode={mode}

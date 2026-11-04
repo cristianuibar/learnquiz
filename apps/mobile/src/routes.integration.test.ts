@@ -84,7 +84,7 @@ beforeEach(() => {
   mockSettingFields.length = 0
   releaseReplayHolds()
   takeHeldTarget()
-  jest.mocked(api).mockReset()
+  jest.mocked(api).mockReset().mockResolvedValue({ facebook: false })
   jest.mocked(getToken).mockReturnValue(null)
   jest.mocked(signIn).mockReset()
   jest.mocked(signUp).mockReset()

@@ -2,6 +2,8 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { handleV1 } from './api-v1'
 
+vi.mock('@/server/mobile-facebook', () => ({ handleMobileFacebook: vi.fn() }))
+
 const fns = vi.hoisted(() => ({
   getToday: vi.fn(),
   getInvite: vi.fn(),

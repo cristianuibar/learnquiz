@@ -1,12 +1,14 @@
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from '@better-auth/drizzle-adapter'
-import { APIError, createAuthMiddleware } from 'better-auth/api'
+import { APIError, createAuthMiddleware, getOAuthState } from 'better-auth/api'
+import { deleteSessionCookie } from 'better-auth/cookies'
 import { admin, anonymous, bearer, organization } from 'better-auth/plugins'
 import type { BetterAuthPlugin } from 'better-auth'
 import { and, eq, inArray } from 'drizzle-orm'
 import { getDb, authSchema } from '@/db'
 import { attempts, badges, itemFlags, jobRoles, learnerConcept, learnerItem, learnerTopic, learnerUnit, memberRoleAssignments, modelCalls, placements, sessions, topics } from '@/db/schema'
 import { getEnv } from '@/server/env'
+import { bindMobileFacebookSession } from './mobile-facebook-binding'
 
 export function facebookEnabled(): boolean {
   const { FACEBOOK_APP_ID, FACEBOOK_APP_SECRET } = getEnv()
@@ -70,6 +72,13 @@ export function createAuth(transportPlugins: BetterAuthPlugin[] = []) {
       // These plugin endpoints let any member read the company's people and the invite ids, which are the join secrets. The app reads them through getPeople (company admins only).
       before: createAuthMiddleware(async (ctx) => {
         if (PEOPLE_ENDPOINTS.includes(ctx.path)) throw new APIError('FORBIDDEN', { message: 'Not available' })
+      }),
+      after: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== '/callback/:id' || ctx.params?.id !== 'facebook' || !ctx.context.newSession) return
+        const state = await getOAuthState()
+        if (!state?.callbackURL || typeof state.oauthState !== 'string') return
+        // Only mobile handoffs clear browser cookies; ordinary web sign-in keeps them.
+        if (await bindMobileFacebookSession(state.callbackURL, state.oauthState, ctx.context.newSession.session.token)) deleteSessionCookie(ctx)
       }),
     },
     plugins: [

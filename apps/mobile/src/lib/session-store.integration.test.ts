@@ -290,7 +290,7 @@ describe('endSession', () => {
     unsubscribe()
     expect(screen.getByText('signedOut:-:online')).toBeOnTheScreen()
     expect(events.mock.calls).toEqual([['signedOut']])
-    expect(SecureStore.deleteItemAsync).toHaveBeenCalledTimes(1)
+    expect(jest.mocked(SecureStore.deleteItemAsync).mock.calls.filter(([key]) => key === 'lq.token')).toHaveLength(1)
   })
 
   test('a learner who signs in while sign-out stalls stays signed in', async () => {

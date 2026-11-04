@@ -54,7 +54,7 @@ test('parallel 401s erase secure credentials and private SQLite data and reset t
     }
   }
   expect(getToken()).toBeNull()
-  expect(SecureStore.deleteItemAsync).toHaveBeenCalledTimes(1)
+  expect(jest.mocked(SecureStore.deleteItemAsync).mock.calls.filter(([key]) => key === 'lq.token')).toHaveLength(1)
   expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('lq.token')
   expect(screen.getByText('signedOut:-')).toBeOnTheScreen()
   for (const key of ['lq:draft:1', 'lq:today', 'lq:prompt', 'lq:push-token']) {

@@ -35,7 +35,33 @@ Updates are checked on launch by default. A downloaded update normally runs on
 the next cold launch; reopen the app after the download has completed. There is
 no in-app update prompt.
 
-### Firebase is required only for native builds
+## Facebook sign-in
+
+The sign-in and invitation screens show **Continue with Facebook** only when
+`GET /api/v1/auth/capabilities` reports it enabled. Both `FACEBOOK_APP_ID` and
+`FACEBOOK_APP_SECRET` must be configured on the web Worker.
+
+The existing React Native Linking API opens the system browser. Better Auth uses
+its registered `https://app.learnquiz.com/api/auth/callback/facebook` callback,
+then redirects to `learnquiz://sign-in` with a one-time code. The app exchanges
+that code plus a per-attempt secret from SecureStore for a bearer, persisted with
+the same session rules as email login. No session token is placed in a URL.
+Browser attempts expire after five minutes; exchange codes expire after one
+minute and are consumed atomically. The server uses the existing verification
+table, so no database migration is needed. Invitation acceptance and disclosure
+follow the email flow, including after the browser restarts the app.
+
+Deploy the web endpoints before publishing the mobile update. This implementation
+adds no native module or native configuration; the Android fingerprint remains
+`b9c7db54112d4207fce7a344f1732cb72c6e009f`, so the matching preview APK can use OTA.
+Check the fingerprint again for any later bundled changes.
+
+Automated tests mock Facebook, including the real Better Auth callback. Meta's
+Development mode permits only accounts with a role on the Meta app. A device
+smoke test with such an account remains an owner release check; never put real
+Facebook credentials into tests.
+
+## Firebase is required only for native builds
 
 `GOOGLE_SERVICES_JSON` is an EAS **secret file** variable: on the build server it
 is a path to the supplied file. `eas update --environment preview` cannot download

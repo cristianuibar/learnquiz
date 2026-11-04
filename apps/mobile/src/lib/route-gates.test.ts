@@ -40,3 +40,8 @@ test('selects the entry route from the session gates', () => {
   expect(homeTarget(disclosure)).toBe('/welcome')
   expect(homeTarget(ready)).toBe('/(tabs)/today')
 })
+
+test('does not hold a Facebook callback as a post-auth destination', () => {
+  expect(targetFromURL('learnquiz://sign-in?facebookState=state&facebookCode=code')).toBeNull()
+  expect(targetFromURL('learnquiz://sign-in?facebookState=state&facebookError=cancelled')).toBeNull()
+})
