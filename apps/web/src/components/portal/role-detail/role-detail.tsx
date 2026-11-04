@@ -132,7 +132,7 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
           pasteFor={pasteFor}
           onTogglePaste={togglePaste}
           panel={pasteOpen && (canUpload || (pasteFor && !readOnly && role.topicStatus !== 'generating')) ? (
-            <PasteTextPanel key={pasteFor ?? 'new'} replacesId={pasteFor} roleId={role.id} onClose={closePaste} onAdded={async () => { setPasteOpen(false); await router.invalidate() }} />
+            <PasteTextPanel key={pasteFor ?? 'new'} replacesId={pasteFor} roleId={role.id} onClose={closePaste} onAdded={async (current) => { if (current) setPasteOpen(false); await router.invalidate() }} />
           ) : null}
         />
         <Curriculum

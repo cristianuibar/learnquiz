@@ -196,6 +196,26 @@ it('filters the latency chart by job without touching the other figures', async 
   } finally { await unmount() }
 })
 
+it('keeps the latency labels on the shown series when a job request fails', async () => {
+  const { container, unmount } = await mount()
+  try {
+    vi.mocked(getModelUsage).mockRejectedValueOnce(new Error('Usage is unavailable'))
+    const select = container.querySelector('select')!
+    await act(async () => { select.value = 'items'; select.dispatchEvent(new Event('change', { bubbles: true })) })
+    const latency = table(container, 'Latency by day')
+    expect(footer(latency)).toEqual(['30 days', '1.5 s', '6.8 s'])
+    expect(latency.querySelector('caption')!.textContent).not.toContain('Questions')
+    expect(container.querySelector('svg[aria-label^="Line chart"]')!.getAttribute('aria-label')).toContain('latency for all jobs')
+    expect(container.textContent).toContain('Usage is unavailable')
+
+    await click(button(container, 'Try again'))
+    expect(getModelUsage).toHaveBeenLastCalledWith({ data: { from: '2026-10-05', to: '2026-11-03', job: 'items' } })
+    expect(table(container, 'Latency by day').querySelector('caption')!.textContent).toContain('Questions')
+    expect(footer(table(container, 'Latency by day'))).toEqual(['30 days', '2.5 s', '9.1 s'])
+    expect(container.textContent).not.toContain('Usage is unavailable')
+  } finally { await unmount() }
+})
+
 it('starts the failures on page 1 when Back returns to a shorter range', async () => {
   // 7 days have 10 failures, 90 days have 30.
   const failure = usage.failures[0]

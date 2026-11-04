@@ -15,7 +15,7 @@ const fmt = (n: number) => n.toLocaleString('en-US')
 const overMessage = (count: number, max: number) =>
   `${fmt(count)} / ${fmt(max)} characters. Remove ${fmt(count - max)} or upload a PDF instead.`
 
-export function PasteTextPanel({ roleId, replacesId, onClose, onAdded }: { roleId: string; replacesId?: string; onClose: () => void; onAdded: () => unknown }) {
+export function PasteTextPanel({ roleId, replacesId, onClose, onAdded }: { roleId: string; replacesId?: string; onClose: () => void; onAdded: (current: boolean) => unknown }) {
   const { slug } = usePortal()
   const upload = useServerFn(uploadRoleDocument)
   const uid = useId()
@@ -28,9 +28,15 @@ export function PasteTextPanel({ roleId, replacesId, onClose, onAdded }: { roleI
   const [busy, setBusy] = useState(false)
   const [errors, setErrors] = useState<{ title?: string; text?: string }>({})
   const [general, setGeneral] = useState('')
+  // A request can finish after Cancel; the panel open by then is a new one holding another draft.
+  const mounted = useRef(false)
 
   useEffect(() => {
+    mounted.current = true
     titleRef.current?.focus()
+    return () => {
+      mounted.current = false
+    }
   }, [])
 
   const over = text.length > MAX_ROLE_DOCUMENT_CHARS
@@ -49,7 +55,7 @@ export function PasteTextPanel({ roleId, replacesId, onClose, onAdded }: { roleI
     setBusy(true)
     try {
       await upload({ data: formData })
-      await onAdded()
+      await onAdded(mounted.current)
     } catch (err) {
       const fe = fieldErrors(err)
       const message = errorMessage(err)

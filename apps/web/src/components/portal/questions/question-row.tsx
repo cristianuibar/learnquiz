@@ -20,17 +20,19 @@ export function statusWord(q: Question): ComponentProps<typeof Status>['word'] {
   return q.reviewedAt === null ? 'Unreviewed' : 'Live'
 }
 
+export type Action = 'approve' | 'retire'
+
 export const stemId = (id: string) => `stem-${id}`
 export const toggleId = (id: string) => `toggle-${id}`
 
-export function QuestionRow({ question, critical, expanded, slug, sources, onToggle, onApprove, onAnnounce }: {
+export function QuestionRow({ question, critical, expanded, slug, sources, onToggle, onAct, onAnnounce }: {
   question: Question
   critical: boolean
   expanded: boolean
   slug: string
   sources: Review['sources']
   onToggle: () => void
-  onApprove: (id: string) => () => void
+  onAct: (id: string, action: Action) => () => void
   onAnnounce: (message: string) => void
 }) {
   const sid = stemId(question.id)
@@ -76,7 +78,7 @@ export function QuestionRow({ question, critical, expanded, slug, sources, onTog
       )}
       {expanded && (
         <div id={bodyId} className="px-4 pb-4">
-          <QuestionDetails question={question} slug={slug} sources={sources} stemId={sid} onApprove={onApprove} onAnnounce={onAnnounce} />
+          <QuestionDetails question={question} slug={slug} sources={sources} stemId={sid} onAct={onAct} onAnnounce={onAnnounce} />
         </div>
       )}
     </li>

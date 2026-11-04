@@ -236,6 +236,26 @@ it('ends the proficient trend at the week reached when the recent weeks all come
   expect(profile.reachedWeeks).toEqual([{ start, mastery: 0.75, sessions: 7, partial: false }])
 })
 
+it('keeps six weeks up to the week reached once that week has ended', async () => {
+  seedWeek()
+  raw.prepare('INSERT INTO attempts (id, learner_id, item_id, concept_id, at, answer_json, correct, score, confidence, response_ms, rating, p_known_before, p_known_after) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run('early', 'learner-a', 'i-early', 'c1', start - 8 * WEEK, '"answer"', 1, 1, 'sure', 1000, 3, 0.1, 0.3)
+  raw.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, started_at, ended_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .run('early-session', 'learner-a', 'training', 'session', start - 5 * WEEK, start - 5 * WEEK + DAY)
+  raw.prepare('INSERT INTO job_roles (id, org_id, name, benchmark, created_at) VALUES (?, ?, ?, ?, ?)').run('role', 'org-a', 'Safety officer', 0.95, start)
+  raw.prepare('INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at, proficient_at) VALUES (?, ?, ?, ?, ?)').run('learner-a', 'org-a', 'role', start, start + 3 * DAY)
+  vi.setSystemTime(start + 2 * WEEK)
+  const reached = (await getProfile({ data: {} })).reachedWeeks!
+  expect(reached.map((w) => [w.start, w.sessions, w.partial])).toEqual([
+    [start - 5 * WEEK, 1, false],
+    [start - 4 * WEEK, 0, false],
+    [start - 3 * WEEK, 0, false],
+    [start - 2 * WEEK, 0, false],
+    [start - WEEK, 0, false],
+    [start, 7, false],
+  ])
+})
+
 it('uses a ready role curriculum and falls back to the latest personal topic while it is a draft', async () => {
   seedWeek()
   raw.prepare('INSERT INTO job_roles (id, org_id, name, benchmark, created_at) VALUES (?, ?, ?, ?, ?)').run('role', 'org-a', 'Safety officer', 0.95, start)

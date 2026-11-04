@@ -52,12 +52,13 @@ function Jobs() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState<{ text: string } | null>(null)
   const noticeRef = useRef<HTMLDivElement>(null)
-  const inTable = useRef(false)
+  const tableRef = useRef<HTMLDivElement>(null)
   const idle = useRef(true)
   idle.current = !paused && selected.size === 0
 
   useEffect(() => {
-    const timer = setInterval(() => { if (idle.current && !inTable.current) void router.invalidate() }, POLL_MS)
+    // Read focus at each tick: a focused control that unmounts (Clear selection) fires no blur.
+    const timer = setInterval(() => { if (idle.current && !tableRef.current?.contains(document.activeElement)) void router.invalidate() }, POLL_MS)
     return () => clearInterval(timer)
   }, [router])
 
@@ -135,10 +136,7 @@ function Jobs() {
         </div>
       )}
       {error && <ErrorRow message={error} />}
-      <div
-        onFocus={() => { inTable.current = true }}
-        onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) inTable.current = false }}
-      >
+      <div ref={tableRef}>
         <DataTable
           caption={CAPTIONS[filter]}
           columns={columns}
@@ -147,7 +145,13 @@ function Jobs() {
           selection={{
             selected,
             onToggle: (id) => setSelected((prev) => { const next = new Set(prev); if (!next.delete(id)) next.add(id); return next }),
-            onToggleAll: () => setSelected((prev) => (failedIds.length > 0 && failedIds.every((id) => prev.has(id)) ? new Set() : new Set(failedIds))),
+            onToggleAll: () => setSelected((prev) => {
+              // Add or remove only this page's failed jobs; selections from other pages stay.
+              const next = new Set(prev)
+              const all = failedIds.length > 0 && failedIds.every((id) => prev.has(id))
+              for (const id of failedIds) { if (all) next.delete(id); else next.add(id) }
+              return next
+            }),
             rowLabel: (r) => `${r.target}, ${r.company}`,
             selectable: (r) => r.state === 'failed',
             allLabel: 'Select all failed',

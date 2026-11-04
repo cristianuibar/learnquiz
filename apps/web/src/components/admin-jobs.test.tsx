@@ -69,6 +69,36 @@ it('retries the selected failed jobs, then confirms in a focused banner', async 
   }
 })
 
+it('Select all failed adds and removes only this page, keeping jobs checked on other pages', async () => {
+  const page2: JobRow[] = [
+    { id: 'p1', kind: 'concept', company: 'Harbor Freight', role: null, target: 'Dock safety', state: 'failed', startedAt: T0, error: 'Model call timed out' },
+    { id: 'p2', kind: 'concept', company: 'Harbor Freight', role: null, target: 'Crane signals', state: 'failed', startedAt: T0, error: 'Model call timed out' },
+  ]
+  vi.mocked(getGenerationJobs).mockImplementation((async ({ data }: { data: { offset: number } }) =>
+    ({ ...page(), total: 30, rows: data.offset === 0 ? rows : page2 })) as never)
+  const { container, unmount } = await mount()
+  try {
+    await click(box(container, 'Select Battery change procedure, Northwind Logistics'))
+    await click(button(container, 'Next'))
+    expect(box(container, 'Select Dock safety, Harbor Freight')).not.toBeNull()
+
+    await click(box(container, 'Select all failed'))
+    expect(box(container, 'Select all failed').checked).toBe(true)
+    expect(button(container, 'Retry 3 jobs')).toBeDefined()
+
+    // Unchecking a fully selected page clears only that page.
+    await click(box(container, 'Select all failed'))
+    expect(box(container, 'Select Dock safety, Harbor Freight').checked).toBe(false)
+    await click(box(container, 'Select all failed'))
+
+    vi.mocked(retryJobs).mockResolvedValueOnce({ queued: 3, skipped: 0, failed: 0 })
+    await click(button(container, 'Retry 3 jobs'))
+    expect(retryJobs).toHaveBeenLastCalledWith({ data: { ids: ['c1', 'p1', 'p2'] } })
+  } finally {
+    await unmount()
+  }
+})
+
 it('polls every 5 s only while nothing is selected and updates are not paused', async () => {
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
   const { container, unmount } = await mount()
@@ -96,6 +126,31 @@ it('polls every 5 s only while nothing is selected and updates are not paused', 
     await click(pause)
     await advance(5000)
     expect(calls()).toBeGreaterThan(n)
+  } finally {
+    await unmount()
+    vi.useRealTimers()
+  }
+})
+
+it('resumes polling after the focused Clear selection button unmounts', async () => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+  const { container, unmount } = await mount()
+  try {
+    const calls = () => vi.mocked(getGenerationJobs).mock.calls.length
+    const advance = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms) })
+    await click(box(container, 'Select Battery change procedure, Northwind Logistics'))
+    const clear = button(container, 'Clear selection')
+    await act(async () => { clear.focus() })
+    await click(clear)
+    expect(container.contains(clear)).toBe(false)
+    let n = calls()
+    await advance(5000)
+    expect(calls()).toBeGreaterThan(n)
+
+    await act(async () => { box(container, 'Select Battery change procedure, Northwind Logistics').focus() })
+    n = calls()
+    await advance(10_000)
+    expect(calls()).toBe(n)
   } finally {
     await unmount()
     vi.useRealTimers()

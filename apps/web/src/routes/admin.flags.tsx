@@ -30,7 +30,7 @@ function Flags() {
   }
 
   return (
-    <main>
+    <main className="max-w-[1120px]">
       <h1 className="text-title-1 text-ink">Content flags</h1>
       {error && <p role="alert" className="mt-4 font-medium text-wrong">{error}</p>}
       <section aria-labelledby="flags-open" className="mt-8">

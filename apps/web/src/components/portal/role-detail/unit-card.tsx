@@ -2,7 +2,7 @@ import { useId } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { plural } from '@/lib/utils'
 import type { RoleDetail } from '@/server/role-detail'
-import { ConceptRow } from './concept-row'
+import { ConceptRow, questionCell, rowGrid } from './concept-row'
 
 type Unit = RoleDetail['units'][number]
 
@@ -56,10 +56,10 @@ export function UnitCard({ unit, index, open, onToggle, slug, readOnly, running 
         </button>
       </h3>
       <div id={listId} hidden={!open} className="@container">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-6 border-t border-border px-6 py-2">
-          <span />
+        <div className={`${rowGrid} border-t border-border py-2`}>
+          <span className="@max-[560px]:hidden" />
           <div className="flex items-center gap-4 text-caption text-ink-muted">
-            <span>Questions</span>
+            <span className={questionCell}>Questions</span>
             {readOnly ? (
               <span className="w-[92px]" />
             ) : (

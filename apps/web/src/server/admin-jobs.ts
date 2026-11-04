@@ -10,6 +10,7 @@ import { drainConceptQueue } from '@/server/concept-gen'
 import { retryFailedConcept } from '@/server/concept-retry'
 import { runInBackground } from '@/server/env'
 import { liveConcept } from '@/server/live-concept'
+import { COMPANY_CAP_MESSAGE, dailyCapError } from '@/server/model-cap'
 import { claimRoleBuild, releaseStaleBuild } from '@/server/role-curriculum'
 
 export const JOB_FILTERS = ['notReady', 'failed', 'generating', 'pending', 'ready'] as const
@@ -62,6 +63,9 @@ export const getGenerationJobs = createServerFn({ method: 'GET' })
   })
 
 const status = (e: unknown) => (e as { status?: number } | null)?.status
+// A daily-cap refusal keeps its cap message through the build; a provider rate limit is also a 429 but is a failure.
+const capMessages = [dailyCapError().message, COMPANY_CAP_MESSAGE]
+const capRefused = (e: unknown) => status(e) === 429 && e instanceof Error && capMessages.includes(e.message)
 
 // Retries failed jobs one by one; jobs that are no longer retryable are skipped, not failed.
 export const retryJobs = createServerFn({ method: 'POST' })
@@ -104,8 +108,13 @@ export const retryJobs = createServerFn({ method: 'POST' })
     }
     if (conceptsQueued) runInBackground(drainConceptQueue())
     // Awaited, not backgrounded: background work lasts about 30 s and a build can take minutes. A failed build marks its own topic failed.
-    // A claimed role build counts as queued only once its build finishes; a rejected build counts as failed.
+    // A claimed role build counts as queued only once its build finishes; a daily-cap refusal of its model call is skipped like
+    // one refused before the claim, and any other rejected build counts as failed.
     const results = await Promise.allSettled(runs.map((run) => run()))
-    for (const r of results) { if (r.status === 'fulfilled') queued++; else failed++ }
+    for (const r of results) {
+      if (r.status === 'fulfilled') queued++
+      else if (capRefused(r.reason)) skipped++
+      else failed++
+    }
     return { queued, skipped, failed }
   })

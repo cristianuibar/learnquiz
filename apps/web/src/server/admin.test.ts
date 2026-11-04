@@ -4,6 +4,7 @@ import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { dbSchema } from '@/db'
+import { DailyCapError, LlmError } from '@/lib/llm/client'
 import { getAuth } from '@/server/auth'
 import { getSessionUser } from '@/server/session'
 import { createRole, getOrgOverview, listRoles } from '@/server/org'
@@ -205,6 +206,18 @@ it('filters users by role and status together and reports each user\'s company',
   expect(users.find((u) => u.id === staff)).toMatchObject({ admin: true, banned: false, company: null })
 })
 
+it('sorts users alphabetically by name in either direction, newest first by default', async () => {
+  const [staff, learner, outsider] = ['staff', 'learner', 'outsider'].map((name) => accounts.get(name)!.id)
+  // Zoe joined after Ada, so only a name sort puts Ada first.
+  const named = [[staff, 'Mia', 2000], [learner, 'ada', 1000], [outsider, 'Zoe', 3000]] as const
+  for (const [id, name, at] of named) sqlite.prepare('UPDATE user SET name = ?, created_at = ? WHERE id = ?').run(name, at, id)
+  const names = async (order: object) => (await listUsers({ data: { search: '', offset: 0, ...order } })).users.map((u) => u.name)
+  expect(await names({})).toEqual(['Zoe', 'Mia', 'ada'])
+  expect(await names({ sort: 'name', dir: 'ascending' })).toEqual(['ada', 'Mia', 'Zoe'])
+  expect(await names({ sort: 'name', dir: 'descending' })).toEqual(['Zoe', 'Mia', 'ada'])
+  expect(await names({ sort: 'joined', dir: 'ascending' })).toEqual(['ada', 'Mia', 'Zoe'])
+})
+
 // Company topics in beta: a role curriculum that is building, a failed and a ready concept, flagged and retired questions.
 function seedContent() {
   sqlite.prepare('INSERT INTO job_roles (id, org_id, name, created_at) VALUES (?, ?, ?, ?)').run('gen-role', 'beta', 'Picker', NOW)
@@ -296,6 +309,20 @@ it('counts a role build whose model call fails as failed, not queued', async () 
   boundary.chatJson = () => Promise.reject(new Error('timeout'))
   await expect(retryJobs({ data: { ids: ['curriculum:retry-topic'] } })).resolves.toEqual({ queued: 0, skipped: 0, failed: 1 })
   expect(topicStatus()).toBe('failed')
+})
+
+it('counts a role build refused by the owner daily cap as skipped, not failed', async () => {
+  seedAlphaRoleBuild(['Step one: scan the box.'])
+  sqlite.prepare('INSERT INTO job_roles (id, org_id, name, created_at) VALUES (?, ?, ?, ?)').run('capped-role', 'alpha', 'Capped role', NOW)
+  sqlite.prepare('INSERT INTO topics (id, org_id, job_role_id, title, status, created_at) VALUES (?, ?, ?, ?, ?, ?)').run('capped-topic', 'alpha', 'capped-role', 'Capped role', 'failed', NOW)
+  sqlite.prepare('INSERT INTO sources (id, topic_id, kind, title, body_text, created_at) VALUES (?, ?, ?, ?, ?, ?)').run('capped-doc', 'capped-topic', 'text', 'Doc', 'Step one: seal the box.', NOW)
+  // Both builds pass the pre-claim cap check; the model client then refuses the second reservation (one call left).
+  let calls = 0
+  boundary.chatJson = () => Promise.reject(calls++ ? new DailyCapError() : new Error('timeout'))
+  await expect(retryJobs({ data: { ids: ['curriculum:retry-topic', 'curriculum:capped-topic'] } })).resolves.toEqual({ queued: 0, skipped: 1, failed: 1 })
+  // A provider rate limit is not a cap refusal: the build failed again.
+  boundary.chatJson = () => Promise.reject(new LlmError('Rate limited by the provider.', 429))
+  await expect(retryJobs({ data: { ids: ['curriculum:retry-topic'] } })).resolves.toEqual({ queued: 0, skipped: 0, failed: 1 })
 })
 
 it('lists an abandoned role build as failed and lets it be retried', async () => {
