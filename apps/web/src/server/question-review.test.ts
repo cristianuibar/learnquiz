@@ -132,7 +132,7 @@ it('lists company questions and learner flags, approves, edits and retires witho
   expect(row('SELECT status, reviewed_by FROM items WHERE id = ?', 'a-flag')).toEqual({ status: 'active', reviewed_by: 'admin-a' })
   await reviewQuestion({ data: { slug: 'alpha', itemId: 'a-live', action: 'retire' } })
   await expect(reviewQuestion({ data: { slug: 'alpha', itemId: 'a-live', action: 'approve' } })).rejects.toMatchObject({ status: 409 })
-  expect(row('SELECT status FROM items WHERE id = ?', 'a-live')).toEqual({ status: 'retired' })
+  expect(row('SELECT * FROM items WHERE id = ?', 'a-live')).toMatchObject({ status: 'retired', retired_at: Date.now(), retired_by: 'admin-a' })
   raw.prepare("UPDATE items SET status = 'retired' WHERE id = 'personal-live'").run()
   await expect(reportItem({ data: { itemId: 'personal-live' } })).rejects.toMatchObject({ status: 404 })
   expect(row('SELECT status FROM items WHERE id = ?', 'personal-live')).toEqual({ status: 'retired' })
