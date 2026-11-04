@@ -41,7 +41,11 @@ export function useVoiceAnswer({ sessionId, itemId, text, onText, disabled, focu
       const response = await requestRecordingPermissionsAsync()
       return { granted: response.granted, canAskAgain: response.canAskAgain }
     },
-    start: () => streamRef.current.start(),
+    async start() {
+      // Read aloud must not end up in the recording.
+      await import('expo-speech').then((speech) => speech.stop()).catch(() => {})
+      await streamRef.current.start()
+    },
     stop() {
       try { streamRef.current.stop() } catch { /* already released */ }
     },
