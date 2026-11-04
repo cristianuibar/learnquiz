@@ -2,6 +2,7 @@ import { useId, useRef, useState } from 'react'
 import { androidApkUrl, demoTranscriptUrl, demoVideoUrl, signUpUrl } from '../../site-config'
 import { Icon } from '../ui/icon'
 import { PhoneFrame } from '../ui/phone-frame'
+import { Screenshot } from '../ui/screenshot'
 
 const videoTitle = 'Learn Quiz demo, 3 minutes'
 
@@ -145,22 +146,14 @@ export function Hero({
 
           <figure className="hero-phone">
             <PhoneFrame>
-              <picture className="absolute inset-0">
-                <source
-                  media="(prefers-color-scheme: dark)"
-                  srcSet="/screenshots/phone-question-confidence-dark.webp 1x, /screenshots/phone-question-confidence-dark@2x.webp 2x"
-                />
-                <img
-                  src="/screenshots/phone-question-confidence.webp"
-                  srcSet="/screenshots/phone-question-confidence.webp 1x, /screenshots/phone-question-confidence@2x.webp 2x"
-                  alt="Learn Quiz question 1 of 2: Where do you move the tote to start the check? To the assigned checking station and Sure are selected."
-                  width={360}
-                  height={740}
-                  loading="eager"
-                  fetchPriority="high"
-                  className="block size-full object-fill"
-                />
-              </picture>
+              <Screenshot
+                name="phone-question-confidence"
+                alt="Learn Quiz question 1 of 2: Where do you move the tote to start the check? To the assigned checking station and Sure are selected."
+                width={360}
+                height={740}
+                priority
+                className="absolute inset-0 size-full object-cover object-top"
+              />
             </PhoneFrame>
           </figure>
         </div>

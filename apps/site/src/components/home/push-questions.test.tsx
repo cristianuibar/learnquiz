@@ -40,7 +40,7 @@ it('shows the push, question and explanation with accessible images', async () =
   const list = container.querySelector('ol')!
   expect(list.querySelectorAll(':scope > li')).toHaveLength(3)
   expect(list.querySelector('[role="img"]')?.getAttribute('aria-label')).toContain('Learn Quiz notification')
-  const screenshots = [...list.querySelectorAll('img')]
+  const screenshots = [...list.querySelectorAll<HTMLImageElement>('img:not(.shot-dark)')]
   expect(screenshots.map((image) => image.alt)).toEqual([
     expect.stringContaining('Where do you move the tote to start the check?'),
     expect.stringContaining('The expanded Why explanation quotes Warehouse picker SOP v1'),

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { LogoMark } from '../ui/logo'
 import { PhoneFrame } from '../ui/phone-frame'
+import { Screenshot } from '../ui/screenshot'
 
 export function PushQuestions() {
   const rowRef = useRef<HTMLOListElement>(null)
@@ -57,21 +58,13 @@ export function PushQuestions() {
 
           <li className="push-step">
             <PhoneFrame>
-              <picture className="absolute inset-0">
-                <source
-                  media="(prefers-color-scheme: dark)"
-                  srcSet="/screenshots/phone-question-confidence-dark.webp 1x, /screenshots/phone-question-confidence-dark@2x.webp 2x"
-                />
-                <img
-                  src="/screenshots/phone-question-confidence.webp"
-                  srcSet="/screenshots/phone-question-confidence.webp 1x, /screenshots/phone-question-confidence@2x.webp 2x"
-                  alt="Learn Quiz question 1 of 2: Where do you move the tote to start the check? To the assigned checking station and Sure are selected."
-                  width={360}
-                  height={740}
-                  loading="lazy"
-                  className="block size-full object-fill"
-                />
-              </picture>
+              <Screenshot
+                name="phone-question-confidence"
+                alt="Learn Quiz question 1 of 2: Where do you move the tote to start the check? To the assigned checking station and Sure are selected."
+                width={360}
+                height={740}
+                className="absolute inset-0 size-full object-cover object-top"
+              />
             </PhoneFrame>
             <div className="push-cap flex flex-col gap-0.5">
               <h3 className="t-label">Answer and choose your confidence</h3>
@@ -81,21 +74,13 @@ export function PushQuestions() {
 
           <li className="push-step">
             <PhoneFrame>
-              <picture className="absolute inset-0">
-                <source
-                  media="(prefers-color-scheme: dark)"
-                  srcSet="/screenshots/phone-reveal-why-dark.webp 1x, /screenshots/phone-reveal-why-dark@2x.webp 2x"
-                />
-                <img
-                  src="/screenshots/phone-reveal-why.webp"
-                  srcSet="/screenshots/phone-reveal-why.webp 1x, /screenshots/phone-reveal-why@2x.webp 2x"
-                  alt="Correct answer: To the assigned checking station. The expanded Why explanation quotes Warehouse picker SOP v1: Move the tote to the assigned checking station and scan its label."
-                  width={360}
-                  height={740}
-                  loading="lazy"
-                  className="block size-full object-fill"
-                />
-              </picture>
+              <Screenshot
+                name="phone-reveal-why"
+                alt="Correct answer: To the assigned checking station. The expanded Why explanation quotes Warehouse picker SOP v1: Move the tote to the assigned checking station and scan its label."
+                width={360}
+                height={740}
+                className="absolute inset-0 size-full object-cover object-top"
+              />
             </PhoneFrame>
             <div className="push-cap flex flex-col gap-0.5">
               <h3 className="t-label">The answer, with its source</h3>

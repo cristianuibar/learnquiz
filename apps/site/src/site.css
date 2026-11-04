@@ -239,6 +239,14 @@ label.conf-btn:hover { background: var(--surface-sunken); }
   background: var(--surface-page);
   overflow: hidden;
 }
+.shot-light { display: block; }
+.shot-dark { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .shot-light { display: none; }
+  :root:not([data-theme="light"]) .shot-dark { display: block; }
+}
+[data-theme="dark"] .shot-light { display: none; }
+[data-theme="dark"] .shot-dark { display: block; }
 /* ---------- Header ---------- */
 .hdr { position: sticky; top: 0; z-index: 20; background: var(--surface-page); border-bottom: 1px solid var(--border); }
 .hdr-in { display: flex; align-items: center; gap: var(--space-2); height: var(--header-h); }

@@ -9,7 +9,7 @@ it('shows the People page and Morgan’s progress with accessible screenshots', 
   const heading = section.querySelector('h2')!
   expect(heading.id).toBe(section.getAttribute('aria-labelledby'))
   expect(heading.textContent?.trim()).toBe('You see who is on track. They see exactly what you see.')
-  const screenshots = [...section.querySelectorAll('img')]
+  const screenshots = [...section.querySelectorAll<HTMLImageElement>('img:not(.shot-dark)')]
   expect(screenshots.map((image) => image.alt)).toEqual([
     expect.stringContaining('Northwind Logistics People page'),
     expect.stringContaining('Morgan Chen’s Training progress'),
