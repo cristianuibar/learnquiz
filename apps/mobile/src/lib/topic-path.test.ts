@@ -90,6 +90,24 @@ test('a path fetched under one token is never shown under another', async () => 
   expect(latest.path?.topic.title).toBe('Token B path')
 })
 
+test('a late response from learner A never replaces learner B’s loaded path', async () => {
+  const underA = deferred<TopicPath>()
+  mockApi.mockReturnValueOnce(underA.promise)
+  const view = await render(createElement(Probe, { topicId: 'topic-1' }))
+  // B signs in while A's request is still in flight; B's response lands first.
+  const underB = deferred<TopicPath>()
+  mockApi.mockReturnValueOnce(underB.promise)
+  mockGetToken.mockReturnValue('token-b')
+  await view.rerender(createElement(Probe, { topicId: 'topic-1' }))
+  await act(async () => { underB.resolve(pathFor('Token B path')) })
+  expect(latest).toMatchObject({ status: 'ready', owner: 'token-b' })
+  expect(latest.path?.topic.title).toBe('Token B path')
+  // A's response arrives late and must be dropped, not stored over B's.
+  await act(async () => { underA.resolve(pathFor('Token A path')) })
+  expect(latest).toMatchObject({ status: 'ready', owner: 'token-b' })
+  expect(latest.path?.topic.title).toBe('Token B path')
+})
+
 test('hides a loaded path at once when the token changes, before any refetch', async () => {
   mockApi.mockResolvedValueOnce(pathFor('Token A path'))
   const view = await render(createElement(Probe, { topicId: 'topic-1' }))
