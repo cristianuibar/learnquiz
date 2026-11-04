@@ -126,6 +126,66 @@ it('Discard restores the saved values without a request', async () => {
   expect(saveCompanySettings).not.toHaveBeenCalled()
 })
 
+it('a reload after a save keeps edits made while it was saving', async () => {
+  let finish = () => {}
+  vi.mocked(saveCompanySettings)
+    .mockImplementationOnce(() => new Promise<never>((resolve) => { finish = () => resolve(undefined as never) }))
+    .mockResolvedValue(undefined as never)
+  const c = document.createElement('div')
+  document.body.appendChild(c)
+  const root = createRoot(c)
+  roots.push({ unmount: () => root.unmount(), container: c })
+  const saved = { ...(settings as object), name: 'Northwind A', timezone: 'UTC' } as never
+  const reload = () => root.render(<SettingsForm settings={saved} onSaved={reload} />)
+  await act(async () => root.render(<SettingsForm settings={settings} onSaved={reload} />))
+
+  await setValue(field(c, '#name'), 'Northwind A')
+  await setValue(field(c, '#timezone'), 'UTC')
+  await click(button(c, 'Save changes'))
+  await setValue(field(c, '#name'), 'Northwind B')
+  const logo = new File(['x'], 'logo.png', { type: 'image/png' })
+  const input = field<HTMLInputElement>(c, 'input[type="file"][name="logo"]')
+  await act(async () => {
+    Object.defineProperty(input, 'files', { value: [logo], configurable: true })
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })
+  await act(async () => finish())
+
+  expect(c.querySelector('[role="status"]')?.textContent).toBe('Settings saved.')
+  expect(field<HTMLInputElement>(c, '#name').value).toBe('Northwind B')
+  expect(field<HTMLInputElement>(c, '#timezone').value).toBe('UTC')
+  expect(field<HTMLImageElement>(c, 'img[alt="Current logo"]').getAttribute('src')).toBe('blob:preview')
+  expect(URL.revokeObjectURL).not.toHaveBeenCalledWith('blob:preview')
+  await click(button(c, 'Save changes'))
+  expect(sent(1).get('name')).toBe('Northwind B')
+  expect(sent(1).get('logo')).toBe(logo)
+})
+
+it('Discard is unavailable while a save is in flight, so the reload shows the saved values', async () => {
+  let finish = () => {}
+  vi.mocked(saveCompanySettings).mockImplementationOnce(
+    () => new Promise<never>((resolve) => { finish = () => resolve(undefined as never) }),
+  )
+  const c = document.createElement('div')
+  document.body.appendChild(c)
+  const root = createRoot(c)
+  roots.push({ unmount: () => root.unmount(), container: c })
+  const saved = { ...(settings as object), name: 'Acme', logoUrl: null } as never
+  const reload = () => root.render(<SettingsForm settings={saved} onSaved={reload} />)
+  await act(async () => root.render(<SettingsForm settings={settings} onSaved={reload} />))
+
+  await setValue(field(c, '#name'), 'Acme')
+  await click(button(c, 'Remove'))
+  await click(button(c, 'Save changes'))
+  expect(button(c, 'Discard').disabled).toBe(true)
+  await click(button(c, 'Discard'))
+  await act(async () => finish())
+
+  expect(button(c, 'Discard').disabled).toBe(false)
+  expect(field<HTMLInputElement>(c, '#name').value).toBe('Acme')
+  expect(c.querySelector('img[alt="Current logo"]')).toBeNull()
+})
+
 const badLogos = [
   new File([new Uint8Array(2 * 1024 * 1024 + 1)], 'big.png', { type: 'image/png' }),
   new File(['x'], 'logo.gif', { type: 'image/gif' }),

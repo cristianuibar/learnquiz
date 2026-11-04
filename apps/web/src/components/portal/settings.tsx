@@ -112,10 +112,12 @@ export function SettingsForm({ settings, onSaved }: { settings: Settings; onSave
   const owned = useRef(new Set<string>())
   const baselineRef = useRef(baseline)
   baselineRef.current = baseline
+  const logoRef = useRef(logo)
+  logoRef.current = logo
 
-  function revokeOwned(except?: string | null) {
+  function revokeOwned(...keep: (string | null)[]) {
     for (const url of owned.current) {
-      if (url !== except) {
+      if (!keep.includes(url)) {
         URL.revokeObjectURL(url)
         owned.current.delete(url)
       }
@@ -123,7 +125,7 @@ export function SettingsForm({ settings, onSaved }: { settings: Settings; onSave
   }
   useEffect(() => () => revokeOwned(), [])
 
-  function applyBaseline(b: Values, keepStatus = false) {
+  function applyBaseline(b: Values) {
     setBaseline(b)
     setName(b.name)
     setAccent(b.accent)
@@ -137,15 +139,36 @@ export function SettingsForm({ settings, onSaved }: { settings: Settings; onSave
     setLogoError('')
     setShowErrors(false)
     setBanner(null)
-    if (!keepStatus) setStatus('')
+    setStatus('')
     if (fileRef.current) fileRef.current.value = ''
     revokeOwned(b.logo)
   }
 
   if (settings !== prevSettings) {
     setPrevSettings(settings)
-    // A reload after a save must not cut off the "Settings saved." announcement.
-    applyBaseline(baselineOf(settings), true)
+    const next = baselineOf(settings)
+    // Fields edited since the last baseline (e.g. while a save was in flight) keep the newer edit.
+    const keep = <T,>(current: T, saved: T, fresh: T) => (String(current) === String(saved) ? fresh : current)
+    setBaseline(next)
+    setName(keep(name, baseline.name, next.name))
+    setAccent(keep(accent, baseline.accent, next.accent))
+    setTimezone(keep(timezone, baseline.timezone, next.timezone))
+    setDays(keep(days, baseline.days, next.days))
+    setStart(keep(start, baseline.start, next.start))
+    setEnd(keep(end, baseline.end, next.end))
+    setShowErrors(false)
+    setBanner(null)
+    // The "Settings saved." announcement is kept so a reload after a save does not cut it off.
+    if (logo === baseline.logo) {
+      setLogo(next.logo)
+      setFile(null)
+      setRemoveLogo(false)
+      setLogoError('')
+      if (fileRef.current) fileRef.current.value = ''
+      revokeOwned(next.logo)
+    } else {
+      revokeOwned(logo)
+    }
   }
 
   const zones = useMemo(() => {
@@ -223,10 +246,13 @@ export function SettingsForm({ settings, onSaved }: { settings: Settings; onSave
       return
     }
     setBaseline(snapshot)
-    setFile(null)
-    setRemoveLogo(false)
-    if (fileRef.current) fileRef.current.value = ''
-    revokeOwned(snapshot.logo)
+    // A logo picked or removed while saving is a newer edit; leave it in the form.
+    if (logoRef.current === snapshot.logo) {
+      setFile(null)
+      setRemoveLogo(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+    revokeOwned(snapshot.logo, logoRef.current)
     setStatus('Settings saved.')
     savingRef.current = false
     setSaving(false)
@@ -261,6 +287,8 @@ export function SettingsForm({ settings, onSaved }: { settings: Settings; onSave
   }
 
   function discard() {
+    // While a save is in flight the saved values are not known yet.
+    if (savingRef.current) return
     applyBaseline(baseline)
   }
 
@@ -434,7 +462,7 @@ export function SettingsForm({ settings, onSaved }: { settings: Settings; onSave
             </fieldset>
           </Section>
           <div className="flex flex-wrap justify-end gap-3 border-t border-border px-6 py-4">
-            <Button variant="ghost" type="button" onClick={discard}>Discard</Button>
+            <Button variant="ghost" type="button" disabled={saving} onClick={discard}>Discard</Button>
             <Button type="submit">{saving ? 'Saving…' : 'Save changes'}</Button>
           </div>
         </form>
