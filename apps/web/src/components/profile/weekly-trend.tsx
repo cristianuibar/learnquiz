@@ -31,9 +31,9 @@ export function WeeklyTrend({ profile }: { profile: Profile }) {
         <figure className="m-0 flex flex-col gap-3 rounded-md border border-border bg-surface-card p-4">
           <svg viewBox={`0 0 ${chart.width} 188`} className="h-auto w-full" role="img" aria-label={chart.description}>
             {[chart.top, mid, chart.bottom].map((y) => (
-              <line key={y} x1={chart.left} x2={chart.right} y1={y} y2={y} strokeWidth={1} className="stroke-border" />
+              <line key={y} x1={chart.left} x2={chart.width} y1={y} y2={y} strokeWidth={1} className="stroke-border" />
             ))}
-            <line x1={chart.left} x2={chart.right} y1={chart.benchmarkY} y2={chart.benchmarkY} strokeWidth={2} strokeDasharray="4 4" className="stroke-ink-muted" />
+            <line x1={chart.left} x2={chart.width} y1={chart.benchmarkY} y2={chart.benchmarkY} strokeWidth={2} strokeDasharray="4 4" className="stroke-ink-muted" />
             {ticks.map(({ value, y }, i) => (
               <text key={i} x={chart.left - 8} y={y + 4} textAnchor="end" className={`${text} ${i === 1 ? 'fill-ink font-semibold' : 'fill-ink-muted'}`}>
                 {percentText(value)}
@@ -50,14 +50,14 @@ export function WeeklyTrend({ profile }: { profile: Profile }) {
             {chart.projection && last && (
               <>
                 <line x1={last.x} y1={last.y} x2={chart.projection.x} y2={chart.projection.y} strokeWidth={2} strokeLinecap="round" strokeDasharray="6 6" className="stroke-brand" />
-                <circle cx={chart.projection.x} cy={chart.projection.y} r={4} strokeWidth={2} className="fill-surface-page stroke-brand" />
+                <circle cx={chart.projection.x} cy={chart.projection.y} r={4} strokeWidth={2} className="fill-surface-card stroke-brand" />
                 <text x={chart.projection.x} y={164} textAnchor="middle" className={`${text} fill-ink-muted`}>
                   {formatShortDate(chart.projection.at)}
                 </text>
               </>
             )}
             {chart.points.map((p) => (
-              <circle key={p.start} cx={p.x} cy={p.y} r={5} strokeWidth={2} className="fill-brand stroke-surface-page" />
+              <circle key={p.start} cx={p.x} cy={p.y} r={5} strokeWidth={2} className="fill-brand stroke-surface-card" />
             ))}
             {chart.points.map((p) => (
               <text key={`v${p.start}`} x={p.x} y={Math.max(11, p.y - 12)} textAnchor="middle" className={`${text} fill-ink font-semibold`}>
