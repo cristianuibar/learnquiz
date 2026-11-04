@@ -106,7 +106,9 @@ function Usage() {
   const [job, setJob] = useState<{ data: ModelUsage; purpose: string; latency: ModelUsage['latency']; error?: string } | null>(null)
   const jobRequest = useRef(0)
   const [sort, setSort] = useState<{ key: string; direction: SortDirection }>({ key: 'cost', direction: 'descending' })
-  const [page, setPage] = useState(1)
+  // The failures page also belongs to the loaded range, so any range change (presets, picker, Back/Forward) starts on page 1.
+  const [paged, setPaged] = useState<{ data: ModelUsage; page: number } | null>(null)
+  const page = paged?.data === data ? paged.page : 1
 
   const fromMs = dayMs(data.from)
   const toMs = dayMs(data.to)
@@ -227,7 +229,6 @@ function Usage() {
               onValueChange={(next) => {
                 const added = customFrom ? next[0] : next.find((v) => v !== String(range))
                 if (!added) return
-                setPage(1)
                 void navigate({ search: { range: Number(added) as Range } })
               }}
             />
@@ -237,7 +238,6 @@ function Usage() {
               max={isoDay(data.asOf)}
               maxDays={MAX_DAYS}
               onApply={({ from, to }) => {
-                setPage(1)
                 void navigate({ search: { range, from, to } })
               }}
             />
@@ -358,8 +358,8 @@ function Usage() {
               total={data.failures.length}
               noun="failures"
               page={page}
-              onPrevious={() => setPage((p) => Math.max(1, p - 1))}
-              onNext={() => setPage((p) => p + 1)}
+              onPrevious={() => setPaged({ data, page: Math.max(1, page - 1) })}
+              onNext={() => setPaged({ data, page: page + 1 })}
             />
           ) : undefined}
         />
