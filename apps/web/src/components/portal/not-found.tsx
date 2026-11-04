@@ -22,7 +22,7 @@ export function PortalNotFound({ what }: { what: What }) {
   return (
     <Page capped>
       <section aria-labelledby="not-found-heading" className="flex max-w-[560px] flex-col gap-4">
-        <h1 id="not-found-heading" ref={heading} tabIndex={-1} className="text-title-1 text-ink outline-none">{title}</h1>
+        <h1 id="not-found-heading" ref={heading} tabIndex={-1} className="text-title-1 text-ink">{title}</h1>
         <p className="text-body-lg text-ink-muted">The link may be wrong, or {reason}.</p>
         <div className="flex flex-wrap gap-3 max-sm:[&>*]:w-full">
           <Button asChild className="px-6"><Link {...links.overview}>Go to Overview</Link></Button>
