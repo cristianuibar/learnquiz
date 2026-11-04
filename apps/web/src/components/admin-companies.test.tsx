@@ -3,9 +3,11 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet, RouterProvider } from '@tanstack/react-router'
 import { expect, it, vi } from 'vitest'
+import { Route as adminRoute } from '@/routes/admin'
 import { Route as companiesRoute } from '@/routes/admin.companies'
 import { getCompanies } from '@/server/admin-companies'
 
+vi.mock('@/server/admin', () => ({ getStaffSession: vi.fn() }))
 vi.mock('@/server/admin-companies', () => ({ getCompanies: vi.fn() }))
 
 const seed = [
@@ -18,8 +20,14 @@ async function mount(component = companiesRoute.options.component) {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   vi.mocked(getCompanies).mockResolvedValue(seed as never)
   const rootRoute = createRootRoute({ component: Outlet })
-  const route = createRoute({ getParentRoute: (() => rootRoute) as never, path: '/admin/companies' as never, loader: companiesRoute.options.loader as never, component })
-  const router = createRouter({ routeTree: rootRoute.addChildren([route as never]), history: createMemoryHistory({ initialEntries: ['/admin/companies'] }) })
+  const shell = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/admin',
+    beforeLoad: () => ({ staff: { id: 's', name: 'Ana Popescu', email: 'ana@learnquiz.test', failedJobs: 0 } }),
+    component: adminRoute.options.component,
+  })
+  const route = createRoute({ getParentRoute: (() => shell) as never, path: '/companies' as never, loader: companiesRoute.options.loader as never, component })
+  const router = createRouter({ routeTree: rootRoute.addChildren([shell.addChildren([route as never])]), history: createMemoryHistory({ initialEntries: ['/admin/companies'] }) })
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -92,13 +100,16 @@ it('keeps the 44px link and menu targets off the row height so loaded rows match
   }
 })
 
-it('fills the admin shell content column on the loaded and loading pages instead of nesting its own padding', async () => {
+it('fills the admin shell content column on the loaded and loading pages instead of nesting its own padding or a width cap', async () => {
   for (const component of [companiesRoute.options.component, companiesRoute.options.pendingComponent]) {
     const { container, cleanup } = await mount(component)
     try {
-      // The admin shell already caps at 1120 with px-4; md:p-8 here shrank the table to about 1024 and centered it.
+      // At 1440 a max-w-[1120px] shell or md:p-8 here left the table a centered frame of about 1088 or 1024 instead of the full column.
       const main = container.querySelector('main') as HTMLElement
       expect([...main.classList].filter((c) => /^(md:)?p[xy]?-/.test(c))).toEqual(['p-0', 'md:p-0'])
+      const frames: string[] = []
+      for (let el: HTMLElement | null = main; el && el !== container; el = el.parentElement) frames.push(...[...el.classList].filter((c) => /^(mx-auto|max-w-)/.test(c)))
+      expect(frames).toEqual([])
     } finally {
       await cleanup()
     }
