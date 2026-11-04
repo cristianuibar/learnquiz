@@ -4,7 +4,7 @@ import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { errorMessage, fieldErrors } from '@/components/inline-error'
 import { getSessionUser } from '@/server/session'
-import { createCompany, createRole, getOrgOverview, listRoles } from './org'
+import { createCompany, createRole, getOrgOverview, listRoles, updateRole } from './org'
 import { getPeople } from '@/server/people'
 
 const holder = vi.hoisted(() => ({ db: null as unknown, createOrganization: vi.fn() }))
@@ -310,4 +310,41 @@ it('rejects a role name that matches an existing role after trimming and case fo
   expect(duplicate).toMatchObject({ status: 409 })
   expect(fieldErrors(duplicate)).toEqual({ name: 'A role with this name already exists' })
   expect(sqlite.prepare("SELECT name FROM job_roles WHERE lower(trim(name)) = 'customer support'").all()).toEqual([{ name: 'Customer Support' }])
+})
+
+const roleRow = () => sqlite.prepare("SELECT name, benchmark, onboarding_days FROM job_roles WHERE id = 'legacy-role'").get()
+const topicTitle = () => sqlite.prepare("SELECT title FROM topics WHERE job_role_id = 'legacy-role'").get()
+const edit = { slug: 'alpha', roleId: 'legacy-role', name: 'Renamed', benchmark: 90, onboardingDays: 60 }
+const attempt = (data: Partial<typeof edit>) => (async () => updateRole({ data: { ...edit, ...data } }))().catch((e: unknown) => e)
+
+it('updates a role name, benchmark and onboarding days together with its topic title', async () => {
+  await expect(updateRole({ data: { ...edit, name: '  Renamed  ' } })).resolves.toEqual({ id: 'legacy-role' })
+  expect(roleRow()).toEqual({ name: 'Renamed', benchmark: 0.9, onboarding_days: 60 })
+  expect(topicTitle()).toEqual({ title: 'Renamed' })
+})
+
+it('rejects renaming to another active role name but allows keeping its own', async () => {
+  await createRole({ data: { slug: 'alpha', name: 'Customer Support' } })
+  const duplicate = await attempt({ name: ' customer SUPPORT ' })
+  expect(duplicate).toMatchObject({ status: 409 })
+  expect(fieldErrors(duplicate)).toEqual({ name: 'A role with this name already exists' })
+  expect(roleRow()).toMatchObject({ name: 'Original role' })
+  await expect(updateRole({ data: { ...edit, name: ' original ROLE' } })).resolves.toEqual({ id: 'legacy-role' })
+  expect(roleRow()).toEqual({ name: 'original ROLE', benchmark: 0.9, onboarding_days: 60 })
+})
+
+it.each([
+  ['member', { id: 'member' }],
+  ['staff read-only', { id: 'staff', role: 'admin' }],
+])('refuses to update a role for %s without changing it', async (_label, user) => {
+  sqlite.prepare("INSERT OR IGNORE INTO user (id, name, email, role) VALUES (?, ?, ?, ?)").run(user.id, user.id, `${user.id}@x.test`, 'role' in user ? 'admin' : null)
+  vi.mocked(getSessionUser).mockResolvedValue(user as never)
+  expect(await attempt({})).toMatchObject({ status: 403 })
+  expect(roleRow()).toEqual({ name: 'Original role', benchmark: 0.85, onboarding_days: 30 })
+  expect(topicTitle()).toEqual({ title: 'Original role' })
+})
+
+it("returns 404 for another company's role", async () => {
+  expect(await attempt({ roleId: 'other-role' })).toMatchObject({ status: 404 })
+  expect(sqlite.prepare("SELECT name, benchmark FROM job_roles WHERE id = 'other-role'").get()).toEqual({ name: 'Private role', benchmark: 0.85 })
 })

@@ -7,19 +7,21 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { createRole } from '@/server/org'
+import { createRole, updateRole } from '@/server/org'
 
 type Errors = { name?: string; benchmark?: string; onboardingDays?: string }
 
-export function RoleDialog({ open, onOpenChange, slug, onCreated, onCloseAutoFocus }: {
+export function RoleDialog({ open, onOpenChange, slug, role, onSaved, onCloseAutoFocus }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   slug: string
-  onCreated: (roleId: string) => void
+  role?: { id: string; name: string; benchmark: number; onboardingDays: number }
+  onSaved: (roleId: string) => void | Promise<void>
   onCloseAutoFocus?: (e: Event) => void
 }) {
   const uid = useId()
   const create = useServerFn(createRole)
+  const update = useServerFn(updateRole)
   const pending = useRef(false)
   const firstField = useRef<HTMLInputElement>(null)
   const [name, setName] = useState('')
@@ -33,9 +35,9 @@ export function RoleDialog({ open, onOpenChange, slug, onCreated, onCloseAutoFoc
 
   useEffect(() => {
     if (!open) return
-    setName('')
-    setBenchmark('85')
-    setOnboardingDays('30')
+    setName(role?.name ?? '')
+    setBenchmark(role ? String(Math.round(role.benchmark * 100)) : '85')
+    setOnboardingDays(String(role?.onboardingDays ?? 30))
     setErrors({})
     setBanner('')
   }, [open])
@@ -52,8 +54,9 @@ export function RoleDialog({ open, onOpenChange, slug, onCreated, onCloseAutoFoc
     pending.current = true
     setBusy(true)
     try {
-      const res = await create({ data: { slug, name: name.trim(), benchmark: Number(benchmark), onboardingDays: Number(onboardingDays) } })
-      onCreated(res.id)
+      const data = { slug, name: name.trim(), benchmark: Number(benchmark), onboardingDays: Number(onboardingDays) }
+      const res = role ? await update({ data: { ...data, roleId: role.id } }) : await create({ data })
+      await onSaved(res.id)
     } catch (err) {
       const found = fieldErrors(err)
       const next: Errors = {}
@@ -71,7 +74,7 @@ export function RoleDialog({ open, onOpenChange, slug, onCreated, onCloseAutoFoc
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent aria-describedby={undefined} initialFocus={firstField} onCloseAutoFocus={onCloseAutoFocus}>
-        <DialogHeader><DialogTitle>Create role</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{role ? 'Edit role' : 'Create role'}</DialogTitle></DialogHeader>
         <form ref={formRef} noValidate onSubmit={submit} className="flex flex-col gap-6">
           <div className="flex flex-col gap-2">
             <Label htmlFor={id('name')}>Name</Label>
@@ -93,7 +96,7 @@ export function RoleDialog({ open, onOpenChange, slug, onCreated, onCloseAutoFoc
           {banner && <Banner kind="alert">{banner}</Banner>}
           <DialogFooter>
             <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" aria-disabled={busy || undefined} className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50">Create role</Button>
+            <Button type="submit" aria-disabled={busy || undefined} className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50">{role ? 'Save role' : 'Create role'}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
