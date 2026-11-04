@@ -3,17 +3,19 @@ import { StrictMode, act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet, RouterProvider } from '@tanstack/react-router'
 import { loadingTitle, startFailed, startSlow } from '@learnquiz/api/system-copy'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Route as loadingRoute } from '@/routes/play.loading'
 import { Route as appRootRoute } from '@/routes/__root'
-import { startPlacement, startSession } from '@/server/play'
+import { getSessionReadiness, startPlacement, startSession } from '@/server/play'
 
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
-vi.mock('@/server/play', () => ({ startSession: vi.fn(), startPlacement: vi.fn() }))
+vi.mock('@/server/play', () => ({ startSession: vi.fn(), startPlacement: vi.fn(), getSessionReadiness: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
 vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => 't1' }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: async () => ({ user: { id: 'u1', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, companyMember: false, adminCompanies: [] }) }))
+
+beforeEach(() => { vi.mocked(getSessionReadiness).mockResolvedValue(null) })
 
 let cleanups: Array<() => Promise<void>> = []
 afterEach(async () => {
@@ -22,6 +24,7 @@ afterEach(async () => {
   vi.useRealTimers()
   vi.mocked(startSession).mockReset()
   vi.mocked(startPlacement).mockReset()
+  vi.mocked(getSessionReadiness).mockReset()
   delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT
 })
 
@@ -55,7 +58,7 @@ const status = (c: HTMLElement) => c.querySelector('[role=status]')!.textContent
 const tryAgain = (c: HTMLElement) => [...c.querySelectorAll('button')].find((b) => b.textContent === 'Try again')
 
 describe('session Loading screen', () => {
-  it('focuses the title with a visible ring, shows no progress and offers Cancel back to Today', async () => {
+  it('focuses the title with a visible ring, shows no counts while readiness is unknown and offers Cancel back to Today', async () => {
     vi.mocked(startSession).mockReturnValue(new Promise(() => {}))
     const { container } = await renderLoading()
     const h1 = container.querySelector('h1')!
@@ -66,6 +69,53 @@ describe('session Loading screen', () => {
     expect([...h1.classList]).toEqual(expect.arrayContaining(['focus-visible:outline-2', 'focus-visible:outline-offset-2', 'focus-visible:outline-brand']))
     expect(container.querySelector('[role=progressbar]')).toBeNull()
     expect(container.querySelector('a[aria-label="Cancel"]')!.getAttribute('href')).toBe('/today')
+  })
+
+  it('shows the ready count and updates it every 2 s without re-announcing', async () => {
+    vi.useFakeTimers()
+    vi.mocked(startSession).mockReturnValue(new Promise(() => {}))
+    vi.mocked(getSessionReadiness).mockResolvedValue({ ready: 4, total: 12 })
+    const { container } = await renderLoading()
+    await act(async () => {})
+    const bar = () => container.querySelector('[role=progressbar]')!
+    expect(getSessionReadiness).toHaveBeenCalledWith({ data: { topicId: 't1' } })
+    expect(bar().getAttribute('aria-valuenow')).toBe('4')
+    expect(bar().getAttribute('aria-valuemax')).toBe('12')
+    expect(bar().getAttribute('aria-valuetext')).toBe('4 of 12 questions ready')
+    expect(container.textContent).toContain('4 of 12 questions ready')
+    expect(status(container)).toBe('Getting your questions ready.')
+    vi.mocked(getSessionReadiness).mockResolvedValue({ ready: 8, total: 12 })
+    await act(async () => { await vi.advanceTimersByTimeAsync(2_000) })
+    expect(bar().getAttribute('aria-valuenow')).toBe('8')
+    expect(container.textContent).toContain('8 of 12 questions ready')
+    expect(status(container)).toBe('Getting your questions ready.')
+  })
+
+  it('stops reading readiness and drops the bar when the start fails with a 4xx', async () => {
+    vi.useFakeTimers()
+    let fail!: (e: unknown) => void
+    vi.mocked(startSession).mockReturnValue(new Promise((_r, j) => { fail = j }) as never)
+    vi.mocked(getSessionReadiness).mockResolvedValue({ ready: 4, total: 12 })
+    const { container } = await renderLoading()
+    await act(async () => {})
+    expect(container.querySelector('[role=progressbar]')).not.toBeNull()
+    await act(async () => fail(Object.assign(new Error('Unit is locked'), { status: 409 })))
+    expect(container.querySelector('[role=alert]')!.textContent).toContain('Unit is locked')
+    expect(container.querySelector('[role=progressbar]')).toBeNull()
+    expect(container.textContent).not.toContain('questions ready')
+    const calls = vi.mocked(getSessionReadiness).mock.calls.length
+    await act(async () => { await vi.advanceTimersByTimeAsync(6_000) })
+    expect(getSessionReadiness).toHaveBeenCalledTimes(calls)
+  })
+
+  it('never reads readiness for a placement', async () => {
+    vi.useFakeTimers()
+    vi.mocked(startPlacement).mockReturnValue(new Promise(() => {}))
+    const { container } = await renderLoading('topicId=t1&start=placement')
+    await act(async () => { await vi.advanceTimersByTimeAsync(6_000) })
+    expect(getSessionReadiness).not.toHaveBeenCalled()
+    expect(container.querySelector('[role=progressbar]')).toBeNull()
+    expect(status(container)).toBe('Getting your questions ready.')
   })
 
   it.each([

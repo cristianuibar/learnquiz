@@ -6,9 +6,10 @@ import { loadingTitle, slowAfterMs, startFailed, startSlow } from '@learnquiz/ap
 import { errorMessage } from '@/components/inline-error'
 import { ErrorRow } from '@/components/question/error-row'
 import { Button } from '@/components/ui/button'
-import { startPlacement, startSession } from '@/server/play'
+import { getSessionReadiness, startPlacement, startSession } from '@/server/play'
 
 const preparingStatus = 'Getting your questions ready.'
+const readinessEveryMs = 2000
 
 interface Failure {
   message: string
@@ -27,6 +28,7 @@ export function SessionLoading({ topicId, start, unitId }: { topicId: string; st
   const router = useRouter()
   const runSession = useServerFn(startSession)
   const runPlacement = useServerFn(startPlacement)
+  const readSession = useServerFn(getSessionReadiness)
   const heading = useRef<HTMLHeadingElement>(null)
   const mounted = useRef(false)
   const started = useRef<number | null>(null)
@@ -37,6 +39,9 @@ export function SessionLoading({ topicId, start, unitId }: { topicId: string; st
   const [attempt, setAttempt] = useState(0)
   const [slow, setSlow] = useState(false)
   const [failure, setFailure] = useState<Failure | null>(null)
+  const [settled, setSettled] = useState(false)
+  // null = unknown (not fetched, topic not ready, or placement); never simulated.
+  const [progress, setProgress] = useState<{ ready: number; total: number } | null>(null)
 
   useEffect(() => heading.current?.focus(), [])
 
@@ -70,6 +75,7 @@ export function SessionLoading({ topicId, start, unitId }: { topicId: string; st
       request.then(
         ({ sessionId }) => {
           clearTimeout(timer)
+          if (mounted.current) setSettled(true)
           openSession(sessionId)
         },
         (err: unknown) => {
@@ -83,6 +89,28 @@ export function SessionLoading({ topicId, start, unitId }: { topicId: string; st
       clearTimeout(timer)
     }
   }, [attempt, topicId, start, unitId, runSession, runPlacement, openSession])
+
+  // Session starts only: poll how many questions are ready until the start fails or resolves; errors keep the last value.
+  useEffect(() => {
+    if (start !== 'session' || failure || settled) return
+    let live = true
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const tick = () => {
+      const next = () => { if (live) timer = setTimeout(tick, readinessEveryMs) }
+      readSession({ data: unitId === undefined ? { topicId } : { topicId, unitId } }).then(
+        (r) => { if (live) setProgress(r); next() },
+        next,
+      )
+    }
+    tick()
+    return () => {
+      live = false
+      clearTimeout(timer)
+    }
+  }, [start, topicId, unitId, failure, settled, readSession])
+
+  const known = start === 'session' && progress !== null && progress.total > 0 ? progress : null
+  const pct = known ? Math.min(100, Math.max(0, Math.round((known.ready / known.total) * 100))) : 0
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col px-4">
@@ -117,6 +145,7 @@ export function SessionLoading({ topicId, start, unitId }: { topicId: string; st
                 onClick={() => {
                   setFailure(null)
                   setSlow(false)
+                  setSettled(false)
                   setAttempt((n) => n + 1)
                 }}
               >
@@ -125,7 +154,18 @@ export function SessionLoading({ topicId, start, unitId }: { topicId: string; st
             )}
           </>
         ) : (
-          <p role="status" className="text-ink-muted text-center">{slow ? startSlow : preparingStatus}</p>
+          <>
+            {known && (
+              <>
+                <div role="progressbar" aria-label="Questions ready" aria-valuemin={0} aria-valuemax={known.total} aria-valuenow={known.ready} aria-valuetext={`${known.ready} of ${known.total} questions ready`} className="relative h-2 w-full overflow-hidden rounded-full bg-surface-sunken">
+                  <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />
+                </div>
+                <p className="text-ink-muted text-center tabular-nums">{known.ready} of {known.total} questions ready</p>
+              </>
+            )}
+            {/* One announcement on open and one when ready; the count above is not live. */}
+            <p role="status" className={known && !slow ? 'sr-only' : 'text-ink-muted text-center'}>{slow ? startSlow : preparingStatus}</p>
+          </>
         )}
       </div>
     </main>
