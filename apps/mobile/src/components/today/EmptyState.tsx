@@ -13,13 +13,17 @@ export function EmptyState({ companyMember, onRetry, onSignOut }: EmptyStateProp
       <Text variant="title3" header>No training yet</Text>
       <Text variant="body">{companyMember
         ? 'Your company hasn’t assigned you a role. Ask your manager.'
-        : 'Your topic may still be preparing. Open Learn Quiz on the web to check it or start a new topic.'}</Text>
+        : 'To start a topic on the web, sign in with the same account.'}</Text>
       {!companyMember && (
         <LinkButton
           accessibilityLabel="Open topics on the web, opens browser"
+          accessibilityRole="link"
+          role="link"
+          accessibilityHint="Opens in your browser"
+          style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }}
           onPress={() => {
-            void Linking.openURL('https://app.learnquiz.com/start').catch(() => {
-              Alert.alert('Could not open browser', 'Visit https://app.learnquiz.com/start to check or start your topic.')
+            void Linking.openURL('https://app.learnquiz.com/sign-in?redirect=%2Fstart').catch(() => {
+              Alert.alert('Could not open browser', 'Visit https://app.learnquiz.com/sign-in?redirect=%2Fstart and sign in with the same account to start a topic.')
             })
           }}
         >Open topics on the web</LinkButton>

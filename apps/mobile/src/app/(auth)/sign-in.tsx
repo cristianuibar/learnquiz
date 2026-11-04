@@ -104,9 +104,13 @@ export default function SignInScreen() {
         <Text variant="body">New to Learn Quiz? Create your account on the web, then sign in here.</Text>
         <LinkButton
           accessibilityLabel="Open web sign-up, opens browser"
+          accessibilityRole="link"
+          role="link"
+          accessibilityHint="Opens in your browser"
+          style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }}
           onPress={() => {
-            void Linking.openURL('https://app.learnquiz.com/sign-in').catch(() => {
-              Alert.alert('Could not open browser', 'Visit https://app.learnquiz.com/sign-in to create your account.')
+            void Linking.openURL('https://app.learnquiz.com/sign-in?mode=up').catch(() => {
+              Alert.alert('Could not open browser', 'Visit https://app.learnquiz.com/sign-in?mode=up to create your account.')
             })
           }}
         >Open web sign-up</LinkButton>
