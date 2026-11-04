@@ -78,12 +78,15 @@ it('filters by name or slug and clears the search', async () => {
   }
 })
 
-it('keeps the company link target off the row height so loaded rows match the 56px skeleton', async () => {
+it('keeps the 44px link and menu targets off the row height so loaded rows match the 56px skeleton', async () => {
   const { container, cleanup } = await mount()
   try {
     const link = container.querySelector('tbody a') as HTMLAnchorElement
     const cls = [...link.classList]
     expect([cls.some((c) => c.startsWith('min-h-')), link.classList.contains('relative'), link.classList.contains('before:-inset-y-3')]).toEqual([false, true, true])
+    const menu = container.querySelector('tbody button[aria-label="More actions for Birch"]') as HTMLButtonElement
+    // The size-11 button sits in a wrapper that pulls it into the cell's py-2.5 padding.
+    expect([menu.classList.contains('size-11'), menu.closest('td > div')?.classList.contains('-my-1.5')]).toEqual([true, true])
   } finally {
     await cleanup()
   }
