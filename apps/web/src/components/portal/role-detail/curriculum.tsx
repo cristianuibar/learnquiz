@@ -34,8 +34,9 @@ export function Curriculum({ detail, readOnly, controls, error, announce }: {
   useEffect(() => {
     if (running) {
       wasRunning.current = true
-      const next = Math.floor(ready / 5)
-      if (bucket.current !== next) {
+      // Nothing to count until the first units publish.
+      const next = total > 0 ? Math.floor(ready / 5) : null
+      if (next !== null && bucket.current !== next) {
         bucket.current = next
         announceRef.current(`${ready} of ${total} concepts ready`)
       }
@@ -43,7 +44,7 @@ export function Curriculum({ detail, readOnly, controls, error, announce }: {
       wasRunning.current = false
       bucket.current = null
       if (total > 0) {
-        announceRef.current(`${total} of ${total} concepts ready. Curriculum ready.`)
+        announceRef.current(`${ready} of ${total} concepts ready. Curriculum ready.`)
         setFinished(true)
       }
     }

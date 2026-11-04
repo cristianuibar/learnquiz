@@ -139,6 +139,23 @@ it('announces build progress every five concepts and when the curriculum is read
   expect(container.textContent).toContain('31 concepts · 12 live questions · 5 critical questions')
 })
 
+it('announces progress only once units exist, and counts only ready concepts when the build ends', async () => {
+  const build = (readyN: number, status = 'generating', failedN = 0) => {
+    const list = Array.from({ length: 31 }, (_, i) => concept(`c${i}`, `Concept ${i}`, i < readyN ? 'ready' : i < readyN + failedN ? 'failed' : 'pending'))
+    return makeDetail({ status, documents: [pdf], units: unit(list) })
+  }
+  const { router, status } = await mount(makeDetail({ status: 'generating', documents: [pdf] }))
+  expect(status()).toBe('')
+  const refresh = async (d: ReturnType<typeof makeDetail>) => {
+    vi.mocked(getRoleDetail).mockResolvedValue(d as never)
+    await act(() => router.invalidate())
+  }
+  await refresh(build(0))
+  expect(status()).toBe('0 of 31 concepts ready')
+  await refresh(build(30, 'ready', 1))
+  expect(status()).toBe('30 of 31 concepts ready. Curriculum ready.')
+})
+
 it('retries a failed concept', async () => {
   vi.mocked(retryConceptGeneration).mockResolvedValue({ ok: true } as never)
   const { button } = await mount(makeDetail({ status: 'ready', documents: [pdf], units: unit([concept('c9', 'Safe drop', 'failed', { genError: 'No draft passed' })]) }))
