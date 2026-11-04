@@ -114,10 +114,10 @@ function Done() {
           </Button>
         ) : (
           <>
-            <StartButton topicId={s.topicId}>Another session</StartButton>
+            <StartButton topicId={s.topicId}>Start another session</StartButton>
             <Button asChild variant="secondary" className="w-full px-6 sm:w-auto">
               <Link to="/t/$topicId/path" params={{ topicId: s.topicId }}>
-                Your path
+                Open your path
               </Link>
             </Button>
           </>

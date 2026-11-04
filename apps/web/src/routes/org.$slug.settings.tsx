@@ -33,7 +33,7 @@ function Settings() {
       if (remove) remove.checked = false
       setSaved(true)
     } catch (err) {
-      setError(errorMessage(err, 'Could not save settings. Please try again.'))
+      setError(errorMessage(err, "Couldn't save settings. Check your connection and save again."))
     } finally {
       setBusy(false)
     }

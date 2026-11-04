@@ -58,7 +58,7 @@ function Start() {
       const { sessionId } = await place({ data: { topicId: created.current.topicId } })
       await router.navigate({ to: '/play/$sessionId', params: { sessionId } })
     } catch (err) {
-      setError(errorMessage(err))
+      setError(errorMessage(err, "Couldn't set up your topic. Check your connection and try again."))
       setStatus('idle')
     }
   }

@@ -23,7 +23,7 @@ export function fieldErrors(err: unknown): Record<string, string> {
   return out
 }
 
-export const errorMessage = (err: unknown, fallback = 'Something went wrong') =>
+export const errorMessage = (err: unknown, fallback = "That didn't go through. Check your connection and try again.") =>
   typeof navigator !== 'undefined' && navigator.onLine === false
     ? "You're offline"
     : issuesOf(err)?.[0].message || (err instanceof Error && err.message) || fallback
