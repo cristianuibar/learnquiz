@@ -21,18 +21,19 @@ function typeLine(q: Question) {
   return `${fmt} · Unreviewed · Generated ${shortDate(q.createdAt)}${q.source ? ` from ${q.source.title}` : ''}`
 }
 
-export function QuestionDetails({ question, slug, sources, stemId, onAct, onAnnounce }: {
+export function QuestionDetails({ question, slug, sources, stemId, editing, onEditingChange, onAct, onAnnounce }: {
   question: Question
   slug: string
   sources: Review['sources']
   stemId: string
+  editing: boolean
+  onEditingChange: (editing: boolean) => void
   // Called when Approve or Retire is pressed; the returned callback runs once the action is saved and the data refreshed.
   onAct: (id: string, action: Action) => () => void
   onAnnounce: (message: string) => void
 }) {
   const router = useRouter()
   const { readOnly } = usePortal()
-  const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const editButton = useRef<HTMLButtonElement>(null)
@@ -67,7 +68,7 @@ export function QuestionDetails({ question, slug, sources, stemId, onAct, onAnno
       await reviewQuestion({ data: { slug, itemId: question.id, action: 'edit', payload, sourceId } })
       await router.invalidate()
       refocusEdit.current = true
-      setEditing(false)
+      onEditingChange(false)
       onAnnounce('Changes saved. Review the question before approving it again.')
     } catch (err) {
       setError(errorMessage(err))
@@ -84,7 +85,7 @@ export function QuestionDetails({ question, slug, sources, stemId, onAct, onAnno
         busy={busy}
         error={error}
         onSave={(payload, sourceId) => void save(payload, sourceId)}
-        onCancel={() => { refocusEdit.current = true; setError(''); setEditing(false) }}
+        onCancel={() => { refocusEdit.current = true; setError(''); onEditingChange(false) }}
       />
     )
   }
@@ -136,7 +137,7 @@ export function QuestionDetails({ question, slug, sources, stemId, onAct, onAnno
       {canEdit && (
         <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
           {canReview && <Button variant="ghost" aria-describedby={stemId} disabled={busy} onClick={() => void act('retire')}>Retire</Button>}
-          <Button ref={editButton} variant="secondary" aria-describedby={stemId} disabled={busy} onClick={() => { setError(''); setEditing(true) }}><Pencil aria-hidden />Edit</Button>
+          <Button ref={editButton} variant="secondary" aria-describedby={stemId} disabled={busy} onClick={() => { setError(''); onEditingChange(true) }}><Pencil aria-hidden />Edit</Button>
           {canReview && (
             <Button aria-describedby={stemId} disabled={busy} onClick={() => void act('approve')}>
               {isFlagged(question) ? 'Approve, resolve flag and next' : 'Approve and next'}
