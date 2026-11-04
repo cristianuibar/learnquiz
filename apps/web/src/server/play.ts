@@ -12,7 +12,7 @@ import { levelResult, nextLevel, pickNext, PLACEMENT, shouldStop } from '@/lib/l
 import { composeSession, reinsert, SESSION_BONUS, streakAfter, xpFor } from '@/lib/learning/session'
 import { museModelIds } from '@learnquiz/api/models'
 import { reportReasons } from '@learnquiz/api/reveal'
-import type { Confidence, ItemView, Reveal, SessionPlanning, SessionView, SummaryView } from '@learnquiz/api'
+import type { Confidence, ItemView, Progress, Reveal, SessionPlanning, SessionView, SummaryView } from '@learnquiz/api'
 import { chatJson, chatJsonWithModel, DailyCapError, isVoiceEnabled, jobModel, transcribeAudio } from '@/lib/llm/client'
 import { gradePrompt } from '@/lib/llm/prompts'
 import { Grade, type ItemPayload } from '@/lib/llm/schemas'
@@ -139,6 +139,24 @@ export async function loadFrontier(db: Db, learnerId: string, topicId: string) {
     .sort((a, b) => a.unitOrder - b.unitOrder || a.pKnown - b.pKnown || a.concept.order - b.concept.order)
 }
 
+// Placement stops on evidence, not a fixed queue length. Never advertise its cap as a promise.
+async function progressOf(db: Db, session: SessionRow, plan: PlacementPlan | QueuePlan): Promise<Progress> {
+  const ids = JSON.parse(session.itemIdsJson) as string[]
+  if (session.endedAt !== null) {
+    const [{ total }] = await db.select({ total: count() }).from(attempts).where(eq(attempts.sessionId, session.id))
+    return { position: total, total }
+  }
+  const position = plan.position + 1
+  if (!('pool' in plan)) return { position, total: ids.length }
+  if (position >= PLACEMENT.max || shouldStop(plan.log)) return { position, total: position }
+  const unseen = plan.pool.filter((p) => !ids.includes(p.id)).map((p) => p.id)
+  const remaining = await Promise.all(chunks(unseen, 97).map((ids) => db.select({ id: items.id }).from(items)
+    .where(and(eq(items.topicId, session.topicId), ne(items.status, 'retired'), notFlaggedBy(db, session.learnerId), inArray(items.id, ids)))))
+  return remaining.some((rows) => rows.length > 0)
+    ? { position, total: position, totalKnown: false }
+    : { position, total: position }
+}
+
 async function viewOf(db: Db, session: SessionRow, topic: TopicRow, plan: PlacementPlan | QueuePlan): Promise<SessionView> {
   const ids = JSON.parse(session.itemIdsJson) as string[]
   const ended = session.endedAt !== null
@@ -152,13 +170,12 @@ async function viewOf(db: Db, session: SessionRow, topic: TopicRow, plan: Placem
     )
     item.generatedBy = row.generatedBy
   }
-  const placement = session.kind === 'placement'
   return {
     id: session.id,
     kind: session.kind,
     topicId: session.topicId,
     topicTitle: topic.title,
-    progress: { position: plan.position + 1, total: placement ? Math.max(PLACEMENT.max, plan.position + 1) : ids.length },
+    progress: await progressOf(db, session, plan),
     item,
     ended,
     // Role topics play without any model call, so transcription is off there.
@@ -627,7 +644,10 @@ export const answerItem = createServerFn({ method: 'POST' })
       ? (await db.select({ title: sources.title }).from(sources)
           .where(and(eq(sources.id, sourceId), eq(sources.topicId, session.topicId), isNull(sources.deletedAt))).get())?.title ?? null
       : null
-    const revealOf = (r: RevealFields) => buildReveal(session, item, concept, payload, sourceTitle, r)
+    const revealOf = async (r: RevealFields, progressPlan = plan, progressIds = ids): Promise<Reveal> => ({
+      ...buildReveal(session, item, concept, payload, sourceTitle, r),
+      progress: await progressOf(db, { ...session, itemIdsJson: JSON.stringify(progressIds) }, progressPlan),
+    })
 
     // A retry of the same answer whose response was lost gets the original reveal back; nothing is written.
     if (plan.answered) {
@@ -804,7 +824,7 @@ export const answerItem = createServerFn({ method: 'POST' })
       attemptId, correct, confidence: data.confidence, score,
       feedback: shortGrade?.feedback ?? null, missingPoints: shortGrade?.missing_points ?? [],
       correctAnswer: grade.correctAnswer, chosenFeedback: grade.chosenFeedback, detail: grade.detail ?? null, returnsThisSession, pKnownBefore, pKnownAfter,
-    })
+    }, nextPlan, itemIds)
   })
 
 async function advance(db: Db, learnerId: string, session: SessionRow, topic: TopicRow, plan: PlacementPlan | QueuePlan): Promise<SessionView> {

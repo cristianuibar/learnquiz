@@ -290,7 +290,7 @@ function ActiveSession({ sessionId, announceReady }: { sessionId: string; announ
         basics={view?.basics === true}
       />
     ) : null}>
-      <SessionFrame progress={view?.progress} onEnd={endSession} inert={reveal !== null} dock={dock} trailing={
+      <SessionFrame progress={reveal?.progress ?? view?.progress} onEnd={endSession} inert={reveal !== null} dock={dock} trailing={
         <ReadAloudButton
           item={view?.ended ? null : item ?? null}
           itemKey={item ? `${item.id}:${view.progress.position}` : null}

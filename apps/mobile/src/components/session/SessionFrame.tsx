@@ -24,7 +24,7 @@ export function SessionFrame({ children, dock, trailing, inert = false, progress
   const insets = useSafeAreaInsets()
   const keyboardVisible = useKeyboardState((state) => state.isVisible)
   const bottom = keyboardVisible ? 0 : Math.max(space[2], insets.bottom)
-  const count = progress ? `${progress.position} of ${progress.total}` : ''
+  const count = !progress ? '' : progress.totalKnown === false ? `Question ${progress.position}` : `${progress.position} of ${progress.total}`
 
   return (
     <View
@@ -49,10 +49,10 @@ export function SessionFrame({ children, dock, trailing, inert = false, progress
             {progress ? (
               <>
                 <Bar
-                  value={progress.total > 0 ? progress.position / progress.total * 100 : 0}
+                  value={progress.totalKnown !== false && progress.total > 0 ? progress.position / progress.total * 100 : 0}
                   accessibilityRole="progressbar"
                   accessibilityLabel="Session progress"
-                  accessibilityValue={{ min: 0, max: progress.total, now: progress.position, text: count }}
+                  accessibilityValue={progress.totalKnown === false ? { min: undefined, max: undefined, now: undefined, text: count } : { min: 0, max: progress.total, now: progress.position, text: count }}
                   style={{ flex: 1 }}
                 />
                 <Text variant="overline" num muted accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">{count}</Text>

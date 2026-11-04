@@ -257,14 +257,16 @@ function Play({ initial }: { initial: SessionView }) {
 
   const revealed = !view.ended && item && reveal ? { item, reveal } : null
   const answer = revealed ? toAnswer(revealed.item.format, choice) : null
+  const displayProgress = view.ended ? progress : reveal?.progress ?? progress
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col px-4">
       {/* The overlay portals out of this wrapper, so only the page behind it goes inert. */}
       <div inert={Boolean(revealed)} className="flex flex-1 flex-col">
         <ProgressHeader
-          position={progress.position}
-          total={progress.total}
+          position={displayProgress.position}
+          total={displayProgress.total}
+          totalKnown={displayProgress.totalKnown}
           onEnd={leave}
           endDisabled={busy}
           readAloud={item && !reveal && !loading ? [item.stem, ...item.options.map((o) => o.text)] : null}

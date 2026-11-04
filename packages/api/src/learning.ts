@@ -40,6 +40,7 @@ export type RevealDetail =
   | { kind: 'order'; rightPositions: number; steps: { id: string; text: string; note: string; yourPosition: number }[] }
 
 export type Reveal = {
+  progress?: Progress // Updated count after grading, including an adaptive placement stopping here.
   diagramConceptId: string | null
   attemptId: string | null // no scored attempt when grading is unavailable
   state: RevealState
@@ -63,7 +64,11 @@ export type Reveal = {
   pKnownAfter: number
 }
 
-export type Progress = { position: number; total: number } // 1-based position of the current item
+export type Progress = {
+  position: number // 1-based position of the current item
+  total: number
+  totalKnown?: boolean // False for adaptive sessions: total is the count served so far, not a promised final total. Missing means known.
+}
 
 export type SessionPlanning = {
   planner: string
