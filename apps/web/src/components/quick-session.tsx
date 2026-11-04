@@ -157,30 +157,32 @@ function ResultView({ sessionId, item, result }: { sessionId: string; item: Item
         <Close />
       </div>
       <h1 ref={heading} tabIndex={-1} className="sr-only">Quick question done</h1>
-      <div className="mt-6 flex flex-1 flex-col gap-4 pb-6">
-        <div role="status" className={cn('-mx-4 flex items-center gap-3 px-4 py-4', tone.ground)}>
-          <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-full', tone.disc)}>
-            <tone.Icon aria-hidden className="size-5" />
-          </span>
-          <span className={cn('text-title-2', tone.text)}>{model.heading}</span>
+      <div className="mt-2 flex flex-1 flex-col gap-4 pb-6">
+        <div className="overflow-hidden rounded-md border border-border bg-surface-card">
+          <div role="status" className={cn('flex items-center gap-2 px-4 py-3 text-title-3', tone.ground, tone.text)}>
+            <tone.Icon aria-hidden className="size-6 shrink-0" />
+            <span>{model.heading}</span>
+          </div>
+          <div className="flex flex-col gap-4 px-4 pt-3 pb-4">
+            {graded ? (
+              miss ? (
+                <>
+                  {row(revealCopy.theAnswer, reveal.correctAnswer)}
+                  {row(revealCopy.youChose, chosen)}
+                  {why && <p className="text-body">{why}</p>}
+                </>
+              ) : (
+                <div className="text-body-lg">{reveal.correctAnswer}</div>
+              )
+            ) : (
+              <>
+                {row(revealCopy.yourAnswer, chosen)}
+                {row(revealCopy.theAnswer, reveal.correctAnswer)}
+                {reveal.feedback && <p className="text-body">{reveal.feedback}</p>}
+              </>
+            )}
+          </div>
         </div>
-        {graded ? (
-          miss ? (
-            <>
-              {row(revealCopy.theAnswer, reveal.correctAnswer)}
-              {row(revealCopy.youChose, chosen)}
-              {why && <p className="text-body">{why}</p>}
-            </>
-          ) : (
-            <div className="text-body-lg">{reveal.correctAnswer}</div>
-          )
-        ) : (
-          <>
-            {row(revealCopy.yourAnswer, chosen)}
-            {row(revealCopy.theAnswer, reveal.correctAnswer)}
-            {reveal.feedback && <p className="text-body">{reveal.feedback}</p>}
-          </>
-        )}
         {reveal.sourceQuote !== null && <SourceQuote quote={reveal.sourceQuote} title={reveal.sourceTitle} version={reveal.sourceVersion} />}
         {counter && <p className="text-label text-ink-muted tabular-nums">{counter}</p>}
         <p role="status" className="sr-only">{announcement}</p>
