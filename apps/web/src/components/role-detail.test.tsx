@@ -216,7 +216,7 @@ it('shows the page and pasted-text meta on file rows', async () => {
 
 class FakeXhr {
   static instances: FakeXhr[] = []
-  upload: { onprogress: ((e: { loaded: number; total: number }) => void) | null } = { onprogress: null }
+  upload: { onprogress: ((e: { loaded: number; total: number }) => void) | null; onload: (() => void) | null } = { onprogress: null, onload: null }
   onload: (() => void | Promise<void>) | null = null
   onerror: (() => void) | null = null
   status = 0
@@ -289,6 +289,25 @@ it('cancels an upload in flight and removes its row', async () => {
   expect(FakeXhr.instances[0]!.abort).toHaveBeenCalled()
   expect(container.querySelector('[role="progressbar"]')).toBeNull()
   expect(container.querySelector('[role="alert"]')).toBeNull()
+})
+
+it('keeps an upload whose body was sent when Cancel is pressed, and shows the stored document', async () => {
+  vi.stubGlobal('XMLHttpRequest', FakeXhr)
+  FakeXhr.instances = []
+  const { container, button } = await mount(makeDetail())
+  await pickFile(container, new File(['%PDF'], 'sop.pdf', { type: 'application/pdf' }))
+  const xhr = FakeXhr.instances[0]!
+  await act(async () => { xhr.upload.onload?.() })
+  expect(button('Cancel upload')!.getAttribute('aria-disabled')).toBe('true')
+  await act(async () => { button('Cancel upload')!.click() })
+  expect(xhr.abort).not.toHaveBeenCalled()
+  expect(container.querySelector('[role="progressbar"]')).not.toBeNull()
+  vi.mocked(getRoleDetail).mockResolvedValue(makeDetail({ documents: [{ ...pdf, id: 'new1', title: 'sop' }] }) as never)
+  xhr.status = 200
+  xhr.responseText = JSON.stringify({ sourceId: 'new1', topicId: 't1', r2Key: 'k', chars: 10, version: 1 })
+  await act(async () => { await xhr.onload!() })
+  await vi.waitFor(() => expect(container.querySelector('[role="progressbar"]')).toBeNull())
+  expect(button('Replace sop')).not.toBeNull()
 })
 
 it('swaps the uploading row for the new document, announces it and moves focus to Replace', async () => {

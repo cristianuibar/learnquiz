@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 export type UploadResult = { sourceId: string; topicId: string; r2Key: string; chars: number; version: number }
 export type UploadState =
   | 'idle'
-  | { file: File; loaded: number; total: number }
+  | { file: File; loaded: number; total: number; sent?: boolean }
   | { file: File; error: string }
 export type Upload = {
   upload: (file: File, opts?: { title?: string; replacesId?: string }) => void
@@ -11,7 +11,11 @@ export type Upload = {
   state: UploadState
 }
 
-/** Posts a PDF to the role documents route with byte progress. Cancel aborts and also dismisses a server error. */
+/**
+ * Posts a PDF to the role documents route with byte progress. Cancel aborts and also dismisses a server error.
+ * Once the whole body is sent the server stores the document regardless, so Cancel no longer aborts: the hook waits
+ * for the response and hands it to onDone, keeping the new document in view.
+ */
 export function useUpload({ orgSlug, roleId, onDone }: {
   orgSlug: string
   roleId: string
@@ -19,10 +23,12 @@ export function useUpload({ orgSlug, roleId, onDone }: {
 }): Upload {
   const [state, setState] = useState<UploadState>('idle')
   const xhrRef = useRef<XMLHttpRequest | null>(null)
+  const sent = useRef(false)
   const done = useRef(onDone)
   done.current = onDone
 
   const cancel = useCallback(() => {
+    if (xhrRef.current && sent.current) return
     const xhr = xhrRef.current
     xhrRef.current = null
     xhr?.abort()
@@ -39,6 +45,7 @@ export function useUpload({ orgSlug, roleId, onDone }: {
     xhrRef.current?.abort()
     const xhr = new XMLHttpRequest()
     xhrRef.current = xhr
+    sent.current = false
     const live = () => xhrRef.current === xhr
     const fail = (error: string) => {
       if (!live()) return
@@ -54,6 +61,11 @@ export function useUpload({ orgSlug, roleId, onDone }: {
     xhr.withCredentials = true
     xhr.upload.onprogress = (e) => {
       if (live()) setState({ file, loaded: e.loaded, total: e.total || file.size })
+    }
+    xhr.upload.onload = () => {
+      if (!live()) return
+      sent.current = true
+      setState({ file, loaded: file.size, total: file.size, sent: true })
     }
     xhr.onerror = () => fail('Upload failed')
     xhr.onload = async () => {
