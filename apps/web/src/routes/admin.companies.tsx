@@ -121,7 +121,7 @@ function Companies() {
 
   return (
     <div ref={pageRef}>
-      <Page>
+      <Page className="p-0 md:p-0">
         <div className="flex flex-col gap-1">
           <PageHeader title="Companies" />
           <p className="text-caption text-ink-muted tabular-nums" aria-live="polite">{plural(rows.length, 'company', 'companies')}</p>
@@ -165,7 +165,7 @@ function CompaniesLoading() {
   }, [])
   return (
     <div ref={pageRef}>
-      <Page>
+      <Page className="p-0 md:p-0">
         <div className="flex flex-col gap-1">
           <PageHeader title="Companies" />
           <Skel className="h-3 w-[88px]" />
