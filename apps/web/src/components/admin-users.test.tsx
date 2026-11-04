@@ -84,14 +84,31 @@ it('resets to the first page when a filter or the search changes', async () => {
   expect(lastData().offset).toBe(25)
   const select = (label: string) => [...container.querySelectorAll('label')].find((l) => l.textContent!.startsWith(label))!.querySelector('select')!
   await setValue(select('Status'), 'banned', 'change')
-  expect(lastData()).toEqual({ search: '', role: 'all', status: 'banned', offset: 0 })
+  expect(lastData()).toEqual({ search: '', role: 'all', status: 'banned', sort: 'joined', dir: 'descending', offset: 0 })
   await setValue(select('Global role'), 'admin', 'change')
-  expect(lastData()).toEqual({ search: '', role: 'admin', status: 'banned', offset: 0 })
+  expect(lastData()).toEqual({ search: '', role: 'admin', status: 'banned', sort: 'joined', dir: 'descending', offset: 0 })
   await click(button('Next'))
   expect(lastData().offset).toBe(25)
   await setValue(container.querySelector('input[type="search"]')!, ' lee ', 'input')
   await act(async () => { container.querySelector('form[role="search"]')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })) })
-  expect(lastData()).toEqual({ search: 'lee', role: 'admin', status: 'banned', offset: 0 })
+  expect(lastData()).toEqual({ search: 'lee', role: 'admin', status: 'banned', sort: 'joined', dir: 'descending', offset: 0 })
+})
+
+it('sorts by name through the Name header and back to newest first through Joined', async () => {
+  vi.mocked(listUsers).mockResolvedValue({ users: [ana, bo], total: 60 })
+  const container = await render('/admin/users?offset=25')
+  const header = (name: string) => [...container.querySelectorAll('th')].find((th) => th.textContent === name)!
+  const caption = () => container.querySelector('caption')!.textContent
+  expect(caption()).toBe('Users, sorted by joined, newest first')
+  await click(header('Name').querySelector('button')!)
+  expect(lastData()).toMatchObject({ sort: 'name', dir: 'ascending', offset: 0 })
+  expect(header('Name').getAttribute('aria-sort')).toBe('ascending')
+  expect(caption()).toBe('Users, sorted by name, A to Z')
+  await click(header('Name').querySelector('button')!)
+  expect(lastData()).toMatchObject({ sort: 'name', dir: 'descending' })
+  await click(header('Joined').querySelector('button')!)
+  expect(lastData()).toMatchObject({ sort: 'joined', dir: 'descending' })
+  expect(header('Name').hasAttribute('aria-sort')).toBe(false)
 })
 
 it("does not let staff ban themselves", async () => {

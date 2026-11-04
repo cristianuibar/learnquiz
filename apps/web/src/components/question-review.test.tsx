@@ -211,29 +211,52 @@ describe('question review outline', () => {
     expect(link.getAttribute('aria-current')).toBe('location')
   })
 
+  afterEach(() => vi.restoreAllMocks())
+
   // 1440x800 desktop. `tops` places the Cells, Energy and Division headings in the viewport.
-  async function scrollTo(c: HTMLElement, y: number, height: number, tops: number[]) {
+  function place(y: number, height: number, tops: number[]) {
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 })
     Object.defineProperty(window, 'scrollY', { configurable: true, value: y })
     Object.defineProperty(document.documentElement, 'scrollHeight', { configurable: true, value: height })
-    for (const h of c.querySelectorAll('h3')) {
-      const top = tops[['Cells', 'Energy', 'Division'].indexOf(h.textContent!)]
-      h.getBoundingClientRect = () => ({ top }) as DOMRect
-    }
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const at = ['Cells', 'Energy', 'Division'].indexOf(this.textContent!)
+      return ({ top: this.tagName === 'H3' && at >= 0 ? tops[at] : 0 }) as DOMRect
+    })
+  }
+  async function scrollTo(y: number, height: number, tops: number[]) {
+    place(y, height, tops)
     await act(async () => window.dispatchEvent(new Event('scroll')))
   }
   const current = (c: HTMLElement) => c.querySelector('nav[aria-label="Question outline"] [aria-current=location] span')!.textContent
 
   it('follows the scroll position, including concepts that cannot reach the top of a short page', async () => {
+    place(0, 4000, [100, 900, 1700])
     const { c } = await mountReview('/org/x/questions')
     expect(current(c)).toBe('Cells')
-    await scrollTo(c, 600, 4000, [-400, 200, 900])
+    await scrollTo(600, 4000, [-400, 200, 900])
     expect(current(c)).toBe('Energy')
-    await scrollTo(c, 183, 983, [117, 267, 417])
+    await scrollTo(183, 983, [117, 267, 417])
     expect(current(c)).toBe('Division')
     const link = [...c.querySelectorAll('nav[aria-label="Question outline"] a')].find((a) => a.textContent!.startsWith('Energy')) as HTMLElement
     await act(async () => link.click())
-    await scrollTo(c, 183, 983, [117, 267, 417])
+    await scrollTo(183, 983, [117, 267, 417])
     expect(current(c)).toBe('Energy')
+  })
+
+  it('measures a restored scroll position on load, before any scroll event', async () => {
+    place(600, 4000, [-400, 200, 900])
+    const { c } = await mountReview('/org/x/questions#concept-c2')
+    expect(current(c)).toBe('Energy')
+  })
+
+  it('re-measures when a filter with the same concepts moves the next heading above the line', async () => {
+    place(0, 4000, [100, 900, 1700])
+    const { c, router } = await mountReview('/org/x/questions')
+    expect(current(c)).toBe('Cells')
+    place(0, 4000, [100, 250, 400])
+    await act(async () => setValue(search(c), 'stem', 'input'))
+    await waitSearch(router, { q: 'stem' })
+    await vi.waitFor(() => expect(current(c)).toBe('Energy'))
+    expect(entries(c).map(([name]) => name)).toEqual(['Cells', 'Energy', 'Division'])
   })
 })

@@ -134,6 +134,24 @@ it('approving moves to the next open question in the same concept even after the
   expect([...c.querySelectorAll('[role=status]')].map((s) => s.textContent)).toContain('Approved. 2 unreviewed.')
 })
 
+it.each([
+  ['unreviewed', 'Approve and next', { reviewedAt: null }],
+  ['flagged', 'Approve, resolve flag and next', { status: 'reported', reviewedAt: Date.UTC(2026, 9, 30), flags: [{ id: 'f1', reporterId: 'u9', reporterName: 'Jordan Reyes', createdAt: Date.UTC(2026, 10, 2), reason: 'wrong', label: 'Wrong answer', note: null, attempt: null }] }],
+] as const)('approving the last %s result under that filter focuses Clear filters', async (filter, action, open) => {
+  const q1 = { id: 'q1', status: 'active', payload: stemOf('1') }
+  const q2 = { id: 'q2', status: 'active', reviewedAt: Date.UTC(2026, 9, 30), payload: stemOf('2') }
+  const c = await mountAt(
+    review([concept('a', [{ ...q1, ...open }, q2])], 1), `/org/x/questions?${filter}=1`,
+    review([concept('a', [{ ...q1, reviewedAt: Date.UTC(2026, 9, 31) }, q2])], 0),
+  )
+  await act(async () => button(c, action).click())
+  // The no-match card's Clear filters, after the toolbar's.
+  const clear = () => [...c.querySelectorAll('button')].filter((b) => b.textContent === 'Clear filters').at(-1)
+  await vi.waitFor(() => expect(c.textContent).toContain('No questions match these filters.'))
+  await vi.waitFor(() => expect(document.activeElement).toBe(clear()))
+  expect([...c.querySelectorAll('[role=status]')].map((s) => s.textContent)).toContain('Approved. 0 unreviewed.')
+})
+
 it('expands and focuses the question named by ?item=', async () => {
   const qs = Array.from({ length: 6 }, (_, i) => ({ id: `r${i}`, status: 'active', reviewedAt: Date.UTC(2026, 9, 30), payload: stemOf(String(i)) }))
   const c = await mountAt(review([concept('c', qs)], 0), '/org/x/questions?item=r5')

@@ -206,6 +206,18 @@ it('filters users by role and status together and reports each user\'s company',
   expect(users.find((u) => u.id === staff)).toMatchObject({ admin: true, banned: false, company: null })
 })
 
+it('sorts users alphabetically by name in either direction, newest first by default', async () => {
+  const [staff, learner, outsider] = ['staff', 'learner', 'outsider'].map((name) => accounts.get(name)!.id)
+  // Zoe joined after Ada, so only a name sort puts Ada first.
+  const named = [[staff, 'Mia', 2000], [learner, 'ada', 1000], [outsider, 'Zoe', 3000]] as const
+  for (const [id, name, at] of named) sqlite.prepare('UPDATE user SET name = ?, created_at = ? WHERE id = ?').run(name, at, id)
+  const names = async (order: object) => (await listUsers({ data: { search: '', offset: 0, ...order } })).users.map((u) => u.name)
+  expect(await names({})).toEqual(['Zoe', 'Mia', 'ada'])
+  expect(await names({ sort: 'name', dir: 'ascending' })).toEqual(['ada', 'Mia', 'Zoe'])
+  expect(await names({ sort: 'name', dir: 'descending' })).toEqual(['Zoe', 'Mia', 'ada'])
+  expect(await names({ sort: 'joined', dir: 'ascending' })).toEqual(['ada', 'Mia', 'Zoe'])
+})
+
 // Company topics in beta: a role curriculum that is building, a failed and a ready concept, flagged and retired questions.
 function seedContent() {
   sqlite.prepare('INSERT INTO job_roles (id, org_id, name, created_at) VALUES (?, ?, ?, ?)').run('gen-role', 'beta', 'Picker', NOW)
