@@ -158,6 +158,23 @@ test('a successful Try again immediately clears probe offline and does not cause
   expect(mockApi).toHaveBeenCalledTimes(2)
 })
 
+test('Try again recovery restarts the two-failure debounce for the offline notice', async () => {
+  jest.useFakeTimers()
+  mockApi.mockResolvedValue(todayFixtures.normal)
+  await render(createElement(ThemeProvider, { children: createElement(TodayScreen) }))
+  mockReachability.mockRejectedValue(new TypeError('Offline'))
+  await act(async () => { await jest.advanceTimersByTimeAsync(REACHABILITY_INTERVAL_MS * 2) })
+  expect(screen.getByText(offlineTitle)).toBeOnTheScreen()
+
+  await fireEvent.press(screen.getByRole('button', { name: 'Try again' }))
+  expect(screen.queryByText(offlineTitle)).toBeNull()
+
+  await act(async () => { await jest.advanceTimersByTimeAsync(REACHABILITY_INTERVAL_MS) })
+  expect(screen.queryByText(offlineTitle)).toBeNull()
+  await act(async () => { await jest.advanceTimersByTimeAsync(REACHABILITY_INTERVAL_MS) })
+  expect(screen.getByText(offlineTitle)).toBeOnTheScreen()
+})
+
 test('a successful probe recovers a failed Today request with exactly one refetch', async () => {
   jest.useFakeTimers()
   let finishProbe!: () => void
