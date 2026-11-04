@@ -7,12 +7,15 @@ export type CompanyWindow = { name: string; startMinute: number; endMinute: numb
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 // 30-minute steps from the clamped lower bound (company hours may start off the half hour) up to the clamped upper bound, inclusive.
-export function timeOptions(company: CompanyWindow | null, min: number, max: number) {
+// The upper bound and the saved value are always listed, even off the 30-minute steps, so a valid saved time stays selected.
+export function timeOptions(company: CompanyWindow | null, min: number, max: number, selected?: number) {
 	const low = Math.max(min, company?.startMinute ?? 0)
 	const high = Math.min(max, company?.endMinute ?? 1440)
-	const options: { value: number; label: string }[] = []
-	for (let value = low; value <= high; value += 30) options.push({ value, label: formatMinute(value) })
-	return options
+	const values = new Set<number>()
+	for (let value = low; value <= high; value += 30) values.add(value)
+	if (high >= low) values.add(high)
+	if (selected !== undefined && selected >= low && selected <= high) values.add(selected)
+	return [...values].sort((a, b) => a - b).map((value) => ({ value, label: formatMinute(value) }))
 }
 
 // ISO weekday (1 to 7) as a short name.

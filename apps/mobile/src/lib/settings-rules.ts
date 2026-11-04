@@ -7,8 +7,8 @@ export function questionSwitchOn(state: { registered: boolean; permission: strin
 }
 export function settingsTimeOptions(company: CompanyWindow | null, prefs: QuestionPreferences, field: 'from' | 'to') {
   return field === 'from'
-    ? timeOptions(company, 0, prefs.endMinute - 30)
-    : timeOptions(company, prefs.startMinute + 30, 1440)
+    ? timeOptions(company, 0, prefs.endMinute - 30, prefs.startMinute)
+    : timeOptions(company, prefs.startMinute + 30, 1440, prefs.endMinute)
 }
 export function toggleSettingsDay(days: number[], day: number, workingDays: number[]) {
   if (!workingDays.includes(day) || !canToggleDay(days, day)) return null

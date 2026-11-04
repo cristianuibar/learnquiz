@@ -16,6 +16,13 @@ it.each([
 	expect(options.at(-1)!.label).toBe(last)
 })
 
+it('lists the upper bound and the saved value when steps miss them', () => {
+	const offGrid = { ...company, startMinute: 555, endMinute: 1020 }
+	expect(timeOptions(offGrid, 585, 1440).map((o) => o.value).slice(-2)).toEqual([1005, 1020])
+	expect(timeOptions(offGrid, 585, 1440, 990).map((o) => o.value)).toContain(990)
+	expect(timeOptions(offGrid, 585, 1440, 1050).map((o) => o.value)).not.toContain(1050)
+})
+
 it.each([[1, 'Mon'], [4, 'Thu'], [7, 'Sun']])('labels weekday %i as %s', (day, expected) => {
 	expect(weekdayLabel(day)).toBe(expected)
 })
