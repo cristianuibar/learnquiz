@@ -105,10 +105,12 @@ it('fills the admin shell content column on the loaded and loading pages instead
     const { container, cleanup } = await mount(component)
     try {
       // At 1440 a max-w-[1120px] shell or md:p-8 here left the table a centered frame of about 1088 or 1024 instead of the full column.
+      // Any variant prefix counts: lg:mx-auto lg:max-w-[1120px] or lg:p-8 bring the same frame back at that width.
+      const variant = (c: string) => c.replace(/^(?:[^:]+:)*!?/, '')
       const main = container.querySelector('main') as HTMLElement
-      expect([...main.classList].filter((c) => /^(md:)?p[xy]?-/.test(c))).toEqual(['p-0', 'md:p-0'])
+      expect([...main.classList].filter((c) => /^p[xy]?-/.test(variant(c)))).toEqual(['p-0', 'md:p-0'])
       const frames: string[] = []
-      for (let el: HTMLElement | null = main; el && el !== container; el = el.parentElement) frames.push(...[...el.classList].filter((c) => /^(mx-auto|max-w-)/.test(c)))
+      for (let el: HTMLElement | null = main; el && el !== container; el = el.parentElement) frames.push(...[...el.classList].filter((c) => /^(mx-auto|max-w-)/.test(variant(c))))
       expect(frames).toEqual([])
     } finally {
       await cleanup()
