@@ -329,7 +329,7 @@ test('Got it sends one acknowledge while the first tap is pending', async () => 
 test('review mode from Profile shows the branded copy and Got it returns without acknowledging', async () => {
   jest.mocked(getToken).mockReturnValue('token-a')
   jest.mocked(api).mockResolvedValue({ name: 'Learner', role: null, started: true, mastery: 0.66, benchmark: 0.85,
-    onboarding: { day: 16, days: 30 }, proficiency: { achievedAt: null, projectedAt: null }, weeks: [] })
+    onboarding: { day: 16, days: 30 }, proficiency: { achievedAt: null, projectedAt: null }, weeks: [], units: [], confidentErrors: [] })
   jest.mocked(useSession).mockReturnValue({ ...ready, branding: { name: 'Northwind', accent: null, logoUrl: null } })
   const navigation = renderRouter('src/app', { initialUrl: '/profile' })
   await navigation
@@ -345,7 +345,7 @@ test('review mode from Profile shows the branded copy and Got it returns without
 
 test('Profile keeps loaded mastery visible during a return-from-Settings refetch', async () => {
   const profile = { name: 'Learner', role: null, started: true, mastery: 0.66, benchmark: 0.85,
-    onboarding: { day: 16, days: 30 }, proficiency: { achievedAt: null, projectedAt: null }, weeks: [] }
+    onboarding: { day: 16, days: 30 }, proficiency: { achievedAt: null, projectedAt: null }, weeks: [], units: [], confidentErrors: [] }
   let resolve!: (value: unknown) => void
   const pending = new Promise((done) => { resolve = done })
   jest.mocked(getToken).mockReturnValue('token-a')

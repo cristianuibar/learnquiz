@@ -1,21 +1,21 @@
 import { View, type ViewProps } from 'react-native'
-import { Check, Lock } from 'lucide-react-native'
+import { Check, Lock, type LucideIcon } from 'lucide-react-native'
 import { useTheme } from '../../theme/ThemeProvider'
 import { CriticalIcon, StillLearningIcon } from './icons'
 import { StatusMark } from './StatusMark'
 import { Text } from './Text'
 
-export type ChipProps = Omit<ViewProps, 'children'> & (
+export type ChipProps = Omit<ViewProps, 'children'> & { icon?: LucideIcon } & (
   | { variant: 'neutral'; children: string }
   | { variant: 'none' | 'mastered' | 'learning' | 'estimate' | 'critical' | 'locked'; children?: string }
 )
 
-export function Chip({ variant, children, style, ...props }: ChipProps) {
+export function Chip({ variant, children, icon, style, ...props }: ChipProps) {
   const { colors, space, radius } = useTheme()
   const color = variant === 'mastered' ? colors.feedbackCorrect : variant === 'learning' ? colors.feedbackLearning : variant === 'critical' || variant === 'neutral' ? colors.ink : colors.inkMuted
   const labels = { none: 'Not started', mastered: 'Mastered', learning: 'Still learning', estimate: 'Estimate', critical: 'Critical', neutral: children, locked: 'Locked' }
   const label = children ?? labels[variant]
-  const Icon = variant === 'mastered' ? Check : variant === 'learning' ? StillLearningIcon : variant === 'critical' ? CriticalIcon : variant === 'locked' ? Lock : undefined
+  const Icon = icon ?? (variant === 'mastered' ? Check : variant === 'learning' ? StillLearningIcon : variant === 'critical' ? CriticalIcon : variant === 'locked' ? Lock : undefined)
   return (
     <View
       {...props}
