@@ -32,10 +32,10 @@ export const tickShown = (i: number, n: number) => {
 }
 
 /** Card around a chart: title (and optional controls) on the left, legend (hidden from assistive tech; the table carries the data) on the right. */
-export function ChartCard({ title, legend, actions, children }: { title: string; legend?: ReactNode; actions?: ReactNode; children: ReactNode }) {
+export function ChartCard({ title, hideTitle, legend, actions, children }: { title: string; hideTitle?: boolean; legend?: ReactNode; actions?: ReactNode; children: ReactNode }) {
   return (
     <figure className="m-0 flex min-w-0 flex-col gap-4 rounded-md border border-border bg-surface-card p-6 text-ink">
-      <div className="flex flex-wrap items-baseline justify-between gap-4">
+      <div className={hideTitle ? 'sr-only' : 'flex flex-wrap items-baseline justify-between gap-4'}>
         <div className="flex flex-wrap items-baseline gap-4">
           <figcaption className="text-label">{title}</figcaption>
           {actions}
