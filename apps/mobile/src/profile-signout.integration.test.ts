@@ -58,7 +58,7 @@ const replies: Record<string, { data: unknown; token?: string }> = {
   '/api/v1/today': { data: todayFixtures.normal },
   '/api/v1/branding': { data: null },
   '/api/v1/me/profile': { data: { name: 'Ana', role: null, started: true, mastery: 0.66, benchmark: 0.85,
-    onboarding: { day: 16, days: 30 }, proficiency: { achievedAt: null, projectedAt: null }, weeks: [] } },
+    onboarding: { day: 16, days: 30 }, proficiency: { achievedAt: null, projectedAt: null }, weeks: [], units: [], confidentErrors: [] } },
   '/api/auth/sign-out': { data: {} },
 }
 globalThis.fetch = jest.fn(async (input: RequestInfo | URL) => {
