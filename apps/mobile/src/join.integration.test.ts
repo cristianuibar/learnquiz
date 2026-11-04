@@ -83,6 +83,21 @@ beforeEach(() => {
   jest.mocked(signIn).mockResolvedValue({})
 })
 
+test('Join keeps its prefilled read-only email and mode link with the default AccountForm props', async () => {
+  await renderRouter(routes, { initialUrl: '/join/inv-1' })
+  const email = await screen.findByLabelText(`Email, ${invite.email}`)
+  expect(email).toHaveProp('accessibilityHint', 'Set by your invite')
+  expect(screen.queryByLabelText('Email')).toBeNull()
+  expect(screen.getByLabelText('Your name')).toHaveProp('value', invite.name)
+  expect(screen.getByRole('button', { name: 'Create account' })).toBeOnTheScreen()
+  await fireEvent.press(screen.getByText('I already have an account'))
+  expect(screen.getByLabelText(`Email, ${invite.email}`)).toBeOnTheScreen()
+  expect(screen.queryByLabelText('Email')).toBeNull()
+  expect(screen.queryByLabelText('Your name')).toBeNull()
+  expect(screen.getByRole('button', { name: 'Sign in' })).toBeOnTheScreen()
+  expect(screen.getByText('Create an account')).toBeOnTheScreen()
+})
+
 test('a join that finishes behind a pushed screen does not navigate until Join is back in front', async () => {
   const accept = deferred<unknown>()
   jest.mocked(acceptInvitation).mockReturnValue(accept.promise as never)

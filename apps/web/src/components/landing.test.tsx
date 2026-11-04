@@ -289,3 +289,11 @@ it('lists job roles linking to their detail pages and to no page that does not e
     }
   } finally { await cleanup() }
 })
+
+it('styles the visitor Sign in link as a label, not a smaller body size', async () => {
+  const { container, cleanup } = await renderApp('/')
+  try {
+    const signIn = container.querySelector<HTMLAnchorElement>('header a[href="/sign-in"]')!
+    expect([signIn.textContent, signIn.classList.contains('text-label'), signIn.classList.contains('text-sm')]).toEqual(['Sign in', true, false])
+  } finally { await cleanup() }
+})

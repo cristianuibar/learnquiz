@@ -1,3 +1,4 @@
+import type { Branding } from '@learnquiz/api'
 import { createServerFn } from '@tanstack/react-start'
 import { getRequestHeaders } from '@tanstack/react-start/server'
 import { and, asc, eq } from 'drizzle-orm'
@@ -77,7 +78,7 @@ export const saveCompanySettings = createServerFn({ method: 'POST' })
     if (previous?.logoKey && previous.logoKey !== logoKey) await bucket.delete(previous.logoKey).catch(() => {})
   })
 
-export const getCompanyBranding = createServerFn({ method: 'GET' }).handler(async () => {
+export const getCompanyBranding = createServerFn({ method: 'GET' }).handler(async (): Promise<Branding | null> => {
   const session = await getAuth().api.getSession({ headers: getRequestHeaders() })
   if (!session || session.user.isAnonymous) return null
   const active = session.session.activeOrganizationId

@@ -2,6 +2,10 @@ import type { Confidence } from '@learnquiz/api'
 
 export const WEEK = 7 * 86_400_000
 
+// 1-based day of the onboarding period (UTC epoch days, as Today), clamped to 1..days.
+export const onboardingDay = (assignedAt: number, now: number, days: number): number =>
+  Math.min(Math.max(Math.floor((now - assignedAt) / 86_400_000) + 1, 1), days)
+
 export type ProgressAttempt = { itemId: string; conceptId: string; at: number; correct: boolean; confidence: Confidence; pKnownAfter: number }
 export type RoleConcept = { id: string; critical: boolean; pKnown: number }
 

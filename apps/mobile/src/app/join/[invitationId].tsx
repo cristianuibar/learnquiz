@@ -12,7 +12,7 @@ import { OrgLogo } from '@/components/ui/OrgLogo'
 import { Screen, useHeadingFocus } from '@/components/ui/Screen'
 import { Text } from '@/components/ui/Text'
 import { api, mediaSource } from '@/lib/api'
-import { acceptInvitation, signIn, signOut, signUp, subscribeAuth } from '@/lib/auth'
+import { acceptInvitation, signIn, signUp, subscribeAuth } from '@/lib/auth'
 import { peekHeldTarget, takeHeldTarget } from '@/lib/held-target'
 import { useReplayHold } from '@/lib/use-replay-hold'
 import {
@@ -28,7 +28,7 @@ import {
   type JoinOutcome,
   type Viewer,
 } from '@/lib/join'
-import { useSession } from '@/lib/session-store'
+import { endSession, useSession } from '@/lib/session-store'
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider'
 
 const joinApi = {
@@ -226,7 +226,8 @@ function Invite({ invitationId, invite }: { invitationId: string; invite: Invite
     busyRef.current = true
     setBusy(true)
     // The signedOut event resets this screen into sign-in mode; nothing waits here.
-    void signOut().catch(() => {})
+    // endSession() never rejects and signs out even when push unregistration stalls.
+    void endSession()
   }
 
   const { action } = view
