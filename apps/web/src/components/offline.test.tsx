@@ -19,6 +19,7 @@ vi.mock('@/server/session-fn', () => ({ getSessionFn: vi.fn() }))
 vi.mock('@/server/curriculum', () => ({ getTopicPath: vi.fn(), getConceptItems: vi.fn() }))
 vi.mock('@/server/model-trace', () => ({ getModelTrace: vi.fn() }))
 vi.mock('@/server/diagrams', () => ({ generateConceptDiagram: vi.fn() }))
+vi.mock('@/server/procedure', () => ({ getUnitProcedure: vi.fn(async () => null) }))
 vi.mock('@/server/play', () => ({
   prepareNextSession: vi.fn(async () => ({ ok: true })), answerItem: vi.fn(), getSession: vi.fn(), nextItem: vi.fn(), endSession: vi.fn(), reportItem: vi.fn(), startPlacement: vi.fn(), startSession: vi.fn(),
 }))
