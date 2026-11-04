@@ -27,10 +27,15 @@ export function ConceptRow({ concept, slug, readOnly, critHeaderId }: { concept:
   const [error, setError] = useState('')
   const editRef = useRef<HTMLButtonElement>(null)
   const wasEditing = useRef(false)
+  // Critical saves run one at a time so the last choice is the last write.
+  const saving = useRef(Promise.resolve())
+  const saved = useRef(concept.critical)
+  const latest = useRef(0)
   const nameId = `concept-${concept.id}-title`
   const failedId = `concept-${concept.id}-failed`
 
   useEffect(() => {
+    saved.current = concept.critical
     setCritical(concept.critical)
   }, [concept.critical])
 
@@ -39,17 +44,32 @@ export function ConceptRow({ concept, slug, readOnly, critHeaderId }: { concept:
     wasEditing.current = editing
   }, [editing])
 
-  async function toggle(next: boolean) {
-    const previous = critical
+  // Runs a save after every save already queued on this row.
+  function enqueue(run: () => Promise<unknown>) {
+    const done = saving.current.then(run)
+    saving.current = done.then(() => {}, () => {})
+    return done
+  }
+
+  function toggle(next: boolean) {
+    const seq = ++latest.current
     setError('')
     setCritical(next)
-    try {
-      await update({ data: { slug, conceptId: concept.id, critical: next } })
-      await router.invalidate()
-    } catch (err) {
-      setCritical(previous)
-      setError(errorMessage(err))
-    }
+    void enqueue(async () => {
+      // A newer choice is queued behind this one, so skip the stale write.
+      if (seq !== latest.current) return
+      try {
+        await update({ data: { slug, conceptId: concept.id, critical: next } })
+        saved.current = next
+        if (seq === latest.current) await router.invalidate()
+      } catch (err) {
+        if (seq !== latest.current) return
+        setCritical(saved.current)
+        setError(errorMessage(err))
+        // A superseded save may have landed without a reload, so refresh the counts.
+        await router.invalidate().catch(() => {})
+      }
+    })
   }
 
   async function retryGeneration() {
@@ -65,7 +85,7 @@ export function ConceptRow({ concept, slug, readOnly, critHeaderId }: { concept:
   if (editing) {
     return (
       <li className="grid border-t border-border">
-        <ConceptEditForm concept={{ ...concept, critical }} slug={slug} onDone={() => setEditing(false)} />
+        <ConceptEditForm concept={{ ...concept, critical }} slug={slug} queue={enqueue} onDone={() => setEditing(false)} />
       </li>
     )
   }
