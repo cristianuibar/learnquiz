@@ -8,6 +8,7 @@ import { Route as appRootRoute } from '@/routes/__root'
 import { answerItem, endSession, getSession, nextItem, prepareNextSession, reportItem, transcribeAnswer } from '@/server/play'
 import { getModelTrace } from '@/server/model-trace'
 import { generateConceptDiagram } from '@/server/diagrams'
+import { getCompanyBranding } from '@/server/org-settings'
 import type { ItemView, Reveal, SessionView } from '@learnquiz/api'
 
 vi.mock('motion/react', async (original) => ({ ...(await original<typeof import('motion/react')>()), useReducedMotion: () => true }))
@@ -16,7 +17,7 @@ vi.mock('@/server/play', () => ({ prepareNextSession: vi.fn(async () => ({ ok: t
 vi.mock('@/server/model-trace', () => ({ getModelTrace: vi.fn() }))
 vi.mock('@/server/diagrams', () => ({ generateConceptDiagram: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: {} }))
-vi.mock('@/server/org-settings', () => ({ getCompanyBranding: async () => null }))
+vi.mock('@/server/org-settings', () => ({ getCompanyBranding: vi.fn(async () => null) }))
 vi.mock('@/server/latest-topic', () => ({ getLatestTopicIdFn: async () => 't1' }))
 vi.mock('@/server/session-fn', () => ({ getSessionFn: async () => ({ user: { id: 'u1', name: 'Learner', isAnonymous: false }, facebookEnabled: false, needsDisclosure: false, adminCompanies: [] }) }))
 
@@ -637,6 +638,20 @@ describe('reveal overlay', () => {
       expect(dialog()!.getAttribute('aria-labelledby')).toBe(heading.id)
       expect(document.activeElement).toBe(heading)
       expect(container.textContent).toContain('x + 1 = 2; what is x?')
+    } finally { await cleanup() }
+  })
+
+  it.each([
+    { branding: null, line: 'Not quoted from a source', team: null },
+    { branding: { name: 'Acme', logoUrl: null, accent: null }, line: 'Not quoted from your SOP', team: 'Goes to Acme’s training team.' },
+  ])('describes the source and report recipient for company branding $branding.name', async ({ branding, line, team }) => {
+    vi.mocked(getCompanyBranding).mockResolvedValueOnce(branding)
+    const { cleanup } = await check({ ...sureCorrect, sourceQuote: null })
+    try {
+      expect(dialog()!.textContent).toContain(line)
+      await click(linkByText('Report this question'))
+      expect(dialog()!.textContent?.includes('training team')).toBe(team !== null)
+      if (team) expect(dialog()!.textContent).toContain(team)
     } finally { await cleanup() }
   })
 
