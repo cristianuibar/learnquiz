@@ -1,9 +1,11 @@
 import { useId } from 'react'
 import { Check, RotateCw } from 'lucide-react'
 import { criticalRows, formatShortDate, type Profile } from '@learnquiz/api/progress'
+import { Link } from '@tanstack/react-router'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 
-export function CriticalSteps({ confidentErrors }: { confidentErrors: Profile['confidentErrors'] }) {
+export function CriticalSteps({ confidentErrors, flag = false }: { confidentErrors: Profile['confidentErrors']; flag?: boolean }) {
   const id = useId()
   const rows = criticalRows(confidentErrors)
   if (rows.length === 0) return null
@@ -25,6 +27,11 @@ export function CriticalSteps({ confidentErrors }: { confidentErrors: Profile['c
                 <p className="text-body">{row.concept}</p>
                 <p className="text-caption text-ink-muted tabular-nums">{`Answered with confidence, missed ${formatShortDate(row.at)}`}</p>
               </div>
+              {flag && (
+                <Button asChild variant="secondary">
+                  <Link to="/me/flag" search={{ conceptId: row.conceptId }}>Flag an unfair result</Link>
+                </Button>
+              )}
             </li>
           )
         })}

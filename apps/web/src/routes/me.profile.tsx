@@ -13,17 +13,20 @@ export const Route = createFileRoute('/me/profile')({
     const profile = await getProfile({ data: {} })
     return { profile, today: profile.started ? null : await getToday() }
   },
+  validateSearch: (search: Record<string, unknown>): { status?: 'flag-sent' } => ({ status: search.status === 'flag-sent' ? 'flag-sent' : undefined }),
   errorComponent: RouteError,
   component: MyProfile,
 })
 
 function MyProfile() {
   const { profile, today } = Route.useLoaderData()
+  const { status } = Route.useSearch()
   const first = today?.topic && today.plan?.playable && !today.role?.preparing ? { topicId: today.topic.id, placement: today.plan.start === 'placement' } : null
   return (
     <TrainingProgress
       profile={profile}
       self
+      status={status === 'flag-sent' ? <p role="status" className="text-body text-ink">Flag sent</p> : undefined}
       action={first && <StartButton topicId={first.topicId} placement={first.placement} size="lg">Play first session</StartButton>}
     />
   )
