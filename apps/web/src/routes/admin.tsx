@@ -19,7 +19,7 @@ export const Route = createFileRoute('/admin')({
     const { staff } = Route.useRouteContext()
     return (
       <StaffNav failed={staff.failedJobs} name={staff.name}>
-        <div className="mx-auto w-full max-w-[1120px] px-4 pt-8 pb-16">
+        <div className="w-full px-4 pt-8 pb-16">
           <Outlet />
         </div>
       </StaffNav>
