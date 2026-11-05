@@ -62,7 +62,7 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
     return { topic: null, role, plan: null }
   }
   const topicId = topic.id
-  const [placement, openPlacement, lt, dueN, frontier, basics, played, done, cleared, next] = await Promise.all([
+  const [placement, openPlacement, lt, dueN, frontier, basics, played, done, cleared, next, practised] = await Promise.all([
     db.select({ id: placements.id }).from(placements)
       .where(and(eq(placements.learnerId, learnerId), eq(placements.topicId, topicId))).limit(1).get(),
     db.select({ id: sessions.id }).from(sessions)
@@ -94,6 +94,13 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
       .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topicId), eq(items.status, 'active'), notFlaggedBy(db, learnerId), gt(learnerItem.due, now),
         assigned ? ne(items.format, 'short') : undefined))
       .get(),
+    // Practice outside placement sessions: a learner with it keeps their progress view even with a placement left open.
+    db.select({ id: attempts.id }).from(attempts)
+      .innerJoin(items, eq(items.id, attempts.itemId))
+      .where(and(
+        eq(attempts.learnerId, learnerId), eq(items.topicId, topicId),
+        sql`(${attempts.sessionId} is null or not exists (select 1 from sessions s where s.id = ${attempts.sessionId} and s.kind = 'placement'))`,
+      )).limit(1).get(),
     roleStats(),
   ])
   const placed = Boolean(placement)
@@ -126,7 +133,7 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
       streakEarned: (lt?.lastSessionAt ?? -1) >= dayStart },
     role,
     plan: {
-      state: sessionDone ? 'done' : start === 'placement' && openPlacement ? 'first' : basics ? 'basics' : played ? 'normal' : 'first',
+      state: sessionDone ? 'done' : start === 'placement' && openPlacement && !practised ? 'first' : basics ? 'basics' : played ? 'normal' : 'first',
       start, nextUnit: unit?.name ?? null, reviewsLeft: Math.min(dueN, 8), reviewsCleared: cleared?.n ?? 0,
       sessionDone, sessionSize: SESSION_SIZE, playable, nextReviewAt: next?.at ?? null,
     },
