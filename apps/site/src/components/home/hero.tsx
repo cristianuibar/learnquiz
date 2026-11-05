@@ -2,17 +2,7 @@ import { useId, useRef, useState } from 'react'
 import { androidApkUrl, demoTranscriptUrl, demoVideoUrl, signUpUrl } from '../../site-config'
 import { Icon } from '../ui/icon'
 import { PhoneFrame } from '../ui/phone-frame'
-
-const phoneLabel =
-  'Learn Quiz on a phone. Question 7 of 20: A pallet’s shrink wrap is torn on arrival. What do you do first? Four answers, then: How sure are you? Sure, Unsure or Guessing.'
-
-const options = [
-  'Re-wrap it and put it away as normal',
-  'Photograph the damage and note it on the delivery receipt',
-  'Move it straight to Quarantine bay Q1',
-  'Sign the receipt, then tell your lead',
-]
-const selectedOption = 1
+import { Screenshot } from '../ui/screenshot'
 
 const videoTitle = 'Learn Quiz demo, 3 minutes'
 
@@ -155,48 +145,15 @@ export function Hero({
           </div>
 
           <figure className="hero-phone">
-            <PhoneFrame label={phoneLabel}>
-              <div className="p-topbar">
-                <span className="p-ico">
-                  <Icon name="close" size={24} />
-                </span>
-                <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <div className="bar flex-1">
-                    <div className="bar-fill" style={{ width: '35%' }} />
-                  </div>
-                  <span className="t-overline num muted">7 of 20</span>
-                </div>
-                <span className="p-ico">
-                  <Icon name="volume" size={24} />
-                </span>
-              </div>
-              <div className="p-scroll">
-                <p className="t-title2">A pallet’s shrink wrap is torn on arrival. What do you do first?</p>
-                <div className="opt-list">
-                  {options.map((option, index) => (
-                    <div key={option} className={index === selectedOption ? 'opt is-selected' : 'opt'}>
-                      <span className="radio" />
-                      <span className="opt-text">{option}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="p-dock">
-                <div>
-                  <span className="conf-legend">How sure are you?</span>
-                  <div className="conf">
-                    <span className="conf-btn">Sure</span>
-                    <span className="conf-btn is-selected">
-                      <span className="conf-tick">
-                        <Icon name="check" size={16} />
-                      </span>
-                      Unsure
-                    </span>
-                    <span className="conf-btn">Guessing</span>
-                  </div>
-                </div>
-                <span className="p-btn p-btn-primary">Check</span>
-              </div>
+            <PhoneFrame className="fit-w">
+              <Screenshot
+                name="phone-question-confidence"
+                alt="Learn Quiz question 1 of 2: Where do you move the tote to start the check? To the assigned checking station and Sure are selected."
+                width={360}
+                height={740}
+                priority
+                className="absolute inset-0 size-full object-cover object-top"
+              />
             </PhoneFrame>
           </figure>
         </div>

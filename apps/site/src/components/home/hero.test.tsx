@@ -90,16 +90,7 @@ it('shows only the sign-up link when no demo video is configured', async () => {
   const heading = document.getElementById(section.getAttribute('aria-labelledby')!)!
   expect(heading.tagName).toBe('H1')
   expect(heading.textContent).toBe('New hires learn the job from your own SOPs.')
-})
-
-it('presents the phone as one labelled image with nothing focusable inside', async () => {
-  await renderHero()
-  const images = container.querySelectorAll('[role="img"]')
-  expect(images).toHaveLength(1)
-  expect(images[0].getAttribute('aria-label')).toMatch(/^Learn Quiz on a phone\. Question 7 of 20/)
-  const screen = images[0].querySelector('.phone-screen')!
-  expect(screen.getAttribute('aria-hidden')).toBe('true')
-  expect(screen.querySelectorAll('button, a, input, [tabindex]')).toHaveLength(0)
+  expect(container.querySelector('.hero-phone img')?.getAttribute('alt')).toContain('Where do you move the tote to start the check?')
 })
 
 it('opens the demo in a modal dialog and restores focus when it closes', async () => {
