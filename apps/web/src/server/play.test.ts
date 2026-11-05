@@ -1242,9 +1242,11 @@ it('startSession answers 503 rather than "Nothing to practice yet" when another 
   raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un1', 't1', 0, 'Basics')
   raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)').run('c1', 't1', 'un1', 0, 'Variables', '')
   raw.prepare('INSERT INTO learner_unit (learner_id, unit_id, unlocked_at) VALUES (?, ?, ?)').run('u1', 'un1', 1)
-  vi.useFakeTimers({ toFake: ['setTimeout', 'Date'] })
+  vi.useFakeTimers({ toFake: ['setTimeout', 'setInterval', 'clearInterval', 'Date'] })
   onTestFinished(() => { vi.useRealTimers() })
   raw.prepare("UPDATE concepts SET gen_status = 'generating', gen_started_at = ? WHERE id = 'c1'").run(Date.now())
+  const heartbeat = setInterval(() => raw.prepare("UPDATE concepts SET gen_started_at = ? WHERE id = 'c1'").run(Date.now()), 25_000)
+  onTestFinished(() => clearInterval(heartbeat))
   const before = vi.mocked(chatJson).mock.calls.filter(([o]) => o.purpose === 'items').length
 
   const start = startSession({ data: { topicId: 't1' } })
@@ -1256,7 +1258,7 @@ it('startSession answers 503 rather than "Nothing to practice yet" when another 
   expect(scalar(raw, "SELECT gen_status AS s FROM concepts WHERE id = 'c1'").s).toBe('generating')
 })
 
-it('startSession joins an in-flight prepareNextSession generation so one concept is generated once', async () => {
+it.each([false, true])('startSession joins preparation once, including abandoned-claim recovery (%s)', async (deadClaim) => {
   seedTopicAndLearner(raw, 0)
   raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un1', 't1', 0, 'Basics')
   raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)').run('c1', 't1', 'un1', 0, 'Variables', '')
@@ -1279,6 +1281,7 @@ it('startSession joins an in-flight prepareNextSession generation so one concept
   expect((await nextItem({ data: { sessionId: 'p1' } })).ended).toBe(true)
   const before = itemCalls()
 
+  if (deadClaim) raw.prepare("UPDATE concepts SET gen_status = 'generating', gen_started_at = ? WHERE id = 'c1'").run(Date.now() - 100_000)
   const prep = prepareNextSession({ data: { sessionId: 'p1' } })
   await vi.waitFor(() => expect(itemCalls() - before).toBe(1))
   const start = startSession({ data: { topicId: 't1' } })

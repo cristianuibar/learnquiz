@@ -4,11 +4,11 @@ import { concepts, items, topics, units } from '@/db/schema'
 import { utcDayStart } from '@/lib/limits'
 import { generateConceptItems } from '@/server/helpers'
 import { liveConcept } from '@/server/live-concept'
+import { claimConcept, heartbeatClaim, STALE_CLAIM_MS } from '@/server/claim-heartbeat'
 import { assertWithinCompanyCap, COMPANY_CAP_MESSAGE } from '@/server/model-cap'
 
 export const ITEMS_PER_CONCEPT = 6
-// A claim older than this belongs to a worker that died (waitUntil lasts about 30 s).
-export const STALE_CLAIM_MS = 10 * 60 * 1000
+export { STALE_CLAIM_MS } from '@/server/claim-heartbeat'
 
 const activeItems = async (db: Db, conceptId: string) =>
   (await db.select({ n: count() }).from(items).where(and(eq(items.conceptId, conceptId), eq(items.status, 'active'))))[0]?.n ?? 0
@@ -16,20 +16,15 @@ const activeItems = async (db: Db, conceptId: string) =>
 // Generates the shared questions of one company concept. The concept row is the queue message:
 // one atomic claim lets overlapping drains and retries skip work another invocation owns.
 export async function processConcept(db: Db, conceptId: string): Promise<void> {
-  const now = Date.now()
-  const claimed = await db.update(concepts).set({ genStatus: 'generating', genStartedAt: now })
-    .where(and(
-      eq(concepts.id, conceptId),
-      liveConcept(),
-      or(eq(concepts.genStatus, 'pending'), and(eq(concepts.genStatus, 'generating'), lt(concepts.genStartedAt, now - STALE_CLAIM_MS))),
-    ))
-    .returning({ id: concepts.id })
-  if (!claimed.length) return
-  // A status write must not mask the original handling. It only lands while this invocation still holds its claim:
-  // a reset (a replaced document) or a newer claim since then owns the concept, and must not be overwritten.
-  const settle = (set: Partial<typeof concepts.$inferInsert>) =>
-    db.update(concepts).set(set)
-      .where(and(eq(concepts.id, conceptId), eq(concepts.genStatus, 'generating'), eq(concepts.genStartedAt, now))).then(() => {}, (e) => console.error('concept status write failed', e))
+  const claimAt = await claimConcept(db, conceptId, 'pending')
+  if (claimAt === null) return
+  const heartbeat = heartbeatClaim(db, conceptId, claimAt)
+  // Stop renewal before settling, and compare against the last heartbeat we wrote.
+  const settle = async (set: Partial<typeof concepts.$inferInsert>) => {
+    await heartbeat.stop()
+    await db.update(concepts).set(set).where(heartbeat.owned())
+      .then(() => {}, (e) => console.error('concept status write failed', e))
+  }
   try {
     const [row] = await db.select({ concept: concepts, topic: topics }).from(concepts)
       .innerJoin(topics, eq(topics.id, concepts.topicId)).where(eq(concepts.id, conceptId))
@@ -43,7 +38,7 @@ export async function processConcept(db: Db, conceptId: string): Promise<void> {
       await generateConceptItems(db, concept, topic, {
         targetDifficulty: 3, spread: true, want: ITEMS_PER_CONCEPT - have, maxRounds: 3,
         avoidStems: existing.map((r) => (JSON.parse(r.payloadJson) as { stem: string }).stem),
-        learnerId: null, orgId: topic.orgId,
+        learnerId: null, orgId: topic.orgId, heartbeat: heartbeat.renew,
       })
     }
     // A partial set is still ready: its questions are live, and learner sessions top it up.
@@ -64,6 +59,8 @@ export async function processConcept(db: Db, conceptId: string): Promise<void> {
       if (kept) await settle({ genStatus: 'ready', genError: null })
       else await settle({ genStatus: 'failed', genError: typeof status === 'number' ? (e as Error).message : 'Question generation failed.' })
     }
+  } finally {
+    await heartbeat.stop()
   }
 }
 

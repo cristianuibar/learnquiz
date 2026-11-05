@@ -1,12 +1,20 @@
-import { and, count, eq, gte, sql } from 'drizzle-orm'
+import { and, count, eq, gte, lt, sql } from 'drizzle-orm'
 import type { Db } from '@/db'
 import { user } from '@/db/auth-schema'
 import { modelCalls, topics } from '@/db/schema'
 import { ACCOUNT_DAILY_MODEL_CALL_CAP, COMPANY_DAILY_MODEL_CALL_CAP, GUEST_DAILY_MODEL_CALL_CAP, isOverDailyCap, utcDayStart } from '@/lib/limits'
 
+// The longest provider call is 240 s; allow another minute before closing a lost reservation.
+export const ABANDONED_CALL_MS = 300_000
+export async function abandonPendingModelCalls(db: Db, now = Date.now()): Promise<void> {
+  await db.update(modelCalls).set({ ok: false, error: 'abandoned' })
+    .where(and(eq(modelCalls.ok, false), eq(modelCalls.error, 'pending'), lt(modelCalls.createdAt, now - ABANDONED_CALL_MS)))
+}
+
 // Guests (anonymous users) get the low cap; only a user row with isAnonymous false gets the account cap.
 // An id with no user row counts as a guest.
 export async function isOverLearnerDailyCap(db: Db, learnerId: string): Promise<boolean> {
+  await abandonPendingModelCalls(db)
   const [[row], [account]] = await Promise.all([
     db
       .select({ n: count() })
@@ -37,6 +45,7 @@ export async function reserveModelCall(
   row: { id: string; learnerId?: string | null; sessionId?: string | null; topicId?: string | null; purpose: string; model: string; orgId?: string | null },
 ): Promise<boolean> {
   const now = Date.now()
+  await abandonPendingModelCalls(db, now)
   const dayStart = utcDayStart(now)
   const learnerId = row.learnerId ?? null
   const orgId = row.orgId ?? null
@@ -57,6 +66,7 @@ export const COMPANY_CAP_MESSAGE = 'This company has reached the daily limit for
 
 // The cap still counts company calls through their topic.
 export async function companyCallsToday(db: Db, orgId: string): Promise<number> {
+  await abandonPendingModelCalls(db)
   const [row] = await db
     .select({ n: count() })
     .from(modelCalls)
