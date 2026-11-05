@@ -1,4 +1,113 @@
-# Learn Quiz — company edition
+# Learn Quiz
+
+**Learn any topic or train your team from real documents with adaptive quizzes powered by Meta Muse models.**
+
+Demo video: [Learn Quiz: your SOPs become the training (YouTube, 2:59)](https://youtu.be/-jNl_HLRJ7Q) · live app https://app.learnquiz.com · site https://learnquiz.com · Android APK https://github.com/cristianuibar/learnquiz/releases/latest/download/learnquiz.apk
+
+## Hackathon entry
+
+**Meta AI Developer Hackathon** (building period Oct 27 – Nov 4, 2026). Track:
+**Indie Developer**. Problem statement: **Build for Your World**. Built solo by
+Cristian Uibar.
+
+## Built from scratch during the hackathon
+
+- First commit: `a9778b0`, on **2026-10-27 at 16:55 UTC**, “Initial project setup”.
+- **495 commits on main, 474 merged PRs, and 550 closed issues**, all between
+  Oct 27 and Nov 4, 2026.
+- All commits were authored by Cristian Uibar.
+- Before kickoff, only the name, the domain and an unused mood board existed;
+  none of their assets ship.
+- Claude Code and Codex agents wrote and reviewed the code under Cristian's
+  direction. See the [full disclosure](#disclosure-for-the-judges) below.
+
+Check the repository history with `git log --reverse` to verify the starting point,
+commit dates and authorship.
+
+## Bonus prizes we are entering
+
+- **Best Build on Meta Open Weight Models:** Muse Spark Open runs on
+  partner-provided inference (Fireworks,
+  `accounts/fireworks/models/muse-spark-open`) as the placement-result stage of
+  every personal-topic placement, with Spark 1.3 as a fallback. The open-source
+  build also runs fully on **Muse Glimmer** on your own hardware through Ollama or
+  llama.cpp. See the [model documentation](docs/MODELS.md) and
+  [fully local Muse Glimmer guide](docs/LOCAL-MUSE-GLIMMER.md).
+- **Best Creative Build:** Muse Image draws concept diagrams for visual concepts,
+  and Muse Wonder orders personal-topic sessions, with a rules fallback. See the
+  [model documentation](docs/MODELS.md).
+- **Most Viral Project:** the demo video is posted on X; the post link is in the submission.
+  See the [model documentation](docs/MODELS.md) for what powers the project.
+- **Community Vote.** See the [model documentation](docs/MODELS.md) for the build's
+  use of Meta models.
+
+## For judges: try it in 2 minutes, no sign-up needed
+
+### (a) Learner
+
+Open https://app.learnquiz.com and choose **Continue as guest**: no account, no
+email. Type any topic at [/start](https://app.learnquiz.com/start), for example
+“How to keep a cactus alive”, and choose **Find my level**. Generation can take
+**1–4 minutes** when the Meta API is busy. Answer the placement, then open
+**Model trace** to see every Muse call: model, latency, tokens and cost.
+Guests have **150 model calls a day**; email accounts have **500**.
+
+### (b) Company portal (HR)
+
+Demo HR login (a public demo account; no sign-up): `judge@northwind.learnquiz.test` / `LearnQuiz-Judge-2026` at https://app.learnquiz.com/sign-in. It is an admin of the fictional Northwind Logistics demo company; choose **Got it** on **Before you start** the first time.
+
+Sign in at https://app.learnquiz.com/sign-in to explore the **Northwind Logistics**
+demo company:
+
+1. **Overview** for the company training summary.
+2. **Roles → Warehouse picker** for a curriculum with SOP quotes and critical steps.
+3. **Questions** for the role's question bank.
+4. **People → Morgan Chen → Training progress** for an employee's learning progress.
+5. **Roles → Create role → upload a PDF → Build curriculum** to try your own material.
+
+### (c) Android
+
+Install the [Android APK](https://github.com/cristianuibar/learnquiz/releases/latest/download/learnquiz.apk);
+sign in with a web account or open an invite. See [Android app](#android-app) for
+invite details.
+
+Facebook login is in Meta Development mode, so use **email or guest**.
+
+## Quick start (self-host, step by step)
+
+Use Node.js 24 and pnpm 12.14.0, then:
+
+```sh
+git clone https://github.com/cristianuibar/learnquiz.git
+cd learnquiz
+pnpm install
+cp apps/web/.dev.vars.example apps/web/.dev.vars
+```
+
+Fill the keys in `apps/web/.dev.vars`: set `LLM_API_KEY` to your Meta Model API key,
+replace `BETTER_AUTH_SECRET` with a random secret of at least 32 characters, and
+keep `BETTER_AUTH_URL=http://localhost:3000`. For Fireworks placement results, also
+set `FIREWORKS_API_KEY`. Then run:
+
+```sh
+pnpm db:migrate:local
+pnpm dev
+```
+
+Open http://localhost:3000. See [Run locally](#run-locally) for full configuration
+and [fully local Muse Glimmer mode](docs/LOCAL-MUSE-GLIMMER.md) to run inference
+on your own hardware. The root [.env.example](.env.example) lists variable names;
+the web app reads `apps/web/.dev.vars`.
+
+## Docs index
+
+- [Model map](docs/MODELS.md): every model call.
+- [Benchmarks](docs/BENCHMARKS.md): production latency, failure and cost per model.
+- [Trace replay](docs/TRACE-REPLAY.md): a recorded end-to-end run.
+- [Local Muse Glimmer](docs/LOCAL-MUSE-GLIMMER.md): fully local inference.
+- [Fine-tuning](docs/FINETUNE.md): LoRA guide for Muse Glimmer.
+
+## Product overview
 
 > Quiz it, until you learn it.
 
@@ -13,9 +122,6 @@ proficient), progress toward the role benchmark and last activity; the **Overvie
 counts employees, proficient employees, average days to proficiency and critical-step
 errors this week. Each role has a shared curriculum and question bank; each learner
 has their own progress. Personal topics are also available at `/start`.
-
-Built solo by Cristian Uibar for the Meta Global AI Developer Hackathon
-(Oct 27 to Nov 4, 2026), Indie Developer track. The web app and API are live at https://app.learnquiz.com; the marketing site is at https://learnquiz.com.
 
 ## Try it
 
