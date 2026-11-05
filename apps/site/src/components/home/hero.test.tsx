@@ -77,7 +77,7 @@ it.each(unsafeUrls)('renders no transcript link for %s', async (transcriptUrl) =
 })
 
 it('shows only the sign-up link when no demo video is configured', async () => {
-  await renderHero({ apkUrl: '' })
+  await renderHero({ apkUrl: '', videoUrl: '' })
   const links = container.querySelectorAll('#lqs-hero-cta a')
   expect(links).toHaveLength(1)
   expect(links[0].textContent).toBe('Create a company account')
