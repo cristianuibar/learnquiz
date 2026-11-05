@@ -3,6 +3,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { z } from 'zod'
+import { getDb } from '@/db'
 import { modelCalls, topics } from '@/db/schema'
 import { getEnv } from '@/server/env'
 import { ACCOUNT_DAILY_MODEL_CALL_CAP, GUEST_DAILY_MODEL_CALL_CAP } from '@/lib/limits'
@@ -382,4 +383,48 @@ it('stores the company on the reserved model_calls row of a company call', async
     { purpose: 'grade', org_id: null, ok: 1 },
     { purpose: 'items', org_id: 'org-x', ok: 1 },
   ])
+})
+
+it.each(['cap read', 'reservation', 'call completion'] as const)('finalises only expired pending reservations during %s', async (path) => {
+  const seed = () => raw.prepare(`INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, error, created_at)
+    VALUES (?, 'u1', 'items', 'muse-spark-1.3', 0, ?, ?, ?)`)
+  const addRows = () => {
+    seed().run('expired', 0, 'pending', Date.now() - 300_001)
+    seed().run('boundary', 0, 'pending', Date.now() - 300_000)
+    seed().run('recent', 0, 'pending', Date.now() - 120_000)
+    seed().run('failed', 0, 'provider error', Date.now() - 400_000)
+    seed().run('success', 1, null, Date.now() - 400_000)
+  }
+  const fetchModel = vi.fn(async () => {
+    // This row appears after reservation, exercising cleanup in logCall itself.
+    if (path === 'call completion') addRows()
+    return Response.json({ choices: [{ message: { content: '{"answer":"ok"}' } }] })
+  })
+  vi.stubGlobal('fetch', fetchModel)
+  if (path !== 'call completion') addRows()
+  if (path === 'cap read') {
+    const { isOverLearnerDailyCap } = await import('@/server/model-cap')
+    expect(await isOverLearnerDailyCap(getDb(), 'u1')).toBe(false)
+  } else {
+    await chatJson({ ...answerRequest, purpose: 'grade', retry: false })
+  }
+  expect(raw.prepare("SELECT id, ok, error FROM model_calls WHERE id IN ('expired', 'boundary', 'recent', 'failed', 'success') ORDER BY id").all()).toEqual([
+    { id: 'boundary', ok: 0, error: 'pending' },
+    { id: 'expired', ok: 0, error: 'abandoned' },
+    { id: 'failed', ok: 0, error: 'provider error' },
+    { id: 'recent', ok: 0, error: 'pending' },
+    { id: 'success', ok: 1, error: null },
+  ])
+})
+
+it('keeps abandoned reservations counted toward the daily cap', async () => {
+  await db.insert(modelCalls).values(Array.from({ length: GUEST_DAILY_MODEL_CALL_CAP }, (_, i) => ({
+    id: `orphan-${i}`, learnerId: 'u1', purpose: 'items', model: 'muse-spark-1.3', latencyMs: 0, ok: false, error: 'pending', createdAt: Date.now() - 301_000,
+  })))
+  const fetchModel = vi.fn()
+  vi.stubGlobal('fetch', fetchModel)
+  await expect(chatJson({ ...answerRequest, purpose: 'grade', retry: false })).rejects.toMatchObject({ status: 429 })
+  expect(fetchModel).not.toHaveBeenCalled()
+  expect(raw.prepare("SELECT COUNT(*) AS n FROM model_calls WHERE ok = 0 AND error = 'abandoned'").get()).toEqual({ n: GUEST_DAILY_MODEL_CALL_CAP })
+  expect(raw.prepare('SELECT COUNT(*) AS n FROM model_calls').get()).toEqual({ n: GUEST_DAILY_MODEL_CALL_CAP })
 })

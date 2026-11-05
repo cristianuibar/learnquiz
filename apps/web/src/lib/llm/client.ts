@@ -5,7 +5,7 @@ import { modelCalls } from '@/db/schema'
 import { COMPANY_DAILY_MODEL_CALL_CAP, isOverDailyCap } from '@/lib/limits'
 import { META_MODELS, PROVIDERS, type ModelJob } from '@/lib/llm/models'
 import { getEnv } from '@/server/env'
-import { COMPANY_CAP_MESSAGE, companyCallsToday, dailyCapError, reserveModelCall } from '@/server/model-cap'
+import { abandonPendingModelCalls, COMPANY_CAP_MESSAGE, companyCallsToday, dailyCapError, reserveModelCall } from '@/server/model-cap'
 
 // USD per million tokens; reasoning tokens bill as output. Unlisted prices are unknown.
 export const PRICES: Record<string, { in: number; out: number }> = {
@@ -273,6 +273,7 @@ async function logCall(
     const model = opts.model
     const price = PRICES[model.replace(/^accounts\/fireworks\/models\//, '')]
     const db = getDb()
+    await abandonPendingModelCalls(db)
     const done = {
       latencyMs: Date.now() - started,
       promptTokens,

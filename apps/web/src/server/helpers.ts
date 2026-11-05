@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, lt, or, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm'
 import type { Db } from '@/db'
 import { concepts, items, learnerConcept, sources, topics } from '@/db/schema'
 import { chatJson, jobModel, LlmError } from '@/lib/llm/client'
@@ -7,6 +7,7 @@ import { ItemBatch, ItemPayload, SelfCheck } from '@/lib/llm/schemas'
 import { liveConcept } from '@/server/live-concept'
 import { notFlaggedBy } from '@/server/topic-access'
 import { assertWithinDailyCap } from '@/server/model-cap'
+import { claimConcept, heartbeatClaim, STALE_CLAIM_MS } from '@/server/claim-heartbeat'
 
 // Server-only helpers shared by the server-function files. They live apart from them so no server-only import reaches the client bundle.
 
@@ -41,8 +42,6 @@ export const asItem = (r: typeof items.$inferSelect): StoredItem => ({
   generatedBy: r.generatedBy,
 })
 
-// Same 10 minutes as concept-gen's STALE_CLAIM_MS; importing it would cycle (concept-gen imports helpers).
-const STALE_CLAIM_MS = 10 * 60 * 1000
 const JOIN_POLL_MS = 1000
 const JOIN_MAX_WAIT_MS = 120_000
 
@@ -68,44 +67,46 @@ export async function ensureConceptItems(
   // A capped caller never claims: a claim it then refuses would make a concurrent caller join a generation that never runs.
   const capError = await assertWithinDailyCap(db, learnerId).then(() => null, (e: unknown) => e)
   // One generation per concept: an atomic claim on the row; a concurrent caller joins the in-flight one.
-  const now = Date.now()
-  const claimed = capError ? [] : await db
-    .update(concepts)
-    .set({ genStatus: 'generating', genStartedAt: now })
-    .where(and(eq(concepts.id, concept.id), liveConcept(), or(eq(concepts.genStatus, 'ready'), and(eq(concepts.genStatus, 'generating'), lt(concepts.genStartedAt, now - STALE_CLAIM_MS)))))
-    .returning({ id: concepts.id })
-  if (!claimed.length) {
+  let claimAt = capError ? null : await claimConcept(db, concept.id, 'ready')
+  if (claimAt === null) {
     // A refused claim on a dead concept must not fall through to generating unclaimed.
     const [dead] = await db.select({ id: concepts.id }).from(concepts).where(and(eq(concepts.id, concept.id), sql`not (${liveConcept()})`))
     if (dead) return existing.map(asItem)
     const status = async () => (await db.select({ s: concepts.genStatus, startedAt: concepts.genStartedAt }).from(concepts).where(eq(concepts.id, concept.id)))[0]
-    const current = await status()
-    // A stale claim has no live writer; a capped caller that may not reclaim it refuses instead of waiting for nothing.
-    if (current?.s === 'generating' && (current.startedAt ?? 0) >= now - STALE_CLAIM_MS) {
-      // Wait for the in-flight writer, then read what it stored without spending the cap again.
+    let current = await status()
+    if (current?.s === 'generating') {
       const deadline = Date.now() + JOIN_MAX_WAIT_MS
-      while ((await status())?.s === 'generating' && Date.now() < deadline) await new Promise((r) => setTimeout(r, JOIN_POLL_MS))
-      const stored = await db
-        .select()
-        .from(items)
-        .where(and(eq(items.conceptId, concept.id), eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId)))
-        .orderBy(desc(items.createdAt))
-      return stored.map(asItem)
+      while (current?.s === 'generating' && Date.now() < deadline) {
+        if ((current.startedAt ?? 0) < Date.now() - STALE_CLAIM_MS) {
+          if (capError) throw capError
+          claimAt = await claimConcept(db, concept.id, 'ready')
+          if (claimAt !== null) break
+        }
+        await new Promise((r) => setTimeout(r, JOIN_POLL_MS))
+        current = await status()
+      }
+      if (claimAt === null) {
+        const stored = await db.select().from(items)
+          .where(and(eq(items.conceptId, concept.id), eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId)))
+          .orderBy(desc(items.createdAt))
+        return stored.map(asItem)
+      }
     }
   }
-
+  const heartbeat = claimAt === null ? null : heartbeatClaim(db, concept.id, claimAt)
   try {
     if (capError) throw capError
     const avoidStems = existing.slice(0, 3).map((r) => (JSON.parse(r.payloadJson) as ItemPayload).stem)
-    const generated = await generateConceptItems(db, concept, topic, { targetDifficulty: opts.targetDifficulty, spread: opts.spread, avoidStems, want: 3, maxRounds: 2, learnerId, sessionId: opts.sessionId })
+    const generated = await generateConceptItems(db, concept, topic, { targetDifficulty: opts.targetDifficulty, spread: opts.spread, avoidStems, want: 3, maxRounds: 2, learnerId, sessionId: opts.sessionId, heartbeat: heartbeat?.renew })
     return [...existing.map(asItem), ...generated]
   } finally {
     // Release only our own claim; a failed release must not mask the generation's error.
-    if (claimed.length) {
+    if (heartbeat) {
+      await heartbeat.stop()
       await db
         .update(concepts)
         .set({ genStatus: 'ready', genStartedAt: null })
-        .where(and(eq(concepts.id, concept.id), eq(concepts.genStatus, 'generating'), eq(concepts.genStartedAt, now)))
+        .where(heartbeat.owned())
         .catch((e) => console.error('concept claim release failed', e))
     }
   }
@@ -119,7 +120,7 @@ export async function generateConceptItems(
   db: Db,
   concept: typeof concepts.$inferSelect,
   topic: typeof topics.$inferSelect,
-  opts: { targetDifficulty: number; spread?: boolean; avoidStems: string[]; want: number; maxRounds: number; learnerId: string | null; orgId?: string | null; sessionId?: string },
+  opts: { targetDifficulty: number; spread?: boolean; avoidStems: string[]; want: number; maxRounds: number; learnerId: string | null; orgId?: string | null; sessionId?: string; heartbeat?: () => Promise<void> },
 ): Promise<StoredItem[]> {
   const { learnerId, orgId, avoidStems } = opts
   const misconceptions = JSON.parse(concept.misconceptionsJson) as string[]
@@ -131,6 +132,7 @@ export async function generateConceptItems(
   const kept: { payload: ItemPayload; check: unknown }[] = []
   for (let round = 0; round < opts.maxRounds && kept.length < opts.want; round++) {
     try {
+      await opts.heartbeat?.()
       const batch = await chatJson({
         purpose: 'items',
         schema: ItemBatch,
@@ -153,6 +155,7 @@ export async function generateConceptItems(
         topicId: topic.id,
         sessionId: opts.sessionId,
       })
+      await opts.heartbeat?.()
       const drafted = batch.items.flatMap((i) => {
         // A valid draft in a format learners cannot answer yet is dropped, whatever the prompt asked for.
         const ok = ItemPayload.safeParse(i)
@@ -178,6 +181,7 @@ export async function generateConceptItems(
         if (e instanceof LlmError && e.status === 429) throw httpError(e.message, 429)
         if (!(e instanceof LlmError)) throw e
       }
+      await opts.heartbeat?.()
       drafted.forEach((payload, index) => {
         const verdict = verdicts?.find((v) => v.index === index)
         if (verdict?.keep) kept.push({ payload, check: verdict ?? null })
@@ -189,6 +193,7 @@ export async function generateConceptItems(
       break
     }
   }
+  await opts.heartbeat?.()
   if (!kept.length) throw httpError('Could not generate items for this concept', 502)
 
   const now = Date.now()
