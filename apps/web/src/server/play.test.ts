@@ -1071,7 +1071,7 @@ it.each([
   expect(today.quests).toContainEqual({ key: 'session', label: 'One session', count: null, done: true })
 })
 
-it.each([false, true])('resumes an open placement with prior answers intact (advanced=%s)', async (advanced) => {
+it.each([false, true])('resumes the newest open placement with prior answers intact (advanced=%s)', async (advanced) => {
   seedTopicAndLearner(raw, 0)
   seedFrontier(raw, 12, false)
   const { sessionId } = await startPlacement({ data: { topicId: 't1' } })
@@ -1087,6 +1087,7 @@ it.each([false, true])('resumes an open placement with prior answers intact (adv
   decoy.run('other-topic', 'u1', 't2', 'placement', 0, null)
   decoy.run('other-kind', 'u1', 't1', 'session', 0, null)
   decoy.run('closed', 'u1', 't1', 'placement', 0, 1)
+  decoy.run('older-open', 'u1', 't1', 'placement', 0, null)
 
   expect(await startPlacement({ data: { topicId: 't1' } })).toEqual({ sessionId })
   expect(scalar(raw, 'SELECT item_ids_json, plan_json FROM sessions WHERE id = ?', sessionId)).toEqual(stored)
@@ -1096,7 +1097,7 @@ it.each([false, true])('resumes an open placement with prior answers intact (adv
   await answerItem({ data: { sessionId, itemId: resumed.item!.id, answer: { text: '1' }, confidence: 'sure', responseMs: 100 } })
   expect(scalar(raw, 'SELECT COUNT(*) AS n FROM attempts WHERE session_id = ?', sessionId).n).toBe(2)
   expect(JSON.parse(scalar(raw, 'SELECT plan_json FROM sessions WHERE id = ?', sessionId).plan_json as string).log).toHaveLength(2)
-  expect(scalar(raw, "SELECT COUNT(*) AS n FROM sessions WHERE learner_id = 'u1' AND topic_id = 't1' AND kind = 'placement' AND ended_at IS NULL").n).toBe(1)
+  expect(scalar(raw, "SELECT COUNT(*) AS n FROM sessions WHERE learner_id = 'u1' AND topic_id = 't1' AND kind = 'placement' AND ended_at IS NULL").n).toBe(2)
   expect(scalar(raw, 'SELECT COUNT(*) AS n FROM placements').n).toBe(0)
 })
 

@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, count, eq, exists, getTableColumns, gte, inArray, isNotNull, isNull, lt, lte, ne, notExists, or, sql, type SQL } from 'drizzle-orm'
+import { and, asc, count, desc, eq, exists, getTableColumns, gte, inArray, isNotNull, isNull, lt, lte, ne, notExists, or, sql, type SQL } from 'drizzle-orm'
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core'
 import { z } from 'zod'
 import { getDb, type Db } from '@/db'
@@ -192,7 +192,7 @@ export const startPlacement = createServerFn({ method: 'POST' })
     const topic = await ownedTopic(db, learnerId, data.topicId)
     const openPlacement = db.select({ id: sessions.id }).from(sessions)
       .where(and(eq(sessions.learnerId, learnerId), eq(sessions.topicId, topic.id), eq(sessions.kind, 'placement'), isNull(sessions.endedAt)))
-      .orderBy(asc(sessions.startedAt), asc(sessions.id)).limit(1)
+      .orderBy(desc(sessions.startedAt), asc(sessions.id)).limit(1)
     const existing = await openPlacement.get()
     if (existing) return { sessionId: existing.id }
 
