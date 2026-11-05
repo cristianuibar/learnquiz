@@ -2,7 +2,7 @@
 
 **Learn any topic or train your team from real documents with adaptive quizzes powered by Meta Muse models.**
 
-Demo video: <YOUTUBE_LINK_PLACEHOLDER> · live app https://app.learnquiz.com · site https://learnquiz.com · Android APK https://github.com/cristianuibar/learnquiz/releases/latest/download/learnquiz.apk
+Demo video: [Learn Quiz: your SOPs become the training (YouTube, 2:59)](https://youtu.be/-jNl_HLRJ7Q) · live app https://app.learnquiz.com · site https://learnquiz.com · Android APK https://github.com/cristianuibar/learnquiz/releases/latest/download/learnquiz.apk
 
 ## Hackathon entry
 
@@ -36,7 +36,7 @@ commit dates and authorship.
 - **Best Creative Build:** Muse Image draws concept diagrams for visual concepts,
   and Muse Wonder orders personal-topic sessions, with a rules fallback. See the
   [model documentation](docs/MODELS.md).
-- **Most Viral Project:** X post: <X_POST_LINK_PLACEHOLDER>.
+- **Most Viral Project:** the demo video is posted on X; the post link is in the submission.
   See the [model documentation](docs/MODELS.md) for what powers the project.
 - **Community Vote.** See the [model documentation](docs/MODELS.md) for the build's
   use of Meta models.
@@ -54,7 +54,7 @@ Guests have **150 model calls a day**; email accounts have **500**.
 
 ### (b) Company portal (HR)
 
-Demo HR login: <DEMO_HR_EMAIL_PLACEHOLDER> / <DEMO_HR_PASSWORD_PLACEHOLDER>
+Demo HR login (a public demo account; no sign-up): `judge@northwind.learnquiz.test` / `LearnQuiz-Judge-2026` at https://app.learnquiz.com/sign-in. It is an admin of the fictional Northwind Logistics demo company; choose **Got it** on **Before you start** the first time.
 
 Sign in at https://app.learnquiz.com/sign-in to explore the **Northwind Logistics**
 demo company:
