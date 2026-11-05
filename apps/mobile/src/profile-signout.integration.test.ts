@@ -108,3 +108,22 @@ test.each([
     process.off('unhandledRejection', unhandled)
   }
 })
+
+
+test.each([false, true])('Profile shows company-admin visibility only for companyMember=%s', async (companyMember) => {
+  replies['/api/v1/session'].data = {
+    user: { id: 'user-a', name: 'Ana', isAnonymous: false }, needsDisclosure: false, companyMember,
+  }
+  try {
+    const navigation = renderRouter('src/app', { initialUrl: '/profile' })
+    await navigation
+    expect(await screen.findByText('Ana')).toBeOnTheScreen()
+    const visibility = screen.queryByText("Your company's training admins see this same page.")
+    if (companyMember) expect(visibility).toBeOnTheScreen()
+    else expect(visibility).toBeNull()
+  } finally {
+    replies['/api/v1/session'].data = {
+      user: { id: 'user-a', name: 'Ana', isAnonymous: false }, needsDisclosure: false,
+    }
+  }
+})

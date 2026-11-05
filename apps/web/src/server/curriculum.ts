@@ -7,7 +7,7 @@ import { validateSkeleton, fallbackSkeleton } from '@/lib/curriculum/validate'
 import { conceptStatus, roleMastery, unitState } from '@/lib/learning/path'
 import { onboardingDay } from '@/lib/learning/profile'
 import { streakShown } from '@/lib/learning/session'
-import { chatJson, jobModel, LlmError } from '@/lib/llm/client'
+import { chatJson, DailyCapError, jobModel, LlmError } from '@/lib/llm/client'
 import { curriculumPrompt } from '@/lib/llm/prompts'
 import { CurriculumSkeleton } from '@/lib/llm/schemas'
 import { MAX_SOURCE_TEXT_CHARS } from '@/lib/limits'
@@ -57,7 +57,7 @@ export const createTopic = createServerFn({ method: 'POST' })
         })
         generatedBy = jobModel('curriculum').model
       } catch (e) {
-        if (e instanceof LlmError && e.status === 429) {
+        if (e instanceof DailyCapError) {
           // A request that raced the cap check stored its rows before the backstop
           // fired; remove them so a capped request leaves nothing behind.
           await db.delete(sources).where(eq(sources.topicId, topicId)).catch(() => {})
@@ -66,7 +66,7 @@ export const createTopic = createServerFn({ method: 'POST' })
         }
         // Only invalid output falls back to the generic skeleton; a dead or unauthorised model must not look like success.
         if (!(e instanceof LlmError) || e.status !== 422) {
-          throw httpError(`The model did not answer (${e instanceof LlmError ? e.status : 'error'}). Try again.`, 503)
+          throw httpError('Your learning path could not be prepared. Try again in a few minutes.', 503)
         }
         console.error('curriculum output invalid, using fallback', e.message)
         skeleton = fallbackSkeleton(data.topic)

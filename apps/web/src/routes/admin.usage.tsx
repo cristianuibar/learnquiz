@@ -150,9 +150,9 @@ function Usage() {
   const last = data.days.at(-1)
   const callsSummary = totals.calls === 0
     ? `Bar chart of model calls per day from ${spanWords}: no calls in this range.`
-    : `Bar chart of model calls per day from ${spanWords}, with failure rate below: ${rangeOf(data.days.map((d) => d.calls), count)} calls a day`
-      + (callsPeak >= 0 ? `, highest on ${monthDay(dayMs(data.days[callsPeak].day))} with ${count(data.days[callsPeak].calls)} calls and a ${percent(dayRate(data.days[callsPeak]))} failure rate` : '')
-      + (isPartial && last ? `${partialClause}, at ${percent(dayRate(last))}.` : '.')
+    : `Bar chart of model calls per day from ${spanWords}, with failure rate below`
+      + (callsPeak >= 0 ? `: ${rangeOf(data.days.map((d) => d.calls), count)} calls a day on complete days, highest on ${monthDay(dayMs(data.days[callsPeak].day))} with ${count(data.days[callsPeak].calls)} calls and a ${percent(dayRate(data.days[callsPeak]))} failure rate` : '')
+      + (isPartial && last ? `${partialClause}, with ${count(last.calls)} calls and a ${percent(dayRate(last))} failure rate.` : '.')
   const costSummary = totals.calls === 0
     ? `Bar chart of model cost per day from ${spanWords}: no calls in this range.`
     : `Bar chart of model cost per day from ${spanWords}: ${rangeOf(data.days.map((d) => d.cost ?? 0), money)} a day`

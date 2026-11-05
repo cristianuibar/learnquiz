@@ -62,7 +62,8 @@ export function DocumentsCard({ detail, readOnly, pasteOpen, pasteFor, onToggleP
     if (busy) return
     if (!isPdf(file)) return setReject(`${file.name} wasn't uploaded. Upload a PDF or paste the text.`)
     if (file.size > MAX_ROLE_DOCUMENT_BYTES) {
-      return setReject(`${file.name} wasn't uploaded. It's ${mb(file.size)} MB; the limit is 10 MB. Split it or export a smaller PDF.`)
+      const size = mb(file.size) === mb(MAX_ROLE_DOCUMENT_BYTES) ? 'just over 10 MB' : `${mb(file.size)} MB`
+      return setReject(`${file.name} wasn't uploaded. It's ${size}; the limit is 10 MB. Split it or export a smaller PDF.`)
     }
     setReject('')
     setReplacedId(replacesId)

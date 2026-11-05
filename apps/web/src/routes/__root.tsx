@@ -70,14 +70,13 @@ function Root() {
   const nav = user && /^\/(?:today|t\/[^/]+\/path|me|me\/profile)\/?$/.test(pathname) // the four bottom-nav screens
   const resolved = useRouterState({ select: (s) => s.resolvedLocation?.pathname })
   const router = useRouter()
-  const first = useRef(true)
+  const previousPath = useRef(pathname)
 
   // After a navigation, move focus to the new page's heading (not on first load).
   useEffect(() => {
-    if (first.current) {
-      first.current = false
-      return
-    }
+    // Initial resolution and StrictMode effect replay are not page changes.
+    if (!resolved || resolved === previousPath.current) return
+    previousPath.current = resolved
     const key = router.state.resolvedLocation?.state.focus
     const control = key && document.querySelector<HTMLElement>(`[data-focus="${key}"]`)
     if (control) {

@@ -1,4 +1,6 @@
 import { createElement } from 'react'
+import { Appearance } from 'react-native'
+import { applyAppearance } from './lib/appearance'
 import { render, screen } from '@testing-library/react-native'
 import { useFonts } from '@expo-google-fonts/inter'
 import * as SplashScreen from 'expo-splash-screen'
@@ -6,6 +8,19 @@ import RootLayout from './app/_layout'
 import { useSession } from './lib/session-store'
 import { useURL } from 'expo-linking'
 import { holdTarget, takeHeldTarget } from './lib/held-target'
+
+let mockSystemScheme: 'light' | 'dark' = 'light'
+let mockAppearance: 'light' | 'dark' | 'unspecified' = 'unspecified'
+jest.mock('react-native/Libraries/Utilities/useColorScheme', () => ({
+  __esModule: true,
+  default: () => mockAppearance === 'unspecified' ? mockSystemScheme : mockAppearance,
+}))
+// Expose the native status-bar boundary so assertions observe its requested icon style.
+jest.mock('expo-status-bar', () => ({
+  StatusBar: ({ style }: { style: string }) => require('react').createElement(
+    require('react-native').Text, { accessibilityLabel: 'Status bar icons' }, style,
+  ),
+}))
 
 jest.mock('@expo-google-fonts/inter', () => ({ useFonts: jest.fn() }))
 jest.mock('expo-splash-screen', () => ({ preventAutoHideAsync: jest.fn(), hideAsync: jest.fn() }))
@@ -109,4 +124,27 @@ test('surfaces a font loading error', async () => {
   fonts.mockReturnValue([false, new Error('Font load failed')])
   await expect(render(createElement(RootLayout))).rejects.toThrow('Font load failed')
   expect(SplashScreen.hideAsync).not.toHaveBeenCalled()
+})
+
+
+test.each([
+  ['light', 'system', 'dark'],
+  ['dark', 'system', 'light'],
+  ['dark', 'light', 'dark'],
+  ['light', 'dark', 'light'],
+] as const)('status bar on system %s with %s appearance uses %s icons', async (system, choice, icons) => {
+  mockSystemScheme = system
+  mockAppearance = 'unspecified'
+  const set = jest.spyOn(Appearance, 'setColorScheme').mockImplementation((value) => {
+    mockAppearance = value ?? 'unspecified'
+  })
+  try {
+    const view = await render(createElement(RootLayout))
+    applyAppearance(choice)
+    await view.rerender(createElement(RootLayout))
+    expect(screen.getByLabelText('Status bar icons')).toHaveTextContent(icons)
+  } finally {
+    set.mockRestore()
+    mockAppearance = 'unspecified'
+  }
 })

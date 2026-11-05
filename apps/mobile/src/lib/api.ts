@@ -25,7 +25,7 @@ const DEFAULT_TIMEOUT_MS = 90_000
 
 export class ApiError extends Error {
   status: number | null
-  constructor(status: number | null, message: string) {
+  constructor(status: number | null, message: string, readonly reason?: 'timeout' | 'aborted' | 'network') {
     super(message)
     this.name = 'ApiError'
     this.status = status
@@ -150,6 +150,7 @@ async function request<T>(url: string, args: CoreArgs): Promise<{ data: T; token
         : args.signal?.aborted
           ? 'Request was aborted'
           : 'Network request failed',
+      timedOut ? 'timeout' : args.signal?.aborted ? 'aborted' : 'network',
     )
   } finally {
     clearTimeout(timer)

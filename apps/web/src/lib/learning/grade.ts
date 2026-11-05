@@ -13,9 +13,11 @@ export function normalize(text: string): string {
 }
 
 function numericExpression(text: string): string | null {
-  // Preserve the comma and percent-sign tolerance of prose normalization.
-  text = text.replace(/[,%]/g, '')
-  if (!/\d/.test(text) || !/^[\d\s.+/−-]+$/.test(text)) return null
+  // Strip thousands separators, but keep decimal commas from collapsing to integers.
+  text = text.replace(/%/g, '').replace(/\d[\d,]*/g, (number) =>
+    /^[1-9]\d{0,2}(,\d{3})+$/.test(number) ? number.replace(/,/g, '') : number,
+  )
+  if (!/\d/.test(text) || !/^[\d\s.,+/−-]+$/.test(text)) return null
   return text.trim().replace(/−/g, '-').replace(/\s*([+/-])\s*/g, '$1')
 }
 

@@ -264,10 +264,10 @@ test('cancel after ready is a no-op', async () => {
   expect(effects.replace).toHaveBeenCalledWith('/play/s1')
 })
 
-test.each(['session', 'placement'] as const)('%s waits until exactly 90s before aborting', async (start) => {
+test.each(['session', 'placement'] as const)('%s waits until exactly 250s before aborting', async (start) => {
   jest.useFakeTimers()
   const originalApi = apiModule.api
-  // A session start must keep its own 90s budget even if the shared API's
+  // A session start must keep its own 250s budget even if the shared API's
   // default becomes shorter. Omitting the override must fail this test too.
   const apiCall = jest.spyOn(apiModule, 'api').mockImplementation((path, options) =>
     originalApi(path, { ...options, timeoutMs: options?.timeoutMs ?? 1_000 }),
@@ -276,7 +276,7 @@ test.each(['session', 'placement'] as const)('%s waits until exactly 90s before 
     abortableFetch()
     const pending = startPlay({ topicId: 't1', start })
     const assertion = expect(pending).rejects.toThrow(/timed out/)
-    await jest.advanceTimersByTimeAsync(89_999)
+    await jest.advanceTimersByTimeAsync(249_999)
     expect((lastCall().init.signal as AbortSignal).aborted).toBe(false)
     await jest.advanceTimersByTimeAsync(1)
     expect((lastCall().init.signal as AbortSignal).aborted).toBe(true)

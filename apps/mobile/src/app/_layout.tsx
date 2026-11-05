@@ -8,12 +8,13 @@ import {
 import { useURL } from 'expo-linking'
 import { Stack, usePathname, useRouter, type Href } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
+import { StatusBar } from 'expo-status-bar'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { applyStoredAppearance } from '@/lib/appearance'
-import { ThemeProvider } from '@/theme/ThemeProvider'
+import { ThemeProvider, useTheme } from '@/theme/ThemeProvider'
 import { SessionProvider, useSession } from '@/lib/session-store'
 import { holdTarget, replayVersion, subscribeReplay, takeReplayTarget } from '@/lib/held-target'
 import { canOpenTarget, targetFromURL } from '@/lib/route-gates'
@@ -103,6 +104,7 @@ function SessionRoutes({ fontsLoaded }: { fontsLoaded: boolean }) {
   const signedIn = session.status === 'ready'
   return (
     <ThemeProvider accent={session.branding?.accent}>
+      <ThemedStatusBar />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="join/[invitationId]" />
@@ -126,4 +128,9 @@ function SessionRoutes({ fontsLoaded }: { fontsLoaded: boolean }) {
       </Stack>
     </ThemeProvider>
   )
+}
+
+function ThemedStatusBar() {
+  const { scheme } = useTheme()
+  return <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
 }

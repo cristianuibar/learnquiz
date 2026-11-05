@@ -174,6 +174,39 @@ it('shows chart tables whose totals match the figures', async () => {
   } finally { await unmount() }
 })
 
+it.each([29, 0])('describes today\'s four failed calls separately from %i complete days', async (completeDays) => {
+  const asOf = Date.UTC(2026, 10, 4, 10, 42)
+  vi.setSystemTime(asOf)
+  const days = Array.from({ length: completeDays + 1 }, (_, i) => ({
+    day: new Date(Date.UTC(2026, 10, 4 - completeDays + i)).toISOString().slice(0, 10),
+    partial: i === completeDays,
+    calls: i === completeDays ? 4 : 0,
+    failures: i === completeDays ? 4 : 0,
+    p50: null, p95: null, cost: 0, unpriced: 0,
+  }))
+  vi.mocked(getModelUsage).mockResolvedValueOnce({
+    ...usage, from: days[0].day, to: '2026-11-04', asOf, days,
+    totals: { calls: 4, failures: 4, p50: null, p95: null, cost: 0, unpriced: 0 },
+    latency: { total: { p50: null, p95: null }, days },
+    jobs: [], companies: [], failures: [],
+  })
+  const { container, unmount } = await mount(`/admin/usage?from=${days[0].day}&to=2026-11-04`)
+  try {
+    const callsTable = table(container, CALLS)
+    const today = callsTable.querySelector('tbody tr:last-child')!
+    expect([...today.children].map((c) => c.textContent)).toEqual(['Nov 4 (to 10:42)', '4', '4', '100.0%'])
+    expect(footer(callsTable)).toEqual([`${days.length} ${days.length === 1 ? 'day' : 'days'}`, '4', '4', '100.0%'])
+    const summary = container.querySelector('svg[role="img"][aria-label^="Bar chart of model calls"]')!.getAttribute('aria-label')!
+    expect(summary).toContain('Nov 4 is partial, through 10:42, with 4 calls and a 100% failure rate.')
+    if (completeDays > 0) {
+      expect(summary).toContain('0 to 0 calls a day on complete days, highest on Oct 6 with 0 calls')
+    } else {
+      expect(summary).not.toContain('calls a day')
+      expect(summary).not.toContain('highest on')
+    }
+  } finally { await unmount() }
+})
+
 it('filters the latency chart by job without touching the other figures', async () => {
   const { container, unmount } = await mount()
   try {

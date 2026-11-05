@@ -105,7 +105,7 @@ export default function LoadingScreen() {
           {failure ? (
             <>
               <AlertRow>{failure.title ? `${failure.title}\n${failure.message}` : failure.message}</AlertRow>
-              {failure.retry && <Button size="lg" onPress={() => setAttempt((previous) => previous + 1)}>Try again</Button>}
+              {failure.retry && <Button size="lg" onPress={() => setAttempt((previous) => previous + 1)}>{failure.retryLabel ?? 'Try again'}</Button>}
             </>
           ) : (
             <Text role="status" accessibilityLiveRegion="none" muted style={{ textAlign: 'center' }}>
