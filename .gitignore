@@ -20,3 +20,4 @@ todos.json
 /apps/mobile/ios
 *.p8
 google-services*.json
+.claude/worktrees/

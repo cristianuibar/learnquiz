@@ -109,7 +109,7 @@ afterEach(() => { jest.useRealTimers() })
 test.each(['light', 'dark'] as const)('empty Today gives personal learners web guidance in %s mode', async (scheme) => {
   mockSession.mockReturnValue({ ...sessionFor('u1'), companyMember: false })
   mockApi.mockResolvedValue({ topic: null, role: null, plan: null })
-  const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true)
+  const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined)
   await render(createElement(ThemeProvider, { scheme, children: createElement(TodayScreen) }))
   expect(screen.getByText('To start a topic on the web, sign in with the same account.')).toBeOnTheScreen()
   expect(screen.queryByText('Your company hasn’t assigned you a role. Ask your manager.')).toBeNull()

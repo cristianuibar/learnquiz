@@ -3,6 +3,8 @@ import * as Notifications from 'expo-notifications'
 import { useRouter } from 'expo-router'
 import { holdTarget } from '@/lib/held-target'
 
+Notifications.setNotificationHandler(null)
+
 export interface QuickRoute {
   itemId: string
   pushId?: string

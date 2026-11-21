@@ -35,6 +35,7 @@ jest.mock('expo-notifications', () => ({
   DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
   getLastNotificationResponseAsync: jest.fn(async () => null),
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  setNotificationHandler: jest.fn(),
 }))
 jest.mock('react-native-gesture-handler', () => ({ GestureHandlerRootView: 'View' }))
 jest.mock('react-native-keyboard-controller', () => ({
@@ -84,7 +85,7 @@ test.each([
   const unhandled = jest.fn()
   process.on('unhandledRejection', unhandled)
   try {
-    const navigation = renderRouter('src/app', { initialUrl: '/profile' })
+    const navigation = await renderRouter('src/app', { initialUrl: '/profile' })
     await navigation
     expect(await screen.findByText('Ana')).toBeOnTheScreen()
 
@@ -115,7 +116,7 @@ test.each([false, true])('Profile shows company-admin visibility only for compan
     user: { id: 'user-a', name: 'Ana', isAnonymous: false }, needsDisclosure: false, companyMember,
   }
   try {
-    const navigation = renderRouter('src/app', { initialUrl: '/profile' })
+    const navigation = await renderRouter('src/app', { initialUrl: '/profile' })
     await navigation
     expect(await screen.findByText('Ana')).toBeOnTheScreen()
     const visibility = screen.queryByText("Your company's training admins see this same page.")

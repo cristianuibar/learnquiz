@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
-import { AccessibilityInfo, BackHandler, findNodeHandle, ScrollView, useWindowDimensions, View, type Text as NativeText } from 'react-native'
+import { AccessibilityInfo, BackHandler, findNodeHandle, ScrollView, useWindowDimensions, View, type TextInstance, type ViewInstance } from 'react-native'
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller'
 import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -18,7 +18,7 @@ export type SheetProps = {
   /** Android Back while the sheet is mounted. Return true to consume it. */
   onBack?: () => boolean
   /** Accessibility focus moves here once after mount. */
-  focusRef?: RefObject<View | NativeText | null>
+  focusRef?: RefObject<ViewInstance | TextInstance | null>
 }
 
 export type SheetHostProps = {
@@ -28,7 +28,7 @@ export type SheetHostProps = {
   sheet: ReactNode | null
 }
 
-function useSheetFocus(ref: RefObject<View | NativeText | null> | undefined) {
+function useSheetFocus(ref: RefObject<ViewInstance | TextInstance | null> | undefined) {
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
       const tag = ref?.current && findNodeHandle(ref.current)

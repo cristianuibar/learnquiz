@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { View, type Text as NativeText } from 'react-native'
+import { View, type TextInstance } from 'react-native'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { ChevronLeft } from 'lucide-react-native'
 import { AlertRow } from '@/components/ui/AlertRow'
@@ -28,7 +28,7 @@ export default function Flag() {
 function FlagForm({ token, conceptId }: { token: string; conceptId: string | undefined }) {
   const router = useRouter()
   const { space, sizes } = useTheme()
-  const headingRef = useRef<NativeText | null>(null)
+  const headingRef = useRef<TextInstance | null>(null)
   useHeadingFocus(headingRef)
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)

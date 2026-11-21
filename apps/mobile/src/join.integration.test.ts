@@ -156,7 +156,7 @@ describe.each(['light', 'dark'] as const)('%s join form layout', (scheme) => {
 test('a join that finishes behind a pushed screen does not navigate until Join is back in front', async () => {
   const accept = deferred<unknown>()
   jest.mocked(acceptInvitation).mockReturnValue(accept.promise as never)
-  const navigation = renderRouter(routes, { initialUrl: '/join/inv-1' })
+  const navigation = await renderRouter(routes, { initialUrl: '/join/inv-1' })
   await navigation
   await submitCreateAccount()
   expect(signUp).toHaveBeenCalledWith('jordan@northwind.example', 'correct horse', 'Jordan Reyes')
@@ -183,7 +183,7 @@ test('a 401 on accept signs out, returns to sign-in, and the retry signs in agai
       throw new ApiError(401, 'Unauthorized')
     })
     .mockResolvedValueOnce({} as never)
-  const navigation = renderRouter(routes, { initialUrl: '/join/inv-1' })
+  const navigation = await renderRouter(routes, { initialUrl: '/join/inv-1' })
   await navigation
   await submitCreateAccount()
 

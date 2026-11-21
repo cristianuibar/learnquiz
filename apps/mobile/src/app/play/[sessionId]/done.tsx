@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
-import { BackHandler, View, type Text as NativeText } from 'react-native'
+import { BackHandler, View, type TextInstance } from 'react-native'
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import * as Notifications from 'expo-notifications'
 import type { SummaryView } from '@learnquiz/api'
@@ -139,7 +139,7 @@ function Summary({ summary, finished, toToday, active }: {
 }) {
   const router = useRouter()
   const { space } = useTheme()
-  const heading = useRef<NativeText>(null)
+  const heading = useRef<TextInstance>(null)
   const [pending, setPending] = useState(false)
   useHeadingFocus(heading)
 

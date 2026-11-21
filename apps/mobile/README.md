@@ -52,8 +52,7 @@ table, so no database migration is needed. Invitation acceptance and disclosure
 follow the email flow, including after the browser restarts the app.
 
 Deploy the web endpoints before publishing the mobile update. This implementation
-adds no native module or native configuration; the Android fingerprint remains
-`b9c7db54112d4207fce7a344f1732cb72c6e009f`, so the matching preview APK can use OTA.
+adds no native module or native configuration.
 Check the fingerprint again for any later bundled changes.
 
 Automated tests mock Facebook, including the real Better Auth callback. Meta's

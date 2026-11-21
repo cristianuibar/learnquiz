@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AccessibilityInfo, findNodeHandle, ScrollView, View, type Text as NativeText } from 'react-native'
+import { AccessibilityInfo, findNodeHandle, ScrollView, View, type TextInstance, type ScrollViewInstance } from 'react-native'
 import { useFocusEffect, useRouter, useScrollToTop } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { EmptyState } from '@/components/today/EmptyState'
@@ -18,8 +18,8 @@ export default function TodayScreen() {
   const { colors, space } = useTheme()
   const insets = useSafeAreaInsets()
   const router = useRouter()
-  const heading = useRef<NativeText>(null)
-  const scroll = useRef<ScrollView>(null)
+  const heading = useRef<TextInstance>(null)
+  const scroll = useRef<ScrollViewInstance>(null)
   const [retrying, setRetrying] = useState(false)
   const retryHadFocus = useRef(false)
   const retryStartedWithFocus = useRef(false)

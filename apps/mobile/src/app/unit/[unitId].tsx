@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { AccessibilityInfo, findNodeHandle, ScrollView, View, type Text as NativeText } from 'react-native'
+import { AccessibilityInfo, findNodeHandle, ScrollView, View, type TextInstance } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { ChevronLeft, FileText } from 'lucide-react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -28,7 +28,7 @@ export default function UnitScreen() {
   const { colors, space, radius, sizes } = useTheme()
   const insets = useSafeAreaInsets()
   const router = useRouter()
-  const heading = useRef<NativeText>(null)
+  const heading = useRef<TextInstance>(null)
 
   const unit = path ? findUnit(path, unitId) : null
   const procedure = useUnitProcedure(unit?.id ?? null)

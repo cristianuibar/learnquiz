@@ -53,6 +53,7 @@ jest.mock('expo-notifications', () => ({
   DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
   getLastNotificationResponseAsync: jest.fn(async () => null),
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  setNotificationHandler: jest.fn(),
 }))
 jest.mock('react-native-gesture-handler', () => ({ GestureHandlerRootView: 'View' }))
 jest.mock('react-native-keyboard-controller', () => ({
@@ -61,6 +62,18 @@ jest.mock('react-native-keyboard-controller', () => ({
   KeyboardAwareScrollView: require('react-native').ScrollView,
   useKeyboardState: () => false,
 }))
+const mockRouterReplace = jest.fn()
+jest.mock('expo-router', () => {
+  const actual = jest.requireActual('expo-router')
+  const { useMemo } = jest.requireActual('react')
+  return { ...actual, useRouter: () => {
+    const router = actual.useRouter()
+    return useMemo(() => ({ ...router, replace: (...args: unknown[]) => {
+      mockRouterReplace(...args)
+      return router.replace(...args)
+    } }), [router])
+  } }
+})
 jest.mock('expo-router/build/toolbar/native', () => ({ RouterToolbarHost: 'View', RouterToolbarItem: 'View' }))
 jest.mock(require.resolve('expo-glass-effect', { paths: [require.resolve('expo-router')] }), () => ({
   GlassView: 'View', isLiquidGlassAvailable: () => false, isGlassEffectAPIAvailable: () => false,
@@ -111,7 +124,7 @@ beforeEach(async () => {
   acceptResponse = null
   invite.status = 'pending'
   jest.mocked(fetch).mockClear()
-  jest.spyOn(Linking, 'openURL').mockResolvedValue(true)
+  jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined)
   mockIndexOpen = true
 })
 afterEach(() => { jest.restoreAllMocks() })
@@ -137,11 +150,11 @@ test('first-time learners can open web sign-up from Sign in', async () => {
 })
 
 test("the layout leaves '/' to index even when its effect sees '/' before index's focus", async () => {
-  const navigation = renderRouter('src/app', { initialUrl: '/sign-in' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/sign-in' })
   await navigation
   expect(await screen.findByRole('header', { name: 'Sign in' })).toBeOnTheScreen()
   holdTarget('/unit/u1')
-  const replace = jest.spyOn(router, 'replace')
+  const replace = mockRouterReplace.mockClear()
   setIndexOpen(false)
   await submitSignIn()
 
@@ -159,14 +172,14 @@ test("the layout leaves '/' to index even when its effect sees '/' before index'
 })
 
 async function signInOverJoin(held: string | null) {
-  const navigation = renderRouter('src/app', { initialUrl: '/join/inv-1' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/join/inv-1' })
   await navigation
   expect(await screen.findByRole('header', { name: 'Train as a warehouse picker' })).toBeOnTheScreen()
   // A warm link to sign-in opens over the invitation.
   await act(async () => { router.push('/sign-in') })
   expect(navigation.getPathname()).toBe('/sign-in')
   if (held) holdTarget(held)
-  const replace = jest.spyOn(router, 'replace')
+  const replace = mockRouterReplace.mockClear()
   await submitSignIn()
   return { navigation, replace }
 }
@@ -175,13 +188,13 @@ test('signing in over Join without a held link goes on to Today through index', 
   const { navigation, replace } = await signInOverJoin(null)
   expect(navigation.getPathname()).toBe('/today')
   expect(screen.getByText('Today screen')).toBeOnTheScreen()
-  expect(replace.mock.calls.map(([target]) => target)).toEqual(['/', '/(tabs)/today'])
+  expect(replace.mock.calls.map(([target]) => target)).toEqual(['/(tabs)/today'])
 })
 
 test('signing in over Join with a held unit opens the unit once, decided by index', async () => {
   const { navigation, replace } = await signInOverJoin('/unit/u1')
   expect(navigation.getPathname()).toBe('/unit/u1')
-  expect(replace.mock.calls.map(([target]) => target)).toEqual(['/', '/unit/u1'])
+  expect(replace.mock.calls.map(([target]) => target)).toEqual(['/unit/u1'])
   expect(peekHeldTarget()).toBeNull()
 })
 
@@ -190,16 +203,16 @@ test('signing in over Join that still needs Disclosure opens it and keeps the he
   const { navigation, replace } = await signInOverJoin('/unit/u1')
   expect(navigation.getPathname()).toBe('/welcome')
   expect(screen.getByText('Before you start')).toBeOnTheScreen()
-  expect(replace.mock.calls.map(([target]) => target)).toEqual(['/', '/welcome'])
+  expect(replace.mock.calls.map(([target]) => target)).toEqual(['/welcome'])
   expect(peekHeldTarget()).toBe('/unit/u1')
 })
 
 test('going Back from sign-in to Join while signed out stays on Join', async () => {
-  const navigation = renderRouter('src/app', { initialUrl: '/join/inv-1' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/join/inv-1' })
   await navigation
   expect(await screen.findByRole('header', { name: 'Train as a warehouse picker' })).toBeOnTheScreen()
   await act(async () => { router.push('/sign-in') })
-  const replace = jest.spyOn(router, 'replace')
+  const replace = mockRouterReplace.mockClear()
   await act(async () => { router.back() })
   await flush()
   expect(navigation.getPathname()).toBe('/join/inv-1')
@@ -227,7 +240,7 @@ async function facebookReturn() {
 
 test('exchanges the browser code, stores the bearer and opens Today', async () => {
   facebookEnabled = true
-  const navigation = renderRouter('src/app', { initialUrl: '/sign-in' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/sign-in' })
   await navigation
   await openFacebook()
   expect(getToken()).toBeNull()
@@ -243,7 +256,7 @@ test('exchanges the browser code, stores the bearer and opens Today', async () =
 test('Facebook from an invite accepts it and follows the email disclosure destination', async () => {
   facebookEnabled = true
   needsDisclosure = true
-  const navigation = renderRouter('src/app', { initialUrl: '/join/inv-1' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/join/inv-1' })
   await navigation
   expect(await screen.findByRole('header', { name: 'Train as a warehouse picker' })).toBeOnTheScreen()
   await openFacebook()
@@ -261,7 +274,7 @@ test('a persisted Facebook attempt can complete after a cold app launch', async 
   await store.setItemAsync('lq.facebook.pending', JSON.stringify({
     state: facebookState, verifier: facebookVerifier, expiresAt: Date.now() + 300_000, target: null,
   }))
-  const navigation = renderRouter('src/app', { initialUrl: `/sign-in?facebookState=${facebookState}&facebookCode=${facebookCode}` })
+  const navigation = await renderRouter('src/app', { initialUrl: `/sign-in?facebookState=${facebookState}&facebookCode=${facebookCode}` })
   await navigation
   await flush()
   expect(getToken()).toBe('facebook-bearer')
@@ -271,7 +284,7 @@ test('a persisted Facebook attempt can complete after a cold app launch', async 
 
 test('cancelling Facebook shows an actionable error and keeps the learner signed out', async () => {
   facebookEnabled = true
-  const navigation = renderRouter('src/app', { initialUrl: '/sign-in' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/sign-in' })
   await navigation
   await openFacebook()
   await act(async () => { router.push(`/sign-in?facebookState=${facebookState}&facebookError=cancelled`) })
@@ -286,7 +299,7 @@ test('cancelling Facebook shows an actionable error and keeps the learner signed
 test('Facebook from an already-used invitation goes to Today without accepting again', async () => {
   facebookEnabled = true
   invite.status = 'accepted'
-  const navigation = renderRouter('src/app', { initialUrl: '/join/inv-1' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/join/inv-1' })
   await navigation
   await openFacebook()
   await facebookReturn()
@@ -298,7 +311,7 @@ test('Facebook from an already-used invitation goes to Today without accepting a
 test('a failed Facebook invitation accept returns the signed-in learner to Join', async () => {
   facebookEnabled = true
   acceptResponse = Promise.resolve({ ok: false, status: 400, text: async () => JSON.stringify({ message: 'Invitation could not be accepted' }), headers: { get: () => null } } as unknown as Response)
-  const navigation = renderRouter('src/app', { initialUrl: '/join/inv-1' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/join/inv-1' })
   await navigation
   await openFacebook()
   await facebookReturn()
@@ -311,7 +324,7 @@ test('Facebook publishes the session change only after invitation acceptance res
   facebookEnabled = true
   let accept!: (response: Response) => void
   acceptResponse = new Promise((resolve) => { accept = resolve })
-  const navigation = renderRouter('src/app', { initialUrl: '/join/inv-1' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/join/inv-1' })
   await navigation
   await openFacebook()
   const changed = jest.fn()

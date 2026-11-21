@@ -1,5 +1,5 @@
 import { createElement as h, createRef } from 'react'
-import type { View } from 'react-native'
+import type { ViewInstance } from 'react-native'
 import { render, screen } from '@testing-library/react-native'
 import { themes } from '@learnquiz/tokens/native'
 import type { RevealModel } from '@learnquiz/api/reveal'
@@ -85,7 +85,7 @@ describe.each(['light', 'dark'] as const)('%s compact band', (scheme) => {
 })
 
 test('the ref reaches the band so the sheet can focus it', async () => {
-  const ref = createRef<View>()
+  const ref = createRef<ViewInstance>()
   await band(models.correct, 'light', { ref })
   expect(ref.current == null).toBe(false)
 })

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Pressable, View, type Text as NativeText } from 'react-native'
+import { Pressable, View, type TextInstance } from 'react-native'
 import { ChevronLeft } from 'lucide-react-native'
 import { reportReasons, type ReportReason } from '@learnquiz/api/reveal'
 import { reportFailed } from '@learnquiz/api/system-copy'
@@ -48,7 +48,7 @@ export function useReportSheet({ itemId, attemptId, onBack, onSent, branding }: 
   const [note, setNote] = useState('')
   const [send, setSend] = useState<SendState>(initialSendState)
   const [focusedReason, setFocusedReason] = useState<ReportReason | null>(null)
-  const headingRef = useRef<NativeText | null>(null)
+  const headingRef = useRef<TextInstance | null>(null)
   const sendRef = useRef<SendState>(initialSendState)
   const generation = useRef(0)
 

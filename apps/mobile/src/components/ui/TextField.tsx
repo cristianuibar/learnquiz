@@ -1,11 +1,11 @@
 import { useId, useState, type ReactNode } from 'react'
-import { TextInput, View, type TextInputProps } from 'react-native'
+import { TextInput, View, type TextInputProps, type TextInputInstance } from 'react-native'
 import { Lock } from 'lucide-react-native'
 import { useTheme } from '../../theme/ThemeProvider'
 import { Text } from './Text'
 
 export type TextFieldProps = TextInputProps & {
-  ref?: React.Ref<TextInput>
+  ref?: React.Ref<TextInputInstance>
   label: string
   helper?: string
   hint?: string

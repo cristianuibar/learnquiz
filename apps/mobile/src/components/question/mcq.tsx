@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { Platform, View, type NativeSyntheticEvent } from 'react-native'
+import { Platform, View, type NativeSyntheticEvent, type ViewInstance } from 'react-native'
 import { useTheme } from '../../theme/ThemeProvider'
 import { OptionRow } from '../session/OptionRow'
 import { DiagramImage } from './diagram-image'
@@ -7,7 +7,7 @@ import type { QuestionBodyProps } from './types'
 
 export function MultipleChoiceBody({ item, answer, onAnswer, marks, disabled }: QuestionBodyProps) {
   const { space } = useTheme()
-  const refs = useRef<(View | null)[]>([])
+  const refs = useRef<(ViewInstance | null)[]>([])
   const active = Math.max(0, item.options.findIndex((option) => option.id === answer.optionId))
 
   function onKeyDown(event: NativeSyntheticEvent<{ key: string }>, index: number) {

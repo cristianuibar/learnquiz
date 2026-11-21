@@ -1,5 +1,5 @@
 import type { RefObject } from 'react'
-import { View, type Text as NativeText } from 'react-native'
+import { View, type TextInstance } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { TodayStreak } from '@learnquiz/api/today'
 import { mediaSource } from '@/lib/api'
@@ -15,7 +15,7 @@ export type TodayTopBarProps = {
   streakCount: number
   reward: boolean
   popIn: boolean
-  headingRef: RefObject<NativeText | null>
+  headingRef: RefObject<TextInstance | null>
 }
 
 export function TodayTopBar({ streak, streakCount, reward, popIn, headingRef }: TodayTopBarProps) {

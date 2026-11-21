@@ -1,5 +1,5 @@
 import { createElement as h, createRef } from 'react'
-import { Text as NativeText } from 'react-native'
+import type { TextInstance } from 'react-native'
 import { render, screen } from '@testing-library/react-native'
 import { ThemeProvider } from '../../theme/ThemeProvider'
 import { StreakPill } from '../ui/StreakPill'
@@ -14,7 +14,7 @@ jest.mock('react-native-reanimated', () => ({ ...jest.requireActual('react-nativ
 describe.each(['light', 'dark'] as const)('%s Today streak', (scheme) => {
   test.each([false, true])('20dp flame, reward %s; shared default remains 16dp', async (reward) => {
     await render(h(ThemeProvider, { scheme, children: h(TodayTopBar, {
-      streak: { text: '4 days', label: '4 days in a row' }, streakCount: 4, reward, popIn: true, headingRef: createRef<NativeText>(),
+      streak: { text: '4 days', label: '4 days in a row' }, streakCount: 4, reward, popIn: true, headingRef: createRef<TextInstance>(),
     }) }))
     const pill = screen.getByRole('text', { name: '4 days in a row' })
     const flame = pill.children[0] as typeof pill

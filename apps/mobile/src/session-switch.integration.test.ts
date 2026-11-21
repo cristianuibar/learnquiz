@@ -68,6 +68,7 @@ jest.mock('expo-notifications', () => ({
   DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
   getLastNotificationResponseAsync: jest.fn(async () => null),
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  setNotificationHandler: jest.fn(),
 }))
 jest.mock('react-native-gesture-handler', () => ({ GestureHandlerRootView: 'View' }))
 jest.mock('react-native-keyboard-controller', () => ({
@@ -76,6 +77,18 @@ jest.mock('react-native-keyboard-controller', () => ({
   KeyboardAwareScrollView: require('react-native').ScrollView,
   useKeyboardState: () => false,
 }))
+const mockRouterReplace = jest.fn()
+jest.mock('expo-router', () => {
+  const actual = jest.requireActual('expo-router')
+  const { useMemo } = jest.requireActual('react')
+  return { ...actual, useRouter: () => {
+    const router = actual.useRouter()
+    return useMemo(() => ({ ...router, replace: (...args: unknown[]) => {
+      mockRouterReplace(...args)
+      return router.replace(...args)
+    } }), [router])
+  } }
+})
 jest.mock('expo-router/build/toolbar/native', () => ({ RouterToolbarHost: 'View', RouterToolbarItem: 'View' }))
 jest.mock(require.resolve('expo-glass-effect', { paths: [require.resolve('expo-router')] }), () => ({
   GlassView: 'View', isLiquidGlassAvailable: () => false, isGlassEffectAPIAvailable: () => false,
@@ -123,7 +136,7 @@ async function anaOnProfile(sessionFor: Record<string, () => Promise<Response>>)
   // Each test starts with Ana's bearer, whatever the previous test left in auth.
   await signIn('ana@example.com', 'password')
   nextToken = 'token-b'
-  const navigation = renderRouter('src/app', { initialUrl: '/profile' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/profile' })
   await navigation
   expect(await screen.findByText('Ana')).toBeOnTheScreen()
   const day = new Date().toISOString().slice(0, 10)
@@ -200,13 +213,13 @@ test('sign-in with a held unit while B\'s /session stalls: loading shows nothing
   await setJSON('lq:today:user-a', { userId: 'user-a', day, branding: null,
     today: { ...todayFixtures.normal, topic: { ...todayFixtures.normal.topic!, title: "Ana's private topic" } } })
 
-  const navigation = renderRouter('src/app', { initialUrl: '/sign-in' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/sign-in' })
   await navigation
   expect(await screen.findByRole('header', { name: 'Sign in' })).toBeOnTheScreen()
   await fireEvent.changeText(screen.getByLabelText('Email'), 'bo@example.com')
   await fireEvent.changeText(screen.getByLabelText('Password'), 'password')
   holdTarget('/unit/u1')
-  const replace = jest.spyOn(router, 'replace')
+  const replace = mockRouterReplace.mockClear()
   await fireEvent.press(screen.getByRole('button', { name: 'Sign in' }))
   await flush()
 

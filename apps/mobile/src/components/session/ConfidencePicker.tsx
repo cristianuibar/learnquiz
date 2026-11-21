@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Platform, Pressable, View, type NativeSyntheticEvent } from 'react-native'
+import { Platform, Pressable, View, type NativeSyntheticEvent, type ViewInstance } from 'react-native'
 import { Check } from 'lucide-react-native'
 import type { Confidence } from '@learnquiz/api'
 import { useTheme } from '../../theme/ThemeProvider'
@@ -20,7 +20,7 @@ const choices = [
 
 export function ConfidencePicker({ value, onChange, disabled = false, compact = false }: ConfidencePickerProps) {
   const { colors, space, radius, sizes } = useTheme()
-  const refs = useRef<(View | null)[]>([])
+  const refs = useRef<(ViewInstance | null)[]>([])
   const [focused, setFocused] = useState<number | null>(null)
   const active = Math.max(0, choices.findIndex((choice) => choice.value === value))
 

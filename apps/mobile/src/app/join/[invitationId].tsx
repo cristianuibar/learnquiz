@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { View, type Text as NativeText } from 'react-native'
+import { View, type TextInstance } from 'react-native'
 import { useKeyboardState } from 'react-native-keyboard-controller'
 import { useIsFocused, useLocalSearchParams, useRouter, type Href } from 'expo-router'
 import { roleHeadline, type InviteView } from '@learnquiz/api/invite'
@@ -283,7 +283,7 @@ function Heading({ title, body }: { title: string; body: string | null }) {
 
 function FocusedHeading({ title, body }: { title: string; body: string | null }) {
   const { space } = useTheme()
-  const ref = useRef<NativeText>(null)
+  const ref = useRef<TextInstance>(null)
   useHeadingFocus(ref)
   return (
     <View style={{ gap: space[2] }}>

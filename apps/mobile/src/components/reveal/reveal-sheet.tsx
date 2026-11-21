@@ -1,5 +1,5 @@
 import { useEffect, useRef, type RefObject } from 'react'
-import type { View } from 'react-native'
+import type { ViewInstance } from 'react-native'
 import { Flag } from 'lucide-react-native'
 import type { Answer, Confidence, ItemView, Reveal } from '@learnquiz/api'
 import { revealCopy, revealModel } from '@learnquiz/api/reveal'
@@ -30,15 +30,15 @@ export type RevealSheetProps = {
   basics?: boolean
   onBack?: () => boolean
   /** Ref on the Report link, so focus can return to it after Report. */
-  reportRef?: RefObject<View | null>
+  reportRef?: RefObject<ViewInstance | null>
 }
 
 const consumeBack = () => true
 
 /** Result sheet slots, so a caller can swap other content onto the same mounted Sheet. */
-export function useRevealSheet({ reveal, item, answer, reflection, onReflection, onContinue, onReport, busy, error, branding, basics, onBack, reportRef }: RevealSheetProps): SheetProps & { bandRef: RefObject<View | null> } {
+export function useRevealSheet({ reveal, item, answer, reflection, onReflection, onContinue, onReport, busy, error, branding, basics, onBack, reportRef }: RevealSheetProps): SheetProps & { bandRef: RefObject<ViewInstance | null> } {
   const model = revealModel(reveal, { hasCompany: branding != null, basics })
-  const bandRef = useRef<View>(null)
+  const bandRef = useRef<ViewInstance>(null)
   const announced = useRef(false)
 
   useEffect(() => {

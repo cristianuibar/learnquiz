@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Alert, Linking, View, type Text as NativeText } from 'react-native'
+import { Alert, Linking, View, type TextInstance } from 'react-native'
 import { useKeyboardState } from 'react-native-keyboard-controller'
 import { useIsFocused, useLocalSearchParams } from 'expo-router'
 import { FacebookSignIn } from '@/components/facebook-sign-in'
@@ -34,7 +34,7 @@ export default function SignInScreen() {
   const focused = useIsFocused()
   const holdReplay = useReplayHold()
   const keyboardVisible = useKeyboardState((state) => state.isVisible)
-  const heading = useRef<NativeText>(null)
+  const heading = useRef<TextInstance>(null)
   useHeadingFocus(heading)
   const [state, setState] = useState<SignInState>({ busy: false, error: null })
   const [settled, setSettled] = useState(0)
