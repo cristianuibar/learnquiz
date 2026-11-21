@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { AccessibilityInfo, findNodeHandle, Pressable, View } from 'react-native'
+import { AccessibilityInfo, findNodeHandle, Pressable, View, type ViewInstance } from 'react-native'
 import { useTheme } from '../../theme/ThemeProvider'
 import { clearSteps, ORDER_CAPTION, orderRows, positionOf, stepAnnouncement, toggleStep } from '../../lib/session/order'
 import { Button } from '../ui/Button'
@@ -9,7 +9,7 @@ import type { QuestionBodyProps } from './types'
 
 export function OrderBody({ item, answer, onAnswer, marks, disabled }: QuestionBodyProps) {
   const { colors, space, radius, sizes } = useTheme()
-  const refs = useRef<(View | null)[]>([])
+  const refs = useRef<(ViewInstance | null)[]>([])
   const [focusedId, setFocusedId] = useState<string | null>(null)
   const order = answer.order ?? []
   const rows = orderRows(item.options, order, marks, disabled)

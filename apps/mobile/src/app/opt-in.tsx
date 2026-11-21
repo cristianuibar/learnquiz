@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { BackHandler, View, type Text as NativeText } from 'react-native'
+import { BackHandler, View, type TextInstance } from 'react-native'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { describeWindow, type PushSchedule } from '@learnquiz/api/schedule'
 import { AlertRow } from '@/components/ui/AlertRow'
@@ -23,7 +23,7 @@ type State =
 export default function OptIn() {
   const router = useRouter()
   const { colors, space, radius } = useTheme()
-  const headingRef = useRef<NativeText | null>(null)
+  const headingRef = useRef<TextInstance | null>(null)
   useHeadingFocus(headingRef)
   const [state, setState] = useState<State>({ status: 'loading' })
   const [attempt, setAttempt] = useState(0)

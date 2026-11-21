@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react'
-import { AccessibilityInfo, findNodeHandle, ScrollView, View, type Text as NativeText } from 'react-native'
+import { AccessibilityInfo, findNodeHandle, ScrollView, View, type TextInstance, type ScrollViewInstance, type ViewInstance } from 'react-native'
 import { useFocusEffect, useRouter, useScrollToTop } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { networkError } from '@learnquiz/api/system-copy'
@@ -23,9 +23,9 @@ export default function PathScreen() {
   const { colors, space, radius } = useTheme()
   const insets = useSafeAreaInsets()
   const router = useRouter()
-  const heading = useRef<NativeText>(null)
-  const scroll = useRef<ScrollView>(null)
-  const rowRefs = useRef(new Map<string, View>())
+  const heading = useRef<TextInstance>(null)
+  const scroll = useRef<ScrollViewInstance>(null)
+  const rowRefs = useRef(new Map<string, ViewInstance>())
   const returnTo = useRef<string | null>(null)
   useScrollToTop(scroll)
 

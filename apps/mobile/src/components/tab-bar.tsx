@@ -11,7 +11,7 @@ export type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['ta
 
 const icons = { today: House, path: Route, profile: User }
 
-export function TabBar({ state, descriptors, navigation, insets }: TabBarProps) {
+export function TabBar({ state, descriptors, emitter, navigateToTab, insets }: TabBarProps) {
   const { colors, space, sizes } = useTheme()
   const { today } = useToday()
   const bottom = Math.max(space[2], insets.bottom)
@@ -41,11 +41,11 @@ export function TabBar({ state, descriptors, navigation, insets }: TabBarProps) 
               routeKey: route.key,
               focused,
               disabled,
-              emit: navigation.emit,
-              navigate: () => navigation.navigate(route.name, route.params),
+              emit: emitter.emit,
+              navigate: () => navigateToTab(route.key),
             })
           }
-          onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })}
+          onLongPress={() => emitter.emit({ type: 'tabLongPress', target: route.key })}
         />
       ))}
     </View>

@@ -1,12 +1,12 @@
 import type { Ref } from 'react'
-import { View } from 'react-native'
+import { View, type ViewInstance } from 'react-native'
 import { Check, Info, X } from 'lucide-react-native'
 import type { RevealModel } from '@learnquiz/api/reveal'
 import { useTheme } from '../../theme/ThemeProvider'
 import { StillLearningIcon } from '../ui/icons'
 import { Text } from '../ui/Text'
 
-export type ResultBandProps = { model: RevealModel; compact?: boolean; ref?: Ref<View> }
+export type ResultBandProps = { model: RevealModel; compact?: boolean; ref?: Ref<ViewInstance> }
 
 const icons = { correct: Check, wrong: X, learning: StillLearningIcon, neutral: Info } as const
 

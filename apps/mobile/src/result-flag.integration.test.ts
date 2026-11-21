@@ -37,6 +37,7 @@ jest.mock('expo-notifications', () => ({
   DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
   getLastNotificationResponseAsync: jest.fn(async () => null),
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  setNotificationHandler: jest.fn(),
 }))
 jest.mock('react-native-gesture-handler', () => ({ GestureHandlerRootView: 'View' }))
 jest.mock('react-native-keyboard-controller', () => ({
@@ -87,7 +88,7 @@ beforeEach(async () => {
 afterEach(() => { jest.restoreAllMocks() })
 
 async function openFlag() {
-  const navigation = renderRouter('src/app', { initialUrl: '/profile' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/profile' })
   await navigation
   await fireEvent.press(await screen.findByRole('button', { name: 'Flag an unfair result for Check sign-off' }))
   expect(await screen.findByText('Tell your training team what looks wrong. A person reviews every flag.')).toBeOnTheScreen()
@@ -227,7 +228,7 @@ test('each critical-step button names and opens its own concept', async () => {
 })
 
 test('Back from a directly opened flag falls back to Training progress', async () => {
-  const navigation = renderRouter('src/app', { initialUrl: '/flag?conceptId=concept-1' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/flag?conceptId=concept-1' })
   await navigation
   expect(router.canGoBack()).toBe(false)
   await fireEvent.press(await screen.findByRole('button', { name: 'Back to Training progress' }))

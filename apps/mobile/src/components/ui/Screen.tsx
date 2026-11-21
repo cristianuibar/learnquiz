@@ -1,5 +1,5 @@
 import { useEffect, type ReactNode, type RefObject } from 'react'
-import { AccessibilityInfo, findNodeHandle, View, type Text as NativeText } from 'react-native'
+import { AccessibilityInfo, findNodeHandle, View, type TextInstance } from 'react-native'
 import { KeyboardAwareScrollView, KeyboardAvoidingView, useKeyboardState, type KeyboardAwareScrollViewProps } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from '../../theme/ThemeProvider'
@@ -9,7 +9,7 @@ export type ScreenProps = KeyboardAwareScrollViewProps & {
   footer?: ReactNode
 }
 
-export function useHeadingFocus(ref: RefObject<NativeText | null>) {
+export function useHeadingFocus(ref: RefObject<TextInstance | null>) {
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
       const tag = ref.current && findNodeHandle(ref.current)

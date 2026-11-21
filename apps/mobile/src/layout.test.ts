@@ -10,7 +10,7 @@ import { useURL } from 'expo-linking'
 import { holdTarget, takeHeldTarget } from './lib/held-target'
 
 let mockSystemScheme: 'light' | 'dark' = 'light'
-let mockAppearance: 'light' | 'dark' | 'unspecified' = 'unspecified'
+let mockAppearance: Parameters<typeof Appearance.setColorScheme>[0] = 'unspecified'
 jest.mock('react-native/Libraries/Utilities/useColorScheme', () => ({
   __esModule: true,
   default: () => mockAppearance === 'unspecified' ? mockSystemScheme : mockAppearance,
@@ -42,6 +42,7 @@ jest.mock('expo-notifications', () => ({
   DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
   getLastNotificationResponseAsync: jest.fn(async () => null),
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  setNotificationHandler: jest.fn(),
 }))
 jest.mock('react-native-gesture-handler', () => ({ GestureHandlerRootView: 'View' }))
 jest.mock('react-native-safe-area-context', () => ({ SafeAreaProvider: 'View' }))

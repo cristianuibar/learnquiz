@@ -37,6 +37,7 @@ jest.mock('expo-notifications', () => ({
   DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
   getLastNotificationResponseAsync: jest.fn(async () => null),
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  setNotificationHandler: jest.fn(),
 }))
 // The selected-option check is decorative (hidden from TalkBack); a tagged stand-in lets tests find it.
 jest.mock('lucide-react-native', () => ({
@@ -150,7 +151,7 @@ test('Back from Settings restores accessibility focus to the Profile Settings ic
   jest.spyOn(Native, 'findNodeHandle').mockImplementation((node: unknown) =>
     (node as { props?: { accessibilityLabel?: string } })?.props?.accessibilityLabel === 'Settings' ? 7 : 42)
   const focus = jest.spyOn(Native.AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => {})
-  const navigation = renderRouter('src/app', { initialUrl: '/profile' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/profile' })
   await navigation
   await screen.findByText('Ana')
   await fireEvent.press(screen.getByRole('button', { name: 'Settings' }))
@@ -214,7 +215,7 @@ test('Back lets a submitted preference and its queued edit finish without aborti
   let finish!: (response: Response) => void
   const signals: (AbortSignal | null | undefined)[] = []
   saveReply = (init) => { signals.push(init?.signal); return new Promise((resolve) => { finish = resolve }) }
-  const navigation = renderRouter('src/app', { initialUrl: '/profile' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/profile' })
   await navigation
   await screen.findByText('Ana')
   await fireEvent.press(screen.getByRole('button', { name: 'Settings' }))

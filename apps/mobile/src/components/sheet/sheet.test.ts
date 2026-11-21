@@ -1,5 +1,5 @@
 import { createElement as h, useRef } from 'react'
-import { AccessibilityInfo, BackHandler, StyleSheet, Text } from 'react-native'
+import { AccessibilityInfo, BackHandler, StyleSheet, Text, type TextInstance } from 'react-native'
 import { act, render, screen } from '@testing-library/react-native'
 import { setUpTests, useReducedMotion } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -191,9 +191,9 @@ describe('accessibility focus', () => {
     jest.spyOn(global, 'requestAnimationFrame').mockImplementation((callback) => frames.push(callback))
     jest.spyOn(Native, 'findNodeHandle').mockReturnValue(42)
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => {})
-    const nativeTitle = {} as Text
+    const nativeTitle = {} as TextInstance
     function Harness({ label }: { label: string }) {
-      const ref = useRef<Text>(nativeTitle)
+      const ref = useRef<TextInstance>(nativeTitle)
       return mount({ focusRef: ref, body: h(Text, null, label) })
     }
     const view = await render(h(Harness, { label: 'a' }))

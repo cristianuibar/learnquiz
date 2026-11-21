@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Linking, View, type Text as NativeText } from 'react-native'
+import { Linking, View, type TextInstance } from 'react-native'
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router'
 import { Lock } from 'lucide-react-native'
 import type { DisclosureAccepted } from '@learnquiz/api'
@@ -27,7 +27,7 @@ export default function Welcome() {
   const { review } = useLocalSearchParams<{ review?: string }>()
   const isReview = review === '1'
   const { branding, needsDisclosure, setDisclosed } = useSession()
-  const headingRef = useRef<NativeText | null>(null)
+  const headingRef = useRef<TextInstance | null>(null)
   useHeadingFocus(headingRef)
   const busyRef = useRef(false)
   const [pending, setPending] = useState(false)

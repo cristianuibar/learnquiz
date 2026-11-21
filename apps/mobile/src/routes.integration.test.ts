@@ -26,6 +26,7 @@ jest.mock('expo-notifications', () => ({
   DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
   getLastNotificationResponseAsync: jest.fn(async () => null),
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  setNotificationHandler: jest.fn(),
 }))
 jest.mock('./lib/session-store', () => ({
   SessionProvider: ({ children }: { children: unknown }) => children,
@@ -60,6 +61,18 @@ jest.mock('react-native-keyboard-controller', () => ({
   useKeyboardState: () => false,
 }))
 jest.mock('expo-image', () => ({ Image: () => null }))
+const mockRouterReplace = jest.fn()
+jest.mock('expo-router', () => {
+  const actual = jest.requireActual('expo-router')
+  const { useMemo } = jest.requireActual('react')
+  return { ...actual, useRouter: () => {
+    const router = actual.useRouter()
+    return useMemo(() => ({ ...router, replace: (...args: unknown[]) => {
+      mockRouterReplace(...args)
+      return router.replace(...args)
+    } }), [router])
+  } }
+})
 jest.mock('expo-router/build/toolbar/native', () => ({ RouterToolbarHost: 'View', RouterToolbarItem: 'View' }))
 jest.mock(require.resolve('expo-glass-effect', { paths: [require.resolve('expo-router')] }), () => ({
   GlassView: 'View', isLiquidGlassAvailable: () => false, isGlassEffectAPIAvailable: () => false,
@@ -94,7 +107,7 @@ afterEach(() => { jest.useRealTimers(); jest.restoreAllMocks() })
 
 test('the actual router sends a signed-out private link to sign-in', async () => {
   jest.mocked(useSession).mockReturnValue(signedOut)
-  const navigation = renderRouter('src/app', { initialUrl: '/settings' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/settings' })
   await navigation
   expect(navigation.getPathname()).toBe('/sign-in')
   expect(screen.getByRole('header', { name: 'Sign in' })).toBeOnTheScreen()
@@ -129,7 +142,7 @@ test('sign-in without an email parameter defaults the editable email to an empty
 
 test('the actual router sends an undisclosed private link to welcome', async () => {
   jest.mocked(useSession).mockReturnValue({ ...ready, needsDisclosure: true })
-  const navigation = renderRouter('src/app', { initialUrl: '/play/session-1' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/play/session-1' })
   await navigation
   expect(navigation.getPathname()).toBe('/welcome')
   expect(screen.getByText('Before you start')).toBeOnTheScreen()
@@ -138,7 +151,7 @@ test('the actual router sends an undisclosed private link to welcome', async () 
 
 test('the actual router opens private routes after disclosure', async () => {
   jest.mocked(useSession).mockReturnValue(ready)
-  const navigation = renderRouter('src/app', { initialUrl: '/settings' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/settings' })
   await navigation
   expect(navigation.getPathname()).toBe('/settings')
   expect(screen.getByText('Settings')).toBeOnTheScreen()
@@ -147,7 +160,7 @@ test('the actual router opens private routes after disclosure', async () => {
 test('the actual router leaves invitations reachable while signed out', async () => {
   jest.mocked(useSession).mockReturnValue(signedOut)
   jest.mocked(api).mockResolvedValue(invite)
-  const navigation = renderRouter('src/app', { initialUrl: '/join/invitation-1' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/join/invitation-1' })
   await navigation
   expect(navigation.getPathname()).toBe('/join/invitation-1')
   expect(screen.getByRole('header', { name: 'Train as a warehouse picker' })).toBeOnTheScreen()
@@ -155,7 +168,7 @@ test('the actual router leaves invitations reachable while signed out', async ()
 
 test('the actual router keeps sign-in closed for a signed-in learner', async () => {
   jest.mocked(useSession).mockReturnValue(ready)
-  const navigation = renderRouter('src/app', { initialUrl: '/sign-in' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/sign-in' })
   await navigation
   expect(navigation.getPathname()).toBe('/today')
   expect(screen.getByText('Today screen')).toBeOnTheScreen()
@@ -171,7 +184,7 @@ test('the actual router replays a held target after startup, sign-in and disclos
   const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } }
   jest.mocked(useSession).mockImplementation(() => useSyncExternalStore(subscribe, () => snapshot))
   holdTarget('/play/session-1?from=notification')
-  const navigation = renderRouter('src/app', { initialUrl: '/' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/' })
   await navigation
   const transition = async (next: ReturnType<typeof useSession>) => {
     await act(async () => { snapshot = next; listeners.forEach((listener) => listener()) })
@@ -219,12 +232,12 @@ async function signInThroughRoot(held: string | null, needsDisclosure = false) {
     if (path === '/disclosure') return { roleTopicId: null }
     throw new Error(`Unexpected request: ${path}`)
   })
-  const navigation = renderRouter('src/app', { initialUrl: '/sign-in' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/sign-in' })
   await navigation
   await fireEvent.changeText(screen.getByLabelText('Email'), 'returning@example.com')
   await fireEvent.changeText(screen.getByLabelText('Password'), 'password')
   if (held) holdTarget(held)
-  const replace = jest.spyOn(router, 'replace')
+  const replace = mockRouterReplace.mockClear()
   await fireEvent.press(screen.getByRole('button', { name: 'Sign in' }))
   expect(signIn).toHaveBeenCalledWith('returning@example.com', 'password')
   expect(refresh).toHaveBeenCalledTimes(1)
@@ -267,10 +280,10 @@ test('real root sign-in opens Today once and hands an unopenable link back to re
 
 test('a plain signedOut-to-ready transition opens its held unit once through the real root', async () => {
   const session = liveSession(signedOut)
-  const navigation = renderRouter('src/app', { initialUrl: '/sign-in' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/sign-in' })
   await navigation
   holdTarget('/unit/u1')
-  const replace = jest.spyOn(router, 'replace')
+  const replace = mockRouterReplace.mockClear()
   await act(async () => { session.set(ready) })
   expect(navigation.getPathname()).toBe('/unit/u1')
   expect(replace.mock.calls.map(([target]) => target)).toEqual(['/unit/u1'])
@@ -283,11 +296,11 @@ test('Join keeps ownership of its held destination through the real root session
   jest.mocked(signUp).mockResolvedValue({})
   jest.mocked(acceptInvitation).mockResolvedValue({})
   jest.mocked(api).mockImplementation(async (path) => path.startsWith('/invites/') ? invite : { needsDisclosure: false })
-  const navigation = renderRouter('src/app', { initialUrl: '/join/invitation-1' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/join/invitation-1' })
   await navigation
   await fireEvent.changeText(screen.getByLabelText('Create a password'), 'password')
   holdTarget('/unit/u1')
-  const replace = jest.spyOn(router, 'replace')
+  const replace = mockRouterReplace.mockClear()
   await fireEvent.press(screen.getByRole('button', { name: 'Create account' }))
   expect(acceptInvitation).toHaveBeenCalledWith('invitation-1')
   expect(navigation.getPathname()).toBe('/unit/u1')
@@ -299,7 +312,7 @@ test('Got it falls back to Today when the held link still cannot open', async ()
   const session = liveSession(ready)
   session.set(undisclosed(session))
   holdTarget('/sign-in')
-  const navigation = renderRouter('src/app', { initialUrl: '/' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/' })
   await navigation
   expect(navigation.getPathname()).toBe('/welcome')
   jest.mocked(api).mockResolvedValue({ roleTopicId: null })
@@ -313,7 +326,7 @@ test('Got it can be retried after a failed save and then opens the held link', a
   const session = liveSession(ready)
   session.set(undisclosed(session))
   holdTarget('/settings')
-  const navigation = renderRouter('src/app', { initialUrl: '/' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/' })
   await navigation
   expect(navigation.getPathname()).toBe('/welcome')
   jest.mocked(api).mockRejectedValueOnce(new Error('network down')).mockResolvedValueOnce({ roleTopicId: null })
@@ -328,7 +341,7 @@ test('Got it can be retried after a failed save and then opens the held link', a
 test('Got it sends one acknowledge while the first tap is pending', async () => {
   const session = liveSession(ready)
   session.set(undisclosed(session))
-  const navigation = renderRouter('src/app', { initialUrl: '/welcome' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/welcome' })
   await navigation
   let resolve!: (value: unknown) => void
   jest.mocked(api).mockReturnValue(new Promise((done) => { resolve = done }) as ReturnType<typeof api>)
@@ -346,7 +359,7 @@ test('review mode from Settings shows the branded copy and Got it returns withou
   jest.mocked(api).mockResolvedValueOnce({ name: 'Learner', role: null, started: true, mastery: 0.66, benchmark: 0.85,
     onboarding: { day: 16, days: 30 }, proficiency: { achievedAt: null, projectedAt: null }, weeks: [], units: [], confidentErrors: [] }).mockResolvedValue(settingsFixture)
   jest.mocked(useSession).mockReturnValue({ ...ready, branding: { name: 'Northwind', accent: null, logoUrl: null } })
-  const navigation = renderRouter('src/app', { initialUrl: '/profile' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/profile' })
   await navigation
   expect(screen.queryByRole('link', { name: 'What we record' })).toBeNull()
   await fireEvent.press(screen.getByRole('button', { name: 'Settings' }))
@@ -369,7 +382,7 @@ test('Profile keeps loaded mastery visible during a return-from-Settings refetch
   jest.mocked(getToken).mockReturnValue('token-a')
   jest.mocked(useSession).mockReturnValue(ready)
   jest.mocked(api).mockResolvedValueOnce(profile).mockResolvedValueOnce(settingsFixture).mockReturnValueOnce(pending)
-  const navigation = renderRouter('src/app', { initialUrl: '/profile' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/profile' })
   await navigation
   expect(await screen.findByLabelText('66% of 85% benchmark')).toBeOnTheScreen()
   expect(screen.queryByText('Projected')).toBeNull()
@@ -473,7 +486,7 @@ test('a retry that loads the profile but then fails on Today moves TalkBack focu
 test('the actual router keeps an open invitation mounted while the session reloads for a new bearer', async () => {
   const session = liveSession(ready)
   jest.mocked(api).mockResolvedValue(invite)
-  const navigation = renderRouter('src/app', { initialUrl: '/join/invitation-1' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/join/invitation-1' })
   await navigation
   const heading = { name: 'Train as a warehouse picker' }
   expect(await screen.findByRole('header', heading)).toBeOnTheScreen()

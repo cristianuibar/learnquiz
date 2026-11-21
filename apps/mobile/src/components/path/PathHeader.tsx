@@ -1,5 +1,5 @@
 import type { RefObject } from 'react'
-import { View, type Text as NativeText } from 'react-native'
+import { View, type TextInstance } from 'react-native'
 import type { TopicPath } from '@learnquiz/api/progress'
 import { headerLine, roleBarText } from '@/lib/path'
 import { useTheme } from '@/theme/ThemeProvider'
@@ -9,7 +9,7 @@ import { Text } from '../ui/Text'
 export type PathHeaderProps = {
   title: string | null
   path: Pick<TopicPath, 'mastery' | 'benchmark' | 'onboarding'> | null
-  headingRef: RefObject<NativeText | null>
+  headingRef: RefObject<TextInstance | null>
 }
 
 // The role name, mastery against the benchmark, and the role bar. The heading

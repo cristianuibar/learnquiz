@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, type Ref } from 'react'
-import { AccessibilityInfo, findNodeHandle, Linking, Pressable, View, type TextInput } from 'react-native'
+import { AccessibilityInfo, findNodeHandle, Linking, Pressable, View, type ViewInstance, type TextInputInstance } from 'react-native'
 import { Mic } from 'lucide-react-native'
 import { useReducedMotion } from 'react-native-reanimated'
 import { useTheme } from '../../../theme/ThemeProvider'
@@ -25,7 +25,7 @@ export function ShortBody(props: QuestionBodyProps) {
   )
 }
 
-function TypedAnswer({ answer, onAnswer, marks, disabled, fieldRef }: QuestionBodyProps & { fieldRef?: Ref<TextInput> }) {
+function TypedAnswer({ answer, onAnswer, marks, disabled, fieldRef }: QuestionBodyProps & { fieldRef?: Ref<TextInputInstance> }) {
   const { colors } = useTheme()
   const readOnly = disabled || marks !== null
   return (
@@ -51,8 +51,8 @@ function VoiceAnswer(props: QuestionBodyProps & { sessionId: string }) {
   const { colors, space } = useTheme()
   const reducedMotion = useReducedMotion()
   const readOnly = disabled || marks !== null
-  const fieldRef = useRef<TextInput>(null)
-  const stopRef = useRef<View>(null)
+  const fieldRef = useRef<TextInputInstance>(null)
+  const stopRef = useRef<ViewInstance>(null)
 
   const focus = useCallback<VoicePorts['focus']>((target) => {
     requestAnimationFrame(() => {
@@ -150,7 +150,7 @@ function VoiceAnswer(props: QuestionBodyProps & { sessionId: string }) {
 
 // The 64 dp round record button; while recording it shows the pressed style
 // (brand-hover with a 2 dp ring) and a filled stop square.
-function MicButton({ ref, recording, disabled, onPress }: { ref: Ref<View>; recording: boolean; disabled: boolean; onPress(): void }) {
+function MicButton({ ref, recording, disabled, onPress }: { ref: Ref<ViewInstance>; recording: boolean; disabled: boolean; onPress(): void }) {
   const { colors, space, radius, sizes } = useTheme()
   const ring = space[1] + 2
   return (

@@ -1,8 +1,8 @@
-import { Text as NativeText, type TextProps as NativeTextProps } from 'react-native'
+import { Text as NativeText, type TextProps as NativeTextProps, type TextInstance } from 'react-native'
 import { useTheme } from '../../theme/ThemeProvider'
 
 export type TextProps = NativeTextProps & {
-  ref?: React.Ref<NativeText>
+  ref?: React.Ref<TextInstance>
   variant?: 'display' | 'title1' | 'title2' | 'title3' | 'bodyLg' | 'body' | 'label' | 'labelLg' | 'caption' | 'overline' | 'chip'
   num?: boolean
   muted?: boolean

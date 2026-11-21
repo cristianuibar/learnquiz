@@ -31,6 +31,7 @@ jest.mock('expo-notifications', () => ({
   DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
   getLastNotificationResponseAsync: jest.fn(async () => null),
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  setNotificationHandler: jest.fn(),
 }))
 jest.mock('react-native-gesture-handler', () => ({ GestureHandlerRootView: 'View' }))
 jest.mock('react-native-keyboard-controller', () => ({
@@ -91,7 +92,7 @@ async function signOutStalls(press: () => Promise<void>) {
 }
 
 test("Today's empty-state sign-out ends signed out when the push unregister hangs", async () => {
-  const navigation = renderRouter('src/app', { initialUrl: '/today' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/today' })
   await navigation
   expect(await screen.findByText('No training yet')).toBeOnTheScreen()
 
@@ -101,7 +102,7 @@ test("Today's empty-state sign-out ends signed out when the push unregister hang
 })
 
 test("Join's switch-account ends signed out when the push unregister hangs", async () => {
-  const navigation = renderRouter('src/app', { initialUrl: '/join/inv-1' })
+  const navigation = await renderRouter('src/app', { initialUrl: '/join/inv-1' })
   await navigation
   const switchAccount = await screen.findByRole('button', { name: `Sign in as ${invite.email}` })
   expect(screen.getByText(`You’re signed in as Ana. This invite is for ${invite.email}.`)).toBeOnTheScreen()

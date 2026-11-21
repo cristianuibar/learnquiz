@@ -1,5 +1,5 @@
 import { useState, type ReactNode, type Ref } from 'react'
-import { Pressable, View } from 'react-native'
+import { Pressable, View, type ViewInstance } from 'react-native'
 import type { UnitRowModel } from '@/lib/path'
 import { useTheme } from '@/theme/ThemeProvider'
 import { Bar } from '../ui/Bar'
@@ -13,7 +13,7 @@ export type UnitRowProps = {
   row: UnitRowModel
   benchmark: number
   onPress: () => void
-  ref?: Ref<View>
+  ref?: Ref<ViewInstance>
 }
 
 // One unit: the node on the rail and a tight card. A row is one link whose

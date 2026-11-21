@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AccessibilityInfo, AppState, BackHandler, findNodeHandle, View, type Text as NativeText } from 'react-native'
+import { AccessibilityInfo, AppState, BackHandler, findNodeHandle, View, type TextInstance, type ViewInstance } from 'react-native'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { isAnswerReady, type Answer, type Confidence, type Draft, type ItemView, type Reveal, type SessionView } from '@learnquiz/api'
 import { checkFailedMessage, networkError } from '@learnquiz/api/system-copy'
@@ -64,7 +64,7 @@ function ActiveSession({ sessionId, announceReady }: { sessionId: string; announ
   const mounted = useRef(false)
   const leaving = useRef(false)
   const preparedId = useRef<string | null>(null)
-  const dockRef = useRef<View>(null)
+  const dockRef = useRef<ViewInstance>(null)
   const path = `/sessions/${encodeURIComponent(sessionId)}`
 
   const active = useCallback(() => mounted.current && !leaving.current, [])
@@ -169,7 +169,7 @@ function ActiveSession({ sessionId, announceReady }: { sessionId: string; announ
       // React Native's public element traversal reaches the dock's final child,
       // its CheckButton, without changing the shared question-parts API.
       const retry = dockRef.current?.firstElementChild?.lastElementChild
-      const tag = retry && findNodeHandle(retry as unknown as View)
+      const tag = retry && findNodeHandle(retry as unknown as ViewInstance)
       if (tag != null) AccessibilityInfo.setAccessibilityFocus(tag)
     })
     return () => cancelAnimationFrame(frame)
@@ -354,7 +354,7 @@ function SessionQuestion({ item, notice, marks, answer, onAnswer, disabled, onSu
 }
 
 function SessionStem({ stem }: { stem: string }) {
-  const stemRef = useRef<NativeText>(null)
+  const stemRef = useRef<TextInstance>(null)
   useHeadingFocus(stemRef)
   return <Text ref={stemRef} variant="title2" header>{stem}</Text>
 }

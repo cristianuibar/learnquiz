@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AccessibilityInfo, findNodeHandle, View, type Text as NativeText } from 'react-native'
+import { AccessibilityInfo, findNodeHandle, View, type TextInstance, type ViewInstance } from 'react-native'
 import { useFocusEffect, useRouter } from 'expo-router'
 import type { Profile as ProfileData } from '@learnquiz/api/progress'
 import type { Today } from '@learnquiz/api/today'
@@ -40,10 +40,10 @@ export default function Profile() {
   const profile = current ? state.profile : null
   const status = current ? state.status : 'loading'
   const error = current ? state.error : null
-  const settingsRef = useRef<View | null>(null)
+  const settingsRef = useRef<ViewInstance | null>(null)
   const returningFromSettings = useRef(false)
-  const headingRef = useRef<NativeText | null>(null)
-  const retryRef = useRef<View | null>(null)
+  const headingRef = useRef<TextInstance | null>(null)
+  const retryRef = useRef<ViewInstance | null>(null)
   const retryHadFocus = useRef(false)
   const retryStartedWithFocus = useRef(false)
   const prevStatus = useRef(status)

@@ -1,11 +1,11 @@
 import { useState, type Ref } from 'react'
-import { Pressable, View, type NativeSyntheticEvent, type PressableProps } from 'react-native'
+import { Pressable, View, type NativeSyntheticEvent, type PressableProps, type ViewInstance } from 'react-native'
 import { Check, X } from 'lucide-react-native'
 import { useTheme } from '../../theme/ThemeProvider'
 import { Text } from '../ui/Text'
 
 export type OptionRowProps = Omit<PressableProps, 'children'> & {
-  ref?: Ref<View>
+  ref?: Ref<ViewInstance>
   children: string
   variant: 'radio' | 'check'
   selected: boolean

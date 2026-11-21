@@ -7,7 +7,9 @@ export type LearnerItemRow = Omit<typeof learnerItem.$inferSelect, 'learnerId' |
 export type Schedule = Omit<LearnerItemRow, 'lastWrongConfidentAt'>
 
 // Deterministic: no fuzz, so the same history gives the same due date.
-const scheduler = fsrs({ request_retention: 0.9, maximum_interval: 90, enable_fuzz: false, enable_short_term: true })
+const MAX_INTERVAL_DAYS = 90
+const DAY_MS = 86_400_000
+const scheduler = fsrs({ request_retention: 0.9, maximum_interval: MAX_INTERVAL_DAYS, enable_fuzz: false, enable_short_term: true })
 
 export function toCard(row: Schedule | null): Card {
   if (!row) return createEmptyCard()
@@ -15,7 +17,6 @@ export function toCard(row: Schedule | null): Card {
     due: new Date(row.due),
     stability: row.stability,
     difficulty: row.difficulty,
-    elapsed_days: 0, // deprecated in ts-fsrs, unused by the scheduler
     scheduled_days: row.scheduledDays,
     learning_steps: 0, // shortcut: step index is not stored, a learning card restarts at step 0; add a column if re-asks matter
     reps: row.reps,
@@ -47,11 +48,16 @@ export function ratingFor(correct: boolean, confidence: Confidence): Grade {
 // 0 for a card never reviewed, so it counts as due.
 export function retrievability(row: Schedule | null, now: Date): number {
   if (!row || row.lastReview === null || row.state === State.New) return 0
-  return scheduler.get_retrievability(toCard(row), now, false)
+  return scheduler.retrievability(toCard(row), now)
 }
 
 export function review(row: Schedule | null, correct: boolean, confidence: Confidence, now: Date) {
   const retrievabilityBefore = retrievability(row, now)
   const { card } = scheduler.next(toCard(row), now, ratingFor(correct, confidence))
-  return { next: fromCard(card), retrievabilityBefore }
+  const next = fromCard(card)
+  if (next.scheduledDays > MAX_INTERVAL_DAYS) {
+    next.scheduledDays = MAX_INTERVAL_DAYS
+    next.due = now.getTime() + MAX_INTERVAL_DAYS * DAY_MS
+  }
+  return { next, retrievabilityBefore }
 }

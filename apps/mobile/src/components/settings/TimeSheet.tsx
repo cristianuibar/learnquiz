@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { View, type Text as NativeText } from 'react-native'
+import { View, type TextInstance } from 'react-native'
 import { X } from 'lucide-react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Sheet } from '../sheet/sheet'
@@ -13,7 +13,7 @@ export function TimeSheet({ label, value, options, onSelect, onClose }: {
 }) {
   const { space } = useTheme()
   const insets = useSafeAreaInsets()
-  const heading = useRef<NativeText | null>(null)
+  const heading = useRef<TextInstance | null>(null)
   return <Sheet focusRef={heading} onBack={() => { onClose(); return true }}
     band={<View style={{ flexDirection: 'row', alignItems: 'center', padding: space[4], paddingBottom: space[2] }}>
       <Text ref={heading} header variant="title2" style={{ flex: 1 }}>{label}</Text>

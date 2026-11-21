@@ -1,5 +1,5 @@
 import { createElement as h, useRef } from 'react'
-import type { Text as NativeText } from 'react-native'
+import type { TextInstance } from 'react-native'
 import { act, fireEvent, render, screen } from '@testing-library/react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useKeyboardState } from 'react-native-keyboard-controller'
@@ -31,9 +31,9 @@ test('a mounted heading receives accessibility focus', async () => {
   jest.spyOn(global, 'requestAnimationFrame').mockImplementation((callback) => { frame = callback; return 1 })
   jest.spyOn(Native, 'findNodeHandle').mockReturnValue(42)
   const focus = jest.spyOn(Native.AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => {})
-  const nativeHeading = {} as NativeText
+  const nativeHeading = {} as TextInstance
   function Heading() {
-    const ref = useRef<NativeText>(nativeHeading)
+    const ref = useRef<TextInstance>(nativeHeading)
     useHeadingFocus(ref)
     return h(Text, { header: true, variant: 'title1' }, 'Before you start')
   }
@@ -48,7 +48,7 @@ test('unmounting cancels the pending heading focus', async () => {
   jest.spyOn(global, 'requestAnimationFrame').mockReturnValue(7)
   const cancel = jest.spyOn(global, 'cancelAnimationFrame').mockImplementation(() => {})
   function Heading() {
-    const ref = useRef<NativeText>(null)
+    const ref = useRef<TextInstance>(null)
     useHeadingFocus(ref)
     return h(Text, { ref, header: true }, 'Today')
   }

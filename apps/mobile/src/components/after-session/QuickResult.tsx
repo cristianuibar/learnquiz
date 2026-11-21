@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { View, type Text as NativeText } from 'react-native'
+import { View, type TextInstance } from 'react-native'
 import type { Reveal } from '@learnquiz/api'
 import { revealCopy, revealModel } from '@learnquiz/api/reveal'
 import { quickResult } from '../../lib/quick-result'
@@ -24,7 +24,7 @@ export type QuickResultProps = {
 /** Inline result for the one-question quick session. The route owns the frame, dock and report sheet. */
 export function QuickResult({ reveal, chosenText, reviewsLeft, hasCompany = false }: QuickResultProps) {
   const { colors, space } = useTheme()
-  const headingRef = useRef<NativeText>(null)
+  const headingRef = useRef<TextInstance>(null)
   useHeadingFocus(headingRef)
   const result = quickResult(reveal, chosenText, reviewsLeft)
   const revealView = revealModel(reveal, { hasCompany })

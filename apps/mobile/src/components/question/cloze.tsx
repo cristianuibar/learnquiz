@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { isAnswerReady } from '@learnquiz/api'
-import { Pressable, StyleSheet, TextInput, View } from 'react-native'
+import { Pressable, StyleSheet, TextInput, View, type TextInputInstance } from 'react-native'
 import { clozeAnswer, clozeMaxLength, splitClozeStem } from '../../lib/session/cloze'
 import { useTheme } from '../../theme/ThemeProvider'
 import { Text } from '../ui/Text'
@@ -8,7 +8,7 @@ import type { QuestionBodyProps } from './types'
 
 export function ClozeBody({ item, answer, onAnswer, marks, disabled, onSubmit }: QuestionBodyProps) {
   const { colors, typography, space, radius, sizes } = useTheme()
-  const input = useRef<TextInput>(null)
+  const input = useRef<TextInputInstance>(null)
   const [focused, setFocused] = useState(false)
   const numeric = item.blank?.numeric === true
   const readOnly = disabled || marks !== null

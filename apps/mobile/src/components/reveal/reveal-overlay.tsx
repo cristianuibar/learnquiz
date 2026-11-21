@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { View } from 'react-native'
+import { View, type ViewInstance } from 'react-native'
 import type { Answer, Confidence, ItemView, Reveal } from '@learnquiz/api'
 import { initialOverlay, overlayStep, reportAvailable, type ContinueRequest, type OverlayAction, type OverlayState } from '../../lib/session/overlay'
 import type { Branding } from '../../lib/session-store'
@@ -32,7 +32,7 @@ const consumeBack = () => true
 export function RevealOverlay({ reveal, item, answer, confidence, onContinue, busy, error, branding, basics }: RevealOverlayProps) {
   const [state, setState] = useState<OverlayState>(initialOverlay)
   const stateRef = useRef(state)
-  const reportRef = useRef<View>(null)
+  const reportRef = useRef<ViewInstance>(null)
   const onContinueRef = useRef(onContinue)
   onContinueRef.current = onContinue
 

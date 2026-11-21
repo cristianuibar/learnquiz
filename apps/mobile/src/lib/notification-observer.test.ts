@@ -44,6 +44,7 @@ jest.mock('expo-notifications', () => ({
   DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
   getLastNotificationResponseAsync: (...args: unknown[]) => mockGetLast(...args),
   addNotificationResponseReceivedListener: (...args: unknown[]) => mockAddListener(...args),
+  setNotificationHandler: jest.fn(),
 }))
 
 function tap(identifier: string, url: unknown, actionIdentifier: string = DEFAULT_ACTION): NotificationResponse {

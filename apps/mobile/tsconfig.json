@@ -5,7 +5,8 @@
     "allowImportingTsExtensions": true,
     "types": [
       "node",
-      "jest"
+      "jest",
+      "react-native-reanimated/lib/typescript/jestUtils/index.native"
     ],
     "paths": {
       "@/*": [

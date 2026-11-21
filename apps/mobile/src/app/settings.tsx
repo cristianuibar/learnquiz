@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AccessibilityInfo, AppState, findNodeHandle, Linking, Pressable, ScrollView, View, type Text as NativeText } from 'react-native'
+import { AccessibilityInfo, AppState, findNodeHandle, Linking, Pressable, ScrollView, View, type TextInstance, type ViewInstance } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { SheetHost } from '@/components/sheet/sheet-host'
@@ -37,13 +37,13 @@ export default function Settings() {
   const { colors, space, sizes } = useTheme()
   const router = useRouter()
   const insets = useSafeAreaInsets()
-  const fromField = useRef<View | null>(null)
-  const toField = useRef<View | null>(null)
+  const fromField = useRef<ViewInstance | null>(null)
+  const toField = useRef<ViewInstance | null>(null)
   const returnToField = useRef<{ field: 'from' | 'to'; owner: string | null } | null>(null)
   const viewActive = useRef<() => boolean>(() => false)
   const session = useSession()
   const token = getToken()
-  const heading = useRef<NativeText | null>(null)
+  const heading = useRef<TextInstance | null>(null)
   useHeadingFocus(heading)
   const [loaded, setLoaded] = useState<Loaded | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)

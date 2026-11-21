@@ -2,7 +2,7 @@ import { loadingTitle, startSlow } from '@learnquiz/api/system-copy'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { X } from 'lucide-react-native'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AccessibilityInfo, BackHandler, View, type Text as NativeText } from 'react-native'
+import { AccessibilityInfo, BackHandler, View, type TextInstance } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { SessionSkeleton } from '@/components/session-skeleton'
 import { AlertRow } from '@/components/ui/AlertRow'
@@ -38,7 +38,7 @@ export default function LoadingScreen() {
   const session = useSession()
   const { space, sizes } = useTheme()
   const insets = useSafeAreaInsets()
-  const heading = useRef<NativeText>(null)
+  const heading = useRef<TextInstance>(null)
   const request = useRef<ReturnType<typeof beginStartPlay> | null>(null)
   const [attempt, setAttempt] = useState(0)
   const [slow, setSlow] = useState(false)

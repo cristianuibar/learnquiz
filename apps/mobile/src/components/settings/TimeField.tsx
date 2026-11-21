@@ -1,10 +1,10 @@
 import { useState, type Ref } from 'react'
-import { Pressable, View } from 'react-native'
+import { Pressable, View, type ViewInstance } from 'react-native'
 import { ChevronDown } from 'lucide-react-native'
 import { Text } from '../ui/Text'
 import { useTheme } from '@/theme/ThemeProvider'
 
-export function TimeField({ label, value, onPress, disabled, ref }: { label: string; value: string; onPress(): void; disabled?: boolean; ref?: Ref<View> }) {
+export function TimeField({ label, value, onPress, disabled, ref }: { label: string; value: string; onPress(): void; disabled?: boolean; ref?: Ref<ViewInstance> }) {
   const { colors, space, sizes, radius } = useTheme()
   const [focused, setFocused] = useState(false)
   return <View style={{ flex: 1, gap: space[1] }}>

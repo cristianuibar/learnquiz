@@ -1,5 +1,5 @@
 import type { RefObject } from 'react'
-import { View, type Text as NativeText } from 'react-native'
+import { View, type TextInstance, type ViewInstance } from 'react-native'
 import { Eye } from 'lucide-react-native'
 import { IconButton } from '../ui/IconButton'
 import { SettingsIcon } from '../ui/icons'
@@ -10,8 +10,8 @@ export function ProfileHeader({ name, role, companyMember, headingRef, settingsR
   name: string | null
   role: string | null
   companyMember: boolean
-  headingRef: RefObject<NativeText | null>
-  settingsRef: RefObject<View | null>
+  headingRef: RefObject<TextInstance | null>
+  settingsRef: RefObject<ViewInstance | null>
   onSettings(): void
 }) {
   const { colors, space } = useTheme()

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { AccessibilityInfo, BackHandler, findNodeHandle, Keyboard, View, type Text as NativeText, type ViewStyle } from 'react-native'
+import { AccessibilityInfo, BackHandler, findNodeHandle, Keyboard, View, type TextInstance, type ViewStyle, type ViewInstance } from 'react-native'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Flag } from 'lucide-react-native'
@@ -44,9 +44,9 @@ function QuickSession({ itemId, pushId }: { itemId: string; pushId?: string }) {
   const controller = useRef<ReturnType<typeof createQuickSession> | null>(null)
   const busy = useRef(false)
   const leaving = useRef(false)
-  const frameRef = useRef<View>(null)
-  const dockRef = useRef<View>(null)
-  const reportRef = useRef<View>(null)
+  const frameRef = useRef<ViewInstance>(null)
+  const dockRef = useRef<ViewInstance>(null)
+  const reportRef = useRef<ViewInstance>(null)
 
   useEffect(() => {
     leaving.current = false
@@ -88,7 +88,7 @@ function QuickSession({ itemId, pushId }: { itemId: string; pushId?: string }) {
       // SessionFrame has no label override. Its first top-bar control is the
       // shared close button; adapt its native label without copying the frame.
       const close = frameRef.current?.firstElementChild?.firstElementChild?.firstElementChild
-      const nativeClose = close as unknown as View | undefined
+      const nativeClose = close as unknown as ViewInstance | undefined
       nativeClose?.setNativeProps({ accessibilityLabel: 'Close' })
     })
     return () => cancelAnimationFrame(frame)
@@ -99,7 +99,7 @@ function QuickSession({ itemId, pushId }: { itemId: string; pushId?: string }) {
     if (!checkError) return
     const frame = requestAnimationFrame(() => {
       const retry = dockRef.current?.firstElementChild?.lastElementChild
-      const tag = retry && findNodeHandle(retry as unknown as View)
+      const tag = retry && findNodeHandle(retry as unknown as ViewInstance)
       if (tag != null) AccessibilityInfo.setAccessibilityFocus(tag)
     })
     return () => cancelAnimationFrame(frame)
@@ -121,7 +121,7 @@ function QuickSession({ itemId, pushId }: { itemId: string; pushId?: string }) {
     setReporting(false)
     requestAnimationFrame(() => {
       const link = reportRef.current?.firstElementChild
-      const tag = link && findNodeHandle(link as unknown as View)
+      const tag = link && findNodeHandle(link as unknown as ViewInstance)
       if (tag != null) AccessibilityInfo.setAccessibilityFocus(tag)
       if (sent) AccessibilityInfo.announceForAccessibility('Report sent')
     })
@@ -216,7 +216,7 @@ function QuickQuestion({ item, answer, onAnswer, busy, onSubmit }: {
   item: ItemView; answer: Answer; onAnswer(answer: Answer): void; busy: boolean; onSubmit(): void
 }) {
   const { space } = useTheme()
-  const headingRef = useRef<NativeText>(null)
+  const headingRef = useRef<TextInstance>(null)
   useHeadingFocus(headingRef)
   return (
     <>
@@ -230,7 +230,7 @@ function QuickQuestion({ item, answer, onAnswer, busy, onSubmit }: {
 }
 
 function QuickFailure({ status, onRetry }: { status: 'error' | 'unavailable' | 'answered'; onRetry(): void }) {
-  const headingRef = useRef<NativeText>(null)
+  const headingRef = useRef<TextInstance>(null)
   useHeadingFocus(headingRef)
   return (
     <>

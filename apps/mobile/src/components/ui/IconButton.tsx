@@ -1,10 +1,10 @@
 import { useState, type ComponentType, type Ref } from 'react'
-import { Pressable, type PressableProps, type View } from 'react-native'
+import { Pressable, type PressableProps, type ViewInstance } from 'react-native'
 import type { LucideProps } from 'lucide-react-native'
 import { useTheme } from '../../theme/ThemeProvider'
 
 export type IconButtonProps = Omit<PressableProps, 'children' | 'accessibilityLabel'> & {
-  ref?: Ref<View>
+  ref?: Ref<ViewInstance>
   accessibilityLabel: string
   icon: ComponentType<LucideProps>
   toggle?: boolean
