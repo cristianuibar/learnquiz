@@ -253,10 +253,12 @@ pnpm dev                              # http://localhost:3000
 ```
 
 `apps/web/.dev.vars` is git-ignored; keep credentials out of version control.
-`apps/web/wrangler.jsonc` configures no model: without one, creating a topic and
-building role training show as unavailable, the question queue waits, diagrams and
-voice are hidden, and sessions, placement results and short-answer reveals use their
-rules and template fallbacks. Local D1 data is separate from production.
+The deployed Worker never calls a model, whatever its bindings; model settings apply
+only under `pnpm dev` and the local seed command. `apps/web/wrangler.jsonc`
+configures no model: without one, creating a topic and building role training show
+as unavailable, replacing a role document is paused, the question queue waits,
+diagrams and voice are hidden, and sessions, placement results and short-answer
+reveals use their rules and template fallbacks. Local D1 data is separate from production.
 
 | Setting | Purpose |
 | --- | --- |
@@ -285,8 +287,8 @@ immediately. Requests, call logs and generated-content labels use the model that
 made each attempt, including failures and retries.
 
 `apps/web/.dev.vars` can set `JOB_MODELS` as a JSON string. Unmapped text jobs use
-`LLM_PROFILE` and `LLM_MODEL`. `LLM_BASE_URL` overrides the URL for `LLM_PROFILE`;
-that profile may also fall back to `LLM_API_KEY` for its secret. For the local
+`LLM_PROFILE` and `LLM_MODEL`. `LLM_BASE_URL` overrides the URL for `LLM_PROFILE`.
+Each provider gets only its own secret binding. For the local
 edition, set `JOB_MODELS={}`, `LLM_PROFILE=ollama`, `LLM_MODEL=muse-glimmer` and point
 `LLM_BASE_URL` at an Ollama or llama.cpp server running Muse Glimmer. Voice and
 image generation stay off; no model server is bundled.

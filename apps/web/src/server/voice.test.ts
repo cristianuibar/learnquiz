@@ -87,7 +87,7 @@ function upload(audio = recording(), itemId = 'i1') {
 }
 
 it.each([
-  { profile: 'baseten' as const, url: 'https://llm.example/v1/asr/transcribe' },
+  { profile: 'baseten' as const, url: 'https://llm.example/v1/asr/transcribe', BASETEN_API_KEY: 'test-key' },
   { profile: 'ollama' as const, url: 'https://inference.baseten.co/v1/asr/transcribe', BASETEN_API_KEY: 'test-key' },
 ])('transcribes an owned current answer with global profile $profile, logs voice, and grades the edited transcript', async ({ url, profile, ...keys }) => {
   Object.assign(getEnv(), { LLM_PROFILE: profile, ...keys })

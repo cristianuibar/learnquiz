@@ -36,11 +36,19 @@ const PURPOSE_TIMEOUT_MS: Partial<Record<ModelJob, number>> = {
   procedure: 180_000,
 }
 
-// Production configures no model: every job is unavailable until JOB_MODELS or LLM_PROFILE names one.
-// Voice and images run only when JOB_MODELS maps them; other unmapped jobs use LLM_PROFILE and LLM_MODEL.
+// The deployed Worker never calls a model, whatever its bindings: model calls run only under `vite dev` and tests,
+// or in a local command that opts in (the Northwind seed).
+let localCommand = false
+export function allowLocalModelCalls(): void {
+  localCommand = true
+}
+
+// Every job is unavailable until JOB_MODELS or LLM_PROFILE names a model. Voice and images run only when
+// JOB_MODELS maps them; other unmapped jobs use LLM_PROFILE and LLM_MODEL.
 export function jobModel(job: ModelJob) {
   const env = getEnv()
   try {
+    if (!localCommand && !import.meta.env.DEV) throw new Error('Model calls are off in the deployed Worker')
     // Wrangler JSON bindings are objects; .dev.vars can supply JSON strings.
     const mapping: unknown = typeof env.JOB_MODELS === 'string' ? JSON.parse(env.JOB_MODELS) : env.JOB_MODELS === undefined ? {} : env.JOB_MODELS
     const jobs = z.record(z.string(), z.unknown()).parse(mapping)
@@ -56,7 +64,8 @@ export function jobModel(job: ModelJob) {
       provider: selected.provider,
       model: selected.model,
       baseUrl: baseUrl.replace(/\/$/, ''),
-      apiKey: env[provider.keyBinding] || (selected.provider === env.LLM_PROFILE ? env.LLM_API_KEY : undefined),
+      // Each provider gets only its own secret; LLM_API_KEY is never sent to a hosted provider.
+      apiKey: env[provider.keyBinding],
     }
   } catch {
     // Configuration errors must never include bindings or credentials.

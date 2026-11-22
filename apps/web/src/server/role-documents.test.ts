@@ -5,7 +5,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vite
 import * as schema from '@/db/schema'
 import * as authSchema from '@/db/auth-schema'
 
-const state = vi.hoisted(() => ({ db: null as unknown, user: 'owner-a' as string | null, active: null as string | null, anonymous: false, bucket: { put: vi.fn(), delete: vi.fn() }, background: [] as Promise<unknown>[] }))
+const state = vi.hoisted(() => ({ db: null as unknown, user: 'owner-a' as string | null, active: null as string | null, anonymous: false, bucket: { put: vi.fn(), delete: vi.fn() }, background: [] as Promise<unknown>[], model: {} as object }))
 const drain = vi.hoisted(() => vi.fn())
 
 // Fake only the server transport, session and Cloudflare bindings. Validators,
@@ -22,7 +22,7 @@ vi.mock('@tanstack/react-start', () => ({
 }))
 vi.mock('@tanstack/react-start/server', () => ({ getRequestHeaders: () => new Headers() }))
 vi.mock('@/db', () => ({ getDb: () => state.db }))
-vi.mock('@/server/env', () => ({ getEnv: () => ({ MEDIA: state.bucket, BETTER_AUTH_URL: 'http://127.0.0.1:8800' }), drainsOnRequest: () => false, runInBackground: (task: Promise<unknown>) => { state.background.push(task) } }))
+vi.mock('@/server/env', () => ({ getEnv: () => ({ MEDIA: state.bucket, BETTER_AUTH_URL: 'http://127.0.0.1:8800', ...state.model }), drainsOnRequest: () => false, runInBackground: (task: Promise<unknown>) => { state.background.push(task) } }))
 vi.mock('@/server/concept-gen', () => ({ drainConceptQueue: drain }))
 vi.mock('@/server/session', () => ({ getSessionUser: async () => state.user ? { id: state.user, isAnonymous: state.anonymous } : null }))
 vi.mock('@/server/auth', () => ({ getAuth: () => ({ api: { getSession: async () => state.user ? { user: { id: state.user, isAnonymous: state.anonymous }, session: { activeOrganizationId: state.active } } : null } }) }))
@@ -31,6 +31,7 @@ import { MAX_ROLE_DOCUMENT_BYTES, MAX_ROLE_DOCUMENT_CHARS } from '@/lib/limits'
 import { Route } from '@/routes/api/org.$orgId.roles.$roleId.documents'
 import { listRoles } from './org'
 import { previewRetireRoleDocument, removeRoleDocument, retireRoleDocument, uploadRoleDocument } from './role-documents'
+import { REPLACE_PAUSED } from './role-document-upload'
 
 let sqlite: DatabaseSync
 // One-shot hook: runs just before the next SQL statement that starts with the given prefix.
@@ -81,6 +82,7 @@ beforeEach(() => {
   state.bucket.delete.mockResolvedValue(undefined)
   drain.mockResolvedValue(undefined)
   state.background = []
+  state.model = { LLM_PROFILE: 'baseten', LLM_BASE_URL: 'https://llm.example', LLM_MODEL: 'text-model' }
   beforeSql = null
 })
 afterEach(() => sqlite.exec('ROLLBACK'))
@@ -164,6 +166,17 @@ it('still refuses a replacement PDF with no text layer, leaving the live documen
   await expect(uploadRoleDocument({ data: form({ replacesId: 'src-1', file: pdf('') }) })).rejects.toMatchObject({ status: 422 })
   expect(state.bucket.put).not.toHaveBeenCalled()
   expect(sqlite.prepare('SELECT id, retired_at, status FROM sources').all()).toEqual([{ id: 'src-1', retired_at: null, status: 'ready' }])
+})
+
+it('refuses to replace a readable document while no question model is configured, keeping its questions live', async () => {
+  seedV1()
+  state.model = {}
+  await expect(uploadRoleDocument({ data: form({ replacesId: 'src-1', text: 'Always wear a vest on the dock.' }) }))
+    .rejects.toMatchObject({ status: 503, message: REPLACE_PAUSED })
+  expect(state.bucket.put).not.toHaveBeenCalled()
+  expect(sqlite.prepare('SELECT id, retired_at, version FROM sources').all()).toEqual([{ id: 'src-1', retired_at: null, version: 1 }])
+  expect(itemStatus()).toEqual({ 'item-1': 'active', 'item-2': 'active', 'item-other': 'active' })
+  expect(sqlite.prepare("SELECT gen_status FROM concepts WHERE id = 'con-1'").get()).toEqual({ gen_status: 'ready' })
 })
 
 it('replacing a failed source removes it from the list and keeps its version', async () => {

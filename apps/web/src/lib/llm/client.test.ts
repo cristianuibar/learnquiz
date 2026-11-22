@@ -62,6 +62,7 @@ beforeEach(() => {
 afterEach(() => {
   raw.exec('ROLLBACK TO model_test; RELEASE model_test')
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
   vi.useRealTimers()
 })
 afterAll(() => raw.close())
@@ -175,11 +176,18 @@ it('routes unmapped jobs to the profile and mapped jobs to their provider, valid
   ])
 })
 
-it('ends a placement with the template line and calls no model under the production configuration', async () => {
+it.each([
+  { name: 'the checked-in configuration', bindings: {} },
+  { name: 'Baseten bindings added in the dashboard', bindings: {
+    LLM_PROFILE: 'baseten', LLM_MODEL: 'text-model', BASETEN_API_KEY: 'provider-key', VOICE_ENABLED: 'true',
+    JOB_MODELS: { image: { provider: 'baseten', model: 'image-model' }, voice: { provider: 'baseten', model: 'voice-model' } },
+  } },
+])('ends a placement with the template line and calls no model in the deployed Worker with $name', async ({ bindings }) => {
+  vi.stubEnv('DEV', false)
   const { rawConfig } = experimental_readRawConfig({ config: 'wrangler.jsonc' })
   // Production also still holds the retired provider secrets until they are removed.
   Object.assign(getEnv(), { LLM_PROFILE: undefined, LLM_BASE_URL: undefined, LLM_MODEL: undefined, JOB_MODELS: undefined, VOICE_ENABLED: undefined },
-    rawConfig.vars, { LLM_API_KEY: 'retired-key', FIREWORKS_API_KEY: 'retired-key' })
+    rawConfig.vars, { LLM_API_KEY: 'retired-key', FIREWORKS_API_KEY: 'retired-key' }, bindings)
   raw.exec(`
     INSERT INTO topics (id, learner_id, title, status, created_at) VALUES ('t1', 'u1', 'Algebra', 'ready', 1);
     INSERT INTO learner_topic (learner_id, topic_id) VALUES ('u1', 't1');
@@ -201,6 +209,15 @@ it('ends a placement with the template line and calls no model under the product
   await expect(generateImage({ prompt: 'A diagram', learnerId: 'u1', topicId: 't1' })).rejects.toMatchObject({ status: 404 })
   expect(fetchModel).not.toHaveBeenCalled()
   expect(raw.prepare('SELECT COUNT(*) AS n FROM model_calls').get()).toEqual({ n: 0 })
+})
+
+it('never sends LLM_API_KEY to a hosted provider', async () => {
+  Object.assign(getEnv(), { LLM_API_KEY: 'retired-key' })
+  const fetchModel = vi.fn(async () => Response.json({ choices: [{ message: { content: '{"answer":"ok"}' } }] }))
+  vi.stubGlobal('fetch', fetchModel)
+  await expect(chatJson({ ...answerRequest, purpose: 'items' })).resolves.toEqual({ answer: 'ok' })
+  const [[, init]] = fetchModel.mock.calls as unknown as [[string, { headers: Record<string, string> }]]
+  expect(init.headers.authorization).toBeUndefined()
 })
 
 it.each([
