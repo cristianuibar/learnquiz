@@ -10,7 +10,7 @@ import { drainConceptQueue } from '@/server/concept-gen'
 import { retryFailedConcept } from '@/server/concept-retry'
 import { drainsOnRequest, runInBackground } from '@/server/env'
 import { liveConcept } from '@/server/live-concept'
-import { COMPANY_CAP_MESSAGE, dailyCapError } from '@/server/model-cap'
+import { assertCompanyGenerationEnabled, COMPANY_CAP_MESSAGE, dailyCapError } from '@/server/model-cap'
 import { claimRoleBuild, releaseStaleBuild } from '@/server/role-curriculum'
 
 export const JOB_FILTERS = ['notReady', 'failed', 'generating', 'pending', 'ready'] as const
@@ -72,6 +72,7 @@ export const retryJobs = createServerFn({ method: 'POST' })
   .validator(z.object({ ids: z.array(z.string().min(1).max(120)).min(1).max(100) }))
   .handler(async ({ data }): Promise<{ queued: number; skipped: number; failed: number }> => {
     await requireStaff()
+    assertCompanyGenerationEnabled()
     const db = getDb()
     let queued = 0
     let skipped = 0

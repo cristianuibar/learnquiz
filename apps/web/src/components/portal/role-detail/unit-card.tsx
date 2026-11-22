@@ -22,7 +22,7 @@ function unitMeta(unit: Unit, running: boolean) {
   return meta
 }
 
-export function UnitCard({ unit, index, open, onToggle, slug, readOnly, running }: {
+export function UnitCard({ unit, index, open, onToggle, slug, readOnly, running, paused }: {
   unit: Unit
   index: number
   open: boolean
@@ -30,6 +30,7 @@ export function UnitCard({ unit, index, open, onToggle, slug, readOnly, running 
   slug: string
   readOnly: boolean
   running: boolean
+  paused: boolean
 }) {
   const uid = useId()
   const buttonId = `${uid}-unit`
@@ -72,7 +73,7 @@ export function UnitCard({ unit, index, open, onToggle, slug, readOnly, running 
         </div>
         <ol aria-labelledby={buttonId}>
           {unit.concepts.map((c) => (
-            <ConceptRow key={c.id} concept={c} slug={slug} readOnly={readOnly} critHeaderId={critHeaderId} />
+            <ConceptRow key={c.id} concept={c} slug={slug} readOnly={readOnly} paused={paused} critHeaderId={critHeaderId} />
           ))}
         </ol>
       </div>

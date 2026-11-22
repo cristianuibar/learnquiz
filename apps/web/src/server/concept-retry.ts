@@ -5,9 +5,11 @@ import { drainConceptQueue } from '@/server/concept-gen'
 import { drainsOnRequest, runInBackground } from '@/server/env'
 import { httpError } from '@/server/helpers'
 import { liveConcept } from '@/server/live-concept'
+import { assertCompanyGenerationEnabled } from '@/server/model-cap'
 
 // Resets a failed concept to pending and wakes the queue. No orgId means any company topic (staff).
 export async function retryFailedConcept(conceptId: string, orgId?: string, wake = true): Promise<void> {
+  assertCompanyGenerationEnabled()
   const db = getDb()
   const scope = db.select({ id: topics.id }).from(topics).where(orgId ? eq(topics.orgId, orgId) : isNotNull(topics.orgId))
   const reset = await db.update(concepts).set({ genStatus: 'pending', genError: null, genStartedAt: null })

@@ -5,6 +5,7 @@ import { ChevronRight } from 'lucide-react'
 import { Banner } from '@/components/admin/banner'
 import { Page, PageHeader } from '@/components/admin/page'
 import { errorMessage } from '@/components/inline-error'
+import { GenerationPausedBanner } from '@/components/portal/generation-paused'
 import { usePortal, usePortalLinks } from '@/components/portal/portal-context'
 import { Button } from '@/components/ui/button'
 import { RoleDialog } from '@/components/portal/roles/role-dialog'
@@ -56,7 +57,8 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
   }
   const ready = documents.filter((d) => d.status === 'ready').length
   const concepts = units.flatMap((u) => u.concepts)
-  const running = role.topicStatus === 'generating' || concepts.some((c) => c.genStatus === 'pending' || c.genStatus === 'generating')
+  const paused = detail.generationPaused
+  const running = !paused && (role.topicStatus === 'generating' || concepts.some((c) => c.genStatus === 'pending' || c.genStatus === 'generating'))
   const canUpload = !readOnly && (role.topicStatus === 'draft' || role.topicStatus === 'failed')
 
   useLayoutEffect(() => {
@@ -150,6 +152,7 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
         />
       )}
       <div className="flex flex-col gap-10">
+        {paused && <GenerationPausedBanner />}
         <DocumentsCard
           uploader={uploader}
           finishing={finished}
@@ -167,7 +170,7 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
           readOnly={readOnly}
           announce={setAnnounced}
           error={buildError ? <Banner kind="alert">{buildError}</Banner> : null}
-          controls={canUpload && busy ? (
+          controls={paused ? null : canUpload && busy ? (
             <Button type="button" variant="secondary" disabled>Build curriculum</Button>
           ) : canUpload && ready > 0 ? (
             <div className="flex flex-wrap items-center gap-4">

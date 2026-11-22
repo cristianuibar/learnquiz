@@ -15,7 +15,7 @@ import { reviewQuestion } from './question-review'
 import { getGenerationJobs, retryJobs } from './admin-jobs'
 import { listUsers, setUserBan } from './admin-users'
 
-const boundary = vi.hoisted(() => ({ db: null as unknown, headers: new Headers(), status: 200, background: [] as unknown[], chatJson: (() => new Promise(() => {})) as () => Promise<unknown> }))
+const boundary = vi.hoisted(() => ({ db: null as unknown, headers: new Headers(), status: 200, background: [] as unknown[], chatJson: (() => new Promise(() => {})) as () => Promise<unknown>, companyGeneration: 'true' as string | undefined }))
 
 // Only the request transport and database binding are replaced. Authorization,
 // validation, queries, Better Auth and its admin plugin execute for real.
@@ -33,7 +33,7 @@ vi.mock('@tanstack/react-start', () => ({
 }))
 vi.mock('@tanstack/react-start/server', () => ({ getRequestHeaders: () => boundary.headers, setCookie: () => {}, setResponseStatus: (status: number) => { boundary.status = status } }))
 vi.mock('@/db', async (original) => ({ ...await original<typeof import('@/db')>(), getDb: () => boundary.db }))
-vi.mock('@/server/env', () => ({ getEnv: () => ({ BETTER_AUTH_URL: 'http://localhost:3000', BETTER_AUTH_SECRET: 'staff-tests-only-secret-at-least-32-characters' }),
+vi.mock('@/server/env', () => ({ getEnv: () => ({ BETTER_AUTH_URL: 'http://localhost:3000', BETTER_AUTH_SECRET: 'staff-tests-only-secret-at-least-32-characters', COMPANY_GENERATION_ENABLED: boundary.companyGeneration }),
   drainsOnRequest: () => false,
   runInBackground: (task: unknown) => { boundary.background.push(task) },
 }))
@@ -99,6 +99,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   sqlite.exec('BEGIN')
+  boundary.companyGeneration = 'true'
   boundary.headers = new Headers({ cookie: accounts.get('staff')!.cookie })
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(NOW)
@@ -282,6 +283,11 @@ it('retries a failed concept once and leaves it pending without draining on the 
   await expect(retryJobs({ data: { ids: ['concept:c-failed'] } })).resolves.toEqual({ queued: 0, skipped: 1, failed: 0 })
   expect(boundary.background).toHaveLength(0)
   await expect(retryJobs({ data: { ids: ['concept:missing', 'other:thing'] } })).resolves.toEqual({ queued: 0, skipped: 2, failed: 0 })
+  // While company generation is paused a retry is refused with the reason and requeues nothing.
+  boundary.companyGeneration = undefined
+  await expect(retryJobs({ data: { ids: ['curriculum:bad-topic'] } })).rejects.toMatchObject({ status: 503, message: 'Company training generation is paused until an official model path exists.' })
+  expect(sqlite.prepare('SELECT status FROM topics WHERE id = ?').get('bad-topic')).toEqual({ status: 'failed' })
+  boundary.companyGeneration = 'true'
   await expect(getStaffSession()).resolves.toMatchObject({ failedJobs: 1 })
   const { rows } = await getGenerationJobs({ data: { filter: 'pending', offset: 0 } })
   expect(rows).toEqual([expect.objectContaining({ id: 'concept:c-failed', state: 'pending', error: null, startedAt: null })])

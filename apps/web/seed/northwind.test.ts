@@ -21,6 +21,7 @@ const bindings = vi.hoisted(() => ({ waitUntil: (task: Promise<unknown>) => { ba
   LLM_PROFILE: 'meta',
   LLM_BASE_URL: 'https://model.test',
   LLM_MODEL: 'muse-spark-1.3',
+  COMPANY_GENERATION_ENABLED: 'true',
 } }))
 
 // Only the Worker/request transport and provider HTTP are substituted. The seed,

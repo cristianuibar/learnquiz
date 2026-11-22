@@ -6,11 +6,13 @@ import { member, user } from '@/db/auth-schema'
 import { concepts, items, jobRoles, memberRoleAssignments, sources, topics, units } from '@/db/schema'
 import { requireOrgAdmin, requireOrgReader } from '@/server/authz'
 import { httpError } from '@/server/helpers'
+import { companyGenerationPaused } from '@/server/model-cap'
 import { releaseStaleBuild } from '@/server/role-curriculum'
 
 export type RoleDetail = {
   org: { slug: string; name: string }
   readOnly: boolean
+  generationPaused: boolean
   role: { id: string; name: string; benchmark: number; onboardingDays: number; topicId: string; topicStatus: typeof topics.$inferSelect.status; people: number; liveQuestions: number; criticalQuestions: number }
   documents: {
     id: string
@@ -75,6 +77,7 @@ export const getRoleDetail = createServerFn({ method: 'GET' })
     return {
       org: { slug: org.slug, name: org.name },
       readOnly,
+      generationPaused: companyGenerationPaused(),
       role: {
         ...role,
         people: assigned?.n ?? 0,

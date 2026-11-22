@@ -400,6 +400,7 @@ it.each([false, null])('offers typing when voice availability is %s', async (voi
     expect(input.getAttribute('rows')).toBe('4')
     expect(container.querySelector('label[for="answer"]')!.textContent).toBe('Your answer')
     expect(byLabel(container, 'Record answer')).toBeNull()
+    expect(document.getElementById(input.getAttribute('aria-describedby')!)!.textContent).toBe('Voice answers are unavailable. Type your answer.')
     await act(async () => {
       type(input, '1')
       container.querySelector<HTMLInputElement>('input[value="sure"]')!.click()

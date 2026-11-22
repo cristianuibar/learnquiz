@@ -13,10 +13,9 @@ import { composeSession, reinsert, SESSION_BONUS, streakAfter, xpFor } from '@/l
 import { museModelIds } from '@learnquiz/api/models'
 import { reportReasons } from '@learnquiz/api/reveal'
 import type { Confidence, ItemView, Progress, Reveal, SessionPlanning, SessionView, SummaryView } from '@learnquiz/api'
-import { chatJson, chatJsonWithModel, DailyCapError, isVoiceEnabled, jobModel, transcribeAudio } from '@/lib/llm/client'
+import { chatJson, chatJsonWithModel, DailyCapError, jobModel } from '@/lib/llm/client'
 import { gradePrompt } from '@/lib/llm/prompts'
 import { Grade, type ItemPayload } from '@/lib/llm/schemas'
-import { validateVoiceWav } from '@/lib/voice'
 import { plural } from '@/lib/utils'
 import { dueCount } from '@/server/due'
 import { asItem, chunks, ensureConceptItems, httpError, targetFor } from '@/server/helpers'
@@ -178,8 +177,6 @@ async function viewOf(db: Db, session: SessionRow, topic: TopicRow, plan: Placem
     progress: await progressOf(db, session, plan),
     item,
     ended,
-    // Role topics play without any model call, so transcription is off there.
-    voiceEnabled: topic.jobRoleId === null && isVoiceEnabled(),
     basics: 'queue' in plan && plan.basics === true,
   }
 }
@@ -536,24 +533,10 @@ export const transcribeAnswer = createServerFn({ method: 'POST' })
       sessionId: data.get('sessionId'), itemId: data.get('itemId'), audio: data.get('audio'),
     })
   })
-  .handler(async ({ data }): Promise<string> => {
-    const learnerId = await requireLearnerId()
-    if (!isVoiceEnabled()) throw httpError('Voice answers are unavailable.', 404)
-    const db = getDb()
-    const { session, topic } = await loadSession(db, learnerId, data.sessionId)
-    if (topic.jobRoleId !== null) throw httpError('Voice answers are unavailable.', 404)
-    const plan = readPlan(session)
-    if (session.endedAt !== null || plan.answered || (JSON.parse(session.itemIdsJson) as string[])[plan.position] !== data.itemId) {
-      throw httpError('That is not the current question', 409)
-    }
-    const { payload } = await loadItem(db, session.topicId, data.itemId)
-    if (payload.format === 'mcq') throw httpError('Choose an answer for this question.', 400)
-    try {
-      await validateVoiceWav(data.audio)
-    } catch (e) {
-      throw httpError(e instanceof Error ? e.message : 'Invalid recording.', 400)
-    }
-    return transcribeAudio({ audio: data.audio, learnerId, sessionId: session.id, topicId: session.topicId, orgId: topic.orgId })
+  // No transcription model has an official path (owner decision, 21 Nov 2026); the route stays for existing clients and refuses.
+  .handler(async (): Promise<string> => {
+    await requireLearnerId()
+    throw httpError('Voice answers are unavailable. Type your answer instead.', 404)
   })
 
 // Sticky: a role topic's assignment gets proficient_at once the benchmark is met, and it is never cleared.

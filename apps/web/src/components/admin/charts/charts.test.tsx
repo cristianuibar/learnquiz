@@ -156,10 +156,10 @@ describe('modelDisplayName', () => {
 describe('jobLabel', () => {
   // Keyed on ModelJob so a new job must be added here too.
   const jobs: Record<ModelJob, true> = {
-    curriculum: true, items: true, self_check: true, plan: true, grade: true, procedure: true, image: true, voice: true, placement_line: true,
+    curriculum: true, items: true, self_check: true, plan: true, grade: true, procedure: true, placement_line: true,
   }
 
-  it.each([...Object.keys(jobs), 'diagram'])('labels %s', (purpose) => {
+  it.each([...Object.keys(jobs), 'image', 'voice', 'diagram'])('labels %s', (purpose) => {
     expect(jobLabel(purpose)).not.toBe(purpose)
   })
 

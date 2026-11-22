@@ -24,7 +24,7 @@ export function Curriculum({ detail, readOnly, controls, error, announce }: {
   const total = concepts.length
   const ready = concepts.filter((c) => c.genStatus === 'ready').length
   const failed = concepts.filter((c) => c.genStatus === 'failed').length
-  const running = role.topicStatus === 'generating' || concepts.some((c) => c.genStatus === 'pending' || c.genStatus === 'generating')
+  const running = !detail.generationPaused && (role.topicStatus === 'generating' || concepts.some((c) => c.genStatus === 'pending' || c.genStatus === 'generating'))
   const [openById, setOpenById] = useState<Record<string, boolean>>({})
   const [finished, setFinished] = useState(false)
   const bucket = useRef<string | null>(null)
@@ -93,6 +93,7 @@ export function Curriculum({ detail, readOnly, controls, error, announce }: {
               slug={slug}
               readOnly={readOnly}
               running={running}
+              paused={detail.generationPaused}
             />
           ))}
         </ol>

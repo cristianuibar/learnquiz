@@ -1,21 +1,18 @@
-import { GUEST_DAILY_MODEL_CALL_CAP } from '@/lib/limits'
 import { readFileSync, readdirSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { createTopic, getTopicPath } from '@/server/curriculum'
 import { answerItem } from '@/server/play'
-import { getModelTrace } from '@/server/model-trace'
 import { generateConceptDiagram, serveConceptDiagram } from './diagrams'
-import type { JobModels } from '@/lib/llm/models'
 
 const boundary = vi.hoisted(() => ({
   db: null as unknown,
   learnerId: 'learner' as string | null,
   objects: new Map<string, Uint8Array>(),
   env: {
-    LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://model.test/v1', LLM_MODEL: 'muse-spark-1.3', IMAGE_MODEL: 'muse-image-1.0',
-    JOB_MODELS: undefined as JobModels | undefined,
+    LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://model.test/v1', LLM_MODEL: 'muse-spark-1.3',
+    JOB_MODELS: undefined as string | undefined,
     MEDIA: { head: vi.fn(), get: vi.fn(), put: vi.fn() },
   },
 }))
@@ -63,7 +60,7 @@ beforeEach(() => {
   boundary.env.MEDIA.get.mockImplementation(async (key: string) => boundary.objects.has(key) ? { body: boundary.objects.get(key) } : null)
   boundary.env.MEDIA.put.mockImplementation(async (key: string, bytes: Uint8Array) => { boundary.objects.set(key, bytes); return {} })
   boundary.env.MEDIA.put.mockClear()
-  fetchModel.mockReset().mockImplementation(async () => Response.json({ data: [{ b64_json: btoa(String.fromCharCode(...png)) }] }))
+  fetchModel.mockReset()
   vi.stubGlobal('fetch', fetchModel)
   raw.prepare('INSERT INTO topics (id, learner_id, title, status, created_at) VALUES (?, ?, ?, ?, ?)').run('topic', 'learner', 'Northwind procedures', 'ready', 1)
   raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('unit', 'topic', 0, 'Order handling')
@@ -77,47 +74,26 @@ afterEach(() => {
 })
 const row = (sql: string) => raw.prepare(sql).get() as Record<string, unknown>
 
-it('routes the image job independently of text and records an unknown cost in its topic trace', async () => {
-  boundary.env.LLM_PROFILE = 'baseten'
-  boundary.env.JOB_MODELS = { image: { provider: 'meta', model: 'muse-image-1.0' } }
-  expect(await generateConceptDiagram({ data: { conceptId: 'procedure' } })).toMatchObject({ status: 'ready' })
-  expect(fetchModel).toHaveBeenCalledTimes(1)
-  expect(fetchModel.mock.calls[0][0]).toBe('https://api.meta.ai/v1/images/generations')
-  expect(JSON.parse(fetchModel.mock.calls[0][1].body).model).toBe('muse-image-1.0')
-  expect(await getModelTrace({ data: { scope: 'topic', topicId: 'topic' } })).toMatchObject({
-    calls: [{ purpose: 'diagram', model: 'muse-image-1.0', costUsd: null }], totalCostUsd: 0,
-  })
+const storeDiagram = (conceptId: string) => {
+  boundary.objects.set(`concepts/${conceptId}/diagram.png`, png)
+  raw.prepare('UPDATE concepts SET image_key = ?, image_alt = ? WHERE id = ?').run(`concepts/${conceptId}/diagram.png`, 'Dispatch an order', conceptId)
+}
+
+// The old Muse Image mapping no longer turns generation on.
+it('never generates a diagram for the topic owner and reports it unavailable', async () => {
+  boundary.env.JOB_MODELS = JSON.stringify({ image: { provider: 'meta', model: 'muse-image-1.0' } })
+  expect(await generateConceptDiagram({ data: { conceptId: 'procedure' } })).toEqual({ status: 'unavailable' })
+  raw.exec('UPDATE concepts SET visual = 0')
+  expect(await generateConceptDiagram({ data: { conceptId: 'procedure' } })).toEqual({ status: 'disabled' })
+  expect(fetchModel).not.toHaveBeenCalled()
+  expect(boundary.env.MEDIA.put).not.toHaveBeenCalled()
+  expect(row('SELECT COUNT(*) AS n FROM model_calls').n).toBe(0)
+  expect(row('SELECT image_generation_started_at FROM concepts')).toEqual({ image_generation_started_at: null })
 })
 
-it('stamps the company on the diagram call of a company topic', async () => {
-  raw.prepare('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, ?)').run('org', 'Northwind', 'northwind', 1)
-  raw.prepare('UPDATE topics SET org_id = ? WHERE id = ?').run('org', 'topic')
-  expect(await generateConceptDiagram({ data: { conceptId: 'procedure' } })).toMatchObject({ status: 'ready' })
-  expect(raw.prepare('SELECT purpose, org_id, ok FROM model_calls').all()).toEqual([{ purpose: 'diagram', org_id: 'org', ok: 1 }])
-})
-
-it('generates one diagram across overlapping views, serves its bytes, and reuses it on Path and reveal', async () => {
-  let finish!: (res: Response) => void
-  let started!: () => void
-  const called = new Promise<void>((resolve) => { started = resolve })
-  fetchModel.mockImplementationOnce(() => { started(); return new Promise<Response>((resolve) => { finish = resolve }) })
-  const first = generateConceptDiagram({ data: { conceptId: 'procedure' } })
-  await called
-  expect(await generateConceptDiagram({ data: { conceptId: 'procedure' } })).toEqual({ status: 'pending' })
-  finish(Response.json({ data: [{ b64_json: btoa(String.fromCharCode(...png)) }] }))
-  const ready = await first
-  expect(ready).toEqual({ status: 'ready', image: { src: '/media/concepts/procedure', alt: 'Dispatch an order: Check stock, pack the order, then dispatch it.' } })
-  expect(await generateConceptDiagram({ data: { conceptId: 'procedure' } })).toEqual(ready)
-  expect(fetchModel).toHaveBeenCalledTimes(1)
-  const [url, request] = fetchModel.mock.calls[0]
-  expect(url).toBe('https://model.test/v1/images/generations')
-  expect(JSON.parse(request.body)).toMatchObject({ model: 'muse-image-1.0', n: 1, response_format: 'b64_json', prompt: expect.stringContaining('Check stock before packing.') })
-  expect(boundary.env.MEDIA.put).toHaveBeenCalledTimes(1)
-  expect(row('SELECT model, purpose, cost_usd, ok FROM model_calls')).toEqual({ model: 'muse-image-1.0', purpose: 'diagram', cost_usd: null, ok: 1 })
-  expect(row('SELECT COUNT(*) AS n FROM model_calls').n).toBe(1)
-  expect(await getModelTrace({ data: { scope: 'topic', topicId: 'topic' } })).toMatchObject({
-    calls: [{ purpose: 'diagram', model: 'muse-image-1.0', costUsd: null }], totalCostUsd: 0,
-  })
+it('serves a stored diagram to its owner and keeps it on Path and reveal', async () => {
+  storeDiagram('procedure')
+  expect(await generateConceptDiagram({ data: { conceptId: 'procedure' } })).toEqual({ status: 'ready', image: { src: '/media/concepts/procedure', alt: 'Dispatch an order' } })
   const response = await serveConceptDiagram('procedure')
   expect(response.status).toBe(200)
   expect(response.headers.get('content-type')).toBe('image/png')
@@ -129,26 +105,15 @@ it('generates one diagram across overlapping views, serves its bytes, and reuses
   raw.prepare('INSERT INTO sessions (id, learner_id, topic_id, kind, item_ids_json, plan_json, started_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run('session', 'learner', 'topic', 'session', '["item"]', JSON.stringify({ position: 0, answered: false, reinserted: [], reasons: { closers: 0 } }), 1)
   const reveal = await answerItem({ data: { sessionId: 'session', itemId: 'item', answer: { text: 'stock' }, confidence: 'sure', responseMs: 100 } })
   expect(reveal).toMatchObject({ correct: true, diagramConceptId: 'procedure' })
-  expect(fetchModel).toHaveBeenCalledTimes(1)
+  expect(fetchModel).not.toHaveBeenCalled()
 })
 
-it('carries the curriculum visual flag into stored concepts', async () => {
-  const concept = { name: 'Dispatch', summary: 'Pack and dispatch.', visual: true, critical: false, prerequisites: [], source_quote: null, misconceptions: [] }
-  const skeleton = { units: Array.from({ length: 4 }, (_, u) => ({ name: `Unit ${u}`, summary: '', concepts: Array.from({ length: 4 }, (_, c) => ({ ...concept, name: `Dispatch ${u}-${c}`, visual: c === 0 })) })) }
-  fetchModel.mockResolvedValueOnce(Response.json({ choices: [{ message: { content: JSON.stringify(skeleton) }, finish_reason: 'stop' }] }))
-  const { topicId } = await createTopic({ data: { topic: 'Warehouse procedures' } })
-  const rows = raw.prepare('SELECT visual FROM concepts WHERE topic_id = ? ORDER BY "order"').all(topicId)
-  expect(rows.map((r) => r.visual)).toEqual([1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-})
-
-it.each([null, 'other-learner'])('refuses generation and media access for %s', async (learnerId) => {
-  await generateConceptDiagram({ data: { conceptId: 'procedure' } })
+it.each([null, 'other-learner'])('refuses a stored diagram and its media to %s', async (learnerId) => {
+  storeDiagram('procedure')
   boundary.learnerId = learnerId
   const status = learnerId ? 404 : 401
   await expect(generateConceptDiagram({ data: { conceptId: 'procedure' } })).rejects.toMatchObject({ status })
   expect((await serveConceptDiagram('procedure')).status).toBe(status)
-  expect(fetchModel).toHaveBeenCalledTimes(1)
-  expect(boundary.env.MEDIA.put).toHaveBeenCalledTimes(1)
 })
 
 it('never generates a shared role diagram for an employee, serves a stored one, and refuses an unassigned user', async () => {
@@ -181,38 +146,11 @@ it('never generates a shared role diagram for an employee, serves a stored one, 
   expect(fetchModel).not.toHaveBeenCalled()
 })
 
-it('does not generate for nonvisual concepts, local models, or capped learners', async () => {
-  raw.exec('UPDATE concepts SET visual = 0')
-  expect(await generateConceptDiagram({ data: { conceptId: 'procedure' } })).toEqual({ status: 'disabled' })
-  raw.exec('UPDATE concepts SET visual = 1')
-  boundary.env.LLM_PROFILE = 'ollama'
-  expect(await generateConceptDiagram({ data: { conceptId: 'procedure' } })).toEqual({ status: 'disabled' })
-  boundary.env.LLM_PROFILE = 'meta'
-  const log = raw.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-  for (let i = 0; i < GUEST_DAILY_MODEL_CALL_CAP; i++) log.run(`call-${i}`, 'learner', 'items', 'muse-spark-1.3', 1, 1, Date.now())
-  await expect(generateConceptDiagram({ data: { conceptId: 'procedure' } })).rejects.toMatchObject({ status: 429 })
-  expect(fetchModel).not.toHaveBeenCalled()
-  expect(boundary.env.MEDIA.put).not.toHaveBeenCalled()
-  expect(row('SELECT COUNT(*) AS n FROM model_calls').n).toBe(GUEST_DAILY_MODEL_CALL_CAP)
-})
-
-it.each(['http', 'invalid-image', 'storage'])('allows retry after a %s failure without leaving a stuck claim', async (failure) => {
-  if (failure === 'http') fetchModel.mockResolvedValueOnce(new Response('unavailable', { status: 503 }))
-  if (failure === 'invalid-image') fetchModel.mockResolvedValueOnce(Response.json({ data: [{ b64_json: btoa('not an image') }] }))
-  if (failure === 'storage') boundary.env.MEDIA.put.mockRejectedValueOnce(new Error('storage unavailable'))
-  await expect(generateConceptDiagram({ data: { conceptId: 'procedure' } })).rejects.toThrow()
-  expect((await serveConceptDiagram('procedure')).status).toBe(404)
-  expect(await generateConceptDiagram({ data: { conceptId: 'procedure' } })).toMatchObject({ status: 'ready' })
-  expect(fetchModel).toHaveBeenCalledTimes(2)
-  expect(row('SELECT COUNT(*) AS n FROM model_calls').n).toBe(2)
-  expect(row('SELECT ok, cost_usd FROM model_calls ORDER BY rowid LIMIT 1')).toEqual({ ok: failure === 'storage' ? 1 : 0, cost_usd: null })
-})
-
-it('recovers an abandoned claim and an uploaded image without generating again', async () => {
-  raw.prepare('UPDATE concepts SET image_generation_started_at = ?').run(Date.now() - 300_000)
-  await generateConceptDiagram({ data: { conceptId: 'procedure' } })
-  raw.exec('UPDATE concepts SET image_key = NULL, image_alt = NULL, image_generation_started_at = NULL')
-  await generateConceptDiagram({ data: { conceptId: 'procedure' } })
-  expect(fetchModel).toHaveBeenCalledTimes(1)
-  expect(boundary.env.MEDIA.put).toHaveBeenCalledTimes(1)
+it('carries the curriculum visual flag into stored concepts', async () => {
+  const concept = { name: 'Dispatch', summary: 'Pack and dispatch.', visual: true, critical: false, prerequisites: [], source_quote: null, misconceptions: [] }
+  const skeleton = { units: Array.from({ length: 4 }, (_, u) => ({ name: `Unit ${u}`, summary: '', concepts: Array.from({ length: 4 }, (_, c) => ({ ...concept, name: `Dispatch ${u}-${c}`, visual: c === 0 })) })) }
+  fetchModel.mockResolvedValueOnce(Response.json({ choices: [{ message: { content: JSON.stringify(skeleton) }, finish_reason: 'stop' }] }))
+  const { topicId } = await createTopic({ data: { topic: 'Warehouse procedures' } })
+  const rows = raw.prepare('SELECT visual FROM concepts WHERE topic_id = ? ORDER BY "order"').all(topicId)
+  expect(rows.map((r) => r.visual)).toEqual([1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 })

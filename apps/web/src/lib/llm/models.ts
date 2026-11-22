@@ -4,7 +4,7 @@ export const PROVIDERS = {
   fireworks: { baseUrl: 'https://api.fireworks.ai/inference/v1', keyBinding: 'FIREWORKS_API_KEY', jsonMode: 'json_object' },
 } as const
 
-export type ModelJob = 'curriculum' | 'items' | 'self_check' | 'plan' | 'grade' | 'procedure' | 'image' | 'voice' | 'placement_line'
+export type ModelJob = 'curriculum' | 'items' | 'self_check' | 'plan' | 'grade' | 'procedure' | 'placement_line'
 export type JobModels = Partial<Record<ModelJob, { provider: keyof typeof PROVIDERS; model: string }>>
 
 // Exact Meta model IDs; Fireworks may prefix these with accounts/fireworks/models/.
@@ -27,10 +27,10 @@ const JOB_LABELS: Record<ModelJob, string> & Record<string, string> = {
   plan: 'Session plan',
   grade: 'Grading',
   procedure: 'Procedure diagrams',
+  placement_line: 'Placement',
+  // Stored purposes of earlier diagram and voice calls, still read by model-trace.ts and the usage pages.
   image: 'Diagrams',
   voice: 'Voice answers',
-  placement_line: 'Placement',
-  // Stored purpose of the diagram generator (generateImage in client.ts), read by model-trace.ts.
   diagram: 'Diagrams',
 }
 

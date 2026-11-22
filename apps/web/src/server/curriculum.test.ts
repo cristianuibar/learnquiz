@@ -4,6 +4,7 @@ import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { concepts, learnerTopic } from '@/db/schema'
 import { ACCOUNT_DAILY_MODEL_CALL_CAP, COMPANY_DAILY_MODEL_CALL_CAP } from '@/lib/limits'
+import { getEnv } from '@/server/env'
 import { drainConceptQueue } from './concept-gen'
 import * as curriculum from './curriculum'
 import { getLatestTopicIdFn } from './latest-topic'
@@ -32,7 +33,7 @@ vi.mock('@/server/env', async (original) => ({
   runInBackground: (task: Promise<unknown>) => { holder.background.push(task) },
 }))
 vi.mock('cloudflare:workers', () => ({
-  env: { LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://llm.example', LLM_MODEL: 'muse-spark-1.3' },
+  env: { LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://llm.example', LLM_MODEL: 'muse-spark-1.3', COMPANY_GENERATION_ENABLED: 'true' as string | undefined },
   waitUntil: () => {}, // the background question drain is covered in concept-gen.test.ts
 }))
 
@@ -139,6 +140,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))
   fetchModel.mockReset().mockImplementation(async () => modelReply(skeleton()))
   vi.stubGlobal('fetch', fetchModel)
+  getEnv().COMPANY_GENERATION_ENABLED = 'true'
 })
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -293,6 +295,15 @@ it.each([
   expect(topicState()).toEqual({ status: 'failed' })
   expect(storedPath()).toEqual({ units: { n: 0 }, concepts: { n: 0 }, edges: { n: 0 } })
   expect(fetchModel).toHaveBeenCalledTimes(calls)
+})
+
+it('pauses a role build with a clear message before any claim or model call', async () => {
+  getEnv().COMPANY_GENERATION_ENABLED = undefined
+  await expect(generate()).rejects.toMatchObject({ status: 503, message: 'Company training generation is paused until an official model path exists.' })
+  expect(topicState()).toEqual({ status: 'draft' })
+  expect(storedPath()).toEqual({ units: { n: 0 }, concepts: { n: 0 }, edges: { n: 0 } })
+  expect(fetchModel).not.toHaveBeenCalled()
+  expect(raw.prepare('SELECT COUNT(*) AS n FROM model_calls').get()).toEqual({ n: 0 })
 })
 
 it('refuses generation at the daily cap before changing the role topic', async () => {

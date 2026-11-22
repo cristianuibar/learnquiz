@@ -7,7 +7,7 @@ import { getUnitProcedure } from './procedure'
 const boundary = vi.hoisted(() => ({
   db: null as unknown,
   learnerId: 'learner' as string | null,
-  env: { LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://model.test/v1', LLM_MODEL: 'muse-spark-1.3', JOB_MODELS: undefined },
+  env: { LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://model.test/v1', LLM_MODEL: 'muse-spark-1.3', JOB_MODELS: undefined, COMPANY_GENERATION_ENABLED: 'true' as string | undefined },
 }))
 vi.mock('@tanstack/react-start', () => ({
   createServerFn: () => ({ validator: () => ({ handler: (fn: unknown) => fn }) }),
@@ -52,6 +52,7 @@ const run = (sql: string, ...args: (string | number | null)[]) => raw.prepare(sq
 beforeEach(() => {
   raw.exec('BEGIN')
   boundary.learnerId = 'learner'
+  boundary.env.COMPANY_GENERATION_ENABLED = 'true'
   fetchModel.mockReset().mockImplementation(async () => Response.json({ choices: [{ message: { content: JSON.stringify(graph) }, finish_reason: 'stop' }] }))
   vi.stubGlobal('fetch', fetchModel)
   run('INSERT INTO topics (id, learner_id, title, status, created_at) VALUES (?, ?, ?, ?, ?)', 'topic', 'learner', 'Northwind procedures', 'ready', 1)
@@ -139,6 +140,19 @@ it('returns 429 for a company topic over the company cap, with no model call', a
   for (let i = 0; i < 400; i++) log.run(`call-${i}`, 'topic', 'items', 'muse-spark-1.3', 1, 1, Date.now())
   await expect(getUnitProcedure({ data: { unitId: 'unit' } })).rejects.toMatchObject({ status: 429 })
   expect(fetchModel).not.toHaveBeenCalled()
+})
+
+it('serves a stored company flowchart and builds none while company generation is paused', async () => {
+  run('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, ?)', 'org', 'Northwind', 'northwind', 1)
+  run('UPDATE topics SET org_id = ?', 'org')
+  const stored = await getUnitProcedure({ data: { unitId: 'unit' } })
+  expect(stored).toMatchObject({ status: 'ready', source: { version: 3 } })
+  boundary.env.COMPANY_GENERATION_ENABLED = undefined
+  expect(await getUnitProcedure({ data: { unitId: 'unit' } })).toEqual(stored)
+  run('UPDATE sources SET version = 4')
+  expect(await getUnitProcedure({ data: { unitId: 'unit' } })).toBeNull()
+  expect(fetchModel).toHaveBeenCalledTimes(1)
+  expect(raw.prepare('SELECT procedure_started_at FROM units').get()).toEqual({ procedure_started_at: null })
 })
 
 it('sends the whole of a long role document, so steps past 20,000 characters reach the model', async () => {

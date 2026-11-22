@@ -14,6 +14,7 @@ import { getAuth } from '@/server/auth'
 import { requireOrgAdmin, requireOrgReader } from '@/server/authz'
 import { httpError, mean } from '@/server/helpers'
 import { liveConcept } from '@/server/live-concept'
+import { companyGenerationPaused } from '@/server/model-cap'
 import { getSessionUser } from '@/server/session'
 
 const Slug = z.object({ slug: z.string().min(1).max(100) })
@@ -61,9 +62,11 @@ async function roleSummaries(orgId: string) {
   const peopleBy = new Map(people.map((r) => [r.id, r.n]))
   const documentsBy = new Map(documents.map((r) => [r.id, r.n]))
   const conceptsBy = new Map(conceptRows.map((r) => [r.id, r]))
+  // Nothing is being prepared while company generation is paused: queued concepts wait without a build.
+  const paused = companyGenerationPaused()
   return roles.map((role) => {
     const c = conceptsBy.get(role.topicId)
-    return { ...role, people: peopleBy.get(role.id) ?? 0, documents: documentsBy.get(role.topicId) ?? 0, conceptsReady: Number(c?.ready ?? 0), conceptsTotal: c?.total ?? 0, preparing: role.topicStatus === 'generating' || Number(c?.busy ?? 0) > 0 }
+    return { ...role, people: peopleBy.get(role.id) ?? 0, documents: documentsBy.get(role.topicId) ?? 0, conceptsReady: Number(c?.ready ?? 0), conceptsTotal: c?.total ?? 0, preparing: !paused && (role.topicStatus === 'generating' || Number(c?.busy ?? 0) > 0) }
   })
 }
 
@@ -239,7 +242,7 @@ export const getOrgOverview = createServerFn({ method: 'GET' })
     const first = proficient.map(([userId]) => userId).sort((a, b) => (reached.get(a) ?? Infinity) - (reached.get(b) ?? Infinity) || (a < b ? -1 : a > b ? 1 : 0))[0] ?? null
     const top = unreviewed[0]
     const nextStep: { unreviewed: number; documentTitle: string; roleId: string; topicId: string } | null = top?.roleId ? { unreviewed: top.unreviewed, documentTitle: top.title, roleId: top.roleId, topicId: top.topicId } : null
-    return { name: org.name, slug: org.slug, readOnly, roles, nextStep, training: { employees: progress.size + (invited?.n ?? 0), proficientEmployees: proficient.length, daysToProficiency: days.length ? Math.ceil(mean(days)) : null, criticalErrorsThisWeek: errors?.n ?? 0, documentsToReview: unreviewed.length, firstProficientUserId: first, openErrorUserId: openError?.userId ?? null } }
+    return { name: org.name, slug: org.slug, readOnly, generationPaused: companyGenerationPaused(), roles, nextStep, training: { employees: progress.size + (invited?.n ?? 0), proficientEmployees: proficient.length, daysToProficiency: days.length ? Math.ceil(mean(days)) : null, criticalErrorsThisWeek: errors?.n ?? 0, documentsToReview: unreviewed.length, firstProficientUserId: first, openErrorUserId: openError?.userId ?? null } }
   })
 
 // Public on purpose: the invitation id is the secret in the invite link, and the page needs it before the invitee has an account.
