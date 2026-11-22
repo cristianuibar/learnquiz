@@ -49,7 +49,7 @@ if (args.length === 1 && ['--help', '-h'].includes(args[0])) {
         body: JSON.stringify({ sopText: await readFile(new URL('./northwind-sop.md', import.meta.url), 'utf8'), ownerPassword, learnerPassword }),
       })
       if (!response.ok) {
-        console.error(`Northwind seed failed (HTTP ${response.status}). Check migrations, model configuration, daily limits and existing demo records.`)
+        console.error(`Northwind seed failed (HTTP ${response.status}). Check migrations, model configuration, daily limits and existing fixture records.`)
         process.exitCode = 1
       } else {
         console.log(JSON.stringify(await response.json(), null, 2))

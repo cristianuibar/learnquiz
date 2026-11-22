@@ -52,7 +52,7 @@ export async function seedNorthwind(input: z.input<typeof Input>) {
 
   function cookies(headers: Headers) {
     const values = headers.getSetCookie()
-    if (!values.length) throw httpError('The demo sign-in did not return a session.', 503)
+    if (!values.length) throw httpError('The fixture sign-in did not return a session.', 503)
     return new Headers({ cookie: values.map((value) => value.split(';', 1)[0]).join('; ') })
   }
   async function signup(email: string, name: string, password: string) {
@@ -83,7 +83,7 @@ export async function seedNorthwind(input: z.input<typeof Input>) {
 
   async function sopVersion() {
     const source = await db.select({ version: sources.version }).from(sources).where(eq(sources.id, NORTHWIND.sourceId)).get()
-    if (!source) throw httpError('The demo SOP was not stored.', 503)
+    if (!source) throw httpError('The fixture SOP was not stored.', 503)
     return source.version
   }
   // One correct practice attempt per concept with a gradable question, so progress counts every practiced concept as measured.
@@ -124,14 +124,14 @@ export async function seedNorthwind(input: z.input<typeof Input>) {
     let stored: unknown
     try { stored = JSON.parse(org.metadata ?? '') } catch { /* An unmarked company is never adopted. */ }
     const parsed = Metadata.safeParse(stored)
-    if (!parsed.success || org.name !== 'Northwind Logistics') throw httpError('Northwind Logistics already exists without this demo marker. Nothing was changed.', 409)
+    if (!parsed.success || org.name !== 'Northwind Logistics') throw httpError('Northwind Logistics already exists without this seed marker. Nothing was changed.', 409)
     metadata = parsed.data
     for (const key of ['owner', 'onboarding', 'proficient'] as const) {
       const existing = await db.select().from(user).where(eq(user.email, NORTHWIND.emails[key])).get()
-      if ((existing?.id ?? undefined) !== metadata.accounts[key]) throw httpError(`The reserved demo ${key} account differs from its recorded id.`, 409)
+      if ((existing?.id ?? undefined) !== metadata.accounts[key]) throw httpError(`The reserved fixture ${key} account differs from its recorded id.`, 409)
     }
     const owner = await db.select().from(member).where(and(eq(member.organizationId, org.id), eq(member.userId, metadata.accounts.owner), eq(member.role, 'owner'))).get()
-    if (!owner) throw httpError('The recorded demo owner no longer owns this company.', 409)
+    if (!owner) throw httpError('The recorded fixture owner no longer owns this company.', 409)
     // Earlier seeds stored the topic without its company, so the question queue never saw its concepts.
     await db.update(topics).set({ orgId: org.id }).where(and(eq(topics.id, NORTHWIND.topicId), isNull(topics.orgId),
       inArray(topics.jobRoleId, db.select({ id: jobRoles.id }).from(jobRoles).where(eq(jobRoles.orgId, org.id)))))
@@ -149,17 +149,17 @@ export async function seedNorthwind(input: z.input<typeof Input>) {
     ownerHeaders = await signin(NORTHWIND.emails.owner, data.ownerPassword)
   } else {
     const existing = await db.select({ id: user.id }).from(user).where(inArray(user.email, Object.values(NORTHWIND.emails))).get()
-    if (existing) throw httpError('A reserved Northwind demo email is already in use. Nothing was changed.', 409)
+    if (existing) throw httpError('A reserved Northwind fixture email is already in use. Nothing was changed.', 409)
     const owner = await signup(NORTHWIND.emails.owner, 'Jordan Blake', data.ownerPassword)
     ownerHeaders = owner.headers
     metadata = { seed: marker, accounts: { owner: owner.id }, fixtureAt: data.now ?? Date.now(), complete: false }
     const created = await auth.api.createOrganization({ body: { name: 'Northwind Logistics', slug: NORTHWIND.slug, userId: owner.id, metadata } })
     org = await db.select().from(organization).where(eq(organization.id, created.id)).get()
-    if (!org) throw httpError('The demo company was not stored.', 503)
+    if (!org) throw httpError('The fixture company was not stored.', 503)
   }
 
   const invitedUser = await db.select({ id: user.id }).from(user).where(eq(user.email, NORTHWIND.emails.invited)).get()
-  if (invitedUser) throw httpError('The invited demo employee has already joined. The demo was not reset.', 409)
+  if (invitedUser) throw httpError('The invited fixture employee has already joined. The fixture was not reset.', 409)
   const now = metadata.fixtureAt
   const role = await db.select().from(jobRoles).where(eq(jobRoles.id, NORTHWIND.roleId)).get()
   const topic = await db.select().from(topics).where(eq(topics.id, NORTHWIND.topicId)).get()
@@ -171,7 +171,7 @@ export async function seedNorthwind(input: z.input<typeof Input>) {
       db.insert(jobRoles).values({ id: NORTHWIND.roleId, orgId: org.id, name: 'Warehouse picker', benchmark: 0.85, onboardingDays: 14, createdAt: now - 10 * DAY }),
       db.insert(topics).values({ id: NORTHWIND.topicId, orgId: org.id, jobRoleId: NORTHWIND.roleId, title: 'Warehouse picker', status: 'draft', createdAt: now - 10 * DAY }),
     ])
-  } else if (!role || !topic) throw httpError('The demo role and topic are incomplete; no existing data was overwritten.', 409)
+  } else if (!role || !topic) throw httpError('The fixture role and topic are incomplete; no existing data was overwritten.', 409)
 
   await addRoleDocument({ orgId: org.id, roleId: NORTHWIND.roleId, id: NORTHWIND.sourceId, title: 'Warehouse picker SOP', bodyText: data.sopText })
   if (topic?.status !== 'ready') await buildRoleCurriculum({ orgId: org.id, ownerId: metadata.accounts.owner, roleId: NORTHWIND.roleId })
@@ -189,23 +189,23 @@ export async function seedNorthwind(input: z.input<typeof Input>) {
   const mismatchStep = steps.find((step) => step.label === 'resolve a scan mismatch')
   const critical = (mismatchStep && conceptRows.find((c) => c.grounded && quotedIn(c.sourceQuote, mismatchStep)))
     ?? conceptRows.find((c) => c.critical && c.grounded && /scan/i.test(c.name) && /mismatch/i.test(c.name))
-  if (!readyTopic || !critical) throw httpError('The generated SOP curriculum needs a grounded critical scanning step before this demo can be seeded.', 422)
+  if (!readyTopic || !critical) throw httpError('The generated SOP curriculum needs a grounded critical scanning step before this fixture can be seeded.', 422)
 
   // Three representative concepts keep generation within the normal daily cap.
   const selected = [critical, ...conceptRows.filter((c) => c.id !== critical.id).slice(0, 2)]
   for (const concept of selected) {
     const stored = await db.select({ id: items.id, format: items.format }).from(items).where(and(eq(items.conceptId, concept.id), eq(items.status, 'active'), ne(items.id, LABEL_ITEM_ID)))
-    // The demo error needs a multiple-choice question, so a rerun regenerates until the self-check keeps one.
+    // The fixture's confident error needs a multiple-choice question, so a rerun regenerates until the self-check keeps one.
     const missing = concept.id === critical.id ? !stored.some((item) => item.format === 'mcq') : !stored.length
     if (missing) await ensureConceptItems(db, metadata.accounts.owner, concept, readyTopic, { targetDifficulty: 3, unseen: new Set(stored.map((item) => item.id)) })
   }
   const criticalItems = await db.select().from(items).where(and(eq(items.conceptId, critical.id), eq(items.status, 'active'), ne(items.id, LABEL_ITEM_ID)))
   const criticalItem = criticalItems.find((item) => item.format === 'mcq')
-  if (!criticalItem) throw httpError('The critical scanning step needs a multiple-choice question for the demo error.', 422)
+  if (!criticalItem) throw httpError('The critical scanning step needs a multiple-choice question for the fixture error.', 422)
   const payload = JSON.parse(criticalItem.payloadJson) as import('@/lib/llm/schemas').ItemPayload
   const wrongOption = payload.options.find((option) => !option.is_correct)!
   const answer = { optionId: wrongOption.id }
-  if (gradeAnswer(payload, answer).correct) throw httpError('The demo answer must be incorrect.', 422)
+  if (gradeAnswer(payload, answer).correct) throw httpError('The fixture error answer must be incorrect.', 422)
 
   // One authored question with an image: the SVG goes to R2 under the item's key, the payload points at it.
   const labelPayload = ItemPayload.parse({

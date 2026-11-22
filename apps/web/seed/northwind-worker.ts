@@ -33,7 +33,7 @@ export default {
     } catch (error) {
       // Auth/provider/database errors can contain request data. Do not return or log them.
       const status = error instanceof Error && 'status' in error && typeof error.status === 'number' ? error.status : 500
-      return new Response('Northwind seed could not finish. Check migrations, model configuration, daily limits and demo account conflicts before retrying.', { status: status >= 400 && status <= 599 ? status : 500 })
+      return new Response('Northwind seed could not finish. Check migrations, model configuration, daily limits and fixture account conflicts before retrying.', { status: status >= 400 && status <= 599 ? status : 500 })
     }
   },
 }
