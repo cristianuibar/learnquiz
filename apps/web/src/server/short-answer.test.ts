@@ -9,7 +9,7 @@ const holder = vi.hoisted(() => ({ db: null as unknown, learnerId: 'u1' }))
 vi.mock('@/db', () => ({ getDb: () => holder.db }))
 vi.mock('@/server/session', () => ({ requireLearnerId: async () => holder.learnerId }))
 vi.mock('cloudflare:workers', () => ({ env: {
-  LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://llm.example/v1', LLM_MODEL: 'muse-spark-1.3',
+  LLM_PROFILE: 'baseten', LLM_BASE_URL: 'https://llm.example/v1', LLM_MODEL: 'muse-spark-1.3',
 } }))
 // Keep validation, handlers, the model client and database writes real; replace
 // only request transport, authentication, Cloudflare bindings and provider HTTP.
@@ -20,6 +20,7 @@ vi.mock('@tanstack/react-start', () => ({ createServerFn: () => ({
 }) }))
 
 import { answerItem, endSession, getSession, nextItem, startSession } from './play'
+import { requestedSchema } from '@/lib/llm/test-request'
 
 let raw: DatabaseSync
 const fetchModel = vi.fn()
@@ -92,7 +93,7 @@ it.each([0.5, 0.8, 1])('returns and stores a short-answer score of %s with feedb
   const [url, options] = fetchModel.mock.calls[0] as [string, RequestInit]
   expect(url).toBe('https://llm.example/v1/chat/completions')
   const body = JSON.parse(options.body as string)
-  expect(body.response_format.json_schema.name).toBe('grade')
+  expect(requestedSchema(body).name).toBe('grade')
   expect(JSON.parse(body.messages[1].content)).toEqual({ question: payload.stem, model_answer: payload.model_answer, source_quote: payload.source_quote, learner_answer: request.data.answer.text })
   expect(JSON.parse(row('SELECT plan_json FROM sessions').plan_json as string).answered).toBe(true)
 })

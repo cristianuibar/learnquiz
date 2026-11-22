@@ -723,7 +723,6 @@ export const answerItem = createServerFn({ method: 'POST' })
           schema: Grade,
           schemaName: 'grade',
           ...gradePrompt({ item: payload, answer: data.answer.text ?? '' }),
-          reasoningEffort: 'minimal',
           maxTokens: 2000,
           learnerId,
           sessionId: session.id,
@@ -943,7 +942,7 @@ const unitBand = (order: number, total: number) => 1 + Math.round((order / Math.
 
 const PlacementLine = z.object({ line: z.string().max(240) })
 
-// One Spark call; any failure falls back to a template so placement always ends.
+// One model call; any failure, or no configured model, falls back to a template so placement always ends.
 async function placementLine(db: Db, learnerId: string, session: SessionRow, topic: TopicRow, log: PlacementPlan['log'], level: number) {
   const right = log.filter((l) => l.correct).length
   const fallback = `You got ${right} of ${log.length} right and landed at level ${level} of 5 on ${topic.title}. Your path starts there.`
@@ -965,7 +964,6 @@ line: exactly two sentences, second person, at most 240 characters in total. Fir
 Placed at level ${level} of 5.
 Answers in order (concept, result, confidence):
 ${log.map((l) => `- ${concept.get(l.itemId) ?? 'unknown'}: ${l.correct ? 'right' : 'wrong'}, ${l.confidence}`).join('\n')}`,
-      reasoningEffort: 'minimal',
       maxTokens: 2000,
       learnerId,
       sessionId: session.id,

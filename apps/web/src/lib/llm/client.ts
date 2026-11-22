@@ -3,14 +3,12 @@ import { eq } from 'drizzle-orm'
 import { getDb } from '@/db'
 import { modelCalls } from '@/db/schema'
 import { COMPANY_DAILY_MODEL_CALL_CAP, isOverDailyCap } from '@/lib/limits'
-import { META_MODELS, PROVIDERS, type ModelJob } from '@/lib/llm/models'
+import { PROVIDERS, type ModelJob } from '@/lib/llm/models'
 import { getEnv } from '@/server/env'
 import { COMPANY_CAP_MESSAGE, companyCallsToday, dailyCapError, reserveModelCall } from '@/server/model-cap'
 
 // USD per million tokens; reasoning tokens bill as output. Unlisted prices are unknown.
-export const PRICES: Record<string, { in: number; out: number }> = {
-  'muse-spark-1.3': { in: 1.25, out: 4.25 },
-}
+export const PRICES: Record<string, { in: number; out: number }> = {}
 
 export class LlmError extends Error {
   status: number
@@ -38,30 +36,27 @@ const PURPOSE_TIMEOUT_MS: Partial<Record<ModelJob, number>> = {
   procedure: 180_000,
 }
 
-// `fallback` resolves the Meta model that backs up a failed Fireworks call.
-export function jobModel(job: ModelJob, fallback = false) {
+// Production configures no model: every job is unavailable until JOB_MODELS or LLM_PROFILE names one.
+// Voice and images run only when JOB_MODELS maps them; other unmapped jobs use LLM_PROFILE and LLM_MODEL.
+export function jobModel(job: ModelJob) {
   const env = getEnv()
   try {
     // Wrangler JSON bindings are objects; .dev.vars can supply JSON strings.
     const mapping: unknown = typeof env.JOB_MODELS === 'string' ? JSON.parse(env.JOB_MODELS) : env.JOB_MODELS === undefined ? {} : env.JOB_MODELS
     const jobs = z.record(z.string(), z.unknown()).parse(mapping)
-    const selected = fallback
-      ? { provider: 'meta' as const, model: 'muse-spark-1.3' }
-      : jobs[job] === undefined
-      ? { provider: env.LLM_PROFILE, model: job === 'voice' ? 'muse-voice-transcribe-1.0' : job === 'image' ? env.IMAGE_MODEL : env.LLM_MODEL }
-      : z.object({ provider: z.enum(['meta', 'baseten', 'fireworks']), model: z.string().min(1) }).parse(jobs[job])
-    const modelId = selected.provider === 'fireworks' ? selected.model.replace(/^accounts\/fireworks\/models\//, '') : selected.model
-    if (!META_MODELS.has(modelId)) throw new Error('Only Meta models are supported')
-    const provider = selected.provider === 'ollama'
-      ? { baseUrl: env.LLM_BASE_URL, keyBinding: 'LLM_API_KEY' as const, jsonMode: 'json_object' as const }
-      : PROVIDERS[selected.provider]
+    const selected = jobs[job] === undefined
+      ? job === 'voice' || job === 'image' ? undefined : { provider: env.LLM_PROFILE, model: env.LLM_MODEL }
+      : z.object({ provider: z.enum(['baseten']), model: z.string().min(1) }).parse(jobs[job])
+    if (!selected?.provider || !selected.model) throw new Error('No model configured')
+    const provider = selected.provider === 'ollama' ? { baseUrl: env.LLM_BASE_URL, keyBinding: 'LLM_API_KEY' as const } : PROVIDERS[selected.provider]
     if (!provider) throw new Error('Unknown provider')
+    const baseUrl = (selected.provider === env.LLM_PROFILE && env.LLM_BASE_URL) || provider.baseUrl
+    if (!baseUrl) throw new Error('No model URL configured')
     return {
-      ...selected,
-      modelId,
-      baseUrl: (selected.provider === env.LLM_PROFILE ? env.LLM_BASE_URL : provider.baseUrl).replace(/\/$/, ''),
+      provider: selected.provider,
+      model: selected.model,
+      baseUrl: baseUrl.replace(/\/$/, ''),
       apiKey: env[provider.keyBinding] || (selected.provider === env.LLM_PROFILE ? env.LLM_API_KEY : undefined),
-      jsonMode: provider.jsonMode,
     }
   } catch {
     // Configuration errors must never include bindings or credentials.
@@ -69,23 +64,22 @@ export function jobModel(job: ModelJob, fallback = false) {
   }
 }
 
-export function isVoiceEnabled(): boolean {
-  if (getEnv().VOICE_ENABLED !== 'true') return false
+// Lets callers refuse before writing anything when a job has no model.
+export function hasModel(job: ModelJob): boolean {
   try {
-    const selected = jobModel('voice')
-    return selected.provider === 'meta' && selected.model === 'muse-voice-transcribe-1.0'
+    jobModel(job)
+    return true
   } catch {
     return false
   }
 }
 
+export function isVoiceEnabled(): boolean {
+  return getEnv().VOICE_ENABLED === 'true' && hasModel('voice')
+}
+
 export function isImageEnabled(): boolean {
-  try {
-    const selected = jobModel('image')
-    return selected.provider !== 'ollama' && selected.modelId === 'muse-image-1.0'
-  } catch {
-    return false
-  }
+  return hasModel('image')
 }
 
 type ChatJsonOpts<T> = {
@@ -94,7 +88,6 @@ type ChatJsonOpts<T> = {
   schemaName: string
   system: string
   user: string
-  reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high'
   maxTokens?: number
   timeoutMs?: number
   retry?: boolean
@@ -109,29 +102,18 @@ export async function chatJson<T>(opts: ChatJsonOpts<T>): Promise<T> {
   return (await chatJsonWithModel(opts)).data
 }
 
-// Like chatJson, also returning the model that produced the reply. A failed Fireworks call is repeated once on Meta.
+// Like chatJson, also returning the model that produced the reply.
 export async function chatJsonWithModel<T>(opts: ChatJsonOpts<T>): Promise<{ data: T; model: string }> {
   const selected = jobModel(opts.purpose)
-  try {
-    return { data: await callJson(opts, selected), model: selected.model }
-  } catch (e) {
-    if (selected.provider !== 'fireworks' || !(e instanceof LlmError) || e instanceof DailyCapError || e.message === COMPANY_CAP_MESSAGE) throw e
-    console.error('fireworks call failed, falling back to Meta', e.status)
-    const meta = jobModel(opts.purpose, true)
-    return { data: await callJson(opts, meta), model: meta.model }
-  }
+  return { data: await callJson(opts, selected), model: selected.model }
 }
 
 async function callJson<T>(opts: ChatJsonOpts<T>, selected: ReturnType<typeof jobModel>): Promise<T> {
   const log = { ...opts, model: selected.model }
-  const strict = selected.jsonMode === 'json_schema'
-  // Strict json_schema is a Meta feature; other profiles get json_object plus the schema in the prompt.
+  // Providers get json_object plus the schema in the prompt.
   const { $schema: _, ...jsonSchema } = z.toJSONSchema(opts.schema)
   const messages: Message[] = [
-    {
-      role: 'system',
-      content: strict ? opts.system : `${opts.system}\n\nReply with one JSON object matching this JSON Schema:\n${JSON.stringify(jsonSchema)}`,
-    },
+    { role: 'system', content: `${opts.system}\n\nReply with one JSON object matching this JSON Schema:\n${JSON.stringify(jsonSchema)}` },
     { role: 'user', content: opts.user },
   ]
   const clean = (s: string) => (selected.apiKey ? s.replaceAll(selected.apiKey, '[redacted]') : s).slice(0, 300)
@@ -160,10 +142,7 @@ async function callJson<T>(opts: ChatJsonOpts<T>, selected: ReturnType<typeof jo
             model: selected.model,
             messages,
             max_tokens: opts.maxTokens ?? 8192, // reasoning tokens spend this budget too
-            ...(selected.provider === 'meta' && opts.reasoningEffort && { reasoning_effort: opts.reasoningEffort }),
-            response_format: strict
-              ? { type: 'json_schema', json_schema: { name: opts.schemaName, strict: true, schema: jsonSchema } }
-              : { type: 'json_object' },
+            response_format: { type: 'json_object' },
           }),
           signal: AbortSignal.timeout(opts.timeoutMs ?? PURPOSE_TIMEOUT_MS[opts.purpose] ?? 120_000),
         })
@@ -271,7 +250,7 @@ async function logCall(
     const promptTokens = usage?.prompt_tokens ?? 0
     const completionTokens = usage?.completion_tokens ?? 0
     const model = opts.model
-    const price = PRICES[model.replace(/^accounts\/fireworks\/models\//, '')]
+    const price = PRICES[model]
     const db = getDb()
     const done = {
       latencyMs: Date.now() - started,

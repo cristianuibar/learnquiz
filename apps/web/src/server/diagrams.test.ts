@@ -14,7 +14,7 @@ const boundary = vi.hoisted(() => ({
   learnerId: 'learner' as string | null,
   objects: new Map<string, Uint8Array>(),
   env: {
-    LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://model.test/v1', LLM_MODEL: 'muse-spark-1.3', IMAGE_MODEL: 'muse-image-1.0',
+    LLM_PROFILE: 'baseten', LLM_BASE_URL: 'https://model.test/v1', LLM_MODEL: 'text-model',
     JOB_MODELS: undefined as JobModels | undefined,
     MEDIA: { head: vi.fn(), get: vi.fn(), put: vi.fn() },
   },
@@ -56,8 +56,8 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))
   boundary.learnerId = 'learner'
-  boundary.env.LLM_PROFILE = 'meta'
-  boundary.env.JOB_MODELS = undefined
+  boundary.env.LLM_PROFILE = 'baseten'
+  boundary.env.JOB_MODELS = { image: { provider: 'baseten', model: 'image-model' } }
   boundary.objects.clear()
   boundary.env.MEDIA.head.mockImplementation(async (key: string) => boundary.objects.has(key) ? {} : null)
   boundary.env.MEDIA.get.mockImplementation(async (key: string) => boundary.objects.has(key) ? { body: boundary.objects.get(key) } : null)
@@ -78,14 +78,13 @@ afterEach(() => {
 const row = (sql: string) => raw.prepare(sql).get() as Record<string, unknown>
 
 it('routes the image job independently of text and records an unknown cost in its topic trace', async () => {
-  boundary.env.LLM_PROFILE = 'baseten'
-  boundary.env.JOB_MODELS = { image: { provider: 'meta', model: 'muse-image-1.0' } }
+  boundary.env.LLM_PROFILE = 'ollama'
   expect(await generateConceptDiagram({ data: { conceptId: 'procedure' } })).toMatchObject({ status: 'ready' })
   expect(fetchModel).toHaveBeenCalledTimes(1)
-  expect(fetchModel.mock.calls[0][0]).toBe('https://api.meta.ai/v1/images/generations')
-  expect(JSON.parse(fetchModel.mock.calls[0][1].body).model).toBe('muse-image-1.0')
+  expect(fetchModel.mock.calls[0][0]).toBe('https://inference.baseten.co/v1/images/generations')
+  expect(JSON.parse(fetchModel.mock.calls[0][1].body).model).toBe('image-model')
   expect(await getModelTrace({ data: { scope: 'topic', topicId: 'topic' } })).toMatchObject({
-    calls: [{ purpose: 'diagram', model: 'muse-image-1.0', costUsd: null }], totalCostUsd: 0,
+    calls: [{ purpose: 'diagram', model: 'image-model', costUsd: null }], totalCostUsd: 0,
   })
 })
 
@@ -111,12 +110,12 @@ it('generates one diagram across overlapping views, serves its bytes, and reuses
   expect(fetchModel).toHaveBeenCalledTimes(1)
   const [url, request] = fetchModel.mock.calls[0]
   expect(url).toBe('https://model.test/v1/images/generations')
-  expect(JSON.parse(request.body)).toMatchObject({ model: 'muse-image-1.0', n: 1, response_format: 'b64_json', prompt: expect.stringContaining('Check stock before packing.') })
+  expect(JSON.parse(request.body)).toMatchObject({ model: 'image-model', n: 1, response_format: 'b64_json', prompt: expect.stringContaining('Check stock before packing.') })
   expect(boundary.env.MEDIA.put).toHaveBeenCalledTimes(1)
-  expect(row('SELECT model, purpose, cost_usd, ok FROM model_calls')).toEqual({ model: 'muse-image-1.0', purpose: 'diagram', cost_usd: null, ok: 1 })
+  expect(row('SELECT model, purpose, cost_usd, ok FROM model_calls')).toEqual({ model: 'image-model', purpose: 'diagram', cost_usd: null, ok: 1 })
   expect(row('SELECT COUNT(*) AS n FROM model_calls').n).toBe(1)
   expect(await getModelTrace({ data: { scope: 'topic', topicId: 'topic' } })).toMatchObject({
-    calls: [{ purpose: 'diagram', model: 'muse-image-1.0', costUsd: null }], totalCostUsd: 0,
+    calls: [{ purpose: 'diagram', model: 'image-model', costUsd: null }], totalCostUsd: 0,
   })
   const response = await serveConceptDiagram('procedure')
   expect(response.status).toBe(200)
@@ -181,13 +180,14 @@ it('never generates a shared role diagram for an employee, serves a stored one, 
   expect(fetchModel).not.toHaveBeenCalled()
 })
 
-it('does not generate for nonvisual concepts, local models, or capped learners', async () => {
+it('does not generate for nonvisual concepts, without an image model, or for capped learners', async () => {
   raw.exec('UPDATE concepts SET visual = 0')
   expect(await generateConceptDiagram({ data: { conceptId: 'procedure' } })).toEqual({ status: 'disabled' })
   raw.exec('UPDATE concepts SET visual = 1')
-  boundary.env.LLM_PROFILE = 'ollama'
+  const configured = boundary.env.JOB_MODELS
+  boundary.env.JOB_MODELS = undefined
   expect(await generateConceptDiagram({ data: { conceptId: 'procedure' } })).toEqual({ status: 'disabled' })
-  boundary.env.LLM_PROFILE = 'meta'
+  boundary.env.JOB_MODELS = configured
   const log = raw.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
   for (let i = 0; i < GUEST_DAILY_MODEL_CALL_CAP; i++) log.run(`call-${i}`, 'learner', 'items', 'muse-spark-1.3', 1, 1, Date.now())
   await expect(generateConceptDiagram({ data: { conceptId: 'procedure' } })).rejects.toMatchObject({ status: 429 })

@@ -84,10 +84,10 @@ pnpm install
 cp apps/web/.dev.vars.example apps/web/.dev.vars
 ```
 
-Fill the keys in `apps/web/.dev.vars`: set `LLM_API_KEY` to your Meta Model API key,
-replace `BETTER_AUTH_SECRET` with a random secret of at least 32 characters, and
-keep `BETTER_AUTH_URL=http://localhost:3000`. For Fireworks placement results, also
-set `FIREWORKS_API_KEY`. Then run:
+Fill the keys in `apps/web/.dev.vars`: replace `BETTER_AUTH_SECRET` with a random
+secret of at least 32 characters and keep `BETTER_AUTH_URL=http://localhost:3000`.
+To generate content locally, also configure a model (see [Run locally](#run-locally)).
+Then run:
 
 ```sh
 pnpm db:migrate:local
@@ -185,18 +185,17 @@ feedback name the model that wrote them. Traces are private to the learner.
 Topic links and model labels are recorded for newly generated content. Android
 shows model attribution but has no model-call trace.
 
-Cost estimates use the configured token price table for Spark 1.3. Models without
-a known price, including Wonder, Image and voice, record `cost_usd = null` and show
-**Unknown** in the trace. Totals include priced calls only; unpriced calls add no
+Cost estimates use the token price table in `apps/web/src/lib/llm/client.ts`, which
+lists no current model. Models without a known price record `cost_usd = null` and
+show **Unknown** in the trace; rows already stored keep their recorded cost. Totals include priced calls only; unpriced calls add no
 monetary charge and still count toward the daily model-call cap. Billing rates and
 units for these models will be added separately.
 
-With the checked-in `VOICE_ENABLED=true` and the voice job mapped to Meta's Muse
-Voice Transcribe 1.0, personal-topic written-answer questions on the web offer a
-record button. Allow microphone access, tap to record (up to one minute), then tap
+With `VOICE_ENABLED=true` and the voice job mapped in `JOB_MODELS`, personal-topic
+written-answer questions on the web offer a record button. Allow microphone access, tap to record (up to one minute), then tap
 to stop. Edit the transcript before choosing confidence and pressing Check.
 Recordings are converted locally to mono 16-bit 24 kHz WAV and sent to
-`/v1/asr/transcribe`; recordings are not stored. Each transcription counts toward the
+the voice provider's `/asr/transcribe`; recordings are not stored. Each transcription counts toward the
 daily model-call cap and logs a `voice` call. Typing remains available when recording
 or transcription fails.
 
@@ -244,56 +243,53 @@ pnpm install --frozen-lockfile
 cp apps/web/.dev.vars.example apps/web/.dev.vars
 ```
 
-Edit `apps/web/.dev.vars`: set `LLM_API_KEY` to your Meta Model API key, replace
-`BETTER_AUTH_SECRET` with a random secret of at least 32 characters, and keep
-`BETTER_AUTH_URL=http://localhost:3000` for the local origin. Then run:
+Edit `apps/web/.dev.vars`: replace `BETTER_AUTH_SECRET` with a random secret of at
+least 32 characters, and keep `BETTER_AUTH_URL=http://localhost:3000` for the local
+origin. Then run:
 
 ```sh
 pnpm db:migrate:local
 pnpm dev                              # http://localhost:3000
 ```
 
-`apps/web/.dev.vars` is git-ignored; keep credentials out of version control. The default
-model configuration is in `apps/web/wrangler.jsonc`. Local D1 data is separate from production.
+`apps/web/.dev.vars` is git-ignored; keep credentials out of version control.
+`apps/web/wrangler.jsonc` configures no model: without one, creating a topic and
+building role training show as unavailable, the question queue waits, diagrams and
+voice are hidden, and sessions, placement results and short-answer reveals use their
+rules and template fallbacks. Local D1 data is separate from production.
 
 | Setting | Purpose |
 | --- | --- |
 | `JOB_MODELS` | Provider and model for each model job |
-| `LLM_PROFILE`, `LLM_BASE_URL`, `LLM_MODEL` | Legacy defaults for unmapped jobs (`meta`, `baseten`, `fireworks`, `ollama`) |
-| `LLM_API_KEY`, `BASETEN_API_KEY`, `FIREWORKS_API_KEY` | Provider credentials; store as secrets |
-| `VOICE_ENABLED` | Enable the voice job with Meta's transcription model; `true` in `apps/web/wrangler.jsonc`; set `false` in `apps/web/.dev.vars` to hide voice locally |
-| `IMAGE_MODEL` | Legacy model for an unmapped image job |
+| `LLM_PROFILE`, `LLM_BASE_URL`, `LLM_MODEL` | Defaults for unmapped text jobs (`baseten` or `ollama`) |
+| `LLM_API_KEY`, `BASETEN_API_KEY` | Provider credentials; store as secrets |
+| `VOICE_ENABLED` | `true` enables the voice job when `JOB_MODELS` maps `voice` |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web Push key pair and contact; required to enable notifications |
 | `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET` | App origin and authentication secret |
 | `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET` | Optional Facebook login; both are required |
 
-`JOB_MODELS` in `apps/web/wrangler.jsonc` maps `curriculum`, `items`, `self_check`, `plan`,
-`grade`, `image`, `voice`, and the placement result's `placement_line` to a provider
-and model. For example, set `self_check` to
-`{ "provider": "baseten", "model": "muse-spark-open" }` and supply `BASETEN_API_KEY`
-to use a second model for checking questions. The `plan` job can order personal-topic
-sessions; company roles use the rules planner. Only the Meta models listed in
-`apps/web/src/lib/llm/models.ts` are accepted. Fireworks may prefix a model ID with
-`accounts/fireworks/models/`.
+`JOB_MODELS` maps `curriculum`, `items`, `self_check`, `plan`, `grade`, `procedure`,
+`image`, `voice`, and the placement result's `placement_line` to a provider and
+model, for example `{ "self_check": { "provider": "baseten", "model": "<model id>" } }`
+with `BASETEN_API_KEY`. The `plan` job can order personal-topic sessions; company
+roles use the rules planner. Image and voice jobs run only when mapped.
 
-| Provider | Base URL | Secret binding | JSON mode |
-| --- | --- | --- | --- |
-| `meta` | `https://api.meta.ai/v1` | `LLM_API_KEY` | Strict JSON Schema |
-| `baseten` | `https://inference.baseten.co/v1` | `BASETEN_API_KEY` | JSON object with schema in the prompt |
-| `fireworks` | `https://api.fireworks.ai/inference/v1` | `FIREWORKS_API_KEY` | JSON object with schema in the prompt |
+| Provider | Base URL | Secret binding |
+| --- | --- | --- |
+| `baseten` | `https://inference.baseten.co/v1` | `BASETEN_API_KEY` |
+| `ollama` (profile only) | `LLM_BASE_URL` | `LLM_API_KEY` |
 
-All JSON output is validated locally; invalid output gets one retry. Provider and
-network errors fail immediately. A failed Fireworks call is repeated once on the Meta
-API with `muse-spark-1.3`. Requests, call logs and generated-content labels use the
-model that made each attempt, including failures, retries and fallbacks.
+Requests use JSON object mode with the schema in the prompt. All JSON output is
+validated locally; invalid output gets one retry. Provider and network errors fail
+immediately. Requests, call logs and generated-content labels use the model that
+made each attempt, including failures and retries.
 
-`apps/web/.dev.vars` can override `JOB_MODELS` with a JSON string. Unmapped jobs retain
-`LLM_PROFILE` and `LLM_MODEL` (or `IMAGE_MODEL` for images, Muse Voice Transcribe 1.0
-for voice). `LLM_BASE_URL` overrides the URL for `LLM_PROFILE`; that profile may
-also fall back to `LLM_API_KEY` for its secret. For the local edition, set
-`JOB_MODELS={}`, `LLM_PROFILE=ollama`, `LLM_MODEL=muse-glimmer` and point
+`apps/web/.dev.vars` can set `JOB_MODELS` as a JSON string. Unmapped text jobs use
+`LLM_PROFILE` and `LLM_MODEL`. `LLM_BASE_URL` overrides the URL for `LLM_PROFILE`;
+that profile may also fall back to `LLM_API_KEY` for its secret. For the local
+edition, set `JOB_MODELS={}`, `LLM_PROFILE=ollama`, `LLM_MODEL=muse-glimmer` and point
 `LLM_BASE_URL` at an Ollama or llama.cpp server running Muse Glimmer. Voice and
-image generation switch off; no model server is bundled.
+image generation stay off; no model server is bundled.
 
 For local staff access, sign up first, then grant that local account the staff role:
 
@@ -355,7 +351,6 @@ After verification, configure secrets interactively and apply migrations to your
 own database before deploying (use its name in place of `learnquiz` if different):
 
 ```sh
-pnpm --filter @learnquiz/web exec wrangler secret put LLM_API_KEY
 pnpm --filter @learnquiz/web exec wrangler secret put BETTER_AUTH_SECRET
 pnpm --filter @learnquiz/web exec wrangler d1 migrations apply learnquiz --remote
 pnpm --filter @learnquiz/web deploy

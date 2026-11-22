@@ -6,10 +6,12 @@ import { COMPANY_DAILY_MODEL_CALL_CAP } from '@/lib/limits'
 import { COMPANY_CAP_MESSAGE } from '@/server/model-cap'
 import { drainConceptQueue } from './concept-gen'
 import { retryConceptGeneration } from './curriculum'
+import { requestedSchema } from '@/lib/llm/test-request'
 
 // Real handlers, authorization, generateConceptItems, model client and database; fakes are the
 // transport, session provider, Worker bindings, background scheduler and model HTTP only.
-const holder = vi.hoisted(() => ({ db: null as unknown, userId: 'owner' as string | null, background: [] as Promise<unknown>[], drains: false }))
+const modelEnv = { LLM_PROFILE: 'baseten', LLM_BASE_URL: 'https://llm.example', LLM_MODEL: 'muse-spark-1.3' }
+const holder = vi.hoisted(() => ({ db: null as unknown, userId: 'owner' as string | null, background: [] as Promise<unknown>[], drains: false, env: {} as object }))
 vi.mock('@tanstack/react-start', () => ({
   createServerFn: () => ({
     validator: (schema: { parse: (data: unknown) => unknown }) => ({
@@ -23,7 +25,7 @@ vi.mock('@/server/auth', () => ({
   getAuth: () => ({ api: { getSession: async () => holder.userId ? { user: { id: holder.userId } } : null } }),
 }))
 vi.mock('@/server/env', () => ({
-  getEnv: () => ({ LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://llm.example', LLM_MODEL: 'muse-spark-1.3' }),
+  getEnv: () => holder.env,
   drainsOnRequest: () => holder.drains,
   runInBackground: (task: Promise<unknown>) => { holder.background.push(task) },
 }))
@@ -39,7 +41,7 @@ const item = () => ({
 })
 const fetchModel = vi.fn<typeof fetch>()
 const answerModel = async (_url: unknown, init?: RequestInit) => {
-  const schema = JSON.parse(init!.body as string).response_format.json_schema.name
+  const schema = requestedSchema(init!.body).name
   if (schema === 'item_batch') return modelReply({ items: Array.from({ length: 6 }, item) })
   return modelReply({ results: Array.from({ length: 6 }, (_, index) => ({ index, keep: true, reasons: [] })) })
 }
@@ -96,6 +98,7 @@ beforeEach(() => {
   holder.userId = 'owner'
   holder.background = []
   holder.drains = false
+  holder.env = modelEnv
   beforeSql = null
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))
@@ -119,6 +122,14 @@ it('drains a pending company topic until every concept holds exactly six shared,
   expect(perConcept).toEqual(conceptIds.map((concept_id) => ({ concept_id, n: 6, s: 'co-topic-src', lo: 2, hi: 2 })))
   expect(one('SELECT COUNT(*) AS n FROM model_calls WHERE learner_id IS NOT NULL')).toEqual({ n: 0 })
   expect(one('SELECT COUNT(*) AS n FROM model_calls')).toEqual({ n: CONCEPTS * 2 })
+})
+
+it('keeps every concept pending and calls no model while no question model is configured', async () => {
+  holder.env = {}
+  expect(await drainConceptQueue()).toBe(0)
+  expect(states().map((c) => c.gen_status)).toEqual(conceptIds.map(() => 'pending'))
+  expect(fetchModel).not.toHaveBeenCalled()
+  expect(one('SELECT COUNT(*) AS n FROM model_calls')).toEqual({ n: 0 })
 })
 
 it('stores questions as retired when their document is replaced while they generate', async () => {
@@ -175,7 +186,7 @@ it('resolves a drain whose claim write throws only after the other claimed conce
   let done = 0
   fetchModel.mockImplementation(async (url, init) => {
     const reply = await answerModel(url, init)
-    if (JSON.parse(init!.body as string).response_format.json_schema.name === 'self_check') done++
+    if (requestedSchema(init!.body).name === 'self_check') done++
     return reply
   })
   // The first claim write (c00) throws.
@@ -190,7 +201,7 @@ it('resolves a drain whose claim write throws only after the other claimed conce
 const keepFirst = (keep: number) => {
   let checks = 0
   return async (url: unknown, init?: RequestInit) => {
-    if (JSON.parse(init!.body as string).response_format.json_schema.name !== 'self_check') return answerModel(url, init)
+    if (requestedSchema(init!.body).name !== 'self_check') return answerModel(url, init)
     const kept = checks++ ? 0 : keep
     return modelReply({ results: Array.from({ length: 6 }, (_, index) => ({ index, keep: index < kept, reasons: [] })) })
   }
@@ -239,7 +250,7 @@ it('stores a nine-question top-up within the D1 parameter limit', async () => {
   // The first self-check keeps three items, so a second round adds six more in one write.
   let checks = 0
   fetchModel.mockImplementation(async (url, init) => {
-    const schema = JSON.parse(init!.body as string).response_format.json_schema.name
+    const schema = requestedSchema(init!.body).name
     if (schema !== 'self_check' || checks++) return answerModel(url, init)
     return modelReply({ results: Array.from({ length: 6 }, (_, index) => ({ index, keep: index < 3, reasons: [] })) })
   })
@@ -317,7 +328,7 @@ it('sends the source document for a replacement version or a lost quote, not for
   raw.exec("UPDATE concepts SET source_quote = 'Scan the bin.' WHERE id = 'c00'")
   const userMessages = () => fetchModel.mock.calls
     .map(([, init]) => JSON.parse(init!.body as string))
-    .filter((b) => b.response_format.json_schema.name === 'item_batch')
+    .filter((b) => requestedSchema(b).name === 'item_batch')
     .map((b) => b.messages.find((m: { role: string }) => m.role === 'user').content as string)
   const sent = async (version: number, quote: string | null) => {
     raw.exec('DELETE FROM items')
@@ -337,7 +348,7 @@ it('stores valid multi and order drafts', async () => {
   raw.exec("DELETE FROM concepts WHERE id <> 'c00'")
   const steps = (correct: boolean[]) => correct.map((is_correct, i) => ({ id: 'abcd'[i], text: `Step ${i}`, is_correct, feedback: `Why ${i}` }))
   fetchModel.mockImplementation(async (url, init) => {
-    const schema = JSON.parse(init!.body as string).response_format.json_schema.name
+    const schema = requestedSchema(init!.body).name
     if (schema !== 'item_batch') return answerModel(url, init)
     const items = [
       { ...item(), format: 'multi', options: steps([true, true, false, false]) },
