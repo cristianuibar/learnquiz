@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { X } from 'lucide-react'
-import { loadingTitle, slowAfterMs, startFailed, startSlow } from '@learnquiz/api/system-copy'
+import { loadingTitle, modelUnavailable, slowAfterMs, startFailed, startSlow } from '@learnquiz/api/system-copy'
 import { errorMessage } from '@/components/inline-error'
 import { ErrorRow } from '@/components/question/error-row'
 import { Button } from '@/components/ui/button'
@@ -16,10 +16,12 @@ interface Failure {
   retry: boolean
 }
 
-// A 4xx carries the server's own sentence and will not change on retry; no response or a 5xx is worth trying again.
+// A 4xx carries the server's own sentence and will not change on retry; no response or a 5xx is worth trying again,
+// except a 503 saying no model can write new questions.
 function describeFailure(err: unknown): Failure {
   const status = (err as { status?: unknown } | null)?.status
   if (typeof status === 'number' && status >= 400 && status < 500) return { message: errorMessage(err), retry: false }
+  if (status === 503 && err instanceof Error && err.message === modelUnavailable) return { message: modelUnavailable, retry: false }
   return { message: startFailed, retry: true }
 }
 

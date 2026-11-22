@@ -4,6 +4,8 @@ export const todayError = 'Couldn’t load today’s plan.'
 export const loadingTitle = 'Preparing your session'
 export const startFailed = 'Couldn’t prepare your session.'
 export const startSlow = 'Taking longer than usual. Still working…'
+// No model can write new questions; retrying will not change that.
+export const modelUnavailable = 'New questions are unavailable right now. Reviews come back when they are due.'
 
 export function slowAfterMs(start: 'session' | 'placement'): number {
   return start === 'session' ? 15000 : 45000

@@ -2,7 +2,7 @@
 import { StrictMode, act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet, RouterProvider } from '@tanstack/react-router'
-import { loadingTitle, startFailed, startSlow } from '@learnquiz/api/system-copy'
+import { loadingTitle, modelUnavailable, startFailed, startSlow } from '@learnquiz/api/system-copy'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Route as loadingRoute } from '@/routes/play.loading'
 import { Route as appRootRoute } from '@/routes/__root'
@@ -169,6 +169,14 @@ describe('session Loading screen', () => {
     const { container } = await renderLoading()
     await act(async () => {})
     expect(container.querySelector('[role=alert]')!.textContent).toContain('Unit is locked')
+    expect(tryAgain(container)).toBeUndefined()
+  })
+
+  it('explains without retry that no model can write new questions', async () => {
+    vi.mocked(startSession).mockRejectedValue(Object.assign(new Error(modelUnavailable), { status: 503 }))
+    const { container } = await renderLoading()
+    await act(async () => {})
+    expect(container.querySelector('[role=alert]')!.textContent).toContain(modelUnavailable)
     expect(tryAgain(container)).toBeUndefined()
   })
 

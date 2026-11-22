@@ -1,3 +1,4 @@
+import { modelUnavailable } from '@learnquiz/api/system-copy'
 import { z } from 'zod'
 import { eq } from 'drizzle-orm'
 import { getDb } from '@/db'
@@ -38,7 +39,7 @@ const PURPOSE_TIMEOUT_MS: Partial<Record<ModelJob, number>> = {
   procedure: 180_000,
 }
 
-export const MODEL_UNAVAILABLE_MESSAGE = 'Generating new learning content is unavailable right now.'
+export const MODEL_UNAVAILABLE_MESSAGE = modelUnavailable
 
 // `fallback` resolves the Meta model that backs up a failed Fireworks call.
 export function jobModel(job: ModelJob, fallback = false) {

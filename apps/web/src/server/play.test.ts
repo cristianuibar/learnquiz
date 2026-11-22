@@ -4,6 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import type { z } from 'zod'
+import { modelUnavailable } from '@learnquiz/api/system-copy'
 import { todayView } from '@learnquiz/api/today'
 import { chatJson, LlmError } from '@/lib/llm/client'
 import { requireLearnerId } from '@/server/session'
@@ -1298,6 +1299,27 @@ it('startSession answers 503 rather than "Nothing to practice yet" when another 
 
   expect(vi.mocked(chatJson).mock.calls.filter(([o]) => o.purpose === 'items').length - before).toBe(0)
   expect(scalar(raw, "SELECT gen_status AS s FROM concepts WHERE id = 'c1'").s).toBe('generating')
+})
+
+it('startSession explains that new questions are unavailable, before any request, when no model is configured', async () => {
+  seedTopicAndLearner(raw, 0)
+  raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un1', 't1', 0, 'Basics')
+  raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)').run('c1', 't1', 'un1', 0, 'Variables', '')
+  raw.prepare('INSERT INTO learner_unit (learner_id, unit_id, unlocked_at) VALUES (?, ?, ?)').run('u1', 'un1', 1)
+  const real = await vi.importActual<typeof import('@/lib/llm/client')>('@/lib/llm/client')
+  vi.mocked(chatJson).mockImplementationOnce(real.chatJson)
+  const fetchModel = vi.fn()
+  vi.stubGlobal('fetch', fetchModel)
+  const env = getEnv()
+  const profile = env.LLM_PROFILE
+  env.LLM_PROFILE = undefined
+  onTestFinished(() => { env.LLM_PROFILE = profile; vi.unstubAllGlobals() })
+
+  await expect(startSession({ data: { topicId: 't1' } })).rejects.toMatchObject({ status: 503, message: modelUnavailable })
+  expect(fetchModel).not.toHaveBeenCalled()
+  expect(scalar(raw, 'SELECT COUNT(*) AS n FROM model_calls').n).toBe(0)
+  expect(scalar(raw, 'SELECT COUNT(*) AS n FROM sessions').n).toBe(0)
+  expect(scalar(raw, "SELECT gen_status AS s FROM concepts WHERE id = 'c1'").s).toBe('ready')
 })
 
 it('startSession joins an in-flight prepareNextSession generation so one concept is generated once', async () => {
