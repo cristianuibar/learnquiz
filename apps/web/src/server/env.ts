@@ -2,16 +2,15 @@
 import { env as workerEnv, waitUntil } from 'cloudflare:workers'
 import type { JobModels } from '@/lib/llm/models'
 
-export type AppEnv = Omit<Env, 'LLM_PROFILE' | 'LLM_BASE_URL' | 'LLM_MODEL' | 'LLM_API_KEY' | 'JOB_MODELS' | 'IMAGE_MODEL' | 'VOICE_ENABLED' | 'BETTER_AUTH_URL' | 'BETTER_AUTH_SECRET' | 'BASETEN_API_KEY' | 'FIREWORKS_API_KEY' | 'FACEBOOK_APP_ID' | 'FACEBOOK_APP_SECRET' | 'VAPID_PUBLIC_KEY' | 'VAPID_PRIVATE_KEY' | 'VAPID_SUBJECT'> & {
-  LLM_PROFILE: 'meta' | 'baseten' | 'fireworks' | 'ollama'
-  LLM_BASE_URL: string
-  LLM_MODEL: string
+// Model bindings are optional: production sets none, so every model-backed feature is unavailable there.
+export type AppEnv = Omit<Env, 'LLM_PROFILE' | 'LLM_BASE_URL' | 'LLM_MODEL' | 'LLM_API_KEY' | 'JOB_MODELS' | 'VOICE_ENABLED' | 'BETTER_AUTH_URL' | 'BETTER_AUTH_SECRET' | 'BASETEN_API_KEY' | 'FACEBOOK_APP_ID' | 'FACEBOOK_APP_SECRET' | 'VAPID_PUBLIC_KEY' | 'VAPID_PRIVATE_KEY' | 'VAPID_SUBJECT'> & {
+  LLM_PROFILE?: 'baseten' | 'ollama'
+  LLM_BASE_URL?: string
+  LLM_MODEL?: string
   LLM_API_KEY?: string
   BASETEN_API_KEY?: string
-  FIREWORKS_API_KEY?: string
   JOB_MODELS?: JobModels | string
-  IMAGE_MODEL: string
-  VOICE_ENABLED: string
+  VOICE_ENABLED?: string
   BETTER_AUTH_URL: string
   BETTER_AUTH_SECRET?: string
   FACEBOOK_APP_ID?: string

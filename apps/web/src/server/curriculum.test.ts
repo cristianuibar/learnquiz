@@ -9,6 +9,9 @@ import * as curriculum from './curriculum'
 import { getLatestTopicIdFn } from './latest-topic'
 import { getSession, startSession } from './play'
 import { getToday } from './today'
+import { requestedSchema } from '@/lib/llm/test-request'
+import { getEnv } from './env'
+import { ROLE_BUILDS_PAUSED } from './role-curriculum'
 
 // Keep the handlers, validation, authorization, model client and database real.
 // Only the transport, session provider, Worker bindings and model HTTP are faked.
@@ -32,7 +35,7 @@ vi.mock('@/server/env', async (original) => ({
   runInBackground: (task: Promise<unknown>) => { holder.background.push(task) },
 }))
 vi.mock('cloudflare:workers', () => ({
-  env: { LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://llm.example', LLM_MODEL: 'muse-spark-1.3' },
+  env: { LLM_PROFILE: 'baseten', LLM_BASE_URL: 'https://llm.example', LLM_MODEL: 'muse-spark-1.3' },
   waitUntil: () => {}, // the background question drain is covered in concept-gen.test.ts
 }))
 
@@ -217,7 +220,7 @@ it('leaves new concepts pending for the cron and generates their questions on th
   expect(fetchModel).toHaveBeenCalledTimes(1)
 
   fetchModel.mockImplementation(async (_url, init) => {
-    const schema = JSON.parse(init!.body as string).response_format.json_schema.name
+    const schema = requestedSchema(init!.body).name
     if (schema === 'item_batch') {
       return modelReply({ items: Array.from({ length: 6 }, (_, i) => ({
         format: 'short', stem: `Question ${fetchModel.mock.calls.length}-${i}?`, options: [], accepted_answers: [], model_answer: 'Scan.',
@@ -321,6 +324,23 @@ it('refuses roles with no live document text before calling the model', async ()
   expect(fetchModel).not.toHaveBeenCalled()
 })
 
+it('refuses a personal topic and pauses a role build without a curriculum model, storing nothing', async () => {
+  const env = getEnv()
+  const profile = env.LLM_PROFILE
+  env.LLM_PROFILE = undefined
+  try {
+    await expect(curriculum.createTopic({ data: { topic: 'Warehouse picker', sourceText: 'Scan every SKU.' } }))
+      .rejects.toMatchObject({ status: 503, message: curriculum.NEW_TOPICS_UNAVAILABLE })
+    await expect(generate()).rejects.toMatchObject({ status: 503, message: ROLE_BUILDS_PAUSED })
+  } finally {
+    env.LLM_PROFILE = profile
+  }
+  expect(raw.prepare("SELECT id FROM topics WHERE learner_id = 'owner'").all()).toEqual([])
+  expect(topicState()).toEqual({ status: 'draft' })
+  expect(fetchModel).not.toHaveBeenCalled()
+  expect(raw.prepare('SELECT COUNT(*) AS n FROM model_calls').get()).toEqual({ n: 0 })
+})
+
 it('builds without a document whose extraction failed, and refuses a role whose only document failed', async () => {
   raw.exec("INSERT INTO sources (id, topic_id, kind, title, body_text, status, error, created_at) VALUES ('scan', 'picker-topic', 'pdf', 'Scan', '', 'failed', 'No selectable text found. This looks like a scan.', 0)")
   await expect(generate()).resolves.toEqual({ topicId: 'picker-topic' })
@@ -346,7 +366,7 @@ it('builds from a document replaced between the first read and the claim, never 
 
 const requestOf = (call = 0) => JSON.parse(fetchModel.mock.calls[call][1]!.body as string)
 const minItems = (request: any) => {
-  const units = request.response_format.json_schema.schema.properties.units
+  const units = requestedSchema(request).schema.properties.units
   return { units: units.minItems, concepts: units.items.properties.concepts.minItems }
 }
 const sopSteps = [

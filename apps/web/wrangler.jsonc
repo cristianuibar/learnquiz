@@ -14,23 +14,9 @@
   "routes": [
     { "pattern": "app.learnquiz.com", "custom_domain": true }
   ],
+  // No model is configured in production: new topics, role builds, diagrams and voice show as unavailable,
+  // and sessions, placement lines and grading use their rule and template fallbacks.
   "vars": {
-    "LLM_PROFILE": "meta",
-    "LLM_BASE_URL": "https://api.meta.ai/v1",
-    "LLM_MODEL": "muse-spark-1.3",
-    "IMAGE_MODEL": "muse-image-1.0",
-    "JOB_MODELS": {
-      "curriculum": { "provider": "meta", "model": "muse-spark-1.3" },
-      "items": { "provider": "meta", "model": "muse-spark-1.3" },
-      "self_check": { "provider": "meta", "model": "muse-spark-1.3" },
-      "plan": { "provider": "meta", "model": "muse-wonder-1.0" },
-      "grade": { "provider": "meta", "model": "muse-spark-1.3" },
-      "procedure": { "provider": "meta", "model": "muse-spark-1.3" },
-      "image": { "provider": "meta", "model": "muse-image-1.0" },
-      "voice": { "provider": "meta", "model": "muse-voice-transcribe-1.0" },
-      "placement_line": { "provider": "fireworks", "model": "accounts/fireworks/models/muse-spark-open" }
-    },
-    "VOICE_ENABLED": "true",
     "BETTER_AUTH_URL": "https://app.learnquiz.com"
   },
   "d1_databases": [

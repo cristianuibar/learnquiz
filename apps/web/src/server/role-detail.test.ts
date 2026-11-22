@@ -23,7 +23,7 @@ vi.mock('@/server/auth', () => ({
   getAuth: () => ({ api: { getSession: async () => holder.userId ? { user: { id: holder.userId, role: holder.userId.startsWith('staff') ? 'admin' : null } } : null } }),
 }))
 vi.mock('cloudflare:workers', () => ({
-  env: { LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://llm.example', LLM_MODEL: 'muse-spark-1.3' },
+  env: { LLM_PROFILE: 'baseten', LLM_BASE_URL: 'https://llm.example', LLM_MODEL: 'muse-spark-1.3' },
   waitUntil: () => {}, // the background question drain is covered in concept-gen.test.ts
 }))
 

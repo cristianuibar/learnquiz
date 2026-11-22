@@ -11,7 +11,7 @@ vi.mock('@/server/session', () => ({ requireLearnerId: async () => {
   return holder.learnerId
 } }))
 vi.mock('cloudflare:workers', () => ({ env: {
-  LLM_PROFILE: 'meta', VOICE_ENABLED: 'true', LLM_BASE_URL: 'https://llm.example/v1', LLM_MODEL: 'muse-spark-1.3', LLM_API_KEY: 'test-key',
+  LLM_PROFILE: 'baseten', VOICE_ENABLED: 'true', LLM_BASE_URL: 'https://llm.example/v1', LLM_MODEL: 'muse-spark-1.3', LLM_API_KEY: 'test-key',
 } }))
 // Only the transport wrapper is replaced; validation, handlers, queries, model
 // client and log writes run for real. HTTP and request authentication are faked.
@@ -60,7 +60,7 @@ beforeAll(() => {
 beforeEach(() => {
   raw.exec('SAVEPOINT voice_test')
   holder.learnerId = 'u1'
-  Object.assign(getEnv(), { VOICE_ENABLED: 'true', LLM_PROFILE: 'meta', JOB_MODELS: undefined })
+  Object.assign(getEnv(), { VOICE_ENABLED: 'true', LLM_PROFILE: 'baseten', JOB_MODELS: { voice: { provider: 'baseten', model: 'voice-model' } }, BASETEN_API_KEY: undefined })
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))
   fetchModel.mockReset().mockResolvedValue(Response.json({ transcript: 'one' }))
@@ -87,10 +87,10 @@ function upload(audio = recording(), itemId = 'i1') {
 }
 
 it.each([
-  { profile: 'meta' as const, mapping: undefined, url: 'https://llm.example/v1/asr/transcribe' },
-  { profile: 'baseten' as const, mapping: { voice: { provider: 'meta' as const, model: 'muse-voice-transcribe-1.0' } }, url: 'https://api.meta.ai/v1/asr/transcribe' },
-])('transcribes an owned current answer with global profile $profile, logs voice, and grades the edited transcript', async ({ profile, mapping, url }) => {
-  Object.assign(getEnv(), { LLM_PROFILE: profile, JOB_MODELS: mapping })
+  { profile: 'baseten' as const, url: 'https://llm.example/v1/asr/transcribe', BASETEN_API_KEY: 'test-key' },
+  { profile: 'ollama' as const, url: 'https://inference.baseten.co/v1/asr/transcribe', BASETEN_API_KEY: 'test-key' },
+])('transcribes an owned current answer with global profile $profile, logs voice, and grades the edited transcript', async ({ url, profile, ...keys }) => {
+  Object.assign(getEnv(), { LLM_PROFILE: profile, ...keys })
   expect((await getSession({ data: { sessionId: 's1' } })).voiceEnabled).toBe(true)
   const transcript = await transcribeAnswer(upload())
   expect(transcript).toBe('one')
@@ -100,10 +100,10 @@ it.each([
   expect(request.method).toBe('POST')
   expect(request.headers).toEqual({ authorization: 'Bearer test-key' })
   const body = request.body as FormData
-  expect(JSON.parse(await (body.get('request') as Blob).text())).toEqual({ model: 'muse-voice-transcribe-1.0', mode: 'PUSH_TO_TALK', audioEncoding: 'WAV' })
+  expect(JSON.parse(await (body.get('request') as Blob).text())).toEqual({ model: 'voice-model', mode: 'PUSH_TO_TALK', audioEncoding: 'WAV' })
   expect(new Uint8Array(await (body.get('audio') as File).arrayBuffer())).toEqual(new Uint8Array(await recording().arrayBuffer()))
   expect(row('SELECT learner_id, session_id, topic_id, purpose, model, ok, error FROM model_calls')).toEqual({
-    learner_id: 'u1', session_id: 's1', topic_id: 't1', purpose: 'voice', model: 'muse-voice-transcribe-1.0', ok: 1, error: null,
+    learner_id: 'u1', session_id: 's1', topic_id: 't1', purpose: 'voice', model: 'voice-model', ok: 1, error: null,
   })
   expect(row('SELECT COUNT(*) AS n FROM attempts').n).toBe(0)
   const reveal = await answerItem({ data: { sessionId: 's1', itemId: 'i1', answer: { text: '1' }, confidence: 'sure', responseMs: 1500 } })
@@ -124,9 +124,8 @@ it.each([
   { name: 'unsigned learner', status: 401, setup: () => { holder.learnerId = null } },
   { name: 'another learner’s session', status: 404, setup: () => { holder.learnerId = 'u2' } },
   { name: 'disabled flag', status: 404, setup: () => { getEnv().VOICE_ENABLED = 'false' } },
-  { name: 'local profile', status: 404, setup: () => { getEnv().LLM_PROFILE = 'ollama' } },
-  { name: 'unsupported voice provider', status: 404, setup: () => { getEnv().JOB_MODELS = { voice: { provider: 'baseten', model: 'muse-voice-transcribe-1.0' } } } },
-  { name: 'text model mapped to voice', status: 404, setup: () => { getEnv().JOB_MODELS = { voice: { provider: 'meta', model: 'muse-spark-1.3' } } } },
+  { name: 'no voice model', status: 404, setup: () => { getEnv().JOB_MODELS = undefined } },
+  { name: 'retired Meta voice provider', status: 404, setup: () => { getEnv().JOB_MODELS = JSON.stringify({ voice: { provider: 'meta', model: 'muse-voice-transcribe-1.0' } }) } },
   { name: 'role topic', status: 404, setup: () => { raw.exec(`
     INSERT INTO user (id, name, email) VALUES ('u1', 'Ann', 'ann@example.test');
     INSERT INTO organization (id, name, slug, created_at) VALUES ('o1', 'Acme', 'acme', 1);
@@ -176,7 +175,7 @@ it.each([
   fetchModel.mockImplementationOnce(response)
   await expect(transcribeAnswer(upload())).rejects.toMatchObject({ status })
   const log = row('SELECT purpose, model, ok, error FROM model_calls')
-  expect(log).toMatchObject({ purpose: 'voice', model: 'muse-voice-transcribe-1.0', ok: 0 })
+  expect(log).toMatchObject({ purpose: 'voice', model: 'voice-model', ok: 0 })
   expect(log.error).not.toMatch(/sensitive|test-key/)
   expect(row('SELECT COUNT(*) AS n FROM attempts').n).toBe(0)
   expect(JSON.parse(row('SELECT plan_json FROM sessions').plan_json as string).answered).toBe(false)

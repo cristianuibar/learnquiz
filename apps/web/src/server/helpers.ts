@@ -167,7 +167,6 @@ export async function generateConceptItems(
             schema: SelfCheck,
             schemaName: 'self_check',
             ...selfCheckPrompt({ items: drafted }),
-            reasoningEffort: 'minimal',
             learnerId,
             orgId,
             topicId: topic.id,

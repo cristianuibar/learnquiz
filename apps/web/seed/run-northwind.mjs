@@ -26,7 +26,7 @@ if (args.length === 1 && ['--help', '-h'].includes(args[0])) {
       if (!database?.database_id) throw new Error('Missing DB configuration')
       const token = randomBytes(32).toString('hex')
       const vars = { NORTHWIND_SEED_TOKEN: token }
-      for (const key of ['LLM_PROFILE', 'LLM_BASE_URL', 'LLM_MODEL', 'LLM_API_KEY', 'BASETEN_API_KEY', 'FIREWORKS_API_KEY', 'JOB_MODELS']) {
+      for (const key of ['LLM_PROFILE', 'LLM_BASE_URL', 'LLM_MODEL', 'LLM_API_KEY', 'BASETEN_API_KEY', 'JOB_MODELS']) {
         if (process.env[key]) vars[key] = process.env[key]
       }
       worker = await unstable_dev(fileURLToPath(new URL('./northwind-worker.ts', import.meta.url)), {

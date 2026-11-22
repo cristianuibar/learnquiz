@@ -89,8 +89,6 @@ LLM_BASE_URL=http://127.0.0.1:11434/v1
 LLM_MODEL=muse-glimmer
 LLM_API_KEY=
 BASETEN_API_KEY=
-FIREWORKS_API_KEY=
-IMAGE_MODEL=muse-image-1.0
 VOICE_ENABLED=false
 BETTER_AUTH_URL=http://localhost:3000
 BETTER_AUTH_SECRET=REPLACE_WITH_AT_LEAST_32_RANDOM_CHARACTERS
@@ -102,11 +100,11 @@ Generate the authentication secret privately, for example with
 a bearer key, put it in `LLM_API_KEY`. Leave optional Facebook/Web Push bindings
 empty unless you configure those services.
 
-**`JOB_MODELS={}` is essential.** Otherwise Wrangler's per-job mapping continues
-to select hosted models. `.dev.vars` supports a JSON string override; do not add
-`"provider":"ollama"` entries to `JOB_MODELS`, whose entry validator only accepts
-`meta`, `baseten` or `fireworks`. Empty mapping makes jobs use `LLM_PROFILE` and
-`LLM_MODEL` defaults instead. No tracked configuration edit is needed.
+**Keep `JOB_MODELS={}`.** A per-job mapping selects a hosted provider for that job.
+`.dev.vars` supports a JSON string override; do not add `"provider":"ollama"`
+entries to `JOB_MODELS`, whose entry validator only accepts `baseten`. Empty mapping
+makes jobs use `LLM_PROFILE` and `LLM_MODEL` defaults instead. No tracked
+configuration edit is needed.
 
 ```sh
 pnpm db:migrate:local
@@ -127,10 +125,10 @@ provided.
   text and source-backed procedure graphs use Glimmer through the local endpoint.
 - Session ordering uses rules: `play.ts` explicitly skips the `plan` call for
   `ollama`. It does not run a local Wonder replacement.
-- Voice is off: the gate requires `VOICE_ENABLED=true` **and** the Meta provider
-  with `muse-voice-transcribe-1.0`. Typed answers remain available.
-- Image generation is off: `isImageEnabled` rejects the `ollama` provider even if
-  `IMAGE_MODEL` is set. Text procedure graphs are a separate supported feature.
+- Voice is off: the gate requires `VOICE_ENABLED=true` **and** a `voice` entry in
+  `JOB_MODELS`. Typed answers remain available.
+- Image generation is off: `isImageEnabled` requires an `image` entry in
+  `JOB_MODELS`. Text procedure graphs are a separate supported feature.
 - Company-role sessions retain their existing rules-only planning/grading and
   template placement result behavior; they use shared stored questions.
 
@@ -146,15 +144,15 @@ Curriculum, question and self-check calls should show `muse-glimmer`; check succ
 and latency. Play a session/placement and inspect its session trace as well.
 “planned by rules” is expected. Existing topics can display older hosted calls or
 reuse stored questions without making any new call. Unknown USD cost is expected
-for Glimmer; the ledger currently prices only Spark 1.3. For local staff access,
+for Glimmer; the ledger prices no current model. For local staff access,
 sign up, then use the README's local D1 admin-role command and visit `/admin/usage`.
 
 ## Troubleshooting
 
 | Symptom | Check |
 | --- | --- |
-| Meta/Fireworks still appears | Restart dev after changing `.dev.vars`; confirm `JOB_MODELS={}` and use newly generated content, not cached items. |
-| `Invalid model configuration` | Use exact `LLM_MODEL=muse-glimmer`, `LLM_PROFILE=ollama`, empty `JOB_MODELS`; no invented profile or alias in the app. |
+| A hosted model still appears | Restart dev after changing `.dev.vars`; confirm `JOB_MODELS={}` and use newly generated content, not cached items. |
+| `Invalid model configuration` or "unavailable" | Set `LLM_PROFILE=ollama`, a non-empty `LLM_MODEL` and `LLM_BASE_URL`, and empty `JOB_MODELS`; no invented profile in the app. |
 | 404/model not found | Confirm `/v1/models`, alias, port and the `/v1` suffix. The client appends `/chat/completions` itself. |
 | Network failure | Reach the endpoint from the machine running `pnpm dev`; loopback inside a container refers to that container. Check backend logs and GPU availability. |
 | Invalid JSON / no questions kept | Verify backend JSON-object support, correct chat template and adequate context/output budget; inspect server logs and trace failures. Zod and self-check still run locally. |

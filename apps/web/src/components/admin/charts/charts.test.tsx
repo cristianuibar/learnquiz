@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { BarChart } from './bar-chart'
 import { HBarList } from './hbar-list'
 import { LineChart } from './line-chart'
-import { jobLabel, META_MODELS, modelDisplayName, type ModelJob } from '@/lib/llm/models'
+import { jobLabel, modelDisplayName, type ModelJob } from '@/lib/llm/models'
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
 
@@ -143,7 +143,8 @@ describe('HBarList', () => {
 })
 
 describe('modelDisplayName', () => {
-  it.each([...META_MODELS])('names %s as a Muse model, with or without the Fireworks prefix', (id) => {
+  // Model ids stored on historical model_calls rows.
+  it.each(['muse-spark-1.3', 'muse-wonder-1.0', 'muse-image-1.0', 'muse-voice-transcribe-1.0', 'muse-spark-open', 'muse-glimmer'])('names %s as a Muse model, with or without the Fireworks prefix', (id) => {
     expect(modelDisplayName(id)).toMatch(/^Muse /)
     expect(modelDisplayName(`accounts/fireworks/models/${id}`)).toBe(modelDisplayName(id))
   })
