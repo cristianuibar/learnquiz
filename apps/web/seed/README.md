@@ -1,4 +1,7 @@
-# Northwind Logistics demo
+# Northwind Logistics local fixture
+
+A local development fixture for company-role work. It is not a public or
+production demo.
 
 The seed creates the fictional Northwind Logistics company, its owner and the
 Warehouse picker role. It imports the original [warehouse SOP](northwind-sop.md)
@@ -10,37 +13,37 @@ uses the normal call log and daily limit. One authored multiple-choice question
 about a location label carries an SVG image, stored in the local `MEDIA` R2 bucket.
 
 Use Node 24 and install the project's dependencies. Apply the existing migrations
-to the selected database first. For local D1:
+to the local D1 database first:
 
 ```sh
 pnpm db:migrate:local
 ```
 
 Supply `NORTHWIND_OWNER_PASSWORD` and `NORTHWIND_LEARNER_PASSWORD` from Proton Pass.
-The latter is used for both joined demo employees. Keep passwords out of the
+The latter is used for both joined fixture employees. Keep passwords out of the
 repository, terminal history and command arguments. For example, create an
 untracked environment-reference file containing only your own `pass://`
-references, then run:
+references, then seed the local database:
 
 ```sh
-pass-cli run --env-file /path/to/northwind-references.env -- pnpm --filter @learnquiz/web seed:northwind --local
+pass-cli run --env-file /path/to/northwind-references.env -- pnpm seed:northwind --local
 ```
 
 Configure the model provider and credentials as for the local app in `apps/web/.dev.vars`.
 The command also accepts model bindings supplied through the process environment.
 An invalid model response, missing scan-mismatch concept, exhausted daily
 limit or database conflict stops the seed rather than substituting a generic
-curriculum. Retry after resolving the cause; a partially created marked demo can
-resume. A reserved account that already exists without the demo's ownership
+curriculum. Retry after resolving the cause; a partially created fixture can
+resume. A reserved account that already exists without the fixture's ownership
 record is refused.
 
 The command runs a temporary Worker on loopback and stops it when done. It does
-not deploy the app or apply migrations. `--remote` instead of `--local` selects
-the D1 database configured in `apps/web/wrangler.jsonc` through a remote binding and needs
-the operator's Cloudflare access. Its writes affect that remote database.
+not deploy the app or apply migrations. The `--remote` flag points the seed at
+the D1 database in `apps/web/wrangler.jsonc`, which is production. It is not
+used for a public demo; do not run it against production.
 
-Sign in as `owner@northwind.learnquiz.test` with the owner password and open
-`/org/northwind-logistics/people`:
+Sign in to the local app as `owner@northwind.learnquiz.test` with the owner
+password and open `/org/northwind-logistics/people`:
 
 | Employee | Account | Initial state |
 | --- | --- | --- |
@@ -51,11 +54,11 @@ Sign in as `owner@northwind.learnquiz.test` with the owner password and open
 The company overview shows one proficient employee and 6 days to proficiency.
 Pending invitation links are available in People; no email is sent.
 
-Repeat runs of a completed demo preserve passwords, learning progress,
+Repeat runs of a completed fixture preserve passwords, learning progress,
 invitation state and generated content. They do not reset the scenario or renew
 expired invites. A changed SOP or an unrelated company using the reserved slug
 is refused. Use the app's normal invitation and learning actions to continue an
-existing demo.
+existing fixture.
 
 The background queue generates questions for the remaining concepts after the
 seed finishes. Rerun the seed once question generation finishes to record

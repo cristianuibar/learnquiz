@@ -1,4 +1,4 @@
-// Authored demo image: a bay location label. Inline so the bundled seed Worker needs no asset loader.
+// Authored fixture image: a bay location label. Inline so the bundled seed Worker needs no asset loader.
 export const LOCATION_LABEL_WIDTH = 640
 export const LOCATION_LABEL_HEIGHT = 300
 export const LOCATION_LABEL_ALT = 'Warehouse location label A12-04-C-2. Callouts name each part: aisle A12, bay 04, level C, position 2. A boxed check digit pair, 57, sits at the right.'

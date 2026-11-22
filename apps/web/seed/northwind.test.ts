@@ -297,7 +297,7 @@ it('refuses to overwrite an unrelated company using the reserved slug', async ()
 
 it('regenerates the critical step on rerun when no multiple-choice question was kept', async () => {
   const secret = passwords()
-  // The demo concept gets no multiple-choice question from the self-check, so the seed rejects until a rerun regenerates it.
+  // The critical concept gets no multiple-choice question from the self-check, so the seed rejects until a rerun regenerates it.
   shortOnly.add('Resolve scan mismatches')
   await expect(seedNorthwind({ sopText, ...secret, now })).rejects.toMatchObject({ status: 422 })
   await Promise.all(background.splice(0))
