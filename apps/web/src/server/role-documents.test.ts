@@ -5,7 +5,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vite
 import * as schema from '@/db/schema'
 import * as authSchema from '@/db/auth-schema'
 
-const state = vi.hoisted(() => ({ db: null as unknown, user: 'owner-a' as string | null, active: null as string | null, anonymous: false, bucket: { put: vi.fn(), delete: vi.fn() }, background: [] as Promise<unknown>[], companyGeneration: 'true' as string | undefined }))
+const state = vi.hoisted(() => ({ db: null as unknown, user: 'owner-a' as string | null, active: null as string | null, anonymous: false, bucket: { put: vi.fn(), delete: vi.fn() }, background: [] as Promise<unknown>[], model: {} as object, companyGeneration: 'true' as string | undefined }))
 const drain = vi.hoisted(() => vi.fn())
 
 // Fake only the server transport, session and Cloudflare bindings. Validators,
@@ -22,7 +22,7 @@ vi.mock('@tanstack/react-start', () => ({
 }))
 vi.mock('@tanstack/react-start/server', () => ({ getRequestHeaders: () => new Headers() }))
 vi.mock('@/db', () => ({ getDb: () => state.db }))
-vi.mock('@/server/env', () => ({ getEnv: () => ({ MEDIA: state.bucket, BETTER_AUTH_URL: 'http://127.0.0.1:8800', COMPANY_GENERATION_ENABLED: state.companyGeneration }), drainsOnRequest: () => false, runInBackground: (task: Promise<unknown>) => { state.background.push(task) } }))
+vi.mock('@/server/env', () => ({ getEnv: () => ({ MEDIA: state.bucket, BETTER_AUTH_URL: 'http://127.0.0.1:8800', ...state.model, COMPANY_GENERATION_ENABLED: state.companyGeneration }), drainsOnRequest: () => false, runInBackground: (task: Promise<unknown>) => { state.background.push(task) } }))
 vi.mock('@/server/concept-gen', () => ({ drainConceptQueue: drain }))
 vi.mock('@/server/session', () => ({ getSessionUser: async () => state.user ? { id: state.user, isAnonymous: state.anonymous } : null }))
 vi.mock('@/server/auth', () => ({ getAuth: () => ({ api: { getSession: async () => state.user ? { user: { id: state.user, isAnonymous: state.anonymous }, session: { activeOrganizationId: state.active } } : null } }) }))
@@ -30,7 +30,8 @@ vi.mock('@/server/auth', () => ({ getAuth: () => ({ api: { getSession: async () 
 import { MAX_ROLE_DOCUMENT_BYTES, MAX_ROLE_DOCUMENT_CHARS } from '@/lib/limits'
 import { Route } from '@/routes/api/org.$orgId.roles.$roleId.documents'
 import { listRoles } from './org'
-import { previewRetireRoleDocument, removeRoleDocument, retireRoleDocument, uploadRoleDocument } from './role-documents'
+import { previewRetireRoleDocument, removeRoleDocument, RETIRE_PAUSED, retireRoleDocument, uploadRoleDocument } from './role-documents'
+import { REPLACE_PAUSED } from './role-document-upload'
 
 let sqlite: DatabaseSync
 // One-shot hook: runs just before the next SQL statement that starts with the given prefix.
@@ -82,6 +83,7 @@ beforeEach(() => {
   state.bucket.delete.mockResolvedValue(undefined)
   drain.mockResolvedValue(undefined)
   state.background = []
+  state.model = { LLM_PROFILE: 'baseten', LLM_BASE_URL: 'https://llm.example', LLM_MODEL: 'text-model' }
   beforeSql = null
 })
 afterEach(() => sqlite.exec('ROLLBACK'))
@@ -165,6 +167,17 @@ it('still refuses a replacement PDF with no text layer, leaving the live documen
   await expect(uploadRoleDocument({ data: form({ replacesId: 'src-1', file: pdf('') }) })).rejects.toMatchObject({ status: 422 })
   expect(state.bucket.put).not.toHaveBeenCalled()
   expect(sqlite.prepare('SELECT id, retired_at, status FROM sources').all()).toEqual([{ id: 'src-1', retired_at: null, status: 'ready' }])
+})
+
+it('refuses to replace a readable document while no question model is configured, keeping its questions live', async () => {
+  seedV1()
+  state.model = {}
+  await expect(uploadRoleDocument({ data: form({ replacesId: 'src-1', text: 'Always wear a vest on the dock.' }) }))
+    .rejects.toMatchObject({ status: 503, message: REPLACE_PAUSED })
+  expect(state.bucket.put).not.toHaveBeenCalled()
+  expect(sqlite.prepare('SELECT id, retired_at, version FROM sources').all()).toEqual([{ id: 'src-1', retired_at: null, version: 1 }])
+  expect(itemStatus()).toEqual({ 'item-1': 'active', 'item-2': 'active', 'item-other': 'active' })
+  expect(sqlite.prepare("SELECT gen_status FROM concepts WHERE id = 'con-1'").get()).toEqual({ gen_status: 'ready' })
 })
 
 it('replacing a failed source removes it from the list and keeps its version', async () => {
@@ -399,6 +412,25 @@ it('retiring repoints concepts another document covers and fails the orphans, wi
   ])
   expect(drain).not.toHaveBeenCalled()
   expect(state.background).toHaveLength(0)
+})
+
+it('refuses a retire that would requeue a covered concept while no question model is configured, and allows one that only fails orphans', async () => {
+  seedShared()
+  state.model = {}
+  await expect(retireRoleDocument({ data: { ...ids, sourceId: 'src-1' } })).rejects.toMatchObject({ status: 503, message: RETIRE_PAUSED })
+  expect(sqlite.prepare("SELECT retired_at FROM sources WHERE id = 'src-1'").get()).toEqual({ retired_at: null })
+  expect(itemStatus()).toEqual({ 'item-1': 'active', 'item-2': 'active', 'item-other': 'active' })
+  expect(sqlite.prepare('SELECT id, source_id, gen_status FROM concepts ORDER BY id').all()).toEqual([
+    { id: 'con-1', source_id: 'src-1', gen_status: 'ready' },
+    { id: 'con-2', source_id: 'src-1', gen_status: 'ready' },
+  ])
+
+  sqlite.prepare("UPDATE sources SET body_text = 'Visitors sign in at reception.' WHERE id = 'src-2'").run()
+  await expect(retireRoleDocument({ data: { ...ids, sourceId: 'src-1' } })).resolves.toEqual({ ok: true })
+  expect(sqlite.prepare('SELECT id, gen_status FROM concepts ORDER BY id').all()).toEqual([
+    { id: 'con-1', gen_status: 'failed' },
+    { id: 'con-2', gen_status: 'failed' },
+  ])
 })
 
 // The other document goes away between the concept read and the retire write: the concept never lands on a retired document.

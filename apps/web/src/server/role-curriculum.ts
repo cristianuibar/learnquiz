@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { getDb, type Db } from '@/db'
 import { conceptEdges, concepts, jobRoles, sources, topics, units } from '@/db/schema'
 import { validateSkeleton, type ValidatedSkeleton } from '@/lib/curriculum/validate'
-import { chatJson, jobModel, LlmError } from '@/lib/llm/client'
+import { chatJson, hasModel, jobModel, LlmError } from '@/lib/llm/client'
 import { curriculumPrompt } from '@/lib/llm/prompts'
 import { curriculumSkeletonSchema, type CurriculumSkeleton } from '@/lib/llm/schemas'
 import { curriculumSize } from '@/lib/curriculum/size'
@@ -66,6 +66,8 @@ export async function releaseStaleBuild(db: Db, topicId?: string): Promise<boole
   return released.length > 0
 }
 
+export const ROLE_BUILDS_PAUSED = 'Building role training is paused for now. Your documents are kept, and existing training still works.'
+
 // Refusals throw before anything is claimed; the returned run owns the claim.
 export async function claimRoleBuild({ orgId, ownerId, roleId }: { orgId: string; ownerId: string; roleId: string }): Promise<() => Promise<{ topicId: string }>> {
   assertCompanyGenerationEnabled()
@@ -76,6 +78,7 @@ export async function claimRoleBuild({ orgId, ownerId, roleId }: { orgId: string
     .innerJoin(topics, eq(topics.jobRoleId, jobRoles.id))
     .where(and(eq(jobRoles.id, roleId), eq(jobRoles.orgId, orgId), eq(jobRoles.status, 'active')))
   if (!row) throw httpError('Role topic not found', 404)
+  if (!hasModel('curriculum')) throw httpError(ROLE_BUILDS_PAUSED, 503)
   const topicId = row.topic.id
   const liveDocuments = () => db.select().from(sources)
     .where(and(eq(sources.topicId, topicId), isNull(sources.deletedAt), isNull(sources.retiredAt), ne(sources.status, 'failed')))

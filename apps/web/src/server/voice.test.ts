@@ -10,7 +10,7 @@ vi.mock('@/server/session', () => ({ requireLearnerId: async () => {
   return holder.learnerId
 } }))
 vi.mock('cloudflare:workers', () => ({ env: {
-  LLM_PROFILE: 'meta', VOICE_ENABLED: 'true', LLM_BASE_URL: 'https://llm.example/v1', LLM_MODEL: 'muse-spark-1.3', LLM_API_KEY: 'test-key',
+  LLM_PROFILE: 'baseten', VOICE_ENABLED: 'true', LLM_BASE_URL: 'https://llm.example/v1', LLM_MODEL: 'text-model', BASETEN_API_KEY: 'test-key',
 } }))
 // Only the transport wrapper is replaced; validation, handlers, queries, model
 // client and log writes run for real. HTTP and request authentication are faked.
@@ -58,7 +58,7 @@ beforeAll(() => {
 beforeEach(() => {
   raw.exec('SAVEPOINT voice_test')
   holder.learnerId = 'u1'
-  Object.assign(getEnv(), { LLM_PROFILE: 'meta', JOB_MODELS: undefined })
+  Object.assign(getEnv(), { LLM_PROFILE: 'baseten', JOB_MODELS: undefined })
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))
   fetchModel.mockReset().mockResolvedValue(Response.json({ transcript: 'one' }))
@@ -73,9 +73,9 @@ function upload() {
   return { data }
 }
 
-// The old VOICE_ENABLED flag and a Muse Voice mapping no longer turn transcription on.
+// VOICE_ENABLED and a mapped voice model no longer turn transcription on.
 it('keeps voice off, refuses a recording without a model call, and still grades the typed answer', async () => {
-  getEnv().JOB_MODELS = JSON.stringify({ voice: { provider: 'meta', model: 'muse-voice-transcribe-1.0' } })
+  getEnv().JOB_MODELS = JSON.stringify({ voice: { provider: 'baseten', model: 'voice-model' } })
   expect((await getSession({ data: { sessionId: 's1' } })).voiceEnabled).toBeFalsy()
   await expect(transcribeAnswer(upload())).rejects.toMatchObject({ status: 404, message: 'Voice answers are unavailable. Type your answer instead.' })
   const reveal = await answerItem({ data: { sessionId: 's1', itemId: 'i1', answer: { text: '1' }, confidence: 'sure', responseMs: 1500 } })

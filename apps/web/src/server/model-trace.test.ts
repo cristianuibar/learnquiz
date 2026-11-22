@@ -10,7 +10,7 @@ vi.mock('@/server/session', () => ({ requireLearnerId: async () => {
   return holder.learnerId
 } }))
 vi.mock('cloudflare:workers', () => ({ env: {
-  LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://llm.example', LLM_MODEL: 'muse-spark-1.3',
+  LLM_PROFILE: 'baseten', LLM_BASE_URL: 'https://llm.example', LLM_MODEL: 'muse-spark-1.3',
 } }))
 // Keep validation, handlers, SQL, model retries and logging real; replace only
 // the server-function transport, request identity, bindings and provider HTTP.
@@ -24,6 +24,11 @@ import { createTopic, getTopicPath } from './curriculum'
 import { endSession, getSession, startPlacement, startSession } from './play'
 import { getModelTrace } from './model-trace'
 import { getEnv } from './env'
+import { requestedSchema } from '@/lib/llm/test-request'
+import { PRICES } from '@/lib/llm/client'
+
+// No production model is priced; one priced test model checks the cost arithmetic.
+PRICES['muse-spark-1.3'] = { in: 1.25, out: 4.25 }
 
 let raw: DatabaseSync
 beforeAll(() => {
@@ -101,10 +106,10 @@ it('returns every owned session call and exact costs, with generation scoped to 
 
 it.each(['placement', 'session'] as const)('traces real %s startup generation, retries and persisted model attribution', async (kind) => {
   getEnv().JOB_MODELS = {
-    plan: { provider: 'meta', model: 'muse-wonder-1.0' },
-    curriculum: { provider: 'meta', model: 'muse-wonder-1.0' },
-    items: { provider: 'meta', model: 'muse-wonder-1.0' },
-    placement_line: { provider: 'meta', model: 'muse-wonder-1.0' },
+    plan: { provider: 'baseten', model: 'muse-wonder-1.0' },
+    curriculum: { provider: 'baseten', model: 'muse-wonder-1.0' },
+    items: { provider: 'baseten', model: 'muse-wonder-1.0' },
+    placement_line: { provider: 'baseten', model: 'muse-wonder-1.0' },
   }
   const skeleton = { units: Array.from({ length: 4 }, (_, u) => ({
     name: `Unit ${u}`, summary: 'Basics', concepts: Array.from({ length: 4 }, (_, c) => ({
@@ -118,7 +123,7 @@ it.each(['placement', 'session'] as const)('traces real %s startup generation, r
   let retry = true
   vi.stubGlobal('fetch', vi.fn(async (_url: string, request: RequestInit) => {
     const body = JSON.parse(request.body as string)
-    const name = body.response_format.json_schema.name
+    const name = requestedSchema(body).name
     const content = name === 'item_batch' && retry ? (retry = false, 'invalid JSON') : JSON.stringify(
       name === 'curriculum_skeleton' ? skeleton : name === 'item_batch' ? { items } :
         name === 'session_plan' ? { steps: JSON.parse(body.messages[1].content).candidates.map((c: { itemId: string }) => ({ itemId: c.itemId, reason: 'Practise this concept before moving on.' })) } :

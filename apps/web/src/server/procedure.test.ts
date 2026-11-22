@@ -7,7 +7,7 @@ import { getUnitProcedure } from './procedure'
 const boundary = vi.hoisted(() => ({
   db: null as unknown,
   learnerId: 'learner' as string | null,
-  env: { LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://model.test/v1', LLM_MODEL: 'muse-spark-1.3', JOB_MODELS: undefined, COMPANY_GENERATION_ENABLED: 'true' as string | undefined },
+  env: { LLM_PROFILE: 'baseten', LLM_BASE_URL: 'https://model.test/v1', LLM_MODEL: 'muse-spark-1.3', JOB_MODELS: undefined, COMPANY_GENERATION_ENABLED: 'true' as string | undefined },
 }))
 vi.mock('@tanstack/react-start', () => ({
   createServerFn: () => ({ validator: () => ({ handler: (fn: unknown) => fn }) }),

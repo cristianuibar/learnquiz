@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { getDb } from '@/db'
 import { concepts, items, jobRoles, sources, topics } from '@/db/schema'
 import { findSourceQuote } from '@/lib/curriculum/validate'
+import { hasModel } from '@/lib/llm/client'
 import { requireOrgAdmin } from '@/server/authz'
 import { drainConceptQueue } from '@/server/concept-gen'
 import { drainsOnRequest, getEnv, runInBackground } from '@/server/env'
@@ -68,6 +69,8 @@ export const removeRoleDocument = createServerFn({ method: 'POST' })
     return { ok: true }
   })
 
+export const RETIRE_PAUSED = 'Retiring this document is paused for now because new questions cannot be generated for the concepts other documents also cover. Existing training still works.'
+
 export const retireRoleDocument = createServerFn({ method: 'POST' })
   .validator(SourceArgs)
   .handler(async ({ data }): Promise<{ ok: true }> => {
@@ -89,6 +92,8 @@ export const retireRoleDocument = createServerFn({ method: 'POST' })
     for (let attempt = 1; ; attempt++) {
       const cited = await citedConcepts(topic.id, source.id)
       const moved = cited.filter((c) => c.other)
+      // A covered concept loses its questions and waits for new ones; without a question model none would come.
+      if (moved.length && !hasModel('items')) throw httpError(RETIRE_PAUSED, 503)
       const alternatesLive = [...new Set(moved.map((c) => c.other!.id))]
         .map((id) => exists(db.select({ one: sql`1` }).from(sources).where(liveSource(id, topic.id))))
       const retiredAt = Date.now()

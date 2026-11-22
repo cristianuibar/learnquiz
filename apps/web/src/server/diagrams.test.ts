@@ -11,7 +11,7 @@ const boundary = vi.hoisted(() => ({
   learnerId: 'learner' as string | null,
   objects: new Map<string, Uint8Array>(),
   env: {
-    LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://model.test/v1', LLM_MODEL: 'muse-spark-1.3',
+    LLM_PROFILE: 'baseten', LLM_BASE_URL: 'https://model.test/v1', LLM_MODEL: 'text-model',
     JOB_MODELS: undefined as string | undefined,
     MEDIA: { head: vi.fn(), get: vi.fn(), put: vi.fn() },
   },
@@ -53,7 +53,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))
   boundary.learnerId = 'learner'
-  boundary.env.LLM_PROFILE = 'meta'
+  boundary.env.LLM_PROFILE = 'baseten'
   boundary.env.JOB_MODELS = undefined
   boundary.objects.clear()
   boundary.env.MEDIA.head.mockImplementation(async (key: string) => boundary.objects.has(key) ? {} : null)
@@ -79,9 +79,9 @@ const storeDiagram = (conceptId: string) => {
   raw.prepare('UPDATE concepts SET image_key = ?, image_alt = ? WHERE id = ?').run(`concepts/${conceptId}/diagram.png`, 'Dispatch an order', conceptId)
 }
 
-// The old Muse Image mapping no longer turns generation on.
+// A mapped image model no longer turns generation on.
 it('never generates a diagram for the topic owner and reports it unavailable', async () => {
-  boundary.env.JOB_MODELS = JSON.stringify({ image: { provider: 'meta', model: 'muse-image-1.0' } })
+  boundary.env.JOB_MODELS = JSON.stringify({ image: { provider: 'baseten', model: 'image-model' } })
   expect(await generateConceptDiagram({ data: { conceptId: 'procedure' } })).toEqual({ status: 'unavailable' })
   raw.exec('UPDATE concepts SET visual = 0')
   expect(await generateConceptDiagram({ data: { conceptId: 'procedure' } })).toEqual({ status: 'disabled' })

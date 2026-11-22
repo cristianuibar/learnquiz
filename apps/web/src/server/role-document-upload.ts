@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { getDb } from '@/db'
 import { concepts, items, jobRoles, sources, topics } from '@/db/schema'
 import { findSourceQuote } from '@/lib/curriculum/validate'
+import { hasModel } from '@/lib/llm/client'
 import { MAX_ROLE_DOCUMENT_BYTES, MAX_ROLE_DOCUMENT_CHARS } from '@/lib/limits'
 import { APP_ORIGINS } from '@/server/auth-core'
 import { requireOrgAdmin } from '@/server/authz'
@@ -49,6 +50,8 @@ export const LIVE = ['active', 'reported'] as const
 
 const PDF_MAGIC = [0x25, 0x50, 0x44, 0x46, 0x2d] // %PDF-
 
+export const REPLACE_PAUSED = 'Replacing documents is paused for now because new questions cannot be generated. Existing training still works.'
+
 export async function addRoleDocument(data: ReturnType<typeof parseDocumentForm>) {
   const { user, org } = await requireOrgAdmin(data.slug)
   const db = getDb()
@@ -62,6 +65,8 @@ export async function addRoleDocument(data: ReturnType<typeof parseDocumentForm>
     old = await db.select().from(sources).where(liveSource(data.replacesId, row.topic.id)).get()
     if (!old) throw httpError('Document not found', 404)
     assertDocumentChangeable(row.topic, old)
+    // Replacing a readable document retires its live questions; without a question model none would replace them.
+    if (old.status !== 'failed' && !hasModel('items')) throw httpError(REPLACE_PAUSED, 503)
   } else if (!['draft', 'failed'].includes(row.topic.status)) {
     throw httpError('The curriculum is already generating or ready.', 409)
   }

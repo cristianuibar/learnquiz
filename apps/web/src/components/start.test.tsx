@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { createMemoryHistory, createRootRoute, createRoute, createRouter, RouterProvider } from '@tanstack/react-router'
 import { expect, it, vi } from 'vitest'
 import { Route as startRoute } from '@/routes/start'
+import { NEW_TOPICS_UNAVAILABLE } from '@/server/curriculum'
 import { canCreateTopic } from '@/server/topic-start'
 
 // Run the real createTopic validator; like TanStack Start, a failed parse rejects with the JSON-stringified issues.
@@ -62,7 +63,7 @@ it('shows that creating a topic is unavailable when no model is configured, and 
   const { container, root } = await renderStart()
   const button = [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Find my level')!
   expect(button.disabled).toBe(true)
-  expect(document.getElementById(button.getAttribute('aria-describedby')!)!.textContent?.trim()).toBe('Creating a new topic is unavailable right now.')
+  expect(document.getElementById(button.getAttribute('aria-describedby')!)!.textContent?.trim()).toBe(NEW_TOPICS_UNAVAILABLE)
   await act(async () => { container.querySelector('form')!.requestSubmit() })
   expect(container.textContent).not.toContain('Building your curriculum')
   await act(async () => root.unmount())

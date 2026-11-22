@@ -1,5 +1,9 @@
 import { z } from 'zod'
+import { allowLocalModelCalls } from '@/lib/llm/client'
 import { seedNorthwind } from './northwind'
+
+// The seed is a local command, so it may call the configured model; the app Worker never does.
+allowLocalModelCalls()
 
 // This entry is used only by the seed command, never by the deployed app Worker.
 const Input = z.object({

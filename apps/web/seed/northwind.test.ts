@@ -9,6 +9,7 @@ import { getProfile } from '@/server/profile'
 import { getQuestionReview } from '@/server/question-review'
 import { retireRoleDocument } from '@/server/role-documents'
 import { NORTHWIND, seedNorthwind } from './northwind'
+import { requestedSchema } from '@/lib/llm/test-request'
 
 const request = vi.hoisted(() => ({ headers: new Headers() }))
 const background = vi.hoisted(() => [] as Promise<unknown>[])
@@ -18,7 +19,7 @@ const bindings = vi.hoisted(() => ({ waitUntil: (task: Promise<unknown>) => { ba
   MEDIA: { put: async (key: string, body: unknown, options?: { httpMetadata?: { contentType?: string } }) => { media.objects.set(key, { body, options }) }, get: async (key: string) => media.objects.get(key) ?? null },
   BETTER_AUTH_URL: 'http://127.0.0.1:8800',
   BETTER_AUTH_SECRET: '',
-  LLM_PROFILE: 'meta',
+  LLM_PROFILE: 'baseten',
   LLM_BASE_URL: 'https://model.test',
   LLM_MODEL: 'muse-spark-1.3',
   COMPANY_GENERATION_ENABLED: 'true' as string | undefined,
@@ -138,7 +139,7 @@ beforeEach(() => {
   vi.setSystemTime(now)
   fetchModel.mockReset().mockImplementation(async (_url, init) => {
     const body = JSON.parse(init!.body as string)
-    const schema = body.response_format.json_schema.name
+    const schema = requestedSchema(body).name
     if (schema === 'curriculum_skeleton') return reply(skeleton())
     if (schema === 'self_check') return reply({ results: Array.from({ length: 6 }, (_, index) => ({ index, keep: true, reasons: [] })) })
     if (schema !== 'item_batch') throw new Error(`Unexpected model schema: ${schema}`)

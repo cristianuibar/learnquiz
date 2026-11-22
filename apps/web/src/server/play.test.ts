@@ -128,7 +128,7 @@ describe('Wonder session planning', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))
-    Object.assign(getEnv(), { LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://llm.example/v1', LLM_MODEL: 'muse-spark-1.3', JOB_MODELS: { plan: { provider: 'meta', model: 'muse-wonder-1.0' } } })
+    Object.assign(getEnv(), { LLM_PROFILE: 'baseten', LLM_BASE_URL: 'https://llm.example/v1', LLM_MODEL: 'muse-spark-1.3', JOB_MODELS: { plan: { provider: 'baseten', model: 'muse-wonder-1.0' } } })
     seedTopicAndLearner(raw, 0)
     seedFrontier(raw, 3, true)
     raw.exec(`
@@ -168,8 +168,8 @@ describe('Wonder session planning', () => {
   })
 
   it.each([
-    { profile: 'ollama', provider: 'meta', model: 'muse-wonder-1.0', url: 'https://api.meta.ai/v1/chat/completions' },
-    { profile: 'meta', provider: 'baseten', model: 'muse-spark-open', url: 'https://inference.baseten.co/v1/chat/completions' },
+    { profile: 'ollama', provider: 'baseten', model: 'planner-model', url: 'https://inference.baseten.co/v1/chat/completions' },
+    { profile: 'baseten', provider: 'baseten', model: 'planner-model', url: 'https://llm.example/v1/chat/completions' },
   ] as const)('uses the configured $provider planner when the global profile is $profile', async ({ profile, provider, model, url }) => {
     getEnv().LLM_PROFILE = profile
     getEnv().JOB_MODELS = { plan: { provider, model } }

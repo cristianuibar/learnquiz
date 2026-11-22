@@ -10,7 +10,7 @@ vi.mock('@/server/session', () => ({ requireLearnerId: async () => {
   return holder.learnerId
 } }))
 vi.mock('cloudflare:workers', () => ({ env: {
-  LLM_PROFILE: 'meta', LLM_BASE_URL: 'https://llm.example', LLM_MODEL: 'muse-spark-1.3',
+  LLM_PROFILE: 'baseten', LLM_BASE_URL: 'https://llm.example', LLM_MODEL: 'muse-spark-1.3',
 } }))
 // Keep validation, handlers, SQL, model retries and logging real; replace only
 // the server-function transport, request identity, bindings and provider HTTP.
@@ -23,6 +23,7 @@ vi.mock('@tanstack/react-start', () => ({ createServerFn: () => ({
 import { createTopic, getTopicPath } from './curriculum'
 import { answerItem, endSession, getSession, startSession } from './play'
 import { getEnv } from './env'
+import { requestedSchema } from '@/lib/llm/test-request'
 
 let raw: DatabaseSync
 beforeAll(() => {
@@ -63,7 +64,7 @@ const generated = Array.from({ length: 6 }, (_, i) => ({
 function stubModels() {
   vi.stubGlobal('fetch', vi.fn(async (_url: string, request: RequestInit) => {
     const body = JSON.parse(request.body as string)
-    const name = body.response_format.json_schema.name
+    const name = requestedSchema(body).name
     const content = JSON.stringify(
       name === 'curriculum_skeleton' ? skeleton : name === 'item_batch' ? { items: generated } :
         name === 'session_plan' ? { steps: JSON.parse(body.messages[1].content).candidates.map((c: { itemId: string }) => ({ itemId: c.itemId, reason: 'Practise this concept first.' })) } :
@@ -79,7 +80,7 @@ function logCall(id: string, scope: { sessionId?: string; topicId: string }, pur
 }
 
 it('names the Muse models behind a perfect session, though it has no mistakes', async () => {
-  getEnv().JOB_MODELS = { plan: { provider: 'meta', model: 'muse-wonder-1.0' }, items: { provider: 'meta', model: 'muse-wonder-1.0' } }
+  getEnv().JOB_MODELS = { plan: { provider: 'baseten', model: 'muse-wonder-1.0' }, items: { provider: 'baseten', model: 'muse-wonder-1.0' } }
   stubModels()
   const { topicId } = await createTopic({ data: { topic: 'Algebra' } })
   const path = await getTopicPath({ data: { topicId } })
@@ -100,7 +101,7 @@ it('names the Muse models behind a perfect session, though it has no mistakes', 
 })
 
 it('names the Muse models behind the curriculum, its questions and its diagrams on the path', async () => {
-  getEnv().JOB_MODELS = { curriculum: { provider: 'meta', model: 'muse-wonder-1.0' } }
+  getEnv().JOB_MODELS = { curriculum: { provider: 'baseten', model: 'muse-wonder-1.0' } }
   stubModels()
   const { topicId } = await createTopic({ data: { topic: 'Algebra' } })
   const { units: [unit] } = await getTopicPath({ data: { topicId } })

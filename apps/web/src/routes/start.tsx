@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Working } from '@/components/working'
 import { authClient } from '@/lib/auth-client'
 import { MAX_SOURCE_TEXT_CHARS } from '@/lib/limits'
-import { createTopic } from '@/server/curriculum'
+import { createTopic, NEW_TOPICS_UNAVAILABLE } from '@/server/curriculum'
 import { canCreateTopic } from '@/server/topic-start'
 import { startPlacement } from '@/server/play'
 
@@ -112,9 +112,7 @@ function Start() {
             </p>
           )}
           {!available && (
-            <p id="start-unavailable" role="status" className="text-body text-ink-muted">
-              Creating a new topic is unavailable right now.
-            </p>
+            <p id="start-unavailable" role="status" className="text-body text-ink-muted">{NEW_TOPICS_UNAVAILABLE}</p>
           )}
           <Button type="submit" disabled={!available} aria-describedby={available ? undefined : 'start-unavailable'} className="w-full px-6 sm:w-auto sm:self-end">
             Find my level

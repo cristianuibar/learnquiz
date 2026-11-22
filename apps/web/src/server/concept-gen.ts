@@ -2,6 +2,7 @@ import { and, asc, count, eq, isNotNull, isNull, lt, or } from 'drizzle-orm'
 import { getDb, type Db } from '@/db'
 import { concepts, items, topics, units } from '@/db/schema'
 import { utcDayStart } from '@/lib/limits'
+import { hasModel } from '@/lib/llm/client'
 import { generateConceptItems } from '@/server/helpers'
 import { liveConcept } from '@/server/live-concept'
 import { assertWithinCompanyCap, COMPANY_CAP_MESSAGE, companyGenerationPaused } from '@/server/model-cap'
@@ -69,7 +70,8 @@ export async function processConcept(db: Db, conceptId: string): Promise<void> {
 
 // While company generation is paused, pending concepts stay pending: no claim and no model call.
 export async function drainConceptQueue(opts: { limit: number; concurrency: number } = { limit: 8, concurrency: 4 }, db: Db = getDb()): Promise<number> {
-  if (companyGenerationPaused()) return 0
+  // Without a question model the queue is paused too: concepts stay pending instead of failing.
+  if (companyGenerationPaused() || !hasModel('items')) return 0
   const now = Date.now()
   const due = await db.select({ id: concepts.id }).from(concepts)
     .innerJoin(topics, eq(topics.id, concepts.topicId))

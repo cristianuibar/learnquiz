@@ -12,8 +12,7 @@ import { assertWithinCompanyCap, COMPANY_CAP_MESSAGE, companyGenerationPaused } 
 import { requireLearnerId } from '@/server/session'
 import { learnerCanAccess } from '@/server/topic-access'
 
-// chatJson can take two 120 s attempts on Fireworks and two more on the Meta fallback, so a live claim must outlast
-// that whole retry window; only a crashed request's claim is ever this old.
+// chatJson can take two 180 s attempts, so a live claim must outlast that whole retry window; only a crashed request's claim is ever this old.
 const STALE_CLAIM_MS = 10 * 60 * 1000
 
 export type UnitProcedureResult =
