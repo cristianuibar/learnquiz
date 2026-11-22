@@ -17,7 +17,7 @@ import { chatJson, chatJsonWithModel, DailyCapError, jobModel } from '@/lib/llm/
 import { gradePrompt } from '@/lib/llm/prompts'
 import { Grade, type ItemPayload } from '@/lib/llm/schemas'
 import { plural } from '@/lib/utils'
-import { dueCount } from '@/server/due'
+import { dueCount, gradesShortAnswers } from '@/server/due'
 import { asItem, chunks, ensureConceptItems, httpError, targetFor } from '@/server/helpers'
 import { liveConcept } from '@/server/live-concept'
 import { basicsUnits, unitMastery } from '@/server/mastery'
@@ -258,7 +258,7 @@ export const getSessionReadiness = createServerFn({ method: 'POST' })
     const [row] = await db.select({ n: count() }).from(items)
       .leftJoin(learnerItem, and(eq(learnerItem.itemId, items.id), eq(learnerItem.learnerId, learnerId)))
       .where(and(eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId), inUnit,
-        topic.jobRoleId !== null ? ne(items.format, 'short') : undefined,
+        gradesShortAnswers(topic) ? undefined : ne(items.format, 'short'),
         or(and(isNull(learnerItem.itemId), inFrontier), lte(learnerItem.due, Date.now()))))
     return { ready: Math.min(row.n, SESSION_SIZE), total: SESSION_SIZE }
   })
@@ -299,7 +299,7 @@ export const startSession = createServerFn({ method: 'POST' })
         .from(learnerItem)
         .innerJoin(items, eq(items.id, learnerItem.itemId))
         .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId), inUnit,
-          topic.jobRoleId !== null ? ne(items.format, 'short') : undefined)),
+          gradesShortAnswers(topic) ? undefined : ne(items.format, 'short'))),
       loadFrontier(db, learnerId, topic.id),
       basicsUnits(db, learnerId, topic.id),
     ])
@@ -326,7 +326,7 @@ export const startSession = createServerFn({ method: 'POST' })
     // Anything practisable stored starts the session at once (a shorter one is fine); prepareNextSession tops up during play.
     const storedRows = candidates.length
       ? await db.select().from(items).where(and(eq(items.topicId, topic.id), role ? undefined : inArray(items.conceptId, candidates.map((f) => f.concept.id)),
-        eq(items.status, 'active'), notFlaggedBy(db, learnerId), role ? ne(items.format, 'short') : undefined))
+        eq(items.status, 'active'), notFlaggedBy(db, learnerId), gradesShortAnswers(topic) ? undefined : ne(items.format, 'short')))
       : []
     const top = role ? candidates.filter((f) => storedRows.some((r) => r.conceptId === f.concept.id)).slice(0, 4) : candidates
     const stored = top.map((f) => storedRows.filter((r) => r.conceptId === f.concept.id).map(asItem))
@@ -337,11 +337,12 @@ export const startSession = createServerFn({ method: 'POST' })
       : await Promise.all(top.map((f) => ensureConceptItems(db, learnerId, f.concept, topic, { targetDifficulty, unseen: seen, sessionId })))
     // A role topic cannot generate more, so with nothing due or fresh it replays its stored questions ahead of schedule.
     const replay = topic.jobRoleId !== null && due.length + storedFresh === 0
+    const short = gradesShortAnswers(topic)
     const frontierInput = top.map((f, i) => ({
       conceptId: f.concept.id,
       unitOrder: f.unitOrder,
       pKnown: f.pKnown,
-      items: generated[i].filter((it) => replay || !seen.has(it.id)).map((it) => ({ id: it.id, difficulty: it.difficultyPrior })),
+      items: generated[i].filter((it) => (replay || !seen.has(it.id)) && (short || it.format !== 'short')).map((it) => ({ id: it.id, difficulty: it.difficultyPrior })),
     }))
 
     // shortcut: a closer may be an item seen recently (unseen ones go first); upgrade once items are generated ahead of play.
@@ -351,7 +352,7 @@ export const startSession = createServerFn({ method: 'POST' })
       .from(items)
       .innerJoin(learnerConcept, and(eq(learnerConcept.conceptId, items.conceptId), eq(learnerConcept.learnerId, learnerId)))
       .where(and(eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId), gte(learnerConcept.pKnown, CLOSER_MIN), lte(items.difficultyPrior, lt.level), inUnit,
-        topic.jobRoleId !== null ? ne(items.format, 'short') : undefined))
+        gradesShortAnswers(topic) ? undefined : ne(items.format, 'short')))
     const closers = closerRows
       .filter((c) => !taken.has(c.id))
       .sort((a, b) => Number(seen.has(a.id)) - Number(seen.has(b.id)))
@@ -1061,8 +1062,8 @@ async function summaryOf(db: Db, learnerId: string, session: SessionRow, topic: 
       .from(learnerItem)
       .innerJoin(items, eq(items.id, learnerItem.itemId))
       .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId), lte(learnerItem.due, Date.now() + DAY),
-        topic.jobRoleId !== null ? ne(items.format, 'short') : undefined)),
-    dueCount(db, learnerId, topic.id, Date.now(), topic.jobRoleId !== null),
+        gradesShortAnswers(topic) ? undefined : ne(items.format, 'short'))),
+    dueCount(db, learnerId, topic.id, Date.now(), !gradesShortAnswers(topic)),
     topic.jobRoleId ? db.select({ benchmark: jobRoles.benchmark }).from(jobRoles).where(eq(jobRoles.id, topic.jobRoleId)).get() : undefined,
     db
       .select({ logJson: placements.logJson })

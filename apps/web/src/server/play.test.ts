@@ -548,6 +548,25 @@ describe('learner practice and unit unlocks', () => {
     vi.useRealTimers()
   })
 
+  it('leaves ungradable short answers out of reviews and the due count when no model is configured', async () => {
+    seedFrontier(raw, 1, true)
+    const short = JSON.stringify({ format: 'short', stem: 'Why subtract?', options: [], accepted_answers: [], model_answer: 'To isolate x.', explanation: '', difficulty: 1, source_quote: null, grounded: false, bloom: 'apply' })
+    for (let i = 1; i <= 8; i++) {
+      raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(`s${i}`, 'c1', 't1', 'short', short, 1, Date.now())
+      raw.prepare('INSERT INTO learner_item (learner_id, item_id, due, stability, difficulty, state, last_wrong_confident_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run('u1', `s${i}`, Date.now() - 1, 1, 5, 2, Date.now() - 1)
+    }
+    const env = getEnv()
+    const profile = env.LLM_PROFILE
+    env.LLM_PROFILE = undefined
+    onTestFinished(() => { env.LLM_PROFILE = profile })
+
+    expect((await getToday()).topic).toMatchObject({ due: 1 })
+    const { sessionId } = await startSession({ data: { topicId: 't1' } })
+    const { queue } = JSON.parse(scalar(raw, 'SELECT plan_json FROM sessions WHERE id = ?', sessionId).plan_json as string) as { queue: string[] }
+    expect(queue).toContain('i1')
+    expect(queue.filter((id) => id.startsWith('s'))).toEqual([])
+  })
+
   it.each([
     { format: 'mcq', kind: 'session', answer: { optionId: 'b' }, correct: true, xp: 10, critical: true, sourceVersion: 3, correctOptionIds: ['b'] },
     { format: 'mcq', kind: 'session', answer: { optionId: 'a' }, correct: false, xp: 0, critical: false, sourceVersion: null, correctOptionIds: ['b'] },
