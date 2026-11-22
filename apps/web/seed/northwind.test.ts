@@ -21,7 +21,7 @@ const bindings = vi.hoisted(() => ({ waitUntil: (task: Promise<unknown>) => { ba
   LLM_PROFILE: 'meta',
   LLM_BASE_URL: 'https://model.test',
   LLM_MODEL: 'muse-spark-1.3',
-  COMPANY_GENERATION_ENABLED: 'true',
+  COMPANY_GENERATION_ENABLED: 'true' as string | undefined,
 } }))
 
 // Only the Worker/request transport and provider HTTP are substituted. The seed,
@@ -293,6 +293,24 @@ it('refuses to overwrite an unrelated company using the reserved slug', async ()
   expect(raw.prepare('SELECT COUNT(*) AS n FROM user').get()).toEqual({ n: 0 })
   expect(raw.prepare('SELECT COUNT(*) AS n FROM job_roles').get()).toEqual({ n: 0 })
   expect(fetchModel).not.toHaveBeenCalled()
+})
+
+it('generates no shared questions on a resumed seed while company generation is paused', async () => {
+  const secret = passwords()
+  shortOnly.add('Resolve scan mismatches')
+  await expect(seedNorthwind({ sopText, ...secret, now })).rejects.toMatchObject({ status: 422 })
+  await Promise.all(background.splice(0))
+  shortOnly.clear()
+  const calls = fetchModel.mock.calls.length
+  bindings.env.COMPANY_GENERATION_ENABLED = undefined
+  try {
+    await expect(seedNorthwind({ sopText, ...secret, now }))
+      .rejects.toMatchObject({ status: 503, message: 'Company training generation is paused until an official model path exists.' })
+  } finally {
+    bindings.env.COMPANY_GENERATION_ENABLED = 'true'
+  }
+  expect(fetchModel).toHaveBeenCalledTimes(calls)
+  expect(raw.prepare(`SELECT DISTINCT i.format FROM items i JOIN concepts c ON c.id = i.concept_id WHERE c.name = ?`).all('Resolve scan mismatches')).toEqual([{ format: 'short' }])
 })
 
 it('regenerates the critical step on rerun when no multiple-choice question was kept', async () => {
