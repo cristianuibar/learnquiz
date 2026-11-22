@@ -1325,8 +1325,6 @@ it('startSession explains that new questions are unavailable, before any request
   raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un1', 't1', 0, 'Basics')
   raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)').run('c1', 't1', 'un1', 0, 'Variables', '')
   raw.prepare('INSERT INTO learner_unit (learner_id, unit_id, unlocked_at) VALUES (?, ?, ?)').run('u1', 'un1', 1)
-  const real = await vi.importActual<typeof import('@/lib/llm/client')>('@/lib/llm/client')
-  vi.mocked(chatJson).mockImplementationOnce(real.chatJson)
   const fetchModel = vi.fn()
   vi.stubGlobal('fetch', fetchModel)
   const env = getEnv()
@@ -1339,6 +1337,34 @@ it('startSession explains that new questions are unavailable, before any request
   expect(scalar(raw, 'SELECT COUNT(*) AS n FROM model_calls').n).toBe(0)
   expect(scalar(raw, 'SELECT COUNT(*) AS n FROM sessions').n).toBe(0)
   expect(scalar(raw, "SELECT gen_status AS s FROM concepts WHERE id = 'c1'").s).toBe('ready')
+})
+
+it('startSession plays a stored multiple-choice question past short-only concepts when no model is configured', async () => {
+  seedTopicAndLearner(raw, 0)
+  raw.prepare('INSERT INTO units (id, topic_id, "order", name) VALUES (?, ?, ?, ?)').run('un1', 't1', 0, 'Basics')
+  raw.prepare('INSERT INTO learner_unit (learner_id, unit_id, unlocked_at) VALUES (?, ?, ?)').run('u1', 'un1', 1)
+  const short = JSON.stringify({ format: 'short', stem: 'Why?', options: [], accepted_answers: [], model_answer: 'Because.', explanation: '', difficulty: 1, source_quote: null, grounded: false, bloom: 'apply' })
+  const mcq = JSON.stringify({ format: 'mcq', stem: 'Pick one', options: [{ id: 'a', text: 'A', correct: true }, { id: 'b', text: 'B', correct: false }], accepted_answers: [], model_answer: 'A', explanation: '', difficulty: 1, source_quote: null, grounded: false, bloom: 'apply' })
+  const item = raw.prepare('INSERT INTO items (id, concept_id, topic_id, format, payload_json, difficulty_prior, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+  for (let i = 1; i <= 5; i++) {
+    raw.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary) VALUES (?, ?, ?, ?, ?, ?)').run(`c${i}`, 't1', 'un1', i, `Concept ${i}`, '')
+    if (i < 5) item.run(`s${i}`, `c${i}`, 't1', 'short', short, 1, 1)
+  }
+  item.run('m5', 'c5', 't1', 'mcq', mcq, 1, 1)
+  const fetchModel = vi.fn()
+  vi.stubGlobal('fetch', fetchModel)
+  const env = getEnv()
+  const profile = env.LLM_PROFILE
+  env.LLM_PROFILE = undefined
+  const base = vi.mocked(chatJson).getMockImplementation()!
+  vi.mocked(chatJson).mockImplementation((await vi.importActual<typeof import('@/lib/llm/client')>('@/lib/llm/client')).chatJson)
+  onTestFinished(() => { env.LLM_PROFILE = profile; vi.mocked(chatJson).mockImplementation(base); vi.unstubAllGlobals() })
+
+  const { sessionId } = await startSession({ data: { topicId: 't1' } })
+  const { queue } = JSON.parse(scalar(raw, 'SELECT plan_json FROM sessions WHERE id = ?', sessionId).plan_json as string) as { queue: string[] }
+  expect(queue).toEqual(['m5'])
+  expect(fetchModel).not.toHaveBeenCalled()
+  expect(scalar(raw, 'SELECT COUNT(*) AS n FROM model_calls').n).toBe(0)
 })
 
 it('startSession joins an in-flight prepareNextSession generation so one concept is generated once', async () => {

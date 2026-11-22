@@ -13,7 +13,7 @@ import { composeSession, reinsert, SESSION_BONUS, streakAfter, xpFor } from '@/l
 import { museModelIds } from '@learnquiz/api/models'
 import { reportReasons } from '@learnquiz/api/reveal'
 import type { Confidence, ItemView, Progress, Reveal, SessionPlanning, SessionView, SummaryView } from '@learnquiz/api'
-import { chatJson, chatJsonWithModel, DailyCapError, jobModel } from '@/lib/llm/client'
+import { chatJson, chatJsonWithModel, DailyCapError, hasModel, jobModel, MODEL_UNAVAILABLE_MESSAGE } from '@/lib/llm/client'
 import { gradePrompt } from '@/lib/llm/prompts'
 import { Grade, type ItemPayload } from '@/lib/llm/schemas'
 import { plural } from '@/lib/utils'
@@ -320,20 +320,22 @@ export const startSession = createServerFn({ method: 'POST' })
     const isWeak = (f: (typeof frontier)[number]) => weak?.includes(f.concept.unitId) ?? false
     const ranked = basics ? [...frontier.filter(isWeak), ...frontier.filter((f) => !isWeak(f))] : frontier
     const unitFrontier = ranked.filter((f) => !unitId || f.concept.unitId === unitId)
-    // A role topic plays only stored questions, so it skips frontier concepts that hold none it may serve.
+    // A role topic plays only stored questions, and so does a personal topic without a question model: both skip
+    // frontier concepts that hold none they may serve.
     const role = topic.jobRoleId !== null
-    const candidates = role ? unitFrontier : unitFrontier.slice(0, 4)
+    const storedOnly = role || !hasModel('items')
+    const candidates = storedOnly ? unitFrontier : unitFrontier.slice(0, 4)
     // Anything practisable stored starts the session at once (a shorter one is fine); prepareNextSession tops up during play.
     const storedRows = candidates.length
-      ? await db.select().from(items).where(and(eq(items.topicId, topic.id), role ? undefined : inArray(items.conceptId, candidates.map((f) => f.concept.id)),
+      ? await db.select().from(items).where(and(eq(items.topicId, topic.id), storedOnly ? undefined : inArray(items.conceptId, candidates.map((f) => f.concept.id)),
         eq(items.status, 'active'), notFlaggedBy(db, learnerId), gradesShortAnswers(topic) ? undefined : ne(items.format, 'short')))
       : []
-    const top = role ? candidates.filter((f) => storedRows.some((r) => r.conceptId === f.concept.id)).slice(0, 4) : candidates
+    const top = storedOnly ? candidates.filter((f) => storedRows.some((r) => r.conceptId === f.concept.id)).slice(0, 4) : candidates
     const stored = top.map((f) => storedRows.filter((r) => r.conceptId === f.concept.id).map(asItem))
     const storedFresh = stored.flat().filter((it) => !seen.has(it.id)).length
     // Role questions are built once per concept by the company queue; a role session only plays what is stored (#40).
     // A personal topic generates only when nothing is due, so a daily-cap refusal has no stored reviews to fall back on.
-    const generated = topic.jobRoleId !== null || due.length + storedFresh > 0 ? stored
+    const generated = storedOnly || due.length + storedFresh > 0 ? stored
       : await Promise.all(top.map((f) => ensureConceptItems(db, learnerId, f.concept, topic, { targetDifficulty, unseen: seen, sessionId })))
     // A role topic cannot generate more, so with nothing due or fresh it replays its stored questions ahead of schedule.
     const replay = topic.jobRoleId !== null && due.length + storedFresh === 0
@@ -365,6 +367,7 @@ export const startSession = createServerFn({ method: 'POST' })
     const rulesQueue = composeSession({ size: SESSION_SIZE, due, frontier: frontierInput, closers, targetDifficulty, basics: basicsRank })
     if (!rulesQueue.length) {
       if (topic.jobRoleId !== null) throw httpError(`${await preparingMessage(db, topic.jobRoleId)}. Try again in a few minutes.`, 503)
+      if (storedOnly) throw httpError(MODEL_UNAVAILABLE_MESSAGE, 503)
       // A join that timed out leaves generation running; that is a wait, not an empty topic.
       const pending = top.length
         ? await db.select({ id: concepts.id }).from(concepts).where(and(inArray(concepts.id, top.map((f) => f.concept.id)), eq(concepts.genStatus, 'generating'))).limit(1)
