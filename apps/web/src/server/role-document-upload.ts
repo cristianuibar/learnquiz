@@ -10,6 +10,7 @@ import { requireOrgAdmin } from '@/server/authz'
 import { drainConceptQueue } from '@/server/concept-gen'
 import { drainsOnRequest, getEnv, runInBackground } from '@/server/env'
 import { httpError } from '@/server/helpers'
+import { companyGenerationPaused } from '@/server/model-cap'
 
 // Server-only: kept apart from role-documents.ts so the client bundle of that module (imported by the upload form) never reaches it.
 const Fields = z.object({
@@ -35,6 +36,14 @@ export const parseDocumentForm = (input: FormData) => {
   return { ...parsed.data, text, file }
 }
 
+// Replacing or retiring a readable document of built training retires its questions; while company generation is
+// paused nothing would generate new ones, so the document stays as it is.
+export function assertDocumentChangeable(topic: { status: string }, source: { status: string }) {
+  if (topic.status === 'ready' && source.status !== 'failed' && companyGenerationPaused()) {
+    throw httpError('Documents behind built training cannot be replaced or retired while company training generation is paused.', 503)
+  }
+}
+
 // Rejected items keep their review outcome; only items learners can still see are retired.
 export const LIVE = ['active', 'reported'] as const
 
@@ -52,6 +61,7 @@ export async function addRoleDocument(data: ReturnType<typeof parseDocumentForm>
     if (row.topic.status === 'generating') throw httpError('The curriculum is generating. Try again when it finishes.', 409)
     old = await db.select().from(sources).where(liveSource(data.replacesId, row.topic.id)).get()
     if (!old) throw httpError('Document not found', 404)
+    assertDocumentChangeable(row.topic, old)
   } else if (!['draft', 'failed'].includes(row.topic.status)) {
     throw httpError('The curriculum is already generating or ready.', 409)
   }

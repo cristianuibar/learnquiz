@@ -69,7 +69,7 @@ export const getUnitProcedure = createServerFn({ method: 'GET' })
     if (stored?.sources === key) return { status: 'ready', graph: stored.graph, source: meta }
 
     // A company flowchart is not built while company generation is paused; a stale one is not shown either.
-    if (topic.orgId && companyGenerationPaused()) return null
+    if ((topic.orgId || topic.jobRoleId) && companyGenerationPaused()) return null
     if (topic.orgId) await assertWithinCompanyCap(db, topic.orgId)
     const now = Date.now()
     // Atomic D1 claim works across worker instances. A crashed request can be retried once its claim is stale.

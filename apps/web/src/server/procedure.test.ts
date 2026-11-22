@@ -155,6 +155,15 @@ it('serves a stored company flowchart and builds none while company generation i
   expect(raw.prepare('SELECT procedure_started_at FROM units').get()).toEqual({ procedure_started_at: null })
 })
 
+it('builds no flowchart for a legacy role topic without a company while company generation is paused', async () => {
+  run('INSERT INTO organization (id, name, slug, created_at) VALUES (?, ?, ?, ?)', 'org', 'Northwind', 'northwind', 1)
+  run('INSERT INTO job_roles (id, org_id, name, created_at) VALUES (?, ?, ?, ?)', 'role', 'org', 'Dispatcher', 1)
+  run('UPDATE topics SET job_role_id = ?, org_id = NULL', 'role')
+  boundary.env.COMPANY_GENERATION_ENABLED = undefined
+  expect(await getUnitProcedure({ data: { unitId: 'unit' } })).toBeNull()
+  expect(fetchModel).not.toHaveBeenCalled()
+})
+
 it('sends the whole of a long role document, so steps past 20,000 characters reach the model', async () => {
   const steps = 'Lock out the press before clearing a jam.'
   run('UPDATE sources SET body_text = ?', `${'Company history. '.repeat(2_000)}${steps} ${'Appendix. '.repeat(2_000)}`)

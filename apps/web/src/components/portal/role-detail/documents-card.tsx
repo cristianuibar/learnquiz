@@ -41,6 +41,8 @@ export function DocumentsCard({ detail, readOnly, pasteOpen, pasteFor, onToggleP
   const { role, documents } = detail
   const canUpload = !readOnly && (role.topicStatus === 'draft' || role.topicStatus === 'failed')
   const canChange = !readOnly && role.topicStatus !== 'generating'
+  // While company generation is paused, the readable documents of built training stay as they are.
+  const locked = detail.generationPaused && role.topicStatus === 'ready'
   const canRetire = documents.filter((doc) => doc.status === 'ready').length > 1
   const input = useRef<HTMLInputElement>(null)
   const replacing = useRef<string | undefined>(undefined)
@@ -160,7 +162,10 @@ export function DocumentsCard({ detail, readOnly, pasteOpen, pasteFor, onToggleP
         )}
       </div>
       {canChange && <input ref={input} type="file" accept="application/pdf" hidden tabIndex={-1} aria-hidden onChange={chosen} />}
-      {canChange && !canRetire && documents.some((doc) => doc.status === 'ready') && (
+      {canChange && locked && documents.some((doc) => doc.status === 'ready') && (
+        <p className="text-body text-ink-muted">Documents behind built training cannot be replaced or retired while generation is paused.</p>
+      )}
+      {canChange && !locked && !canRetire && documents.some((doc) => doc.status === 'ready') && (
         <p className="text-body text-ink-muted">Keep at least one readable document. Use Replace to change the last document.</p>
       )}
       {error && <Banner kind="alert">{error}</Banner>}
@@ -216,7 +221,7 @@ export function DocumentsCard({ detail, readOnly, pasteOpen, pasteFor, onToggleP
                   </Button>
                   <RowMenu label={doc.title} items={[{ label: 'Remove', icon: X, onSelect: () => void removeDoc(doc.id) }]} />
                 </>
-              ) : (
+              ) : !locked && (
                 <>
                   <Button id={`rd-replace-${doc.id}`} type="button" variant="ghost" aria-label={`Replace ${doc.title}`} disabled={busy} onClick={() => pick(doc.id)}>
                     <Upload aria-hidden />

@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, isNotNull, lt, or, sql } from 'drizzle-orm'
 import type { Db } from '@/db'
 import { concepts, items, learnerConcept, sources, topics } from '@/db/schema'
-import { chatJson, jobModel, LlmError } from '@/lib/llm/client'
+import { chatJson, jobModel, LlmError, MODEL_UNAVAILABLE_MESSAGE } from '@/lib/llm/client'
 import { ENABLED_FORMATS, itemsPrompt, selfCheckPrompt } from '@/lib/llm/prompts'
 import { ItemBatch, ItemPayload, SelfCheck } from '@/lib/llm/schemas'
 import { liveConcept } from '@/server/live-concept'
@@ -183,7 +183,7 @@ export async function generateConceptItems(
         if (verdict?.keep) kept.push({ payload, check: verdict ?? null })
       })
     } catch (e) {
-      if (e instanceof LlmError && e.status === 429) throw httpError(e.message, 429)
+      if (e instanceof LlmError && (e.status === 429 || e.message === MODEL_UNAVAILABLE_MESSAGE)) throw httpError(e.message, e.status)
       if (!(e instanceof LlmError)) throw e
       console.error('item generation failed', e.message)
       break

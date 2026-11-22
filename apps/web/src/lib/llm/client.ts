@@ -38,6 +38,8 @@ const PURPOSE_TIMEOUT_MS: Partial<Record<ModelJob, number>> = {
   procedure: 180_000,
 }
 
+export const MODEL_UNAVAILABLE_MESSAGE = 'Generating new learning content is unavailable right now.'
+
 // `fallback` resolves the Meta model that backs up a failed Fireworks call.
 export function jobModel(job: ModelJob, fallback = false) {
   const env = getEnv()
@@ -45,27 +47,40 @@ export function jobModel(job: ModelJob, fallback = false) {
     // Wrangler JSON bindings are objects; .dev.vars can supply JSON strings.
     const mapping: unknown = typeof env.JOB_MODELS === 'string' ? JSON.parse(env.JOB_MODELS) : env.JOB_MODELS === undefined ? {} : env.JOB_MODELS
     const jobs = z.record(z.string(), z.unknown()).parse(mapping)
+    // The checked-in configuration names no model: the Muse API is closed and no official path replaces it yet.
+    const profile = env.LLM_PROFILE
+    if (!fallback && jobs[job] === undefined && !profile) throw new LlmError(MODEL_UNAVAILABLE_MESSAGE, 503)
     const selected = fallback
       ? { provider: 'meta' as const, model: 'muse-spark-1.3' }
       : jobs[job] === undefined
-      ? { provider: env.LLM_PROFILE, model: env.LLM_MODEL }
+      ? { provider: profile!, model: env.LLM_MODEL ?? '' }
       : z.object({ provider: z.enum(['meta', 'baseten', 'fireworks']), model: z.string().min(1) }).parse(jobs[job])
     const modelId = selected.provider === 'fireworks' ? selected.model.replace(/^accounts\/fireworks\/models\//, '') : selected.model
     if (!META_MODELS.has(modelId)) throw new Error('Only Meta models are supported')
     const provider = selected.provider === 'ollama'
-      ? { baseUrl: env.LLM_BASE_URL, keyBinding: 'LLM_API_KEY' as const, jsonMode: 'json_object' as const }
+      ? { baseUrl: env.LLM_BASE_URL ?? '', keyBinding: 'LLM_API_KEY' as const, jsonMode: 'json_object' as const }
       : PROVIDERS[selected.provider]
     if (!provider) throw new Error('Unknown provider')
     return {
       ...selected,
       modelId,
-      baseUrl: (selected.provider === env.LLM_PROFILE ? env.LLM_BASE_URL : provider.baseUrl).replace(/\/$/, ''),
-      apiKey: env[provider.keyBinding] || (selected.provider === env.LLM_PROFILE ? env.LLM_API_KEY : undefined),
+      baseUrl: (selected.provider === profile && env.LLM_BASE_URL ? env.LLM_BASE_URL : provider.baseUrl).replace(/\/$/, ''),
+      apiKey: env[provider.keyBinding] || (selected.provider === profile ? env.LLM_API_KEY : undefined),
       jsonMode: provider.jsonMode,
     }
-  } catch {
+  } catch (e) {
+    if (e instanceof LlmError) throw e
     // Configuration errors must never include bindings or credentials.
     throw new LlmError(`Invalid model configuration for ${job}.`, 503)
+  }
+}
+
+export function isModelAvailable(job: ModelJob): boolean {
+  try {
+    jobModel(job)
+    return true
+  } catch {
+    return false
   }
 }
 

@@ -148,6 +148,22 @@ afterEach(() => {
   raw.exec('ROLLBACK TO test; RELEASE test')
 })
 
+it('refuses a new personal topic before any write or model call when no model is configured', async () => {
+  const env = getEnv()
+  const configured = { LLM_PROFILE: env.LLM_PROFILE, LLM_MODEL: env.LLM_MODEL, LLM_BASE_URL: env.LLM_BASE_URL }
+  Object.assign(env, { LLM_PROFILE: undefined, LLM_MODEL: undefined, LLM_BASE_URL: undefined })
+  try {
+    await expect(curriculum.createTopic({ data: { topic: 'Warehouse picker', sourceText: 'Scan every SKU.' } }))
+      .rejects.toMatchObject({ status: 503, message: 'Creating a new topic is unavailable right now.' })
+  } finally {
+    Object.assign(env, configured)
+  }
+  expect(raw.prepare("SELECT COUNT(*) AS n FROM topics WHERE learner_id = 'owner'").get()).toEqual({ n: 0 })
+  expect(raw.prepare('SELECT COUNT(*) AS n FROM sources WHERE topic_id NOT IN (SELECT id FROM topics)').get()).toEqual({ n: 0 })
+  expect(fetchModel).not.toHaveBeenCalled()
+  expect(raw.prepare('SELECT COUNT(*) AS n FROM model_calls').get()).toEqual({ n: 0 })
+})
+
 it.each([401, 429, 503])('explains a personal curriculum failure (%s) while retaining the input and technical call log', async (status) => {
   fetchModel.mockResolvedValueOnce(new Response('Provider unavailable', { status }))
   await expect(curriculum.createTopic({ data: {

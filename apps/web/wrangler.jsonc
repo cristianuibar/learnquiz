@@ -14,21 +14,10 @@
   "routes": [
     { "pattern": "app.learnquiz.com", "custom_domain": true }
   ],
-  // COMPANY_GENERATION_ENABLED stays unset: company curricula, shared questions and procedure flowcharts are paused until an
-  // official model path exists. Diagrams and voice answers have no model path either.
+  // No model is configured: the Muse API is closed and no official model path replaces it yet, so new topics and
+  // questions are unavailable. COMPANY_GENERATION_ENABLED stays unset: company curricula, shared questions and
+  // procedure flowcharts are paused. Diagrams and voice answers have no model path either.
   "vars": {
-    "LLM_PROFILE": "meta",
-    "LLM_BASE_URL": "https://api.meta.ai/v1",
-    "LLM_MODEL": "muse-spark-1.3",
-    "JOB_MODELS": {
-      "curriculum": { "provider": "meta", "model": "muse-spark-1.3" },
-      "items": { "provider": "meta", "model": "muse-spark-1.3" },
-      "self_check": { "provider": "meta", "model": "muse-spark-1.3" },
-      "plan": { "provider": "meta", "model": "muse-wonder-1.0" },
-      "grade": { "provider": "meta", "model": "muse-spark-1.3" },
-      "procedure": { "provider": "meta", "model": "muse-spark-1.3" },
-      "placement_line": { "provider": "fireworks", "model": "accounts/fireworks/models/muse-spark-open" }
-    },
     "BETTER_AUTH_URL": "https://app.learnquiz.com"
   },
   "d1_databases": [

@@ -5,7 +5,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vite
 import * as schema from '@/db/schema'
 import * as authSchema from '@/db/auth-schema'
 
-const state = vi.hoisted(() => ({ db: null as unknown, user: 'owner-a' as string | null, active: null as string | null, anonymous: false, bucket: { put: vi.fn(), delete: vi.fn() }, background: [] as Promise<unknown>[] }))
+const state = vi.hoisted(() => ({ db: null as unknown, user: 'owner-a' as string | null, active: null as string | null, anonymous: false, bucket: { put: vi.fn(), delete: vi.fn() }, background: [] as Promise<unknown>[], companyGeneration: 'true' as string | undefined }))
 const drain = vi.hoisted(() => vi.fn())
 
 // Fake only the server transport, session and Cloudflare bindings. Validators,
@@ -22,7 +22,7 @@ vi.mock('@tanstack/react-start', () => ({
 }))
 vi.mock('@tanstack/react-start/server', () => ({ getRequestHeaders: () => new Headers() }))
 vi.mock('@/db', () => ({ getDb: () => state.db }))
-vi.mock('@/server/env', () => ({ getEnv: () => ({ MEDIA: state.bucket, BETTER_AUTH_URL: 'http://127.0.0.1:8800' }), drainsOnRequest: () => false, runInBackground: (task: Promise<unknown>) => { state.background.push(task) } }))
+vi.mock('@/server/env', () => ({ getEnv: () => ({ MEDIA: state.bucket, BETTER_AUTH_URL: 'http://127.0.0.1:8800', COMPANY_GENERATION_ENABLED: state.companyGeneration }), drainsOnRequest: () => false, runInBackground: (task: Promise<unknown>) => { state.background.push(task) } }))
 vi.mock('@/server/concept-gen', () => ({ drainConceptQueue: drain }))
 vi.mock('@/server/session', () => ({ getSessionUser: async () => state.user ? { id: state.user, isAnonymous: state.anonymous } : null }))
 vi.mock('@/server/auth', () => ({ getAuth: () => ({ api: { getSession: async () => state.user ? { user: { id: state.user, isAnonymous: state.anonymous }, session: { activeOrganizationId: state.active } } : null } }) }))
@@ -73,6 +73,7 @@ beforeAll(() => {
 })
 beforeEach(() => {
   sqlite.exec('BEGIN')
+  state.companyGeneration = 'true'
   state.user = 'owner-a'
   state.active = null
   state.anonymous = false
@@ -214,6 +215,19 @@ it('replaces a document with version 2, retires its items and requeues the conce
     .toEqual({ source_id: result.sourceId, source_quote: 'wear a vest', gen_status: 'pending', gen_started_at: null, gen_error: null })
   expect(drain).not.toHaveBeenCalled()
   expect(state.background).toHaveLength(0)
+})
+
+it('keeps the documents of built training and their questions while company generation is paused', async () => {
+  seedV1()
+  sqlite.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, status, created_at) VALUES ('src-other', 'topic-role-a', 'text', 'Other rules', 'Stop at the red line.', 'ready', 2)").run()
+  state.companyGeneration = undefined
+  const refused = { status: 503, message: 'Documents behind built training cannot be replaced or retired while company training generation is paused.' }
+  await expect(uploadRoleDocument({ data: form({ replacesId: 'src-1', text: 'Always wear a vest on the dock.' }) })).rejects.toMatchObject(refused)
+  await expect(retireRoleDocument({ data: { slug: 'acme', roleId: 'role-a', sourceId: 'src-1' } })).rejects.toMatchObject(refused)
+  expect(itemStatus()).toEqual({ 'item-1': 'active', 'item-2': 'active', 'item-other': 'active' })
+  expect(sqlite.prepare("SELECT id, version, retired_at FROM sources WHERE topic_id = 'topic-role-a' ORDER BY id").all())
+    .toEqual([{ id: 'src-1', version: 1, retired_at: null }, { id: 'src-other', version: 1, retired_at: null }])
+  expect(sqlite.prepare("SELECT source_id, gen_status FROM concepts WHERE id = 'con-1'").get()).toEqual({ source_id: 'src-1', gen_status: 'ready' })
 })
 
 it('records the size and page count of a replacement PDF', async () => {

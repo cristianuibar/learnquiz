@@ -274,6 +274,8 @@ it('explains paused generation and offers no build or retry, while built concept
   expect(draft.button('Build curriculum')).toBeUndefined()
   const built = await mount(makeDetail({ generationPaused: true, status: 'ready', documents: [pdf], units: unit([concept('c1', 'Cash float', 'ready'), concept('c9', 'Safe drop', 'failed')]) }))
   expect(built.button('Retry questions for Safe drop')).toBeUndefined()
+  expect(built.button('Replace Till handbook')).toBeUndefined()
+  expect(built.container.textContent).toContain('Documents behind built training cannot be replaced or retired while generation is paused.')
   expect(built.container.textContent).toContain("Couldn't generate questions.")
   expect(built.container.querySelectorAll('[role="switch"]')).toHaveLength(2)
   expect(built.button('Edit concept: Cash float')).toBeDefined()

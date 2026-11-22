@@ -7,7 +7,7 @@ import { validateSkeleton, fallbackSkeleton } from '@/lib/curriculum/validate'
 import { conceptStatus, roleMastery, unitState } from '@/lib/learning/path'
 import { onboardingDay } from '@/lib/learning/profile'
 import { streakShown } from '@/lib/learning/session'
-import { chatJson, DailyCapError, jobModel, LlmError } from '@/lib/llm/client'
+import { chatJson, DailyCapError, isModelAvailable, jobModel, LlmError } from '@/lib/llm/client'
 import { curriculumPrompt } from '@/lib/llm/prompts'
 import { CurriculumSkeleton } from '@/lib/llm/schemas'
 import { MAX_SOURCE_TEXT_CHARS } from '@/lib/limits'
@@ -33,7 +33,8 @@ export const createTopic = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<{ topicId: string }> => {
     const learnerId = await requireLearnerId()
     const db = getDb()
-    // Before any stored write: a capped learner stores no topic or source row.
+    // Before any stored write: without a model, or once capped, a learner stores no topic or source row.
+    if (!isModelAvailable('curriculum')) throw httpError('Creating a new topic is unavailable right now.', 503)
     await assertWithinDailyCap(db, learnerId)
     const topicId = crypto.randomUUID()
     await db.insert(topics).values({ id: topicId, learnerId, title: data.topic, goal: data.goal ?? null, status: 'generating', createdAt: Date.now() })

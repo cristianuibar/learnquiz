@@ -8,7 +8,7 @@ import { requireOrgAdmin } from '@/server/authz'
 import { drainConceptQueue } from '@/server/concept-gen'
 import { drainsOnRequest, getEnv, runInBackground } from '@/server/env'
 import { httpError } from '@/server/helpers'
-import { addRoleDocument, LIVE, liveSource, parseDocumentForm, refusal } from '@/server/role-document-upload'
+import { addRoleDocument, assertDocumentChangeable, LIVE, liveSource, parseDocumentForm, refusal } from '@/server/role-document-upload'
 
 export const uploadRoleDocument = createServerFn({ method: 'POST' })
   .validator((input: FormData) => parseDocumentForm(input))
@@ -76,6 +76,7 @@ export const retireRoleDocument = createServerFn({ method: 'POST' })
     if (topic.status === 'generating') throw httpError('The curriculum is generating. Try again when it finishes.', 409)
     const source = await db.select().from(sources).where(liveSource(data.sourceId, topic.id)).get()
     if (!source) throw httpError('Document not found', 404)
+    assertDocumentChangeable(topic, source)
     // Conditional at write time: a build may claim the topic after the check above.
     const notGenerating = exists(db.select({ one: sql`1` }).from(topics).where(and(eq(topics.id, topic.id), ne(topics.status, 'generating'))))
     // Keep a readable source available for Replace, even if two retirements race.

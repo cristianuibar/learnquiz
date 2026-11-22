@@ -250,8 +250,10 @@ pnpm db:migrate:local
 pnpm dev                              # http://localhost:3000
 ```
 
-`apps/web/.dev.vars` is git-ignored; keep credentials out of version control. The default
-model configuration is in `apps/web/wrangler.jsonc`. Local D1 data is separate from production.
+`apps/web/.dev.vars` is git-ignored; keep credentials out of version control.
+`apps/web/wrangler.jsonc` configures no model: the Muse API is closed and no official model path
+replaces it yet, so the deployed app shows new topics and questions as unavailable. Configure a
+model in `apps/web/.dev.vars` for local work. Local D1 data is separate from production.
 
 | Setting | Purpose |
 | --- | --- |
@@ -263,7 +265,7 @@ model configuration is in `apps/web/wrangler.jsonc`. Local D1 data is separate f
 | `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET` | App origin and authentication secret |
 | `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET` | Optional Facebook login; both are required |
 
-`JOB_MODELS` in `apps/web/wrangler.jsonc` maps `curriculum`, `items`, `self_check`, `plan`,
+`JOB_MODELS` maps `curriculum`, `items`, `self_check`, `plan`,
 `grade`, `procedure`, and the placement result's `placement_line` to a provider
 and model. For example, set `self_check` to
 `{ "provider": "baseten", "model": "muse-spark-open" }` and supply `BASETEN_API_KEY`
