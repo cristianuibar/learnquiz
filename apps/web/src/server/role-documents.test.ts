@@ -30,7 +30,7 @@ vi.mock('@/server/auth', () => ({ getAuth: () => ({ api: { getSession: async () 
 import { MAX_ROLE_DOCUMENT_BYTES, MAX_ROLE_DOCUMENT_CHARS } from '@/lib/limits'
 import { Route } from '@/routes/api/org.$orgId.roles.$roleId.documents'
 import { listRoles } from './org'
-import { previewRetireRoleDocument, removeRoleDocument, retireRoleDocument, uploadRoleDocument } from './role-documents'
+import { previewRetireRoleDocument, removeRoleDocument, RETIRE_PAUSED, retireRoleDocument, uploadRoleDocument } from './role-documents'
 import { REPLACE_PAUSED } from './role-document-upload'
 
 let sqlite: DatabaseSync
@@ -398,6 +398,25 @@ it('retiring repoints concepts another document covers and fails the orphans, wi
   ])
   expect(drain).not.toHaveBeenCalled()
   expect(state.background).toHaveLength(0)
+})
+
+it('refuses a retire that would requeue a covered concept while no question model is configured, and allows one that only fails orphans', async () => {
+  seedShared()
+  state.model = {}
+  await expect(retireRoleDocument({ data: { ...ids, sourceId: 'src-1' } })).rejects.toMatchObject({ status: 503, message: RETIRE_PAUSED })
+  expect(sqlite.prepare("SELECT retired_at FROM sources WHERE id = 'src-1'").get()).toEqual({ retired_at: null })
+  expect(itemStatus()).toEqual({ 'item-1': 'active', 'item-2': 'active', 'item-other': 'active' })
+  expect(sqlite.prepare('SELECT id, source_id, gen_status FROM concepts ORDER BY id').all()).toEqual([
+    { id: 'con-1', source_id: 'src-1', gen_status: 'ready' },
+    { id: 'con-2', source_id: 'src-1', gen_status: 'ready' },
+  ])
+
+  sqlite.prepare("UPDATE sources SET body_text = 'Visitors sign in at reception.' WHERE id = 'src-2'").run()
+  await expect(retireRoleDocument({ data: { ...ids, sourceId: 'src-1' } })).resolves.toEqual({ ok: true })
+  expect(sqlite.prepare('SELECT id, gen_status FROM concepts ORDER BY id').all()).toEqual([
+    { id: 'con-1', gen_status: 'failed' },
+    { id: 'con-2', gen_status: 'failed' },
+  ])
 })
 
 // The other document goes away between the concept read and the retire write: the concept never lands on a retired document.

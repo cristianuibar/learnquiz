@@ -256,9 +256,10 @@ pnpm dev                              # http://localhost:3000
 The deployed Worker never calls a model, whatever its bindings; model settings apply
 only under `pnpm dev` and the local seed command. `apps/web/wrangler.jsonc`
 configures no model: without one, creating a topic and building role training show
-as unavailable, replacing a role document is paused, the question queue waits,
-diagrams and voice are hidden, and sessions, placement results and short-answer
-reveals use their rules and template fallbacks. Local D1 data is separate from production.
+as unavailable, replacing a role document (or retiring one whose concepts another
+document covers) is paused, the question queue waits, diagrams and voice are hidden,
+and sessions, placement results and short-answer reveals use their rules and
+template fallbacks. Local D1 data is separate from production.
 
 | Setting | Purpose |
 | --- | --- |
