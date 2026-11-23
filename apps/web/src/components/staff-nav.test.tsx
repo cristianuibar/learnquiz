@@ -49,7 +49,11 @@ it('shows the no-access page on a 403 and links to the first portal or Today', a
       [...adminCompanies],
     )
     try {
-      expect(container.querySelector('h1')!.textContent).toBe('No access to the staff admin')
+      const h1 = container.querySelector('h1')!
+      expect(h1.textContent).toBe('No access to the staff admin')
+      expect(document.activeElement).toBe(h1)
+      // Any outline utility outranks the shared :focus-visible ring and hides it from keyboard users.
+      expect([...h1.classList].filter((c) => c.includes('outline'))).toEqual([])
       expect(container.querySelector('strong')!.textContent).toBe(user.email)
       expect([...container.querySelectorAll('a')].find((a) => a.textContent === 'Go to your portal')!.getAttribute('href')).toBe(href)
       expect(container.querySelector('nav')).toBeNull()

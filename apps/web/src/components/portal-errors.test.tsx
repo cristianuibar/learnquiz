@@ -77,6 +77,8 @@ describe('permission denied', () => {
       const h1 = container.querySelector('h1')!
       expect(h1.textContent).toBe('No access to this portal')
       expect(document.activeElement).toBe(h1)
+      // Any outline utility outranks the shared :focus-visible ring and hides it from keyboard users.
+      expect([...h1.classList].filter((c) => c.includes('outline'))).toEqual([])
       for (const t of shown) expect(container.textContent).toContain(t)
       for (const t of hidden) expect(container.textContent).not.toContain(t)
       expect(container.querySelector('[role="navigation"], nav')).toBeNull()
@@ -104,6 +106,7 @@ describe('not found inside the portal', () => {
       const h1 = container.querySelector('h1')!
       expect(h1.textContent).toBe(title)
       expect(document.activeElement).toBe(h1)
+      expect([...h1.classList].filter((c) => c.includes('outline'))).toEqual([])
       const link = (name: string) => [...container.querySelectorAll('a')].find((a) => a.textContent === name)
       expect(link('Go to Overview')?.getAttribute('href')).toBe('/org/x')
       expect(link(list)?.getAttribute('href')).toBe(listHref)
