@@ -169,13 +169,16 @@ link before completing the web join form if you want to create the account in An
 
 ## Meta models and status
 
+The deployed Worker calls no model and reads no Meta Model API or Fireworks key;
+see [Deploy](#deploy) to retire those secrets. Locally, jobs can be mapped to
+Baseten or a local Muse Glimmer server (see [Run locally](#run-locally)).
+
 | Model | Job | Status |
 | --- | --- | --- |
-| Muse Spark 1.3 (`muse-spark-1.3`) | Curriculum skeleton, question generation and item self-check | Shipped; default Meta Model API model with JSON-schema output |
-| Muse Spark 1.3 | Short-answer grading | Shipped for personal topics |
-| Muse Spark Open on Fireworks (`accounts/fireworks/models/muse-spark-open`) | Placement result text (`placement_line`) for personal topics | Configured; falls back to Muse Spark 1.3 when Fireworks fails or times out, then to a template; company roles use a template |
+| Muse Spark 1.3 (`muse-spark-1.3`) | Curriculum skeleton, question generation, item self-check, procedure flowcharts and short-answer grading | Removed with the Meta Model API provider; creating a topic and building role training show as unavailable, and short answers are revealed ungraded |
+| Muse Spark Open on Fireworks (`accounts/fireworks/models/muse-spark-open`) | Placement result text (`placement_line`) for personal topics | Removed with the Fireworks provider; placement results use a template |
 | Muse Voice Transcribe 1.0 (`muse-voice-transcribe-1.0`) | Transcribe spoken answers for editing before submission | Disabled until an official model path exists; learners type their answers |
-| Muse Wonder 1.0 (`muse-wonder-1.0`) | Order selected session items and explain the order | Optional for personal topics, with a rules fallback; company roles use the rules planner |
+| Muse Wonder 1.0 (`muse-wonder-1.0`) | Order selected session items and explain the order | Removed with the Meta Model API provider; sessions use the rules planner |
 | Muse Image 1.0 | Diagrams for visual concepts | Disabled until an official model path exists; stored diagrams stay viewable |
 
 Every model call is logged to the `model_calls` table. For personal topics on the
@@ -359,6 +362,17 @@ pnpm --filter @learnquiz/web deploy
 ```
 
 Set `FACEBOOK_APP_ID` and `FACEBOOK_APP_SECRET` as well if using Facebook login.
+
+The deployed Worker reads no model provider secret. A deployment made before the
+Meta and Fireworks providers were removed may still hold `LLM_API_KEY` (the Meta
+Model API key) and `FIREWORKS_API_KEY`; delete them, along with `BASETEN_API_KEY`
+if it was set, then revoke the keys with their provider:
+
+```sh
+pnpm --filter @learnquiz/web exec wrangler secret delete LLM_API_KEY
+pnpm --filter @learnquiz/web exec wrangler secret delete FIREWORKS_API_KEY
+```
+
 In the Cloudflare dashboard, add a WAF rate limiting rule for your zone: POST
 requests to the app hostname, 10 per minute per IP, block. The Worker also caps model
 calls per UTC day: **150 per guest**, **500 per account**, and **400 per company**.
