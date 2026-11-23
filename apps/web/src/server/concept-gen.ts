@@ -68,8 +68,8 @@ export async function processConcept(db: Db, conceptId: string): Promise<void> {
   }
 }
 
-// Without a question model the queue is paused too: concepts stay pending instead of failing.
-export const conceptQueuePaused = (): boolean => companyGenerationPaused() || !hasModel('items')
+// Without a question model, or the self-check that keeps its drafts, the queue is paused too: concepts stay pending instead of failing.
+export const conceptQueuePaused = (): boolean => companyGenerationPaused() || !hasModel('items') || !hasModel('self_check')
 
 // While the queue is paused, pending concepts stay pending: no claim and no model call.
 export async function drainConceptQueue(opts: { limit: number; concurrency: number } = { limit: 8, concurrency: 4 }, db: Db = getDb()): Promise<number> {
