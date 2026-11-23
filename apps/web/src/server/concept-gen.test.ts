@@ -124,8 +124,12 @@ it('drains a pending company topic until every concept holds exactly six shared,
   expect(one('SELECT COUNT(*) AS n FROM model_calls')).toEqual({ n: CONCEPTS * 2 })
 })
 
-it('keeps every concept pending and calls no model while no question model is configured', async () => {
-  holder.env = { COMPANY_GENERATION_ENABLED: 'true' }
+it.each([
+  ['no question model', {}],
+  // Every drafted batch needs its self-check: an items-only mapping would spend calls and store nothing.
+  ['a question model without its self-check model', { JOB_MODELS: JSON.stringify({ items: { provider: 'baseten', model: 'muse-spark-1.3' } }), BASETEN_API_KEY: 'test-key' }],
+])('keeps every concept pending and calls no model while %s is configured', async (_, env) => {
+  holder.env = { COMPANY_GENERATION_ENABLED: 'true', ...env }
   expect(await drainConceptQueue()).toBe(0)
   expect(states().map((c) => c.gen_status)).toEqual(conceptIds.map(() => 'pending'))
   expect(fetchModel).not.toHaveBeenCalled()
