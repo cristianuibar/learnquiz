@@ -18,7 +18,7 @@ export const rowGrid = 'grid grid-cols-[minmax(0,1fr)_auto] gap-x-6 gap-y-2 px-6
 // Below 560px the controls sit left, so the Questions cell keeps the header's width.
 export const questionCell = '@max-[560px]:min-w-16'
 
-export function ConceptRow({ concept, slug, readOnly, critHeaderId }: { concept: Concept; slug: string; readOnly: boolean; critHeaderId: string }) {
+export function ConceptRow({ concept, slug, readOnly, paused, critHeaderId }: { concept: Concept; slug: string; readOnly: boolean; paused: boolean; critHeaderId: string }) {
   const router = useRouter()
   const update = useServerFn(updateRoleConcept)
   const retry = useServerFn(retryConceptGeneration)
@@ -113,7 +113,7 @@ export function ConceptRow({ concept, slug, readOnly, critHeaderId }: { concept:
           {failed && (
             <>
               <Status word="Failed" />
-              {!readOnly && (
+              {!readOnly && !paused && (
                 <Button type="button" variant="ghost" aria-label={`Retry questions for ${concept.name}`} onClick={retryGeneration}>
                   <RotateCw aria-hidden />
                   Retry

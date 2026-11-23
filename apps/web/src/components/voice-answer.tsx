@@ -155,6 +155,7 @@ export function VoiceAnswer({ sessionId, itemId, voiceEnabled, text, onText, dis
               rows={4}
               className="field-sizing-fixed"
               maxLength={1000}
+              aria-describedby={voiceEnabled ? undefined : 'answer-voice-note'}
               value={text}
               onChange={(e) => {
                 // Editing keeps the review step even if the field is cleared.
@@ -162,6 +163,7 @@ export function VoiceAnswer({ sessionId, itemId, voiceEnabled, text, onText, dis
                 onText(e.target.value)
               }}
             />
+            {!voiceEnabled && <p id="answer-voice-note" className="text-caption text-ink-muted">Voice answers are unavailable. Type your answer.</p>}
           </div>
           {voiceEnabled && (
             <Button type="button" variant="secondary" className="self-start" disabled={disabled} onClick={() => { focusNext.current = 'record'; void start() }}>

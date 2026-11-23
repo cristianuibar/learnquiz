@@ -9,19 +9,22 @@ import { Textarea } from '@/components/ui/textarea'
 import { Working } from '@/components/working'
 import { authClient } from '@/lib/auth-client'
 import { MAX_SOURCE_TEXT_CHARS } from '@/lib/limits'
-import { createTopic } from '@/server/curriculum'
+import { createTopic, NEW_TOPICS_UNAVAILABLE } from '@/server/curriculum'
+import { canCreateTopic } from '@/server/topic-start'
 import { startPlacement } from '@/server/play'
 
 export const Route = createFileRoute('/start')({
   validateSearch: (search: Record<string, unknown>): { topic?: string } => ({
     topic: typeof search.topic === 'string' ? search.topic : undefined,
   }),
+  loader: () => canCreateTopic(),
   component: Start,
 })
 
 function Start() {
   const { user } = Route.useRouteContext()
   const search = Route.useSearch()
+  const available = Route.useLoaderData()
   const router = useRouter()
   const create = useServerFn(createTopic)
   const place = useServerFn(startPlacement)
@@ -34,6 +37,7 @@ function Start() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
+    if (!available) return
     setStatus('curriculum')
     setError('')
     try {
@@ -107,7 +111,10 @@ function Start() {
               {error}
             </p>
           )}
-          <Button type="submit" className="w-full px-6 sm:w-auto sm:self-end">
+          {!available && (
+            <p id="start-unavailable" role="status" className="text-body text-ink-muted">{NEW_TOPICS_UNAVAILABLE}</p>
+          )}
+          <Button type="submit" disabled={!available} aria-describedby={available ? undefined : 'start-unavailable'} className="w-full px-6 sm:w-auto sm:self-end">
             Find my level
           </Button>
         </form>

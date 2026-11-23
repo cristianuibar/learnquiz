@@ -1,3 +1,4 @@
+import { modelUnavailable } from '@learnquiz/api/system-copy'
 import { z } from 'zod'
 import { eq } from 'drizzle-orm'
 import { getDb } from '@/db'
@@ -5,7 +6,7 @@ import { modelCalls } from '@/db/schema'
 import { COMPANY_DAILY_MODEL_CALL_CAP, isOverDailyCap } from '@/lib/limits'
 import { PROVIDERS, type ModelJob } from '@/lib/llm/models'
 import { getEnv } from '@/server/env'
-import { COMPANY_CAP_MESSAGE, companyCallsToday, dailyCapError, reserveModelCall } from '@/server/model-cap'
+import { COMPANY_CAP_MESSAGE, companyCallsToday, reserveModelCall } from '@/server/model-cap'
 
 // USD per million tokens; reasoning tokens bill as output. Unlisted prices are unknown.
 export const PRICES: Record<string, { in: number; out: number }> = {}
@@ -36,6 +37,8 @@ const PURPOSE_TIMEOUT_MS: Partial<Record<ModelJob, number>> = {
   procedure: 180_000,
 }
 
+export const MODEL_UNAVAILABLE_MESSAGE = modelUnavailable
+
 // The deployed Worker never calls a model, whatever its bindings: model calls run only under `vite dev` and tests,
 // or in a local command that opts in (the Northwind seed).
 let localCommand = false
@@ -43,19 +46,18 @@ export function allowLocalModelCalls(): void {
   localCommand = true
 }
 
-// Every job is unavailable until JOB_MODELS or LLM_PROFILE names a model. Voice and images run only when
-// JOB_MODELS maps them; other unmapped jobs use LLM_PROFILE and LLM_MODEL.
+// Every job is unavailable until JOB_MODELS or LLM_PROFILE names a model; unmapped jobs use LLM_PROFILE and LLM_MODEL.
 export function jobModel(job: ModelJob) {
   const env = getEnv()
   try {
-    if (!localCommand && !import.meta.env.DEV) throw new Error('Model calls are off in the deployed Worker')
+    if (!localCommand && !import.meta.env.DEV) throw new LlmError(MODEL_UNAVAILABLE_MESSAGE, 503)
     // Wrangler JSON bindings are objects; .dev.vars can supply JSON strings.
     const mapping: unknown = typeof env.JOB_MODELS === 'string' ? JSON.parse(env.JOB_MODELS) : env.JOB_MODELS === undefined ? {} : env.JOB_MODELS
     const jobs = z.record(z.string(), z.unknown()).parse(mapping)
     const selected = jobs[job] === undefined
-      ? job === 'voice' || job === 'image' ? undefined : { provider: env.LLM_PROFILE, model: env.LLM_MODEL }
+      ? { provider: env.LLM_PROFILE, model: env.LLM_MODEL }
       : z.object({ provider: z.enum(['baseten']), model: z.string().min(1) }).parse(jobs[job])
-    if (!selected?.provider || !selected.model) throw new Error('No model configured')
+    if (!selected?.provider || !selected.model) throw new LlmError(MODEL_UNAVAILABLE_MESSAGE, 503)
     const provider = selected.provider === 'ollama' ? { baseUrl: env.LLM_BASE_URL, keyBinding: 'LLM_API_KEY' as const } : PROVIDERS[selected.provider]
     if (!provider) throw new Error('Unknown provider')
     const baseUrl = (selected.provider === env.LLM_PROFILE && env.LLM_BASE_URL) || provider.baseUrl
@@ -67,7 +69,8 @@ export function jobModel(job: ModelJob) {
       // Each provider gets only its own secret; LLM_API_KEY is never sent to a hosted provider.
       apiKey: env[provider.keyBinding],
     }
-  } catch {
+  } catch (e) {
+    if (e instanceof LlmError) throw e
     // Configuration errors must never include bindings or credentials.
     throw new LlmError(`Invalid model configuration for ${job}.`, 503)
   }
@@ -81,14 +84,6 @@ export function hasModel(job: ModelJob): boolean {
   } catch {
     return false
   }
-}
-
-export function isVoiceEnabled(): boolean {
-  return getEnv().VOICE_ENABLED === 'true' && hasModel('voice')
-}
-
-export function isImageEnabled(): boolean {
-  return hasModel('image')
 }
 
 type ChatJsonOpts<T> = {
@@ -194,42 +189,6 @@ async function callJson<T>(opts: ChatJsonOpts<T>, selected: ReturnType<typeof jo
   throw new LlmError(`LLM output invalid${opts.retry === false ? '' : ' after retry'}: ${failure}`, 422)
 }
 
-// The one-shot voice contract uses a JSON request part and a WAV audio part.
-export async function transcribeAudio(opts: { audio: File; learnerId: string; sessionId: string; topicId: string; orgId?: string | null }): Promise<string> {
-  if (!isVoiceEnabled()) throw new LlmError('Voice answers are unavailable.', 404)
-  const selected = jobModel('voice')
-  const model = selected.model
-  const log = { learnerId: opts.learnerId, sessionId: opts.sessionId, topicId: opts.topicId, orgId: opts.orgId ?? null, purpose: 'voice', model }
-  const reservedId = await reserve({ ...log, id: crypto.randomUUID() }, opts.orgId)
-  if (reservedId === false) {
-    if (opts.orgId && (await companyOverCap(opts.orgId))) throw new LlmError(COMPANY_CAP_MESSAGE, 429)
-    throw dailyCapError()
-  }
-  const started = Date.now()
-  try {
-    const body = new FormData()
-    body.append('request', new Blob([JSON.stringify({ model, mode: 'PUSH_TO_TALK', audioEncoding: 'WAV' })], { type: 'application/json' }))
-    body.append('audio', opts.audio, 'answer.wav')
-    const res = await fetch(`${selected.baseUrl}/asr/transcribe`, {
-      method: 'POST',
-      headers: { ...(selected.apiKey && { authorization: `Bearer ${selected.apiKey}` }) },
-      body,
-      signal: AbortSignal.timeout(120_000),
-    })
-    if (!res.ok) throw new LlmError(`Voice request failed (HTTP ${res.status}).`, res.status === 429 ? 429 : 502)
-    const result = await res.json() as { transcript?: unknown }
-    if (typeof result.transcript !== 'string' || !result.transcript.trim()) throw new LlmError('No speech was recognized. Record again or type your answer.', 422)
-    if (result.transcript.trim().length > 1000) throw new LlmError('Please record a shorter answer.', 422)
-    await logCall(log, started, undefined, null, reservedId)
-    return result.transcript.trim()
-  } catch (e) {
-    // Never log the recording, transcript, credentials or provider response body.
-    const error = e instanceof LlmError ? e : new LlmError("Couldn't transcribe your answer. Record again or type it.", 502)
-    await logCall(log, started, undefined, error.message, reservedId)
-    throw error
-  }
-}
-
 async function companyOverCap(orgId: string): Promise<boolean> {
   try {
     return isOverDailyCap(await companyCallsToday(getDb(), orgId), COMPANY_DAILY_MODEL_CALL_CAP)
@@ -289,41 +248,5 @@ async function logCall(
       })
   } catch (e) {
     console.error('model_calls log failed', e instanceof Error ? e.message : e)
-  }
-}
-
-// Images use their job's provider and model, with the same daily cap and call ledger as text.
-// No automatic retry: a second paid generation needs an explicit retry by the learner.
-export async function generateImage(opts: { prompt: string; learnerId: string; topicId: string; orgId?: string | null }): Promise<Uint8Array> {
-  if (!isImageEnabled()) throw new LlmError('Diagrams are unavailable.', 404)
-  const selected = jobModel('image')
-  const log = { purpose: 'diagram', learnerId: opts.learnerId, topicId: opts.topicId, orgId: opts.orgId ?? null, model: selected.model }
-  const reservedId = await reserve({ ...log, id: crypto.randomUUID() }, opts.orgId)
-  if (reservedId === false) {
-    if (opts.orgId && (await companyOverCap(opts.orgId))) throw new LlmError(COMPANY_CAP_MESSAGE, 429)
-    throw dailyCapError()
-  }
-  const started = Date.now()
-  let error: string | null = null
-  try {
-    const res = await fetch(`${selected.baseUrl}/images/generations`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', ...(selected.apiKey && { authorization: `Bearer ${selected.apiKey}` }) },
-      body: JSON.stringify({ model: selected.model, prompt: opts.prompt, n: 1, size: '1024x1024', response_format: 'b64_json' }),
-      signal: AbortSignal.timeout(120_000),
-    })
-    if (!res.ok) throw new LlmError(`Image HTTP ${res.status}`, res.status)
-    const body = z.object({ data: z.array(z.object({ b64_json: z.string().min(1).max(14_000_000) })).length(1) }).parse(await res.json())
-    const bytes = Uint8Array.from(atob(body.data[0].b64_json), (c) => c.charCodeAt(0))
-    if (bytes.length > 10_000_000 || ![137, 80, 78, 71, 13, 10, 26, 10].every((b, i) => bytes[i] === b)) {
-      throw new Error('Image response is not a PNG under 10 MB')
-    }
-    return bytes
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e)
-    error = (selected.apiKey ? message.replaceAll(selected.apiKey, '[redacted]') : message).slice(0, 300)
-    throw new LlmError('The diagram could not be generated. Try again.', e instanceof LlmError ? e.status : 502)
-  } finally {
-    await logCall(log, started, undefined, error, reservedId)
   }
 }

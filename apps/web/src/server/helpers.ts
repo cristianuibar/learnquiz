@@ -1,12 +1,12 @@
 import { and, desc, eq, inArray, isNotNull, lt, or, sql } from 'drizzle-orm'
 import type { Db } from '@/db'
 import { concepts, items, learnerConcept, sources, topics } from '@/db/schema'
-import { chatJson, jobModel, LlmError } from '@/lib/llm/client'
+import { chatJson, jobModel, LlmError, MODEL_UNAVAILABLE_MESSAGE } from '@/lib/llm/client'
 import { ENABLED_FORMATS, itemsPrompt, selfCheckPrompt } from '@/lib/llm/prompts'
 import { ItemBatch, ItemPayload, SelfCheck } from '@/lib/llm/schemas'
 import { liveConcept } from '@/server/live-concept'
 import { notFlaggedBy } from '@/server/topic-access'
-import { assertWithinDailyCap } from '@/server/model-cap'
+import { assertCompanyGenerationEnabled, assertWithinDailyCap } from '@/server/model-cap'
 
 // Server-only helpers shared by the server-function files. They live apart from them so no server-only import reaches the client bundle.
 
@@ -122,6 +122,8 @@ export async function generateConceptItems(
   opts: { targetDifficulty: number; spread?: boolean; avoidStems: string[]; want: number; maxRounds: number; learnerId: string | null; orgId?: string | null; sessionId?: string },
 ): Promise<StoredItem[]> {
   const { learnerId, orgId, avoidStems } = opts
+  // Shared company questions are paused with the rest of company generation, whichever caller asks for them.
+  if (topic.orgId || topic.jobRoleId) assertCompanyGenerationEnabled()
   const misconceptions = JSON.parse(concept.misconceptionsJson) as string[]
 
   // One read of the source serves both the prompt and the version stamp.
@@ -182,7 +184,7 @@ export async function generateConceptItems(
         if (verdict?.keep) kept.push({ payload, check: verdict ?? null })
       })
     } catch (e) {
-      if (e instanceof LlmError && e.status === 429) throw httpError(e.message, 429)
+      if (e instanceof LlmError && (e.status === 429 || e.message === MODEL_UNAVAILABLE_MESSAGE)) throw httpError(e.message, e.status)
       if (!(e instanceof LlmError)) throw e
       console.error('item generation failed', e.message)
       break

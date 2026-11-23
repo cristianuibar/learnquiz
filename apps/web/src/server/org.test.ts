@@ -8,7 +8,7 @@ import { createCompany, createRole, getOrgOverview, listRoles, updateRole } from
 import { getPeople } from '@/server/people'
 import { getProfile } from '@/server/profile'
 
-const holder = vi.hoisted(() => ({ db: null as unknown, createOrganization: vi.fn() }))
+const holder = vi.hoisted(() => ({ db: null as unknown, createOrganization: vi.fn(), env: { BETTER_AUTH_URL: 'http://127.0.0.1:8800', COMPANY_GENERATION_ENABLED: 'true' as string | undefined } }))
 
 // Fake the request/auth boundaries; keep validation, authorization and SQL real.
 vi.mock('@tanstack/react-start', () => ({
@@ -23,7 +23,7 @@ vi.mock('@tanstack/react-start/server', () => ({ getRequestHeaders: () => new He
 vi.mock('@/db', () => ({ getDb: () => holder.db }))
 vi.mock('@/server/session', () => ({ getSessionUser: vi.fn() }))
 vi.mock('@/server/auth', () => ({ getAuth: () => ({ api: { createOrganization: holder.createOrganization } }) }))
-vi.mock('@/server/env', () => ({ getEnv: () => ({ BETTER_AUTH_URL: 'http://127.0.0.1:8800' }) }))
+vi.mock('@/server/env', () => ({ getEnv: () => holder.env }))
 
 let sqlite: DatabaseSync
 
@@ -75,6 +75,7 @@ beforeAll(() => {
 })
 
 beforeEach(() => {
+  holder.env.COMPANY_GENERATION_ENABLED = 'true'
   sqlite.exec('BEGIN')
   vi.mocked(getSessionUser).mockResolvedValue({ id: 'owner', isAnonymous: false } as never)
   holder.createOrganization.mockImplementation(async ({ body }: { body: { name: string; slug: string } }) => {
@@ -312,6 +313,11 @@ it('shows the same preparing state on Roles and Overview while a ready role stil
     expect((await getOrgOverview({ data: { slug: 'alpha' } })).roles).toEqual(expected)
   }
   await expectBoth({ preparing: true, conceptsReady: 1, conceptsTotal: 2 })
+  // While company generation is paused a queued concept is not being prepared, and the overview says so.
+  holder.env.COMPANY_GENERATION_ENABLED = undefined
+  await expectBoth({ preparing: false, conceptsReady: 1, conceptsTotal: 2 })
+  expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ generationPaused: true })
+  holder.env.COMPANY_GENERATION_ENABLED = 'true'
   sqlite.prepare("UPDATE concepts SET gen_status = 'ready' WHERE id = 'c-pending'").run()
   await expectBoth({ preparing: false, conceptsReady: 2, conceptsTotal: 2 })
 })

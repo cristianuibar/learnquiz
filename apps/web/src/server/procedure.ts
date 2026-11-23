@@ -8,7 +8,7 @@ import { chatJson, DailyCapError, LlmError } from '@/lib/llm/client'
 import { procedurePrompt } from '@/lib/llm/prompts'
 import { ProcedureGraph } from '@/lib/llm/schemas'
 import { httpError } from '@/server/helpers'
-import { assertWithinCompanyCap, COMPANY_CAP_MESSAGE } from '@/server/model-cap'
+import { assertWithinCompanyCap, COMPANY_CAP_MESSAGE, companyGenerationPaused } from '@/server/model-cap'
 import { requireLearnerId } from '@/server/session'
 import { learnerCanAccess } from '@/server/topic-access'
 
@@ -67,6 +67,8 @@ export const getUnitProcedure = createServerFn({ method: 'GET' })
     const key = sourcesKey(documents)
     if (stored?.sources === key) return { status: 'ready', graph: stored.graph, source: meta }
 
+    // A company flowchart is not built while company generation is paused; a stale one is not shown either.
+    if ((topic.orgId || topic.jobRoleId) && companyGenerationPaused()) return null
     if (topic.orgId) await assertWithinCompanyCap(db, topic.orgId)
     const now = Date.now()
     // Atomic D1 claim works across worker instances. A crashed request can be retried once its claim is stale.

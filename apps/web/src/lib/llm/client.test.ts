@@ -8,7 +8,7 @@ import { getEnv } from '@/server/env'
 import { ACCOUNT_DAILY_MODEL_CALL_CAP, GUEST_DAILY_MODEL_CALL_CAP } from '@/lib/limits'
 import { experimental_readRawConfig } from 'wrangler'
 import { requestedSchema } from './test-request'
-import { chatJson, DailyCapError, generateImage, isImageEnabled, isVoiceEnabled, LlmError, PRICES, transcribeAudio } from './client'
+import { chatJson, DailyCapError, LlmError, PRICES } from './client'
 
 // No production model is priced; one priced test model checks the cost arithmetic.
 PRICES['text-model'] = { in: 1.25, out: 4.25 }
@@ -204,9 +204,6 @@ it.each([
   for (const purpose of ['curriculum', 'items', 'self_check', 'plan', 'grade', 'procedure', 'placement_line'] as const) {
     await expect(chatJson({ ...answerRequest, purpose })).rejects.toMatchObject({ status: 503 })
   }
-  expect([isVoiceEnabled(), isImageEnabled()]).toEqual([false, false])
-  await expect(transcribeAudio({ audio: new File([new Uint8Array(8)], 'answer.wav'), learnerId: 'u1', sessionId: 's1', topicId: 't1' })).rejects.toMatchObject({ status: 404 })
-  await expect(generateImage({ prompt: 'A diagram', learnerId: 'u1', topicId: 't1' })).rejects.toMatchObject({ status: 404 })
   expect(fetchModel).not.toHaveBeenCalled()
   expect(raw.prepare('SELECT COUNT(*) AS n FROM model_calls').get()).toEqual({ n: 0 })
 })
@@ -284,31 +281,18 @@ it('refuses a malformed-output retry after the final allowed daily model call', 
   ])
 })
 
-it('lets only one of five concurrent grading and voice calls take the last daily slot', async () => {
-  Object.assign(getEnv(), {
-    VOICE_ENABLED: 'true',
-    JOB_MODELS: { voice: { provider: 'baseten', model: 'voice-model' } },
-  })
+it('lets only one of five concurrent grading calls take the last daily slot', async () => {
   await db.insert(modelCalls).values(Array.from({ length: GUEST_DAILY_MODEL_CALL_CAP - 1 }, (_, i) => ({
     id: `call-${i}`, learnerId: 'u1', purpose: 'test', model: 'text-model', latencyMs: 0, ok: true, createdAt: Date.now(),
   })))
   // The provider answers after yielding, so requests genuinely interleave before any ledger row is finalised.
-  const fetchModel = vi.fn(async (url: string) => {
+  const fetchModel = vi.fn(async () => {
     for (let i = 0; i < 20; i++) await Promise.resolve()
-    return url.endsWith('/asr/transcribe')
-      ? Response.json({ transcript: 'hello' })
-      : Response.json({ choices: [{ message: { content: JSON.stringify({ answer: 'x' }) }, finish_reason: 'stop' }] })
+    return Response.json({ choices: [{ message: { content: JSON.stringify({ answer: 'x' }) }, finish_reason: 'stop' }] })
   })
   vi.stubGlobal('fetch', fetchModel)
-  const voice = () => transcribeAudio({ audio: new File([new Uint8Array(8)], 'answer.wav'), learnerId: 'u1', sessionId: 's1', topicId: 't1' })
 
-  const results = await Promise.allSettled([
-    chatJson({ ...answerRequest, purpose: 'grade', retry: false }),
-    voice(),
-    chatJson({ ...answerRequest, purpose: 'grade', retry: false }),
-    voice(),
-    chatJson({ ...answerRequest, purpose: 'grade', retry: false }),
-  ])
+  const results = await Promise.allSettled(Array.from({ length: 5 }, () => chatJson({ ...answerRequest, purpose: 'grade', retry: false })))
 
   expect(fetchModel).toHaveBeenCalledTimes(1)
   expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1)

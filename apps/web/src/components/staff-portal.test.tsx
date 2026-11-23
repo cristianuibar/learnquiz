@@ -149,7 +149,7 @@ it('shows a role to staff with no way to change anything', async () => {
 
 it('returns to the staff Overview when the role detail breadcrumb is clicked', async () => {
   vi.mocked(getOrgOverview).mockResolvedValue({
-    name: 'Northwind', slug: 'northwind', readOnly: true, nextStep: null, roles: [],
+    name: 'Northwind', slug: 'northwind', readOnly: true, generationPaused: false, nextStep: null, roles: [],
     training: { employees: 3, proficientEmployees: 1, daysToProficiency: 5, criticalErrorsThisWeek: 1, documentsToReview: 0, firstProficientUserId: 'learner1', openErrorUserId: 'learner2' },
   })
   vi.mocked(listRoles).mockResolvedValue({ name: 'Northwind', slug: 'northwind', readOnly: true, roles: [] })

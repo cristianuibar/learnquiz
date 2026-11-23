@@ -10,8 +10,8 @@ import { requestedSchema } from '@/lib/llm/test-request'
 
 // Real handlers, authorization, generateConceptItems, model client and database; fakes are the
 // transport, session provider, Worker bindings, background scheduler and model HTTP only.
-const modelEnv = { LLM_PROFILE: 'baseten', LLM_BASE_URL: 'https://llm.example', LLM_MODEL: 'muse-spark-1.3' }
-const holder = vi.hoisted(() => ({ db: null as unknown, userId: 'owner' as string | null, background: [] as Promise<unknown>[], drains: false, env: {} as object }))
+const modelEnv = { LLM_PROFILE: 'baseten', LLM_BASE_URL: 'https://llm.example', LLM_MODEL: 'muse-spark-1.3', COMPANY_GENERATION_ENABLED: 'true' }
+const holder = vi.hoisted(() => ({ db: null as unknown, userId: 'owner' as string | null, background: [] as Promise<unknown>[], drains: false, env: {} as Record<string, string | undefined> }))
 vi.mock('@tanstack/react-start', () => ({
   createServerFn: () => ({
     validator: (schema: { parse: (data: unknown) => unknown }) => ({
@@ -98,7 +98,7 @@ beforeEach(() => {
   holder.userId = 'owner'
   holder.background = []
   holder.drains = false
-  holder.env = modelEnv
+  holder.env = { ...modelEnv }
   beforeSql = null
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))
@@ -125,7 +125,7 @@ it('drains a pending company topic until every concept holds exactly six shared,
 })
 
 it('keeps every concept pending and calls no model while no question model is configured', async () => {
-  holder.env = {}
+  holder.env = { COMPANY_GENERATION_ENABLED: 'true' }
   expect(await drainConceptQueue()).toBe(0)
   expect(states().map((c) => c.gen_status)).toEqual(conceptIds.map(() => 'pending'))
   expect(fetchModel).not.toHaveBeenCalled()
@@ -167,6 +167,17 @@ it('fails a concept the model cannot answer, resets it on admin retry and refuse
   await expect(retry('northwind', 'c00')).rejects.toMatchObject({ status: 404 })
   expect(states()).toEqual([{ id: 'c00', gen_status: 'ready', gen_error: null }])
   expect(one("SELECT COUNT(*) AS n FROM items WHERE concept_id = 'c00'")).toEqual({ n: 6 })
+})
+
+it('keeps queued and failed concepts as they are while company generation is paused, with no model call', async () => {
+  holder.env.COMPANY_GENERATION_ENABLED = undefined
+  raw.exec("UPDATE concepts SET gen_status = 'failed', gen_error = 'Could not generate items for this concept' WHERE id = 'c00'")
+  expect(await drainConceptQueue()).toBe(0)
+  await expect(retryConceptGeneration({ data: { slug: 'northwind', conceptId: 'c00' } }))
+    .rejects.toMatchObject({ status: 503, message: 'Company training generation is paused until an official model path exists.' })
+  expect(states().filter((c) => c.gen_status !== 'pending')).toEqual([{ id: 'c00', gen_status: 'failed', gen_error: 'Could not generate items for this concept' }])
+  expect(fetchModel).not.toHaveBeenCalled()
+  expect(one('SELECT COUNT(*) AS n FROM model_calls')).toEqual({ n: 0 })
 })
 
 it('leaves a retried concept pending for the cron in production, and the cron drain generates it', async () => {

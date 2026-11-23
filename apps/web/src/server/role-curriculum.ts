@@ -11,7 +11,7 @@ import { MAX_SOURCE_TEXT_CHARS } from '@/lib/limits'
 import { drainConceptQueue, STALE_CLAIM_MS } from '@/server/concept-gen'
 import { drainsOnRequest, runInBackground } from '@/server/env'
 import { chunks, httpError } from '@/server/helpers'
-import { assertWithinCompanyCap, assertWithinDailyCap } from '@/server/model-cap'
+import { assertCompanyGenerationEnabled, assertWithinCompanyCap, assertWithinDailyCap } from '@/server/model-cap'
 
 export function curriculumWrites(db: Db, topicId: string, valid: ValidatedSkeleton, generatedBy: string | null, conceptGenStatus: 'pending' | 'ready' = 'ready') {
   const unitRows = valid.units.map((u, order) => ({ id: u.id, topicId, order, name: u.name, summary: u.summary }))
@@ -70,6 +70,7 @@ export const ROLE_BUILDS_PAUSED = 'Building role training is paused for now. You
 
 // Refusals throw before anything is claimed; the returned run owns the claim.
 export async function claimRoleBuild({ orgId, ownerId, roleId }: { orgId: string; ownerId: string; roleId: string }): Promise<() => Promise<{ topicId: string }>> {
+  assertCompanyGenerationEnabled()
   const db = getDb()
   const [row] = await db
     .select({ topic: topics })

@@ -3,6 +3,7 @@ import type { Db } from '@/db'
 import { user } from '@/db/auth-schema'
 import { modelCalls, topics } from '@/db/schema'
 import { ACCOUNT_DAILY_MODEL_CALL_CAP, COMPANY_DAILY_MODEL_CALL_CAP, GUEST_DAILY_MODEL_CALL_CAP, isOverDailyCap, utcDayStart } from '@/lib/limits'
+import { getEnv } from '@/server/env'
 
 // Guests (anonymous users) get the low cap; only a user row with isAnonymous false gets the account cap.
 // An id with no user row counts as a guest.
@@ -69,4 +70,17 @@ export async function assertWithinCompanyCap(db: Db, orgId: string): Promise<voi
   if (isOverDailyCap(await companyCallsToday(db, orgId), COMPANY_DAILY_MODEL_CALL_CAP)) {
     throw Object.assign(new Error(COMPANY_CAP_MESSAGE), { status: 429 })
   }
+}
+
+export const COMPANY_GENERATION_PAUSED_MESSAGE = 'Company training generation is paused until an official model path exists.'
+
+// Company curricula, shared questions and procedure flowcharts are paused until an official model path exists (owner
+// decision, 21 Nov 2026). They never run on one person's model plan. Only COMPANY_GENERATION_ENABLED=true resumes them.
+export function companyGenerationPaused(): boolean {
+  return getEnv().COMPANY_GENERATION_ENABLED !== 'true'
+}
+
+// Throws 503 before any claim, status write or model call.
+export function assertCompanyGenerationEnabled(): void {
+  if (companyGenerationPaused()) throw Object.assign(new Error(COMPANY_GENERATION_PAUSED_MESSAGE), { status: 503 })
 }

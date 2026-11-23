@@ -8,6 +8,7 @@ import { Page, PageHeader } from '@/components/admin/page'
 import { Skel } from '@/components/admin/skeleton'
 import { Stat, StatsCard } from '@/components/admin/stat-figure'
 import { Status } from '@/components/admin/status-chip'
+import { GenerationPausedBanner } from '@/components/portal/generation-paused'
 import { usePortal, usePortalLinks } from '@/components/portal/portal-context'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -128,7 +129,7 @@ function PreparingCard({ role, readOnly }: { role: RoleRow; readOnly: boolean })
   )
 }
 
-function EmptyCard({ first, readOnly }: { first: RoleRow | undefined; readOnly: boolean }) {
+function EmptyCard({ first, readOnly, paused }: { first: RoleRow | undefined; readOnly: boolean; paused: boolean }) {
   const links = usePortalLinks()
   if (!first) {
     return readOnly ? null : (
@@ -141,7 +142,9 @@ function EmptyCard({ first, readOnly }: { first: RoleRow | undefined; readOnly: 
   return (
     <CardBox labelledBy="overview-empty">
       <h2 id="overview-empty" className="text-title-2 text-ink">Add your first SOP</h2>
-      <p className="text-body text-ink-muted">{first.name} has no documents yet. Upload one, and Learn Quiz builds the training from it.</p>
+      <p className="text-body text-ink-muted">
+        {first.name} has no documents yet. {paused ? 'You can upload one now; no training is built from it while generation is paused.' : 'Upload one, and Learn Quiz builds the training from it.'}
+      </p>
       {!readOnly && (
         <div>
           <Button variant="accent" asChild><Link {...links.role(first.id)}><Upload aria-hidden />Upload SOP</Link></Button>
@@ -167,8 +170,9 @@ export function Overview({ data, readOnly }: { data: OverviewData; readOnly: boo
     <Page>
       <PageHeader title="Overview" />
       <p role="status" className="sr-only">{announcement}</p>
+      {data.generationPaused && <GenerationPausedBanner />}
       {state === 'preparing' && preparingRole && <PreparingCard role={preparingRole} readOnly={readOnly} />}
-      {state === 'empty' && <EmptyCard first={roles[0]} readOnly={readOnly} />}
+      {state === 'empty' && <EmptyCard first={roles[0]} readOnly={readOnly} paused={data.generationPaused} />}
       {state === 'normal' && (
         <>
           <section aria-labelledby="overview-figures" className="flex flex-col gap-4">

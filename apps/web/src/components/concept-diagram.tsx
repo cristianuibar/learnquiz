@@ -21,15 +21,15 @@ export function ConceptDiagram({ conceptId }: { conceptId: string }) {
   }, [conceptId, generate, retry])
 
   if (result?.status === 'disabled') return null
-  if (result?.status === 'unavailable') return <p role="status" className="mt-4 text-sm text-muted-foreground">No diagram yet.</p>
+  if (result?.status === 'unavailable') return <p role="status" className="mt-4 text-sm text-muted-foreground">Diagrams are unavailable for now.</p>
   return (
     <div className="mt-4">
       {result?.status === 'ready' ? (
         <img src={result.image.src} alt={result.image.alt} width={1024} height={1024}
           className="h-auto w-full rounded-md border bg-white" onError={() => setError('The diagram could not be loaded.')} />
-      ) : !error && <p role="status" className="text-sm text-muted-foreground">{result?.status === 'pending' ? 'The diagram is being prepared.' : 'Preparing diagram…'}</p>}
+      ) : !error && <p role="status" className="text-sm text-muted-foreground">Loading diagram…</p>}
       {error && <p role="alert" className="text-sm text-wrong">{error}</p>}
-      {(error || result?.status === 'pending') && (
+      {error && (
         <Button variant="secondary" className="mt-2" onClick={() => setRetry((n) => n + 1)}>Retry diagram</Button>
       )}
     </div>

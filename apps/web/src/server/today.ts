@@ -6,7 +6,7 @@ import { onboardingDay } from '@/lib/learning/profile'
 import { shouldStop } from '@/lib/learning/placement'
 import { streakShown } from '@/lib/learning/session'
 import { attempts, concepts, items, learnerItem, learnerTopic, placements, sessions, topics, units } from '@/db/schema'
-import { dueCount } from '@/server/due'
+import { dueCount, gradesShortAnswers } from '@/server/due'
 import { loadPKnown } from '@/server/helpers'
 import { liveConcept } from '@/server/live-concept'
 import { basicsUnits } from '@/server/mastery'
@@ -62,6 +62,7 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
     return { topic: null, role, plan: null }
   }
   const topicId = topic.id
+  const withoutShort = !gradesShortAnswers({ jobRoleId: assigned ? assigned.topic.jobRoleId : null })
   const [placement, openPlacement, lt, dueN, frontier, basics, played, done, cleared, next, practised] = await Promise.all([
     db.select({ id: placements.id }).from(placements)
       .where(and(eq(placements.learnerId, learnerId), eq(placements.topicId, topicId))).limit(1).get(),
@@ -69,7 +70,7 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
       .where(and(eq(sessions.learnerId, learnerId), eq(sessions.topicId, topicId), eq(sessions.kind, 'placement'), isNull(sessions.endedAt))).limit(1).get(),
     db.select({ xp: learnerTopic.xp, streakCount: learnerTopic.streakCount, lastSessionAt: learnerTopic.lastSessionAt }).from(learnerTopic)
       .where(and(eq(learnerTopic.learnerId, learnerId), eq(learnerTopic.topicId, topicId))).get(),
-    dueCount(db, learnerId, topicId, now, Boolean(assigned)),
+    dueCount(db, learnerId, topicId, now, withoutShort),
     loadFrontier(db, learnerId, topicId),
     basicsUnits(db, learnerId, topicId),
     hasAttemptOn(topicId),
@@ -92,7 +93,7 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
     db.select({ at: min(learnerItem.due) }).from(learnerItem)
       .innerJoin(items, eq(items.id, learnerItem.itemId))
       .where(and(eq(learnerItem.learnerId, learnerId), eq(items.topicId, topicId), eq(items.status, 'active'), notFlaggedBy(db, learnerId), gt(learnerItem.due, now),
-        assigned ? ne(items.format, 'short') : undefined))
+        withoutShort ? ne(items.format, 'short') : undefined))
       .get(),
     // Practice outside placement sessions: a learner with it keeps their progress view even with a placement left open.
     db.select({ id: attempts.id }).from(attempts)

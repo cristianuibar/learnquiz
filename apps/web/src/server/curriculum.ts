@@ -37,7 +37,6 @@ export const createTopic = createServerFn({ method: 'POST' })
     // Before any stored write: without a curriculum model, nothing is stored and no model is called.
     if (!hasModel('curriculum')) throw httpError(NEW_TOPICS_UNAVAILABLE, 503)
     const db = getDb()
-    // Before any stored write: a capped learner stores no topic or source row.
     await assertWithinDailyCap(db, learnerId)
     const topicId = crypto.randomUUID()
     await db.insert(topics).values({ id: topicId, learnerId, title: data.topic, goal: data.goal ?? null, status: 'generating', createdAt: Date.now() })

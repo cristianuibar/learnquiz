@@ -19,6 +19,7 @@ import { getToday } from '@/server/today'
 
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
 vi.mock('@/server/curriculum', () => ({ createTopic: vi.fn() }))
+vi.mock('@/server/topic-start', () => ({ canCreateTopic: vi.fn(async () => true) }))
 vi.mock('@/server/play', () => ({ startPlacement: vi.fn(), startSession: vi.fn() }))
 vi.mock('@/server/today', () => ({ getToday: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ authClient: { useSession: () => ({ data: { user: { email: 'learner@example.test' } } }) } }))
@@ -49,7 +50,7 @@ async function renderStart(initialEntry = '/start') {
     loader: appRootRoute.options.loader,
     component: appRootRoute.options.component,
   })
-  const start = createRoute({ getParentRoute: () => rootRoute, path: '/start', component: startRoute.options.component, validateSearch: startRoute.options.validateSearch })
+  const start = createRoute({ getParentRoute: () => rootRoute, path: '/start', loader: startRoute.options.loader, component: startRoute.options.component, validateSearch: startRoute.options.validateSearch })
   const today = createRoute({ getParentRoute: () => rootRoute, path: '/today', beforeLoad: todayRoute.options.beforeLoad, loader: todayRoute.options.loader, errorComponent: todayRoute.options.errorComponent, component: todayRoute.options.component })
   const index = createRoute({ getParentRoute: () => rootRoute, path: '/', beforeLoad: () => { throw redirect({ to: '/start' }) } })
   const play = createRoute({ getParentRoute: () => rootRoute, path: '/play/$sessionId', component: Outlet })

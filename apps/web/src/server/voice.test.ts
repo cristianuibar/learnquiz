@@ -1,4 +1,3 @@
-import { GUEST_DAILY_MODEL_CALL_CAP } from '@/lib/limits'
 import { readFileSync, readdirSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
@@ -11,7 +10,7 @@ vi.mock('@/server/session', () => ({ requireLearnerId: async () => {
   return holder.learnerId
 } }))
 vi.mock('cloudflare:workers', () => ({ env: {
-  LLM_PROFILE: 'baseten', VOICE_ENABLED: 'true', LLM_BASE_URL: 'https://llm.example/v1', LLM_MODEL: 'muse-spark-1.3', LLM_API_KEY: 'test-key',
+  LLM_PROFILE: 'baseten', VOICE_ENABLED: 'true', LLM_BASE_URL: 'https://llm.example/v1', LLM_MODEL: 'text-model', BASETEN_API_KEY: 'test-key',
 } }))
 // Only the transport wrapper is replaced; validation, handlers, queries, model
 // client and log writes run for real. HTTP and request authentication are faked.
@@ -25,7 +24,6 @@ vi.mock('@tanstack/react-start', () => ({ createServerFn: () => ({
 
 import { getEnv } from '@/server/env'
 import { answerItem, getSession, transcribeAnswer } from './play'
-import { MAX_VOICE_BYTES } from '@/lib/voice'
 
 let raw: DatabaseSync
 const fetchModel = vi.fn()
@@ -60,7 +58,7 @@ beforeAll(() => {
 beforeEach(() => {
   raw.exec('SAVEPOINT voice_test')
   holder.learnerId = 'u1'
-  Object.assign(getEnv(), { VOICE_ENABLED: 'true', LLM_PROFILE: 'baseten', JOB_MODELS: { voice: { provider: 'baseten', model: 'voice-model' } }, BASETEN_API_KEY: undefined })
+  Object.assign(getEnv(), { LLM_PROFILE: 'baseten', JOB_MODELS: undefined })
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))
   fetchModel.mockReset().mockResolvedValue(Response.json({ transcript: 'one' }))
@@ -69,114 +67,26 @@ beforeEach(() => {
 afterEach(() => { raw.exec('ROLLBACK TO voice_test; RELEASE voice_test'); vi.unstubAllGlobals(); vi.useRealTimers() })
 afterAll(() => raw.close())
 
-function recording() {
-  const bytes = new ArrayBuffer(48_044)
-  const view = new DataView(bytes)
-  const text = (at: number, value: string) => [...value].forEach((c, i) => view.setUint8(at + i, c.charCodeAt(0)))
-  text(0, 'RIFF'); text(8, 'WAVEfmt '); text(36, 'data')
-  view.setUint32(4, bytes.byteLength - 8, true); view.setUint32(16, 16, true)
-  view.setUint16(20, 1, true); view.setUint16(22, 1, true)
-  view.setUint32(24, 24_000, true); view.setUint32(28, 48_000, true)
-  view.setUint16(32, 2, true); view.setUint16(34, 16, true); view.setUint32(40, 48_000, true)
-  return new File([bytes], 'answer.wav', { type: 'audio/wav' })
-}
-function upload(audio = recording(), itemId = 'i1') {
+function upload() {
   const data = new FormData()
-  data.append('sessionId', 's1'); data.append('itemId', itemId); data.append('audio', audio)
+  data.append('sessionId', 's1'); data.append('itemId', 'i1'); data.append('audio', new File([new Uint8Array(48_044)], 'answer.wav', { type: 'audio/wav' }))
   return { data }
 }
 
-it.each([
-  { profile: 'baseten' as const, url: 'https://llm.example/v1/asr/transcribe', BASETEN_API_KEY: 'test-key' },
-  { profile: 'ollama' as const, url: 'https://inference.baseten.co/v1/asr/transcribe', BASETEN_API_KEY: 'test-key' },
-])('transcribes an owned current answer with global profile $profile, logs voice, and grades the edited transcript', async ({ url, profile, ...keys }) => {
-  Object.assign(getEnv(), { LLM_PROFILE: profile, ...keys })
-  expect((await getSession({ data: { sessionId: 's1' } })).voiceEnabled).toBe(true)
-  const transcript = await transcribeAnswer(upload())
-  expect(transcript).toBe('one')
-  expect(fetchModel).toHaveBeenCalledTimes(1)
-  const [endpoint, request] = fetchModel.mock.calls[0] as [string, RequestInit]
-  expect(endpoint).toBe(url)
-  expect(request.method).toBe('POST')
-  expect(request.headers).toEqual({ authorization: 'Bearer test-key' })
-  const body = request.body as FormData
-  expect(JSON.parse(await (body.get('request') as Blob).text())).toEqual({ model: 'voice-model', mode: 'PUSH_TO_TALK', audioEncoding: 'WAV' })
-  expect(new Uint8Array(await (body.get('audio') as File).arrayBuffer())).toEqual(new Uint8Array(await recording().arrayBuffer()))
-  expect(row('SELECT learner_id, session_id, topic_id, purpose, model, ok, error FROM model_calls')).toEqual({
-    learner_id: 'u1', session_id: 's1', topic_id: 't1', purpose: 'voice', model: 'voice-model', ok: 1, error: null,
-  })
-  expect(row('SELECT COUNT(*) AS n FROM attempts').n).toBe(0)
+// VOICE_ENABLED and a mapped voice model no longer turn transcription on.
+it('keeps voice off, refuses a recording without a model call, and still grades the typed answer', async () => {
+  getEnv().JOB_MODELS = JSON.stringify({ voice: { provider: 'baseten', model: 'voice-model' } })
+  expect((await getSession({ data: { sessionId: 's1' } })).voiceEnabled).toBeFalsy()
+  await expect(transcribeAnswer(upload())).rejects.toMatchObject({ status: 404, message: 'Voice answers are unavailable. Type your answer instead.' })
   const reveal = await answerItem({ data: { sessionId: 's1', itemId: 'i1', answer: { text: '1' }, confidence: 'sure', responseMs: 1500 } })
   expect(reveal).toMatchObject({ correct: true, correctAnswer: '1', state: 'A' })
   expect(row('SELECT answer_json, correct FROM attempts')).toEqual({ answer_json: '{"text":"1"}', correct: 1 })
-})
-
-it('stamps the company on the voice call of a company topic', async () => {
-  raw.exec(`
-    INSERT INTO organization (id, name, slug, created_at) VALUES ('o1', 'Acme', 'acme', 1);
-    UPDATE topics SET org_id = 'o1';
-  `)
-  expect(await transcribeAnswer(upload())).toBe('one')
-  expect(row('SELECT purpose, org_id, ok FROM model_calls')).toEqual({ purpose: 'voice', org_id: 'o1', ok: 1 })
-})
-
-it.each([
-  { name: 'unsigned learner', status: 401, setup: () => { holder.learnerId = null } },
-  { name: 'another learner’s session', status: 404, setup: () => { holder.learnerId = 'u2' } },
-  { name: 'disabled flag', status: 404, setup: () => { getEnv().VOICE_ENABLED = 'false' } },
-  { name: 'no voice model', status: 404, setup: () => { getEnv().JOB_MODELS = undefined } },
-  { name: 'retired Meta voice provider', status: 404, setup: () => { getEnv().JOB_MODELS = JSON.stringify({ voice: { provider: 'meta', model: 'muse-voice-transcribe-1.0' } }) } },
-  { name: 'role topic', status: 404, setup: () => { raw.exec(`
-    INSERT INTO user (id, name, email) VALUES ('u1', 'Ann', 'ann@example.test');
-    INSERT INTO organization (id, name, slug, created_at) VALUES ('o1', 'Acme', 'acme', 1);
-    INSERT INTO member (id, organization_id, user_id, role, created_at) VALUES ('m1', 'o1', 'u1', 'member', 1);
-    INSERT INTO job_roles (id, org_id, name, created_at) VALUES ('r1', 'o1', 'Support agent', 1);
-    INSERT INTO member_role_assignments (user_id, org_id, job_role_id, assigned_at) VALUES ('u1', 'o1', 'r1', 1);
-    UPDATE topics SET learner_id = NULL, org_id = 'o1', job_role_id = 'r1';
-  `) } },
-  { name: 'ended session', status: 409, setup: () => { raw.exec('UPDATE sessions SET ended_at = 2') } },
-  { name: 'answered question', status: 409, setup: () => { raw.exec(`UPDATE sessions SET plan_json = json_set(plan_json, '$.answered', json('true'))`) } },
-  { name: 'stale question', status: 409, setup: () => { raw.exec(`UPDATE sessions SET item_ids_json = '["i2"]'`) } },
-  { name: 'multiple choice', status: 400, setup: () => { raw.exec(`UPDATE items SET payload_json = json_set(payload_json, '$.format', 'mcq')`) } },
-])('refuses $name before calling or logging the model', async ({ status, setup }) => {
-  setup()
-  await expect(transcribeAnswer(upload())).rejects.toMatchObject({ status })
   expect(fetchModel).not.toHaveBeenCalled()
   expect(row('SELECT COUNT(*) AS n FROM model_calls').n).toBe(0)
 })
 
-it.each([
-  { name: 'WebM disguised as WAV', audio: () => new File(['this is not a WAV'.repeat(4)], 'answer.wav', { type: 'audio/wav' }) },
-  { name: 'empty recording', audio: () => new File([], 'answer.wav') },
-  { name: 'overlong recording', audio: () => new File([new Uint8Array(MAX_VOICE_BYTES + 2)], 'answer.wav') },
-  { name: 'unsupported sample rate', audio: async () => {
-    const bytes = await recording().arrayBuffer(); new DataView(bytes).setUint32(24, 48_000, true)
-    return new File([bytes], 'answer.wav')
-  } },
-])('rejects $name without spending a model call', async ({ audio }) => {
-  await expect(transcribeAnswer(upload(await audio()))).rejects.toMatchObject({ status: 400 })
+it('refuses an unsigned learner before anything else', async () => {
+  holder.learnerId = null
+  await expect(transcribeAnswer(upload())).rejects.toMatchObject({ status: 401 })
   expect(fetchModel).not.toHaveBeenCalled()
-  expect(row('SELECT COUNT(*) AS n FROM model_calls').n).toBe(0)
-})
-
-it('enforces the daily cap for voice without logging an extra call', async () => {
-  const insert = raw.prepare('INSERT INTO model_calls (id, learner_id, purpose, model, latency_ms, ok, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-  for (let i = 0; i < GUEST_DAILY_MODEL_CALL_CAP; i++) insert.run(`call-${i}`, 'u1', 'items', 'muse-spark-1.3', 0, 1, Date.now())
-  await expect(transcribeAnswer(upload())).rejects.toMatchObject({ status: 429 })
-  expect(fetchModel).not.toHaveBeenCalled()
-  expect(row('SELECT COUNT(*) AS n FROM model_calls').n).toBe(GUEST_DAILY_MODEL_CALL_CAP)
-})
-
-it.each([
-  { name: 'provider error', response: () => new Response('sensitive provider body test-key', { status: 503 }), status: 502 },
-  { name: 'empty transcript', response: () => Response.json({ transcript: ' ' }), status: 422 },
-  { name: 'network error', response: () => { throw new Error('sensitive network error test-key') }, status: 502 },
-])('logs a safe voice failure for $name and keeps the question unanswered', async ({ response, status }) => {
-  fetchModel.mockImplementationOnce(response)
-  await expect(transcribeAnswer(upload())).rejects.toMatchObject({ status })
-  const log = row('SELECT purpose, model, ok, error FROM model_calls')
-  expect(log).toMatchObject({ purpose: 'voice', model: 'voice-model', ok: 0 })
-  expect(log.error).not.toMatch(/sensitive|test-key/)
-  expect(row('SELECT COUNT(*) AS n FROM attempts').n).toBe(0)
-  expect(JSON.parse(row('SELECT plan_json FROM sessions').plan_json as string).answered).toBe(false)
 })

@@ -89,7 +89,6 @@ LLM_BASE_URL=http://127.0.0.1:11434/v1
 LLM_MODEL=muse-glimmer
 LLM_API_KEY=
 BASETEN_API_KEY=
-VOICE_ENABLED=false
 BETTER_AUTH_URL=http://localhost:3000
 BETTER_AUTH_SECRET=REPLACE_WITH_AT_LEAST_32_RANDOM_CHARACTERS
 ```
@@ -125,10 +124,10 @@ provided.
   text and source-backed procedure graphs use Glimmer through the local endpoint.
 - Session ordering uses rules: `play.ts` explicitly skips the `plan` call for
   `ollama`. It does not run a local Wonder replacement.
-- Voice is off: the gate requires `VOICE_ENABLED=true` **and** a `voice` entry in
-  `JOB_MODELS`. Typed answers remain available.
-- Image generation is off: `isImageEnabled` requires an `image` entry in
-  `JOB_MODELS`. Text procedure graphs are a separate supported feature.
+- Voice answers and diagram generation are disabled in every edition until an official
+  model path exists. Typed answers and stored diagrams remain available.
+- Company curricula, shared questions and procedure flowcharts are paused unless
+  `COMPANY_GENERATION_ENABLED=true`. Personal-topic procedure graphs are unaffected.
 - Company-role sessions retain their existing rules-only planning/grading and
   template placement result behavior; they use shared stored questions.
 

@@ -1,9 +1,8 @@
 import { createServerFn, createServerOnlyFn } from '@tanstack/react-start'
-import { and, eq, isNull, lt, or } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb, type Db } from '@/db'
 import { concepts, topics } from '@/db/schema'
-import { generateImage, isImageEnabled } from '@/lib/llm/client'
 import { getEnv } from '@/server/env'
 import { httpError } from '@/server/helpers'
 import { getLearnerId, requireLearnerId } from '@/server/session'
@@ -11,60 +10,29 @@ import { learnerCanAccess } from '@/server/topic-access'
 
 export type DiagramResult =
   | { status: 'ready'; image: { src: string; alt: string } }
-  | { status: 'pending' | 'disabled' | 'unavailable' }
+  | { status: 'disabled' | 'unavailable' }
 
-// One access rule for serving and generating: the learner's own topic, or the shared topic of their assigned role.
-// A role concept's diagram is stored once and shared, so its generation counts against the company cap.
+// One access rule for every diagram: the learner's own topic, or the shared topic of their assigned role.
 async function accessibleConcept(db: Db, learnerId: string, conceptId: string) {
-  const [row] = await db.select({ concept: concepts, topic: topics.title, orgId: topics.orgId, ownerId: topics.learnerId })
+  const [row] = await db.select({ concept: concepts })
     .from(concepts).innerJoin(topics, eq(topics.id, concepts.topicId))
     .where(and(eq(concepts.id, conceptId), learnerCanAccess(db, learnerId)))
   return row
 }
 
+// Returns a stored diagram only. No image model has an official path (owner decision, 21 Nov 2026), so nothing is generated;
+// the POST route keeps its name and shape for existing clients.
 export const generateConceptDiagram = createServerFn({ method: 'POST' })
   .validator(z.object({ conceptId: z.string().min(1) }))
   .handler(async ({ data }): Promise<DiagramResult> => {
     const learnerId = await requireLearnerId()
-    const db = getDb()
-    const row = await accessibleConcept(db, learnerId, data.conceptId)
+    const row = await accessibleConcept(getDb(), learnerId, data.conceptId)
     if (!row) throw httpError('Concept not found', 404)
     const { concept } = row
-    const ready = (alt: string): DiagramResult => ({ status: 'ready', image: { src: `/media/concepts/${encodeURIComponent(concept.id)}`, alt } })
-    if (concept.imageKey) return ready(concept.imageAlt ?? `${concept.name}: ${concept.summary}`)
-    // Employees play a shared role topic from stored content only: no paid image call on the employee path (#40).
-    if (row.ownerId !== learnerId) return { status: concept.visual ? 'unavailable' : 'disabled' }
-    const env = getEnv()
-    if (!concept.visual || !isImageEnabled()) return { status: 'disabled' }
-
-    const started = Date.now()
-    // Atomic D1 claim works across worker instances. A crashed request can be
-    // retried after three minutes, longer than the model request timeout.
-    const claimed = await db.update(concepts).set({ imageGenerationStartedAt: started })
-      .where(and(eq(concepts.id, concept.id), isNull(concepts.imageKey),
-        or(isNull(concepts.imageGenerationStartedAt), lt(concepts.imageGenerationStartedAt, started - 180_000))))
-      .returning({ id: concepts.id })
-    if (!claimed.length) return { status: 'pending' }
-    const claim = and(eq(concepts.id, concept.id), eq(concepts.imageGenerationStartedAt, started))
-    const key = `concepts/${concept.id}/diagram.png`
-    const alt = `${concept.name}: ${concept.summary}`
-    try {
-      // Recover an upload whose final database write failed without paying again.
-      if (!(await env.MEDIA.head(key))) {
-        const bytes = await generateImage({
-          learnerId,
-          topicId: concept.topicId,
-          orgId: row.orgId,
-          prompt: `Draw a clear educational procedure diagram for ${concept.name} in ${row.topic}.\n${concept.summary}\n${concept.sourceQuote ? `Source material: ${concept.sourceQuote}\n` : ''}Use numbered steps, arrows and short readable labels on a plain background. Follow the supplied procedure accurately; do not invent steps or company policy.`,
-        })
-        await env.MEDIA.put(key, bytes, { httpMetadata: { contentType: 'image/png' }, onlyIf: { etagDoesNotMatch: '*' } })
-      }
-      await db.update(concepts).set({ imageKey: key, imageAlt: alt, imageGenerationStartedAt: null }).where(claim)
-      return ready(alt)
-    } catch (e) {
-      await db.update(concepts).set({ imageGenerationStartedAt: null }).where(claim).catch(() => {})
-      throw e
+    if (concept.imageKey) {
+      return { status: 'ready', image: { src: `/media/concepts/${encodeURIComponent(concept.id)}`, alt: concept.imageAlt ?? `${concept.name}: ${concept.summary}` } }
     }
+    return { status: concept.visual ? 'unavailable' : 'disabled' }
   })
 
 // GET only serves stored media; viewing a URL cannot trigger a paid generation.

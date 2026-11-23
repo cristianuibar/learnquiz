@@ -14,8 +14,9 @@
   "routes": [
     { "pattern": "app.learnquiz.com", "custom_domain": true }
   ],
-  // No model is configured in production: new topics, role builds, diagrams and voice show as unavailable,
-  // and sessions, placement lines and grading use their rule and template fallbacks.
+  // No model is configured in production: new topics and questions show as unavailable, and sessions, placement
+  // lines and grading use their rule and template fallbacks. COMPANY_GENERATION_ENABLED stays unset: company
+  // curricula, shared questions and procedure flowcharts are paused. Diagrams and voice answers have no model path.
   "vars": {
     "BETTER_AUTH_URL": "https://app.learnquiz.com"
   },
