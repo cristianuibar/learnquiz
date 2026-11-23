@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, desc, eq, inArray, isNull, ne } from 'drizzle-orm'
+import { and, asc, desc, eq, exists, inArray, isNull, ne, type SQL, sql } from 'drizzle-orm'
 import { reportReasons } from '@learnquiz/api/reveal'
 import { z } from 'zod'
 import { getDb, type Db } from '@/db'
@@ -101,13 +101,16 @@ export const reviewQuestion = createServerFn({ method: 'POST' })
     if (!row) throw httpError('Question not found', 404)
 
     let changes: Partial<typeof items.$inferInsert>
+    // The document a question moves to, checked again at write time: a replacement or retirement may commit after the read.
+    let liveChoice: SQL | undefined
     if (data.action === 'edit') {
       const parsed = ItemPayload.safeParse(data.payload)
       if (!parsed.success) throw httpError(`Invalid question: ${parsed.error.issues.map((i) => i.message).join('; ')}`, 400)
       const payload = parsed.data
       if (!ENABLED_FORMATS.includes(payload.format) && payload.format !== row.item.format) throw httpError(`Invalid question: ${payload.format} questions are not available yet`, 400)
       const previouslyGrounded = (JSON.parse(row.item.payloadJson) as ItemPayload).grounded
-      const chosen = data.sourceId ? await db.select().from(sources).where(and(eq(sources.id, data.sourceId), eq(sources.topicId, row.item.topicId), isNull(sources.deletedAt), isNull(sources.retiredAt), ne(sources.status, 'failed'))).get() : undefined
+      liveChoice = data.sourceId ? and(eq(sources.id, data.sourceId), eq(sources.topicId, row.item.topicId), isNull(sources.deletedAt), isNull(sources.retiredAt), ne(sources.status, 'failed')) : undefined
+      const chosen = liveChoice ? await db.select().from(sources).where(liveChoice).get() : undefined
       if (data.sourceId && !chosen) throw httpError('Choose a document from this role', 400)
       const doc = chosen ? { title: chosen.title, version: chosen.version } : row.sourceText !== null ? { title: row.sourceTitle, version: row.sourceVersion } : null
       const quote = findSourceQuote(payload.source_quote, chosen ? chosen.bodyText : row.sourceText ?? row.concept.sourceQuote)
@@ -126,13 +129,17 @@ export const reviewQuestion = createServerFn({ method: 'POST' })
       changes = { status: 'retired', retiredAt: Date.now(), retiredBy: user.id }
     }
     const update = db.update(items).set(changes)
-      .where(and(scope, data.action === 'approve' ? ne(items.status, 'retired') : undefined)).returning({ id: items.id })
+      .where(and(scope, data.action === 'approve' ? ne(items.status, 'retired') : undefined,
+        liveChoice && exists(db.select({ one: sql`1` }).from(sources).where(liveChoice)))).returning({ id: items.id })
     // D1 has no transactions: approving and resolving the item's open flags go in one batch.
     const [done] = data.action === 'approve'
       ? await db.batch([update, db.update(itemFlags).set({ resolvedAt: Date.now() })
         .where(and(eq(itemFlags.itemId, data.itemId), isNull(itemFlags.resolvedAt),
           inArray(itemFlags.itemId, db.select({ id: items.id }).from(items).where(and(eq(items.id, data.itemId), ne(items.status, 'retired'))))))])
       : [await update]
-    if (!done.length) throw httpError('Question is no longer available', 409)
+    if (!done.length) {
+      if (liveChoice && !await db.select({ id: sources.id }).from(sources).where(liveChoice).get()) throw httpError('Choose a document from this role', 409)
+      throw httpError('Question is no longer available', 409)
+    }
     return { ok: true }
   })

@@ -30,6 +30,8 @@ const payload: ItemPayload = {
 }
 let raw: DatabaseSync
 const row = (sql: string, ...params: (string | number)[]) => raw.prepare(sql).get(...params)
+// One-shot hook: runs just before the next SQL statement that starts with the given prefix.
+let beforeSql: { prefix: string; fn: () => void } | null = null
 
 beforeAll(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
@@ -39,6 +41,7 @@ beforeAll(() => {
     raw.exec(readFileSync(`drizzle/${file}`, 'utf8').replaceAll('--> statement-breakpoint', ''))
   }
   holder.db = drizzle(async (sql, params, method) => {
+    if (beforeSql && sql.startsWith(beforeSql.prefix)) { const { fn } = beforeSql; beforeSql = null; fn() }
     const stmt = raw.prepare(sql)
     stmt.setReturnArrays(true)
     if (method === 'run') { stmt.run(...params); return { rows: [] } }
@@ -228,6 +231,12 @@ it('moves a question to another live document of the role and refuses other, ret
   expect(row('SELECT source_id, source_version FROM items WHERE id = ?', 'a-move')).toEqual({ source_id: 'source-a2', source_version: 3 })
   const moved = await getQuestionReview({ data: { slug: 'alpha' } })
   expect(moved.units[1].concepts[1].questions.find((q) => q.id === 'a-move')).toMatchObject({ sourceId: 'source-a2', source: { title: 'Zeta handbook', version: 3 } })
+
+  // The document is replaced after the edit checked it: the question must not land on the retired version.
+  ins('source-a3', 'a', 'Dock rules', 1, null)
+  beforeSql = { prefix: 'update "items"', fn: () => raw.prepare("UPDATE sources SET retired_at = ? WHERE id = 'source-a3'").run(Date.now()) }
+  await expect(edit('source-a3')).rejects.toMatchObject({ status: 409, message: 'Choose a document from this role' })
+  expect(row('SELECT source_id, source_version FROM items WHERE id = ?', 'a-move')).toEqual({ source_id: 'source-a2', source_version: 3 })
 })
 
 
