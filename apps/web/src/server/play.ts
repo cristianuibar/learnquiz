@@ -330,7 +330,10 @@ export const startSession = createServerFn({ method: 'POST' })
       ? await db.select().from(items).where(and(eq(items.topicId, topic.id), storedOnly ? undefined : inArray(items.conceptId, candidates.map((f) => f.concept.id)),
         eq(items.status, 'active'), notFlaggedBy(db, learnerId), gradesShortAnswers(topic) ? undefined : ne(items.format, 'short')))
       : []
-    const top = storedOnly ? candidates.filter((f) => storedRows.some((r) => r.conceptId === f.concept.id)).slice(0, 4) : candidates
+    // A role topic replays its stored questions when nothing is fresh; a personal topic only takes concepts with an unseen one.
+    const top = storedOnly
+      ? candidates.filter((f) => storedRows.some((r) => r.conceptId === f.concept.id && (role || !seen.has(r.id)))).slice(0, 4)
+      : candidates
     const stored = top.map((f) => storedRows.filter((r) => r.conceptId === f.concept.id).map(asItem))
     const storedFresh = stored.flat().filter((it) => !seen.has(it.id)).length
     // Role questions are built once per concept by the company queue; a role session only plays what is stored (#40).
