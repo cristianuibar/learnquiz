@@ -485,6 +485,28 @@ it.each([
   expect(itemStatus()).toEqual({ 'item-1': replaced ? 'retired' : 'active', 'item-2': replaced ? 'retired' : 'active', 'item-other': 'active' })
 })
 
+it('refuses a retire while no question model is configured when an alternate is replaced with a version covering an orphan mid-retire', async () => {
+  seedShared()
+  state.model = {}
+  // con-2 is an orphan when coverage is read; the replacement of src-2 then quotes it.
+  beforeSql = {
+    prefix: 'update "sources"',
+    fn: () => {
+      sqlite.prepare("UPDATE sources SET retired_at = 4 WHERE id = 'src-2'").run()
+      sqlite.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, version, status, created_at) VALUES ('src-2b', 'topic-role-a', 'text', 'Site guide', 'Stop at the red line.', 4, 'ready', 4)").run()
+    },
+  }
+  sqlite.prepare("UPDATE concepts SET source_quote = 'nowhere else' WHERE id = 'con-1'").run()
+  await expect(retireRoleDocument({ data: { ...ids, sourceId: 'src-1' } })).rejects.toMatchObject({ status: 503, message: RETIRE_PAUSED })
+  expect(beforeSql).toBeNull()
+  expect(sqlite.prepare("SELECT retired_at FROM sources WHERE id = 'src-1'").get()).toEqual({ retired_at: null })
+  expect(itemStatus()).toEqual({ 'item-1': 'active', 'item-2': 'active', 'item-other': 'active' })
+  expect(sqlite.prepare('SELECT id, source_id, gen_status FROM concepts ORDER BY id').all()).toEqual([
+    { id: 'con-1', source_id: 'src-1', gen_status: 'ready' },
+    { id: 'con-2', source_id: 'src-1', gen_status: 'ready' },
+  ])
+})
+
 // The browser upload route: same handler as the server function, with the org and role taken from the URL.
 const post = (body: FormData, origin = 'http://127.0.0.1:8800') => (Route.options.server!.handlers as unknown as {
   POST: (ctx: { request: Request; params: { orgId: string; roleId: string } }) => Promise<Response>

@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, eq, exists, inArray, isNull, ne, sql } from 'drizzle-orm'
+import { and, asc, eq, exists, inArray, isNull, ne, notExists, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '@/db'
 import { concepts, items, jobRoles, sources, topics } from '@/db/schema'
@@ -25,21 +25,25 @@ async function roleTopic(slug: string, roleId: string) {
   return row.topic
 }
 
-// Concepts citing the source, each with another live document that carries the same quote (if any).
+// The other live, readable documents of the topic.
+const otherDocuments = (topicId: string, sourceId: string) =>
+  and(eq(sources.topicId, topicId), ne(sources.id, sourceId), isNull(sources.deletedAt), isNull(sources.retiredAt), ne(sources.status, 'failed'))
+
+// Concepts citing the source, each with another live document that carries the same quote (if any), and the documents read.
 async function citedConcepts(topicId: string, sourceId: string) {
   const db = getDb()
   const [cited, others] = await Promise.all([
     db.select().from(concepts).where(and(eq(concepts.sourceId, sourceId), eq(concepts.topicId, topicId))).orderBy(asc(concepts.order), asc(concepts.id)),
-    db.select().from(sources).where(and(eq(sources.topicId, topicId), ne(sources.id, sourceId), isNull(sources.deletedAt), isNull(sources.retiredAt), ne(sources.status, 'failed')))
-      .orderBy(asc(sources.createdAt), asc(sources.id)),
+    db.select().from(sources).where(otherDocuments(topicId, sourceId)).orderBy(asc(sources.createdAt), asc(sources.id)),
   ])
-  return cited.map((concept) => {
+  const covered = cited.map((concept) => {
     for (const other of others) {
       const quote = findSourceQuote(concept.sourceQuote, other.bodyText)
       if (quote) return { concept, other, quote }
     }
     return { concept, other: null, quote: null }
   })
+  return { covered, read: others.map((other) => other.id) }
 }
 
 export const previewRetireRoleDocument = createServerFn({ method: 'POST' })
@@ -49,7 +53,7 @@ export const previewRetireRoleDocument = createServerFn({ method: 'POST' })
     const db = getDb()
     const source = await db.select().from(sources).where(liveSource(data.sourceId, topic.id)).get()
     if (!source) throw httpError('Document not found', 404)
-    const [cited, count] = await Promise.all([
+    const [{ covered: cited }, count] = await Promise.all([
       citedConcepts(topic.id, source.id),
       db.$count(items, and(eq(items.sourceId, source.id), inArray(items.status, LIVE))),
     ])
@@ -89,16 +93,20 @@ export const retireRoleDocument = createServerFn({ method: 'POST' })
     const requeue = { misconceptionsJson: '[]', genStatus: 'pending' as const, genStartedAt: null, genError: null }
     // An alternate document may be retired or replaced between the read and the write; then read again and pick anew.
     for (let attempt = 1; ; attempt++) {
-      const cited = await citedConcepts(topic.id, source.id)
+      const { covered: cited, read } = await citedConcepts(topic.id, source.id)
       const moved = cited.filter((c) => c.other)
       // A covered concept loses its questions and waits for new ones; without the models that generate them none would come.
       if (moved.length && !canGenerateQuestions()) throw httpError(RETIRE_PAUSED, 503)
       const alternatesLive = [...new Set(moved.map((c) => c.other!.id))]
         .map((id) => exists(db.select({ one: sql`1` }).from(sources).where(liveSource(id, topic.id))))
+      // A document added after the read (such as a replacement) may now cover a concept read as an orphan. The read ids
+      // are bound as one string, so any number of documents stays within D1's parameter limit.
+      const noNewDocument = notExists(db.select({ one: sql`1` }).from(sources)
+        .where(and(otherDocuments(topic.id, source.id), sql`instr(${`,${read.join(',')},`}, ',' || ${sources.id} || ',') = 0`)))
       const retiredAt = Date.now()
       const retiredHere = exists(db.select({ one: sql`1` }).from(sources).where(and(eq(sources.id, source.id), eq(sources.retiredAt, retiredAt))))
       const [retired] = await db.batch([
-        db.update(sources).set({ retiredAt }).where(and(liveSource(source.id, topic.id), notGenerating, otherDocument, ...alternatesLive)).returning({ id: sources.id }),
+        db.update(sources).set({ retiredAt }).where(and(liveSource(source.id, topic.id), notGenerating, otherDocument, noNewDocument, ...alternatesLive)).returning({ id: sources.id }),
         db.update(items).set({ status: 'retired' }).where(and(eq(items.sourceId, source.id), inArray(items.status, LIVE), retiredHere)),
         ...moved.map((c) => db.update(concepts).set({ ...requeue, sourceId: c.other!.id, sourceQuote: c.quote })
           .where(and(eq(concepts.id, c.concept.id), eq(concepts.sourceId, source.id), retiredHere))),
