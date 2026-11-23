@@ -169,15 +169,45 @@ it('still refuses a replacement PDF with no text layer, leaving the live documen
   expect(sqlite.prepare('SELECT id, retired_at, status FROM sources').all()).toEqual([{ id: 'src-1', retired_at: null, status: 'ready' }])
 })
 
-it('refuses to replace a readable document while no question model is configured, keeping its questions live', async () => {
+// Every drafted batch needs its self-check: an items-only mapping would generate nothing either.
+const NO_QUESTIONS = [
+  ['no question model', {}],
+  ['a question model without its self-check model', { JOB_MODELS: JSON.stringify({ items: { provider: 'baseten', model: 'muse-spark-1.3' } }) }],
+] as const
+
+it.each(NO_QUESTIONS)('refuses to replace a readable document while %s is configured, keeping its questions live', async (_, model) => {
   seedV1()
-  state.model = {}
+  state.model = model
   await expect(uploadRoleDocument({ data: form({ replacesId: 'src-1', text: 'Always wear a vest on the dock.' }) }))
     .rejects.toMatchObject({ status: 503, message: REPLACE_PAUSED })
   expect(state.bucket.put).not.toHaveBeenCalled()
   expect(sqlite.prepare('SELECT id, retired_at, version FROM sources').all()).toEqual([{ id: 'src-1', retired_at: null, version: 1 }])
   expect(itemStatus()).toEqual({ 'item-1': 'active', 'item-2': 'active', 'item-other': 'active' })
   expect(sqlite.prepare("SELECT gen_status FROM concepts WHERE id = 'con-1'").get()).toEqual({ gen_status: 'ready' })
+})
+
+it('replaces a draft document nothing cites or asks about yet while no question model is configured', async () => {
+  sqlite.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, version, status, created_at) VALUES ('src-1', 'topic-role-a', 'text', 'Dock rules', 'Wear a vest on the dock.', 1, 'ready', 1)").run()
+  state.model = {}
+  const result = await uploadRoleDocument({ data: form({ replacesId: 'src-1', text: 'Always wear a vest on the dock.' }) })
+  expect(result).toMatchObject({ version: 2, status: 'ready' })
+  expect(sqlite.prepare('SELECT id, version, retired_at IS NOT NULL AS retired FROM sources ORDER BY version').all())
+    .toEqual([{ id: 'src-1', version: 1, retired: 1 }, { id: result.sourceId, version: 2, retired: 0 }])
+})
+
+it('refuses a replacement while no question model is configured when a question is saved against the document after the check', async () => {
+  sqlite.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, version, status, created_at) VALUES ('src-1', 'topic-role-a', 'text', 'Dock rules', 'Wear a vest on the dock.', 1, 'ready', 1)").run()
+  sqlite.prepare("INSERT INTO units (id, topic_id, `order`, name) VALUES ('unit-1', 'topic-role-a', 0, 'Unit')").run()
+  sqlite.prepare("INSERT INTO concepts (id, topic_id, unit_id, `order`, name, summary, source_id, source_quote, gen_status) VALUES ('con-1', 'topic-role-a', 'unit-1', 0, 'Vests', 'Vests', null, 'wear a vest', 'ready')").run()
+  state.model = {}
+  state.bucket.put.mockImplementation(async () => {
+    sqlite.prepare("INSERT INTO items (id, concept_id, topic_id, format, payload_json, source_id, source_version, status, created_at) VALUES ('item-1', 'con-1', 'topic-role-a', 'mcq', '{}', 'src-1', 1, 'active', 1)").run()
+    return {}
+  })
+  await expect(uploadRoleDocument({ data: form({ replacesId: 'src-1', file: textPdf() }) })).rejects.toMatchObject({ status: 503, message: REPLACE_PAUSED })
+  expect(sqlite.prepare('SELECT id, retired_at FROM sources').all()).toEqual([{ id: 'src-1', retired_at: null }])
+  expect(itemStatus()).toEqual({ 'item-1': 'active' })
+  expect(state.bucket.delete).toHaveBeenCalledWith(state.bucket.put.mock.calls[0][0])
 })
 
 it('replacing a failed source removes it from the list and keeps its version', async () => {
@@ -414,9 +444,9 @@ it('retiring repoints concepts another document covers and fails the orphans, wi
   expect(state.background).toHaveLength(0)
 })
 
-it('refuses a retire that would requeue a covered concept while no question model is configured, and allows one that only fails orphans', async () => {
+it.each(NO_QUESTIONS)('refuses a retire that would requeue a covered concept while %s is configured, and allows one that only fails orphans', async (_, model) => {
   seedShared()
-  state.model = {}
+  state.model = model
   await expect(retireRoleDocument({ data: { ...ids, sourceId: 'src-1' } })).rejects.toMatchObject({ status: 503, message: RETIRE_PAUSED })
   expect(sqlite.prepare("SELECT retired_at FROM sources WHERE id = 'src-1'").get()).toEqual({ retired_at: null })
   expect(itemStatus()).toEqual({ 'item-1': 'active', 'item-2': 'active', 'item-other': 'active' })
@@ -453,6 +483,28 @@ it.each([
   expect(sqlite.prepare("SELECT source_id, gen_status, gen_error FROM concepts WHERE id = 'con-1'").get()).toEqual(con1)
   expect(sqlite.prepare("SELECT retired_at IS NOT NULL AS retired FROM sources WHERE id = 'src-1'").get()).toEqual({ retired: replaced ? 1 : 0 })
   expect(itemStatus()).toEqual({ 'item-1': replaced ? 'retired' : 'active', 'item-2': replaced ? 'retired' : 'active', 'item-other': 'active' })
+})
+
+it('refuses a retire while no question model is configured when an alternate is replaced with a version covering an orphan mid-retire', async () => {
+  seedShared()
+  state.model = {}
+  // con-2 is an orphan when coverage is read; the replacement of src-2 then quotes it.
+  beforeSql = {
+    prefix: 'update "sources"',
+    fn: () => {
+      sqlite.prepare("UPDATE sources SET retired_at = 4 WHERE id = 'src-2'").run()
+      sqlite.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, version, status, created_at) VALUES ('src-2b', 'topic-role-a', 'text', 'Site guide', 'Stop at the red line.', 4, 'ready', 4)").run()
+    },
+  }
+  sqlite.prepare("UPDATE concepts SET source_quote = 'nowhere else' WHERE id = 'con-1'").run()
+  await expect(retireRoleDocument({ data: { ...ids, sourceId: 'src-1' } })).rejects.toMatchObject({ status: 503, message: RETIRE_PAUSED })
+  expect(beforeSql).toBeNull()
+  expect(sqlite.prepare("SELECT retired_at FROM sources WHERE id = 'src-1'").get()).toEqual({ retired_at: null })
+  expect(itemStatus()).toEqual({ 'item-1': 'active', 'item-2': 'active', 'item-other': 'active' })
+  expect(sqlite.prepare('SELECT id, source_id, gen_status FROM concepts ORDER BY id').all()).toEqual([
+    { id: 'con-1', source_id: 'src-1', gen_status: 'ready' },
+    { id: 'con-2', source_id: 'src-1', gen_status: 'ready' },
+  ])
 })
 
 // The browser upload route: same handler as the server function, with the org and role taken from the URL.
