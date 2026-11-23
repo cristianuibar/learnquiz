@@ -40,7 +40,8 @@ function Today() {
     : today.role ? { name: today.role.company, logoUrl: null } : null
   const online = useOnline()
   const noticeId = useId()
-  const building = view.hero.kind === 'building'
+  // Nothing builds while generation is paused, so there is nothing to poll for.
+  const building = view.hero.kind === 'building' && !today.role?.paused
 
   useEffect(() => {
     if (!building) return

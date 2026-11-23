@@ -46,7 +46,7 @@ export const rolesOf = createServerOnlyFn((orgId: string) =>
     .where(and(eq(jobRoles.orgId, orgId), eq(jobRoles.status, 'active')))
     .orderBy(asc(jobRoles.createdAt)))
 
-// Per active role: people assigned, live documents, and how many of the topic's live concepts are generated or failed.
+// Per active role: people assigned, live documents, and how many of the topic's live concepts are generated, failed or waiting on a paused queue.
 async function roleSummaries(orgId: string) {
   const db = getDb()
   const [roles, people, documents, conceptRows] = await Promise.all([
@@ -68,7 +68,7 @@ async function roleSummaries(orgId: string) {
   const queuePaused = conceptQueuePaused()
   return roles.map((role) => {
     const c = conceptsBy.get(role.topicId)
-    return { ...role, people: peopleBy.get(role.id) ?? 0, documents: documentsBy.get(role.topicId) ?? 0, conceptsReady: Number(c?.ready ?? 0), conceptsTotal: c?.total ?? 0, failedConcepts: Number(c?.failed ?? 0), preparing: !paused && (role.topicStatus === 'generating' || (!queuePaused && Number(c?.busy ?? 0) > 0)) }
+    return { ...role, people: peopleBy.get(role.id) ?? 0, documents: documentsBy.get(role.topicId) ?? 0, conceptsReady: Number(c?.ready ?? 0), conceptsTotal: c?.total ?? 0, failedConcepts: Number(c?.failed ?? 0), pausedConcepts: queuePaused ? Number(c?.busy ?? 0) : 0, preparing: !paused && (role.topicStatus === 'generating' || (!queuePaused && Number(c?.busy ?? 0) > 0)) }
   })
 }
 

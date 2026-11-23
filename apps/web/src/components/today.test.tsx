@@ -242,6 +242,21 @@ describe('Today interactions', () => {
     }
   })
 
+  it('does not poll paused training that nothing is building', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
+    vi.setSystemTime(todayFixtureNow)
+    const { role, topic, plan } = todayFixtures.first
+    const { container, cleanup } = await renderToday({ topic, role: { ...role!, paused: true }, plan: { ...plan!, playable: false } })
+    try {
+      expect(container.querySelector('h2')?.textContent).toBe("Your training isn't ready")
+      expect(container.textContent).toContain('Question generation is paused, so there are no questions to play yet.')
+      await act(async () => { vi.advanceTimersByTime(60_000) })
+      expect(getToday).toHaveBeenCalledTimes(1)
+    } finally {
+      await cleanup()
+    }
+  })
+
   it('opens the Loading screen to start a session when Play is pressed', async () => {
     const { router, buttons, cleanup } = await renderToday(todayFixtures.normal)
     try {

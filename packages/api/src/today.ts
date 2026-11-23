@@ -6,7 +6,9 @@ export type Today = {
   role: { name: string; company: string; topicTitle: string; preparing: boolean; mastery: number | null; benchmark: number
           day: number; days: number; building: { ready: number; total: number } | null
           // Some of the training could not be built and nothing is still building; absent in payloads from before it existed.
-          failed?: boolean } | null
+          failed?: boolean
+          // Questions wait on paused generation, so nothing is building; absent in payloads from before it existed.
+          paused?: boolean } | null
   plan: { state: TodayState; start: 'session' | 'placement'; nextUnit: string | null; reviewsLeft: number
           reviewsCleared: number; sessionDone: boolean; sessionSize: number; playable: boolean
           nextReviewAt: number | null } | null
@@ -55,6 +57,9 @@ function playAction(unit: string | null, disabled: boolean): TodayAction {
 const BUILDING_NOTE =
   'Play unlocks as soon as your first questions are ready. This page updates on its own, so you can come back later.'
 
+const PAUSED_NOTE =
+  'Your questions are made once generation resumes. Check back later.'
+
 const FAILED_NOTE =
   'Ask your company to retry it. This page updates on its own once it is fixed.'
 
@@ -71,6 +76,18 @@ function heroView(today: Today, now: Date): TodayHero {
       total: null,
       status: 'Some of your training could not be built, so there are no questions to play yet.',
       note: FAILED_NOTE,
+      play: playAction(plan?.nextUnit ?? null, true),
+    }
+  }
+
+  if (role?.paused && disabled && plan?.state !== 'done') {
+    return {
+      kind: 'building',
+      title: "Your training isn't ready",
+      ready: null,
+      total: null,
+      status: 'Question generation is paused, so there are no questions to play yet.',
+      note: PAUSED_NOTE,
       play: playAction(plan?.nextUnit ?? null, true),
     }
   }
