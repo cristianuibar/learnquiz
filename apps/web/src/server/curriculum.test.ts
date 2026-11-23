@@ -12,6 +12,7 @@ import { getToday } from './today'
 import { requestedSchema } from '@/lib/llm/test-request'
 import { getEnv } from './env'
 import { ROLE_BUILDS_PAUSED } from './role-curriculum'
+import { canCreateTopic } from './topic-start'
 
 // Keep the handlers, validation, authorization, model client and database real.
 // Only the transport, session provider, Worker bindings and model HTTP are faked.
@@ -349,6 +350,24 @@ it('refuses a personal topic and pauses a role build without a curriculum model,
   expect(topicState()).toEqual({ status: 'draft' })
   expect(fetchModel).not.toHaveBeenCalled()
   expect(raw.prepare('SELECT COUNT(*) AS n FROM model_calls').get()).toEqual({ n: 0 })
+})
+
+it('keeps new topics unavailable when only the curriculum job has a model, storing nothing', async () => {
+  const env = getEnv()
+  const profile = env.LLM_PROFILE
+  env.LLM_PROFILE = undefined
+  env.JOB_MODELS = { curriculum: { provider: 'baseten', model: 'muse-spark-1.3' } }
+  try {
+    await expect(canCreateTopic()).resolves.toBe(false)
+    await expect(curriculum.createTopic({ data: { topic: 'Warehouse picker' } }))
+      .rejects.toMatchObject({ status: 503, message: curriculum.NEW_TOPICS_UNAVAILABLE })
+  } finally {
+    env.LLM_PROFILE = profile
+    delete env.JOB_MODELS
+  }
+  await expect(canCreateTopic()).resolves.toBe(true)
+  expect(raw.prepare("SELECT id FROM topics WHERE learner_id = 'owner'").all()).toEqual([])
+  expect(fetchModel).not.toHaveBeenCalled()
 })
 
 it('builds without a document whose extraction failed, and refuses a role whose only document failed', async () => {
