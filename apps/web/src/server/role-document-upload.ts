@@ -1,4 +1,4 @@
-import { and, eq, exists, inArray, isNull, ne, sql } from 'drizzle-orm'
+import { and, eq, exists, inArray, isNull, ne, notExists, type SQL, sql } from 'drizzle-orm'
 import { extractText, getDocumentProxy } from 'unpdf'
 import { z } from 'zod'
 import { getDb } from '@/db'
@@ -59,6 +59,9 @@ export async function addRoleDocument(data: ReturnType<typeof parseDocumentForm>
     .where(and(eq(jobRoles.id, data.roleId), eq(jobRoles.orgId, org.id), eq(jobRoles.status, 'active'))).get()
   if (!row) throw httpError('Role topic not found', 404)
   let old: typeof sources.$inferSelect | undefined
+  // Set only while questions cannot be generated; checked again when the replacement is written.
+  let unused: SQL | undefined
+  const stillUnused = async () => !unused || Boolean(await db.select({ one: sql`1` }).from(topics).where(and(eq(topics.id, row.topic.id), unused)).get())
   if (data.replacesId) {
     if (row.topic.status === 'generating') throw httpError('The curriculum is generating. Try again when it finishes.', 409)
     old = await db.select().from(sources).where(liveSource(data.replacesId, row.topic.id)).get()
@@ -67,11 +70,11 @@ export async function addRoleDocument(data: ReturnType<typeof parseDocumentForm>
     // Replacing a readable document retires its live questions and requeues the concepts citing it; without the models
     // that generate questions none would replace them. A document nothing cites or asks about yet can still be replaced.
     if (old.status !== 'failed' && !canGenerateQuestions()) {
-      const [cites, asks] = await Promise.all([
-        db.$count(concepts, and(eq(concepts.sourceId, old.id), eq(concepts.topicId, row.topic.id))),
-        db.$count(items, and(eq(items.sourceId, old.id), eq(items.sourceVersion, old.version), inArray(items.status, LIVE))),
-      ])
-      if (cites || asks) throw httpError(REPLACE_PAUSED, 503)
+      unused = and(
+        notExists(db.select({ one: sql`1` }).from(concepts).where(and(eq(concepts.sourceId, old.id), eq(concepts.topicId, row.topic.id)))),
+        notExists(db.select({ one: sql`1` }).from(items).where(and(eq(items.sourceId, old.id), eq(items.sourceVersion, old.version), inArray(items.status, LIVE)))),
+      )
+      if (!await stillUnused()) throw httpError(REPLACE_PAUSED, 503)
     }
   } else if (!['draft', 'failed'].includes(row.topic.status)) {
     throw httpError('The curriculum is already generating or ready.', 409)
@@ -151,7 +154,7 @@ export async function addRoleDocument(data: ReturnType<typeof parseDocumentForm>
             retiredAt: sql<number | null>`${null}`.as('retiredAt'), deletedAt: sql<number | null>`${null}`.as('deletedAt'), createdAt: sql<number>`${now}`.as('createdAt'),
           }).from(topics).where(and(
             eq(topics.id, topicId), ne(topics.status, 'generating'),
-            exists(db.select({ one: sql`1` }).from(sources).where(liveSource(old.id, topicId))),
+            exists(db.select({ one: sql`1` }).from(sources).where(liveSource(old.id, topicId))), unused,
           )),
         ).returning({ id: sources.id }),
         db.update(sources).set(old.status === 'failed' ? { deletedAt: now } : { retiredAt: now }).where(and(eq(sources.id, old.id), inserted)),
@@ -163,7 +166,8 @@ export async function addRoleDocument(data: ReturnType<typeof parseDocumentForm>
         db.update(concepts).set(requeue).where(and(eq(concepts.sourceId, old.id), inserted)),
       ])
       if (!created.length) {
-        throw await refusal(topicId)
+        // A question or concept may have been saved against the old document after the check above.
+        throw await stillUnused() ? await refusal(topicId) : httpError(REPLACE_PAUSED, 503)
       }
     }
   } catch (error) {

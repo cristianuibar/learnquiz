@@ -195,6 +195,21 @@ it('replaces a draft document nothing cites or asks about yet while no question 
     .toEqual([{ id: 'src-1', version: 1, retired: 1 }, { id: result.sourceId, version: 2, retired: 0 }])
 })
 
+it('refuses a replacement while no question model is configured when a question is saved against the document after the check', async () => {
+  sqlite.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, version, status, created_at) VALUES ('src-1', 'topic-role-a', 'text', 'Dock rules', 'Wear a vest on the dock.', 1, 'ready', 1)").run()
+  sqlite.prepare("INSERT INTO units (id, topic_id, `order`, name) VALUES ('unit-1', 'topic-role-a', 0, 'Unit')").run()
+  sqlite.prepare("INSERT INTO concepts (id, topic_id, unit_id, `order`, name, summary, source_id, source_quote, gen_status) VALUES ('con-1', 'topic-role-a', 'unit-1', 0, 'Vests', 'Vests', null, 'wear a vest', 'ready')").run()
+  state.model = {}
+  state.bucket.put.mockImplementation(async () => {
+    sqlite.prepare("INSERT INTO items (id, concept_id, topic_id, format, payload_json, source_id, source_version, status, created_at) VALUES ('item-1', 'con-1', 'topic-role-a', 'mcq', '{}', 'src-1', 1, 'active', 1)").run()
+    return {}
+  })
+  await expect(uploadRoleDocument({ data: form({ replacesId: 'src-1', file: textPdf() }) })).rejects.toMatchObject({ status: 503, message: REPLACE_PAUSED })
+  expect(sqlite.prepare('SELECT id, retired_at FROM sources').all()).toEqual([{ id: 'src-1', retired_at: null }])
+  expect(itemStatus()).toEqual({ 'item-1': 'active' })
+  expect(state.bucket.delete).toHaveBeenCalledWith(state.bucket.put.mock.calls[0][0])
+})
+
 it('replacing a failed source removes it from the list and keeps its version', async () => {
   const failed = await uploadRoleDocument({ data: form({ file: pdf('') }) })
   const result = await uploadRoleDocument({ data: form({ replacesId: failed.sourceId, text: 'Wear a vest on the dock.', title: 'Dock rules' }) })
