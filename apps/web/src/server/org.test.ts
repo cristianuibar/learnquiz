@@ -350,6 +350,31 @@ it('reports a built role whose question generation failed as failed or partly re
   await expectBoth({ conceptsReady: 1, failedConcepts: 0, preparing: true }, 'Preparing training')
 })
 
+it('reports a built role whose queued concepts wait on a paused question queue as paused, not Ready', async () => {
+  sqlite.prepare("UPDATE topics SET status = 'ready' WHERE job_role_id = 'legacy-role'").run()
+  const topic = sqlite.prepare('SELECT id FROM topics WHERE job_role_id = ?').get('legacy-role')!.id as string
+  sqlite.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, created_at, retired_at) VALUES (?, ?, 'text', ?, '', 1, NULL)").run('live-doc', topic, 'Handbook')
+  const concept = sqlite.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary, source_id, gen_status) VALUES (?, ?, ?, 0, ?, ?, ?, ?)')
+  concept.run('c-pending', topic, 'warehouse', 'Label', '', 'live-doc', 'pending')
+  const expectBoth = async (state: { conceptsReady: number; pausedConcepts: number; preparing: boolean }, status: string) => {
+    const roles = (await listRoles({ data: { slug: 'alpha' } })).roles
+    const overview = (await getOrgOverview({ data: { slug: 'alpha' } })).roles
+    expect(roles).toEqual([expect.objectContaining({ id: 'legacy-role', topicStatus: 'ready', ...state })])
+    expect(overview).toEqual([expect.objectContaining({ id: 'legacy-role', topicStatus: 'ready', ...state })])
+    expect(roleTrainingStatus(roles[0])).toBe(status)
+    expect(roleTrainingStatus({ ...overview[0], documentCount: overview[0].documents })).toBe(status)
+  }
+  await expectBoth({ conceptsReady: 0, pausedConcepts: 0, preparing: true }, 'Preparing training')
+  holder.env.COMPANY_GENERATION_ENABLED = undefined
+  await expectBoth({ conceptsReady: 0, pausedConcepts: 1, preparing: false }, 'Training paused')
+  concept.run('c-ready', topic, 'warehouse', 'Scan', '', 'live-doc', 'ready')
+  await expectBoth({ conceptsReady: 1, pausedConcepts: 1, preparing: false }, 'Partly ready')
+  // Without a question model the queue is paused too.
+  holder.env.COMPANY_GENERATION_ENABLED = 'true'
+  holder.env.LLM_PROFILE = undefined
+  await expectBoth({ conceptsReady: 1, pausedConcepts: 1, preparing: false }, 'Partly ready')
+})
+
 it("returns each member's mastery against their job role benchmark", async () => {
   sqlite.prepare("UPDATE topics SET status = 'ready' WHERE job_role_id = 'legacy-role'").run()
   const topic = sqlite.prepare('SELECT id FROM topics WHERE job_role_id = ?').get('legacy-role')!.id as string

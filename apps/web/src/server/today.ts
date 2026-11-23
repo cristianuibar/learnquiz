@@ -6,6 +6,7 @@ import { onboardingDay } from '@/lib/learning/profile'
 import { shouldStop } from '@/lib/learning/placement'
 import { streakShown } from '@/lib/learning/session'
 import { attempts, concepts, items, learnerItem, learnerTopic, placements, sessions, topics, units } from '@/db/schema'
+import { conceptQueuePaused } from '@/server/concept-gen'
 import { dueCount, gradesShortAnswers } from '@/server/due'
 import { loadPKnown } from '@/server/helpers'
 import { liveConcept } from '@/server/live-concept'
@@ -54,8 +55,10 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
     ])
     if (hasAttempt && cs.length) role.mastery = cs.reduce((a, c) => a + (known.get(c.id) ?? 0), 0) / cs.length
     const counted = cs.filter((c) => c.gen !== 'failed')
+    // Queued concepts wait while the question queue is paused, so they are not building.
     if (counted.some((c) => c.gen === 'pending' || c.gen === 'generating')) {
-      role.building = { ready: counted.filter((c) => c.gen === 'ready').length, total: counted.length }
+      if (conceptQueuePaused()) role.paused = !role.failed
+      else role.building = { ready: counted.filter((c) => c.gen === 'ready').length, total: counted.length }
     } else if (counted.length < cs.length) {
       role.failed = true
     }
