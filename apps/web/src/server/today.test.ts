@@ -544,13 +544,13 @@ describe('getToday', () => {
 
     it.each([
       ['in the fourth frontier concept', 4, 'cloze', true],
-      ['only in the fifth frontier concept', 5, 'cloze', false],
+      ['only in the fifth frontier concept, after four failed ones', 5, 'cloze', true],
       ['only as a short-answer item in the first concept', 1, 'short', false],
     ])('for a placed role topic with an item %s', async (_name, position, format, playable) => {
       role()
       place()
       unit('un1', 0)
-      for (let i = 1; i <= 5; i++) concept(`c${i}`, 'un1')
+      for (let i = 1; i <= 5; i++) concept(`c${i}`, 'un1', i < position ? 'failed' : 'ready')
       item('y', `c${position}`, { format })
       expect((await getToday()).plan?.playable).toBe(playable)
     })

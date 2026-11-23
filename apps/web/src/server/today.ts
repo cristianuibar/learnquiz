@@ -122,10 +122,12 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
     (async () => {
       if (start === 'placement' || dueN > 0) return true
       if (!assigned) return frontier.length > 0
-      const ids = frontier.slice(0, 4).map((f) => f.concept.id)
-      if (!ids.length) return false
-      return Boolean(await db.select({ id: items.id }).from(items)
-        .where(and(inArray(items.conceptId, ids), eq(items.status, 'active'), ne(items.format, 'short'), notFlaggedBy(db, learnerId))).limit(1).get())
+      if (!frontier.length) return false
+      // As startSession: a role session takes any frontier concept with a stored question it may serve, not only the first four.
+      const stored = await db.selectDistinct({ conceptId: items.conceptId }).from(items)
+        .where(and(eq(items.topicId, topicId), eq(items.status, 'active'), ne(items.format, 'short'), notFlaggedBy(db, learnerId)))
+      const playableConcepts = new Set(stored.map((r) => r.conceptId))
+      return frontier.some((f) => playableConcepts.has(f.concept.id))
     })(),
   ])
   return {
