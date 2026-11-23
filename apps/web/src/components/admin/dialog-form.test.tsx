@@ -122,6 +122,26 @@ describe('dialogs and form controls', () => {
     for (const name of ['Cancel', 'Ban user']) expect(region.contains(button(name))).toBe(false)
   })
 
+  it.each([
+    // 1024x768: the dialog is capped below the viewport and only the consequences region scrolls, so the controls stay on screen.
+    { viewport: 'desktop', variant: 'md', bounds: ['max-h-[calc(100dvh-2rem)]'] },
+    // Narrow screens: the bottom sheet is capped below the viewport and can also scroll as a whole.
+    { viewport: 'mobile', variant: 'max-md', bounds: ['max-h-[calc(100dvh-24px)]', 'overflow-y-auto'] },
+  ])('bounds the dialog height on $viewport so twenty consequences scroll inside it', async ({ variant, bounds }) => {
+    // happy-dom has no layout and can't match Tailwind's range media queries, so read the utilities active at the breakpoint.
+    const active = (el: Element) => new Set(el.className.split(/\s+/).flatMap((c) => !c.includes(':') ? [c] : c.startsWith(`${variant}:`) ? [c.slice(variant.length + 1)] : []))
+    const many = Array.from({ length: 20 }, (_, i) => ({ icon: Ban, text: `Concept ${i + 1} is also in Site guide v2.` }))
+    await render(<Harness onConfirm={vi.fn()} consequences={many} />)
+    await click(button('Retire'))
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!
+    const region = dialog.querySelector<HTMLElement>('[role="region"][aria-label="Consequences"]')!
+    expect(region.querySelectorAll('li')).toHaveLength(20)
+    // min-h-0 only lets the region shrink and scroll when it is a direct flex child of the bounded dialog.
+    expect(region.parentElement).toBe(dialog)
+    expect([...active(dialog)]).toEqual(expect.arrayContaining(['flex', 'flex-col', ...bounds]))
+    expect([...active(region)]).toEqual(expect.arrayContaining(['min-h-0', 'overflow-y-auto']))
+  })
+
   it('stays open and shows an alert when confirming fails', async () => {
     await render(<Harness onConfirm={() => Promise.reject(new Error('Server said no'))} />)
     await click(button('Retire'))
