@@ -4,9 +4,8 @@ import { z } from 'zod'
 import { getDb } from '@/db'
 import { concepts, items, jobRoles, sources, topics } from '@/db/schema'
 import { findSourceQuote } from '@/lib/curriculum/validate'
-import { hasModel } from '@/lib/llm/client'
 import { requireOrgAdmin } from '@/server/authz'
-import { drainConceptQueue } from '@/server/concept-gen'
+import { canGenerateQuestions, drainConceptQueue } from '@/server/concept-gen'
 import { drainsOnRequest, getEnv, runInBackground } from '@/server/env'
 import { httpError } from '@/server/helpers'
 import { addRoleDocument, assertDocumentChangeable, LIVE, liveSource, parseDocumentForm, refusal } from '@/server/role-document-upload'
@@ -92,8 +91,8 @@ export const retireRoleDocument = createServerFn({ method: 'POST' })
     for (let attempt = 1; ; attempt++) {
       const cited = await citedConcepts(topic.id, source.id)
       const moved = cited.filter((c) => c.other)
-      // A covered concept loses its questions and waits for new ones; without a question model none would come.
-      if (moved.length && !hasModel('items')) throw httpError(RETIRE_PAUSED, 503)
+      // A covered concept loses its questions and waits for new ones; without the models that generate them none would come.
+      if (moved.length && !canGenerateQuestions()) throw httpError(RETIRE_PAUSED, 503)
       const alternatesLive = [...new Set(moved.map((c) => c.other!.id))]
         .map((id) => exists(db.select({ one: sql`1` }).from(sources).where(liveSource(id, topic.id))))
       const retiredAt = Date.now()

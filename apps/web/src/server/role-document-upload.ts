@@ -4,11 +4,10 @@ import { z } from 'zod'
 import { getDb } from '@/db'
 import { concepts, items, jobRoles, sources, topics } from '@/db/schema'
 import { findSourceQuote } from '@/lib/curriculum/validate'
-import { hasModel } from '@/lib/llm/client'
 import { MAX_ROLE_DOCUMENT_BYTES, MAX_ROLE_DOCUMENT_CHARS } from '@/lib/limits'
 import { APP_ORIGINS } from '@/server/auth-core'
 import { requireOrgAdmin } from '@/server/authz'
-import { drainConceptQueue } from '@/server/concept-gen'
+import { canGenerateQuestions, drainConceptQueue } from '@/server/concept-gen'
 import { drainsOnRequest, getEnv, runInBackground } from '@/server/env'
 import { httpError } from '@/server/helpers'
 import { companyGenerationPaused } from '@/server/model-cap'
@@ -65,8 +64,15 @@ export async function addRoleDocument(data: ReturnType<typeof parseDocumentForm>
     old = await db.select().from(sources).where(liveSource(data.replacesId, row.topic.id)).get()
     if (!old) throw httpError('Document not found', 404)
     assertDocumentChangeable(row.topic, old)
-    // Replacing a readable document retires its live questions; without a question model none would replace them.
-    if (old.status !== 'failed' && !hasModel('items')) throw httpError(REPLACE_PAUSED, 503)
+    // Replacing a readable document retires its live questions and requeues the concepts citing it; without the models
+    // that generate questions none would replace them. A document nothing cites or asks about yet can still be replaced.
+    if (old.status !== 'failed' && !canGenerateQuestions()) {
+      const [cites, asks] = await Promise.all([
+        db.$count(concepts, and(eq(concepts.sourceId, old.id), eq(concepts.topicId, row.topic.id))),
+        db.$count(items, and(eq(items.sourceId, old.id), eq(items.sourceVersion, old.version), inArray(items.status, LIVE))),
+      ])
+      if (cites || asks) throw httpError(REPLACE_PAUSED, 503)
+    }
   } else if (!['draft', 'failed'].includes(row.topic.status)) {
     throw httpError('The curriculum is already generating or ready.', 409)
   }
