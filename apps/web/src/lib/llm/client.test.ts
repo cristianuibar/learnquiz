@@ -233,6 +233,15 @@ it.each([
   expect(raw.prepare('SELECT COUNT(*) AS n FROM model_calls').get()).toEqual({ n: 0 })
 })
 
+it.each(['', '  '])('falls back to the local profile when the copied example leaves JOB_MODELS blank: %j', async (mapping) => {
+  Object.assign(getEnv(), { JOB_MODELS: mapping })
+  const fetchModel = vi.fn(async () => Response.json({ choices: [{ message: { content: '{"answer":"ok"}' } }] }))
+  vi.stubGlobal('fetch', fetchModel)
+  await expect(chatJson({ ...answerRequest, purpose: 'self_check' })).resolves.toEqual({ answer: 'ok' })
+  expect(fetchModel).toHaveBeenCalledTimes(1)
+  expect(raw.prepare('SELECT purpose, model, ok FROM model_calls').get()).toEqual({ purpose: 'self_check', model: 'text-model', ok: 1 })
+})
+
 it('logs the selected model and redacts its key when a provider fails without retrying', async () => {
   Object.assign(getEnv(), {
     JOB_MODELS: JSON.stringify({ self_check: { provider: 'baseten', model: 'open-model' } }),

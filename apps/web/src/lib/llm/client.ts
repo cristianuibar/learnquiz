@@ -51,8 +51,10 @@ export function jobModel(job: ModelJob) {
   const env = getEnv()
   try {
     if (!localCommand && !import.meta.env.DEV) throw new LlmError(MODEL_UNAVAILABLE_MESSAGE, 503)
-    // Wrangler JSON bindings are objects; .dev.vars can supply JSON strings.
-    const mapping: unknown = typeof env.JOB_MODELS === 'string' ? JSON.parse(env.JOB_MODELS) : env.JOB_MODELS === undefined ? {} : env.JOB_MODELS
+    // Wrangler JSON bindings are objects; .dev.vars can supply JSON strings, or a blank one copied from the example.
+    const mapping: unknown = typeof env.JOB_MODELS === 'string'
+      ? (env.JOB_MODELS.trim() ? JSON.parse(env.JOB_MODELS) : {})
+      : env.JOB_MODELS === undefined ? {} : env.JOB_MODELS
     const jobs = z.record(z.string(), z.unknown()).parse(mapping)
     const selected = jobs[job] === undefined
       ? { provider: env.LLM_PROFILE, model: env.LLM_MODEL }
