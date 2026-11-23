@@ -23,7 +23,7 @@ vi.mock('@tanstack/react-start', () => ({
 vi.mock('@tanstack/react-start/server', () => ({ getRequestHeaders: () => new Headers() }))
 vi.mock('@/db', () => ({ getDb: () => state.db }))
 vi.mock('@/server/env', () => ({ getEnv: () => ({ MEDIA: state.bucket, BETTER_AUTH_URL: 'http://127.0.0.1:8800', ...state.model, COMPANY_GENERATION_ENABLED: state.companyGeneration }), drainsOnRequest: () => false, runInBackground: (task: Promise<unknown>) => { state.background.push(task) } }))
-vi.mock('@/server/concept-gen', () => ({ drainConceptQueue: drain }))
+vi.mock('@/server/concept-gen', async (original) => ({ ...await original<typeof import('@/server/concept-gen')>(), drainConceptQueue: drain }))
 vi.mock('@/server/session', () => ({ getSessionUser: async () => state.user ? { id: state.user, isAnonymous: state.anonymous } : null }))
 vi.mock('@/server/auth', () => ({ getAuth: () => ({ api: { getSession: async () => state.user ? { user: { id: state.user, isAnonymous: state.anonymous }, session: { activeOrganizationId: state.active } } : null } }) }))
 

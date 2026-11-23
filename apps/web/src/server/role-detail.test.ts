@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
+import { env } from 'cloudflare:workers'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { listRoles } from './org'
@@ -110,6 +111,21 @@ it('gives an admin the role documents newest first and its units with concept ge
     { id: 'scan-bin', name: 'Scan the bin', summary: 'Scan the bin barcode.', critical: true, genStatus: 'ready', genError: null, questionCount: 0 },
     { id: 'scan-sku', name: 'Scan the SKU', summary: 'Scan each SKU.', critical: false, genStatus: 'failed', genError: 'Model timed out', questionCount: 0 },
   ] }])
+})
+
+it('reports queued questions as paused while the question queue cannot drain', async () => {
+  const workerEnv = env as { COMPANY_GENERATION_ENABLED?: string; LLM_PROFILE?: string }
+  try {
+    expect(await read()).toMatchObject({ generationPaused: true, questionsPaused: true })
+    workerEnv.COMPANY_GENERATION_ENABLED = 'true'
+    expect(await read()).toMatchObject({ generationPaused: false, questionsPaused: false })
+    // Generation is enabled but no question model is configured: pending concepts stay pending.
+    workerEnv.LLM_PROFILE = undefined
+    expect(await read()).toMatchObject({ generationPaused: false, questionsPaused: true })
+  } finally {
+    workerEnv.COMPANY_GENERATION_ENABLED = undefined
+    workerEnv.LLM_PROFILE = 'baseten'
+  }
 })
 
 it('counts only current company members in both the Roles list and role detail', async () => {

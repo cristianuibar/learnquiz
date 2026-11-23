@@ -12,7 +12,7 @@ import { RoleDialog } from '@/components/portal/roles/role-dialog'
 import { plural } from '@/lib/utils'
 import { generateRoleCurriculum } from '@/server/curriculum'
 import type { RoleDetail as RoleDetailData } from '@/server/role-detail'
-import { Curriculum } from './curriculum'
+import { buildRunning, Curriculum } from './curriculum'
 import { DocumentsCard } from './documents-card'
 import { PasteTextPanel } from './paste-text-panel'
 import { useUpload } from './use-upload'
@@ -29,7 +29,7 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
   const [pasteOpen, setPasteOpen] = useState(false)
   const [pasteFor, setPasteFor] = useState<string | undefined>()
   const opener = useRef<HTMLElement | null>(null)
-  const { role, documents, units } = detail
+  const { role, documents } = detail
   const [finished, setFinished] = useState<{ name: string; size: number; sourceId: string; refocus: boolean } | null>(null)
   const [announced, setAnnounced] = useState('')
   const [roleStatus, setRoleStatus] = useState('')
@@ -56,9 +56,8 @@ export function RoleDetail({ detail, readOnly }: { detail: RoleDetailData; readO
     uploadStatus = q ? `Uploading ${uploader.state.file.name}, ${q}%` : ''
   }
   const ready = documents.filter((d) => d.status === 'ready').length
-  const concepts = units.flatMap((u) => u.concepts)
   const paused = detail.generationPaused
-  const running = !paused && (role.topicStatus === 'generating' || concepts.some((c) => c.genStatus === 'pending' || c.genStatus === 'generating'))
+  const running = buildRunning(detail)
   const canUpload = !readOnly && (role.topicStatus === 'draft' || role.topicStatus === 'failed')
 
   useLayoutEffect(() => {

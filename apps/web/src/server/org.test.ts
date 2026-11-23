@@ -8,7 +8,7 @@ import { createCompany, createRole, getOrgOverview, listRoles, updateRole } from
 import { getPeople } from '@/server/people'
 import { getProfile } from '@/server/profile'
 
-const holder = vi.hoisted(() => ({ db: null as unknown, createOrganization: vi.fn(), env: { BETTER_AUTH_URL: 'http://127.0.0.1:8800', COMPANY_GENERATION_ENABLED: 'true' as string | undefined } }))
+const holder = vi.hoisted(() => ({ db: null as unknown, createOrganization: vi.fn(), env: { BETTER_AUTH_URL: 'http://127.0.0.1:8800', COMPANY_GENERATION_ENABLED: 'true' as string | undefined, LLM_PROFILE: 'baseten' as string | undefined, LLM_MODEL: 'muse-spark-1.3' } }))
 
 // Fake the request/auth boundaries; keep validation, authorization and SQL real.
 vi.mock('@tanstack/react-start', () => ({
@@ -76,6 +76,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   holder.env.COMPANY_GENERATION_ENABLED = 'true'
+  holder.env.LLM_PROFILE = 'baseten'
   sqlite.exec('BEGIN')
   vi.mocked(getSessionUser).mockResolvedValue({ id: 'owner', isAnonymous: false } as never)
   holder.createOrganization.mockImplementation(async ({ body }: { body: { name: string; slug: string } }) => {
@@ -318,6 +319,10 @@ it('shows the same preparing state on Roles and Overview while a ready role stil
   await expectBoth({ preparing: false, conceptsReady: 1, conceptsTotal: 2 })
   expect(await getOrgOverview({ data: { slug: 'alpha' } })).toMatchObject({ generationPaused: true })
   holder.env.COMPANY_GENERATION_ENABLED = 'true'
+  // Without a question model the queue never drains, so a queued concept is not being prepared either.
+  holder.env.LLM_PROFILE = undefined
+  await expectBoth({ preparing: false, conceptsReady: 1, conceptsTotal: 2 })
+  holder.env.LLM_PROFILE = 'baseten'
   sqlite.prepare("UPDATE concepts SET gen_status = 'ready' WHERE id = 'c-pending'").run()
   await expectBoth({ preparing: false, conceptsReady: 2, conceptsTotal: 2 })
 })
