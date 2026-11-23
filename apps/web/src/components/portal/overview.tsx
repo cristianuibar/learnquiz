@@ -63,6 +63,14 @@ function TrainingCell({ role }: { role: RoleRow }) {
       </span>
     )
   }
+  if ((status === 'Partly ready' || status === 'Training failed') && role.failedConcepts > 0) {
+    return (
+      <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+        <Status word={status} />
+        <span className="text-[13px]/[18px] text-ink-muted">{role.failedConcepts} of {role.conceptsTotal} concepts failed</span>
+      </span>
+    )
+  }
   return <Status word={status} />
 }
 

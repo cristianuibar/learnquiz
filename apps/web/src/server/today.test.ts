@@ -219,6 +219,42 @@ describe('getToday', () => {
     expect(today.role).toMatchObject({ name: 'Analyst', company: 'Alpha Co', topicTitle: 'Analyst onboarding', preparing: true })
   })
 
+  it('explains unavailable training when every role concept failed its questions, and recovers after a retry', async () => {
+    role()
+    unit('un1', 0)
+    concept('c1', 'un1', 'failed')
+    const today = await getToday()
+    expect(today.role).toMatchObject({ preparing: false, building: null, failed: true })
+    const view = todayView(today, new Date(NOW))
+    expect(view.hero).toMatchObject({
+      kind: 'building', title: "Your training isn't ready",
+      status: 'Some of your training could not be built, so there are no questions to play yet.',
+      note: 'Ask your company to retry it. This page updates on its own once it is fixed.', play: { disabled: true },
+    })
+    // The owner retries the concept: it is queued again and Today shows the build.
+    run("UPDATE concepts SET gen_status = 'pending' WHERE id = 'c1'")
+    expect(todayView(await getToday(), new Date(NOW)).hero).toMatchObject({ kind: 'building', title: 'Building your questions', status: '0 of 1 topics ready' })
+    run("UPDATE concepts SET gen_status = 'ready' WHERE id = 'c1'")
+    item('i1', 'c1')
+    expect(todayView(await getToday(), new Date(NOW)).hero).toMatchObject({ kind: 'first', title: 'Your first session', play: { disabled: false } })
+  })
+
+  it('keeps partly built role training playable', async () => {
+    role()
+    basics()
+    concept('c2', 'un1', 'failed')
+    const today = await getToday()
+    expect(today.role).toMatchObject({ failed: true, building: null })
+    expect(todayView(today, new Date(NOW)).hero).toMatchObject({ kind: 'first', play: { disabled: false } })
+  })
+
+  it('tells a learner on a failed role build that it is not ready rather than building', async () => {
+    role({ topicStatus: 'failed' })
+    const today = await getToday()
+    expect(today).toMatchObject({ topic: null, plan: null, role: { preparing: false, failed: true } })
+    expect(todayView(today, new Date(NOW)).hero).toMatchObject({ kind: 'building', title: "Your training isn't ready", play: { disabled: true } })
+  })
+
   it('prefers the role topic over a personal one and reports the role facts', async () => {
     role({ assignedAt: NOW - 2 * DAY })
     basics()

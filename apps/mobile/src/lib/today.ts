@@ -36,6 +36,9 @@ export function buildingStep(today: Today | null): number | null {
   return Math.floor((building.ready / building.total) * 10)
 }
 
+// Poll while questions are building, and after a failed build so an owner's retry shows up on its own.
+export const pollsForBuild = (today: Today) => today.role?.building != null || today.role?.failed === true
+
 // Announce only when the step changes after the first reading.
 export function shouldAnnounce(previous: number | null, next: number | null): boolean {
   return previous !== null && next !== null && next !== previous
@@ -195,7 +198,7 @@ export function useToday({ monitorConnectivity = false }: { monitorConnectivity?
         freshOwner.current = ownerForRun
         setOwner(ownerForRun)
         setToday(next)
-        setBuilding(next.role?.building != null)
+        setBuilding(pollsForBuild(next))
         setPayloadDay(requestDay)
         needsRecovery.current = false
         reachability.current?.reset()
@@ -295,7 +298,7 @@ export function useToday({ monitorConnectivity = false }: { monitorConnectivity?
       if (freshOwner.current?.id === capturedId && freshOwner.current?.token === requestToken) return
       setOwner({ id: capturedId, token: requestToken })
       setToday(entry.today)
-      setBuilding(entry.today.role?.building != null)
+      setBuilding(pollsForBuild(entry.today))
       setPayloadDay(entry.day)
     })
   }, [fixture, userId, token])

@@ -46,7 +46,7 @@ export const rolesOf = createServerOnlyFn((orgId: string) =>
     .where(and(eq(jobRoles.orgId, orgId), eq(jobRoles.status, 'active')))
     .orderBy(asc(jobRoles.createdAt)))
 
-// Per active role: people assigned, live documents, and how many of the topic's live concepts are generated.
+// Per active role: people assigned, live documents, and how many of the topic's live concepts are generated or failed.
 async function roleSummaries(orgId: string) {
   const db = getDb()
   const [roles, people, documents, conceptRows] = await Promise.all([
@@ -57,7 +57,7 @@ async function roleSummaries(orgId: string) {
       .where(eq(memberRoleAssignments.orgId, orgId))
       .groupBy(memberRoleAssignments.jobRoleId),
     db.select({ id: sources.topicId, n: count() }).from(sources).innerJoin(topics, eq(topics.id, sources.topicId)).where(and(eq(topics.orgId, orgId), isNull(sources.retiredAt), isNull(sources.deletedAt))).groupBy(sources.topicId),
-    db.select({ id: concepts.topicId, total: count(), ready: sql<number>`coalesce(sum(${concepts.genStatus} = 'ready'), 0)`, busy: sql<number>`coalesce(sum(${concepts.genStatus} in ('pending', 'generating')), 0)` })
+    db.select({ id: concepts.topicId, total: count(), ready: sql<number>`coalesce(sum(${concepts.genStatus} = 'ready'), 0)`, busy: sql<number>`coalesce(sum(${concepts.genStatus} in ('pending', 'generating')), 0)`, failed: sql<number>`coalesce(sum(${concepts.genStatus} = 'failed'), 0)` })
       .from(concepts).innerJoin(topics, eq(topics.id, concepts.topicId)).where(and(eq(topics.orgId, orgId), liveConcept())).groupBy(concepts.topicId),
   ])
   const peopleBy = new Map(people.map((r) => [r.id, r.n]))
@@ -68,7 +68,7 @@ async function roleSummaries(orgId: string) {
   const queuePaused = conceptQueuePaused()
   return roles.map((role) => {
     const c = conceptsBy.get(role.topicId)
-    return { ...role, people: peopleBy.get(role.id) ?? 0, documents: documentsBy.get(role.topicId) ?? 0, conceptsReady: Number(c?.ready ?? 0), conceptsTotal: c?.total ?? 0, preparing: !paused && (role.topicStatus === 'generating' || (!queuePaused && Number(c?.busy ?? 0) > 0)) }
+    return { ...role, people: peopleBy.get(role.id) ?? 0, documents: documentsBy.get(role.topicId) ?? 0, conceptsReady: Number(c?.ready ?? 0), conceptsTotal: c?.total ?? 0, failedConcepts: Number(c?.failed ?? 0), preparing: !paused && (role.topicStatus === 'generating' || (!queuePaused && Number(c?.busy ?? 0) > 0)) }
   })
 }
 

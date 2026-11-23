@@ -4,7 +4,9 @@ export type Today = {
            // The streak was credited today (a session of 10 answers, or a finished reviews-only queue).
            streakEarned: boolean } | null
   role: { name: string; company: string; topicTitle: string; preparing: boolean; mastery: number | null; benchmark: number
-          day: number; days: number; building: { ready: number; total: number } | null } | null
+          day: number; days: number; building: { ready: number; total: number } | null
+          // Some of the training could not be built and nothing is still building; absent in payloads from before it existed.
+          failed?: boolean } | null
   plan: { state: TodayState; start: 'session' | 'placement'; nextUnit: string | null; reviewsLeft: number
           reviewsCleared: number; sessionDone: boolean; sessionSize: number; playable: boolean
           nextReviewAt: number | null } | null
@@ -53,9 +55,25 @@ function playAction(unit: string | null, disabled: boolean): TodayAction {
 const BUILDING_NOTE =
   'Play unlocks as soon as your first questions are ready. This page updates on its own, so you can come back later.'
 
+const FAILED_NOTE =
+  'Ask your company to retry it. This page updates on its own once it is fixed.'
+
 function heroView(today: Today, now: Date): TodayHero {
   const { topic, role, plan } = today
   const disabled = !plan?.playable || role?.preparing === true
+
+  // Partly built training stays playable; only a learner with nothing to play is told why.
+  if (role?.failed && disabled && plan?.state !== 'done') {
+    return {
+      kind: 'building',
+      title: "Your training isn't ready",
+      ready: null,
+      total: null,
+      status: 'Some of your training could not be built, so there are no questions to play yet.',
+      note: FAILED_NOTE,
+      play: playAction(plan?.nextUnit ?? null, true),
+    }
+  }
 
   if ((role?.building != null || role?.preparing) && plan?.state !== 'done') {
     const building = role?.building ?? null

@@ -30,9 +30,10 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
   let role: Today['role'] = null
   if (assigned) {
     const ready = assigned.topic.status === 'ready'
+    const failed = assigned.topic.status === 'failed'
     const days = assigned.onboardingDays
     const day = onboardingDay(assigned.assignedAt, now, days)
-    role = { name: assigned.roleName, company: assigned.company, topicTitle: assigned.topic.title, preparing: !ready, mastery: null, benchmark: assigned.benchmark, day, days, building: null }
+    role = { name: assigned.roleName, company: assigned.company, topicTitle: assigned.topic.title, preparing: !ready && !failed, mastery: null, benchmark: assigned.benchmark, day, days, building: null, failed }
     if (ready) placeable = await rolePlayable(db, assigned.topic)
     if (ready) topic = { id: assigned.topic.id, title: assigned.topic.title }
   } else {
@@ -55,6 +56,8 @@ export const getToday = createServerFn({ method: 'GET' }).handler(async (): Prom
     const counted = cs.filter((c) => c.gen !== 'failed')
     if (counted.some((c) => c.gen === 'pending' || c.gen === 'generating')) {
       role.building = { ready: counted.filter((c) => c.gen === 'ready').length, total: counted.length }
+    } else if (counted.length < cs.length) {
+      role.failed = true
     }
   }
   if (!topic) {

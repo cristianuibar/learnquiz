@@ -7,6 +7,7 @@ import { getSessionUser } from '@/server/session'
 import { createCompany, createRole, getOrgOverview, listRoles, updateRole } from './org'
 import { getPeople } from '@/server/people'
 import { getProfile } from '@/server/profile'
+import { roleTrainingStatus } from '@/lib/training-status'
 
 const holder = vi.hoisted(() => ({ db: null as unknown, createOrganization: vi.fn(), env: { BETTER_AUTH_URL: 'http://127.0.0.1:8800', COMPANY_GENERATION_ENABLED: 'true' as string | undefined, LLM_PROFILE: 'baseten' as string | undefined, LLM_MODEL: 'muse-spark-1.3' } }))
 
@@ -325,6 +326,28 @@ it('shows the same preparing state on Roles and Overview while a ready role stil
   holder.env.LLM_PROFILE = 'baseten'
   sqlite.prepare("UPDATE concepts SET gen_status = 'ready' WHERE id = 'c-pending'").run()
   await expectBoth({ preparing: false, conceptsReady: 2, conceptsTotal: 2 })
+})
+
+it('reports a built role whose question generation failed as failed or partly ready, not Ready', async () => {
+  sqlite.prepare("UPDATE topics SET status = 'ready' WHERE job_role_id = 'legacy-role'").run()
+  const topic = sqlite.prepare('SELECT id FROM topics WHERE job_role_id = ?').get('legacy-role')!.id as string
+  sqlite.prepare("INSERT INTO sources (id, topic_id, kind, title, body_text, created_at, retired_at) VALUES (?, ?, 'text', ?, '', 1, NULL)").run('live-doc', topic, 'Handbook')
+  const concept = sqlite.prepare('INSERT INTO concepts (id, topic_id, unit_id, "order", name, summary, source_id, gen_status) VALUES (?, ?, ?, 0, ?, ?, ?, ?)')
+  concept.run('c-failed', topic, 'warehouse', 'Label', '', 'live-doc', 'failed')
+  const expectBoth = async (state: { conceptsReady: number; failedConcepts: number; preparing: boolean }, status: string) => {
+    const roles = (await listRoles({ data: { slug: 'alpha' } })).roles
+    const overview = (await getOrgOverview({ data: { slug: 'alpha' } })).roles
+    expect(roles).toEqual([expect.objectContaining({ id: 'legacy-role', topicStatus: 'ready', ...state })])
+    expect(overview).toEqual([expect.objectContaining({ id: 'legacy-role', topicStatus: 'ready', ...state })])
+    expect(roleTrainingStatus(roles[0])).toBe(status)
+    expect(roleTrainingStatus({ ...overview[0], documentCount: overview[0].documents })).toBe(status)
+  }
+  await expectBoth({ conceptsReady: 0, failedConcepts: 1, preparing: false }, 'Training failed')
+  concept.run('c-ready', topic, 'warehouse', 'Scan', '', 'live-doc', 'ready')
+  await expectBoth({ conceptsReady: 1, failedConcepts: 1, preparing: false }, 'Partly ready')
+  // A retried concept is queued again, so the role is preparing until it settles.
+  sqlite.prepare("UPDATE concepts SET gen_status = 'pending' WHERE id = 'c-failed'").run()
+  await expectBoth({ conceptsReady: 1, failedConcepts: 0, preparing: true }, 'Preparing training')
 })
 
 it("returns each member's mastery against their job role benchmark", async () => {

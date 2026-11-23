@@ -18,7 +18,9 @@ type Role = Org['roles'][number]
 
 const sub = 'text-[13px]/[18px] text-ink-muted'
 
-const failed = (r: Role) => roleTrainingStatus(r) === 'Training failed'
+const failed = (r: Role) => ['Training failed', 'Partly ready'].includes(roleTrainingStatus(r))
+// Questions failed on a built curriculum; each failed concept is retried from the role.
+const questionsFailed = (r: Role) => r.topicStatus === 'ready' && r.failedConcepts > 0 && r.failedDocuments === 0
 
 export function Roles({ org, readOnly = false }: { org: Org; readOnly?: boolean }) {
   const links = usePortalLinks()
@@ -96,8 +98,10 @@ export function Roles({ org, readOnly = false }: { org: Org; readOnly?: boolean 
             kind="alert"
             action={<Button asChild variant="secondary"><Link {...links.role(r.id)}>{action}</Link></Button>}
           >
-            <strong>{r.name} training failed.</strong>{' '}
-            {r.failedDocuments > 0
+            <strong>{r.name} training {roleTrainingStatus(r) === 'Partly ready' ? 'is partly ready' : 'failed'}.</strong>{' '}
+            {questionsFailed(r)
+              ? `Questions could not be made for ${plural(r.failedConcepts, 'concept', 'concepts')}. Open the role to retry them.`
+              : r.failedDocuments > 0
               ? `${plural(r.failedDocuments, 'document', 'documents')} ${r.failedDocuments === 1 ? 'has' : 'have'} no selectable text. Replace them or paste the text.`
               : r.documentCount > 0
                 ? 'The curriculum build did not finish. Build the curriculum again.'
