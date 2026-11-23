@@ -6,7 +6,9 @@ import type { z } from 'zod'
 
 // Only the server-fn transport, the session and Cloudflare bindings are faked; getToday runs for real
 // against an in-memory SQLite database speaking the drizzle proxy protocol.
-const holder = vi.hoisted(() => ({ db: null as unknown }))
+// The company question queue has its question and self-check models, so queued role concepts are building.
+const queueEnv = { COMPANY_GENERATION_ENABLED: 'true', JOB_MODELS: JSON.stringify({ items: { provider: 'baseten', model: 'muse-spark-1.3' }, self_check: { provider: 'baseten', model: 'muse-spark-1.3' } }) }
+const holder = vi.hoisted(() => ({ db: null as unknown, env: {} as Record<string, string | undefined> }))
 
 vi.mock('@tanstack/react-start', () => ({
   createServerFn: () => ({
@@ -25,7 +27,7 @@ vi.mock('@/server/session', () => ({
   getSessionUser: async () => ({ id: 'u1', isAnonymous: false }),
 }))
 
-vi.mock('cloudflare:workers', () => ({ env: {} }))
+vi.mock('cloudflare:workers', () => ({ env: holder.env }))
 
 import { todayView } from '@learnquiz/api/today'
 import { SESSION_SIZE } from './play'
@@ -79,6 +81,8 @@ let raw: DatabaseSync
 beforeAll(() => { raw = makeDb() })
 beforeEach(() => {
   raw.exec('BEGIN')
+  for (const key of Object.keys(holder.env)) delete holder.env[key]
+  Object.assign(holder.env, queueEnv)
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-11-03T12:00:00Z'))
 })
@@ -237,6 +241,24 @@ describe('getToday', () => {
     run("UPDATE concepts SET gen_status = 'ready' WHERE id = 'c1'")
     item('i1', 'c1')
     expect(todayView(await getToday(), new Date(NOW)).hero).toMatchObject({ kind: 'first', title: 'Your first session', play: { disabled: false } })
+  })
+
+  it('says paused training is not ready and stops building while the question queue is paused', async () => {
+    role()
+    unit('un1', 0)
+    concept('c1', 'un1', 'pending')
+    holder.env.COMPANY_GENERATION_ENABLED = undefined
+    const today = await getToday()
+    expect(today.role).toMatchObject({ preparing: false, building: null, failed: false, paused: true })
+    expect(todayView(today, new Date(NOW)).hero).toMatchObject({
+      kind: 'building', title: "Your training isn't ready",
+      status: 'Question generation is paused, so there are no questions to play yet.',
+      note: 'Your questions are made once generation resumes. Check back later.', play: { disabled: true },
+    })
+    // Generation resumes: the queued concept is building again.
+    holder.env.COMPANY_GENERATION_ENABLED = 'true'
+    expect(await getToday()).toMatchObject({ role: { building: { ready: 0, total: 1 } } })
+    expect((await getToday()).role?.paused).toBeUndefined()
   })
 
   it('keeps partly built role training playable', async () => {

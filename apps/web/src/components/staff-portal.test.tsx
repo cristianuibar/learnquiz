@@ -70,7 +70,7 @@ beforeEach(() => {
   vi.mocked(getOrgOverview).mockResolvedValue(overview as never)
   vi.mocked(listRoles).mockResolvedValue({
     name: 'Northwind', slug: 'northwind', readOnly: true,
-    roles: [{ ...detail.role, topicStatus: 'ready', documentCount: 1, failedDocuments: 0, failedConcepts: 0, conceptsReady: 12, conceptsTotal: 12, preparing: false, peopleCount: 3 }],
+    roles: [{ ...detail.role, topicStatus: 'ready', documentCount: 1, failedDocuments: 0, failedConcepts: 0, pausedConcepts: 0, conceptsReady: 12, conceptsTotal: 12, preparing: false, peopleCount: 3 }],
   })
   session('admin')
 })

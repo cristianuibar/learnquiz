@@ -18,7 +18,8 @@ type Role = Org['roles'][number]
 
 const sub = 'text-[13px]/[18px] text-ink-muted'
 
-const failed = (r: Role) => ['Training failed', 'Partly ready'].includes(roleTrainingStatus(r))
+// Partly ready only fails when concepts failed; the rest wait on paused generation.
+const failed = (r: Role) => { const status = roleTrainingStatus(r); return status === 'Training failed' || (status === 'Partly ready' && r.failedConcepts > 0) }
 // Questions failed on a built curriculum; each failed concept is retried from the role.
 const questionsFailed = (r: Role) => r.topicStatus === 'ready' && r.failedConcepts > 0 && r.failedDocuments === 0
 

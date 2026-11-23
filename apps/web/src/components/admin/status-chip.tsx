@@ -57,6 +57,7 @@ export const STATUS = {
   Active: { tone: 'settled', icon: CircleDot },
   Ready: { tone: 'settled', icon: CircleCheck },
   'Partly ready': { tone: 'dashed', icon: DashedAlert },
+  'Training paused': { tone: 'dashed', icon: Clock },
   Done: { tone: 'settled', icon: CircleCheck },
   Live: { tone: 'settled', icon: Radio },
   Approved: { tone: 'settled', icon: CircleCheck },
