@@ -71,6 +71,9 @@ export async function processConcept(db: Db, conceptId: string): Promise<void> {
 // New questions need a question model and the self-check that keeps its drafts.
 export const canGenerateQuestions = (): boolean => hasModel('items') && hasModel('self_check')
 
+// A new personal topic needs its curriculum and the placement questions written right after it.
+export const newTopicsAvailable = (): boolean => hasModel('curriculum') && canGenerateQuestions()
+
 // Without them the queue is paused too: concepts stay pending instead of failing.
 export const conceptQueuePaused = (): boolean => companyGenerationPaused() || !canGenerateQuestions()
 

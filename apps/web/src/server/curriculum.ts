@@ -7,7 +7,7 @@ import { validateSkeleton, fallbackSkeleton } from '@/lib/curriculum/validate'
 import { conceptStatus, roleMastery, unitState } from '@/lib/learning/path'
 import { onboardingDay } from '@/lib/learning/profile'
 import { streakShown } from '@/lib/learning/session'
-import { chatJson, DailyCapError, hasModel, jobModel, LlmError } from '@/lib/llm/client'
+import { chatJson, DailyCapError, jobModel, LlmError } from '@/lib/llm/client'
 import { curriculumPrompt } from '@/lib/llm/prompts'
 import { CurriculumSkeleton } from '@/lib/llm/schemas'
 import { MAX_SOURCE_TEXT_CHARS } from '@/lib/limits'
@@ -21,6 +21,7 @@ import { loadFrontier } from '@/server/play'
 import { museModelIds } from '@learnquiz/api/models'
 import type { TopicPath } from '@learnquiz/api/progress'
 import { buildRoleCurriculum, curriculumWrites } from '@/server/role-curriculum'
+import { newTopicsAvailable } from '@/server/concept-gen'
 
 export const NEW_TOPICS_UNAVAILABLE = 'Creating new topics is unavailable right now. Your existing topics still work.'
 
@@ -34,8 +35,8 @@ export const createTopic = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }): Promise<{ topicId: string }> => {
     const learnerId = await requireLearnerId()
-    // Before any stored write: without a curriculum model, nothing is stored and no model is called.
-    if (!hasModel('curriculum')) throw httpError(NEW_TOPICS_UNAVAILABLE, 503)
+    // Before any stored write: without the models a new topic needs, nothing is stored and no model is called.
+    if (!newTopicsAvailable()) throw httpError(NEW_TOPICS_UNAVAILABLE, 503)
     const db = getDb()
     await assertWithinDailyCap(db, learnerId)
     const topicId = crypto.randomUUID()
