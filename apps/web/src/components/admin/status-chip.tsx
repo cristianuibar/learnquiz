@@ -56,6 +56,7 @@ export const STATUS = {
   'Building curriculum': { tone: 'tint', icon: Hourglass },
   Active: { tone: 'settled', icon: CircleDot },
   Ready: { tone: 'settled', icon: CircleCheck },
+  'Partly ready': { tone: 'dashed', icon: DashedAlert },
   Done: { tone: 'settled', icon: CircleCheck },
   Live: { tone: 'settled', icon: Radio },
   Approved: { tone: 'settled', icon: CircleCheck },

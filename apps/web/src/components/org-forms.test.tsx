@@ -104,7 +104,7 @@ it('opens the new company once it is created', async () => {
 })
 
 const role = (over: object = {}) => ({
-  id: 'r1', name: 'Cashier', benchmark: 0.85, onboardingDays: 30, topicId: 't', topicStatus: 'draft', failedDocuments: 0,
+  id: 'r1', name: 'Cashier', benchmark: 0.85, onboardingDays: 30, topicId: 't', topicStatus: 'draft', failedDocuments: 0, failedConcepts: 0,
   peopleCount: 0, documentCount: 0, conceptsReady: 0, conceptsTotal: 0, preparing: false, ...over,
 })
 const mountRoles = (roles: object[] = []) =>
@@ -188,6 +188,8 @@ it.each([
   ['failed documents', role({ failedDocuments: 2, documentCount: 2 }), ['Training failed']],
   ['ready topic with only failed documents left', role({ topicStatus: 'ready', failedDocuments: 1, documentCount: 1 }), ['Training failed']],
   ['documents added', role({ documentCount: 1 }), ['Documents added']],
+  ['ready topic whose questions all failed', role({ topicStatus: 'ready', documentCount: 1, conceptsTotal: 1, failedConcepts: 1 }), ['Training failed'], ['Ready']],
+  ['ready topic with some failed questions', role({ topicStatus: 'ready', documentCount: 1, conceptsReady: 1, conceptsTotal: 2, failedConcepts: 1 }), ['Partly ready'], ['Ready']],
 ])('words the training state: %s', async (_name, r, words, absent: string[] = []) => {
   const container = await mountRoles([r])
   for (const w of words) expect(container.textContent).toContain(w)
@@ -209,6 +211,7 @@ it.each([
 it.each([
   ['readable documents', role({ topicStatus: 'failed', documentCount: 1 }), 'The curriculum build did not finish. Build the curriculum again.', 'Open role'],
   ['no documents', role({ topicStatus: 'failed' }), 'Add a document to build the curriculum.', 'Upload SOP'],
+  ['failed questions', role({ topicStatus: 'ready', documentCount: 1, conceptsReady: 1, conceptsTotal: 3, failedConcepts: 2 }), 'Cashier training is partly ready. Questions could not be made for 2 concepts. Open the role to retry them.', 'Open role'],
 ])('does not ask to fix documents when a build failed with %s', async (_name, r, text, link) => {
   const container = await mountRoles([r])
   const alert = container.querySelector('[role="alert"]')!
