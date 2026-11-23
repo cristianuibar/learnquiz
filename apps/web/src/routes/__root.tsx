@@ -12,6 +12,10 @@ import { getCompanyBranding } from '@/server/org-settings'
 
 import appCss from '../styles.css?url'
 
+// The customer accent belongs to the learner app; the company portal and staff admin stay petrol.
+const learnerAccent = (accent: string | null | undefined, pathname: string | undefined) =>
+  pathname && /^\/(?:org|admin)(?:\/|$)/.test(pathname) ? undefined : accent ?? undefined
+
 export const Route = createRootRoute({
   beforeLoad: async ({ location }) => {
     const session = await getSessionFn()
@@ -29,7 +33,7 @@ export const Route = createRootRoute({
       <p className="text-lg font-medium">Page not found.</p>
     </main>
   ),
-  head: ({ loaderData }) => ({
+  head: ({ loaderData, matches }) => ({
     meta: [
       {
         charSet: 'utf-8',
@@ -38,7 +42,7 @@ export const Route = createRootRoute({
         name: 'viewport',
         content: 'width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content',
       },
-      { name: 'theme-color', content: loaderData?.branding?.accent ?? '#0E5A73' },
+      { name: 'theme-color', content: learnerAccent(loaderData?.branding?.accent, matches.at(-1)?.pathname) ?? '#0E5A73' },
       { name: 'mobile-web-app-capable', content: 'yes' },
       { name: 'apple-mobile-web-app-capable', content: 'yes' },
       { name: 'apple-mobile-web-app-title', content: 'Learn Quiz' },
@@ -107,7 +111,7 @@ const THEME_SCRIPT = "try{var t=localStorage.getItem('lq-theme');if(t==='light'|
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   const data = Route.useLoaderData()
-  const accent = data?.branding?.accent
+  const accent = learnerAccent(data?.branding?.accent, useLocation().pathname)
   const css = accent ? brandCss(accent) : ''
   return (
     <html lang="en" suppressHydrationWarning>
