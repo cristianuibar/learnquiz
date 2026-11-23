@@ -28,11 +28,12 @@ const pasted: Doc = { ...pdf, id: 'd2', title: 'Closing notes', kind: 'text', ve
 const concept = (id: string, name: string, genStatus: string, over: Record<string, unknown> = {}) => ({ id, name, summary: `About ${name}`, critical: false, genStatus, genError: null, questionCount: genStatus === 'ready' ? 4 : 0, ...over })
 const concepts = [concept('c1', 'Cash float', 'ready'), concept('c2', 'Card reader', 'generating')]
 
-function makeDetail(over: { status?: string; documents?: Doc[]; units?: unknown[]; readOnly?: boolean; generationPaused?: boolean } = {}) {
+function makeDetail(over: { status?: string; documents?: Doc[]; units?: unknown[]; readOnly?: boolean; generationPaused?: boolean; questionsPaused?: boolean } = {}) {
   return {
     org: { slug: 'x', name: 'Acme' },
     readOnly: over.readOnly ?? false,
     generationPaused: over.generationPaused ?? false,
+    questionsPaused: over.questionsPaused ?? over.generationPaused ?? false,
     role: { id: 'r1', name: 'Cashier', benchmark: 0.85, onboardingDays: 30, topicId: 't1', topicStatus: over.status ?? 'draft', people: 3, liveQuestions: 12, criticalQuestions: 5 },
     documents: over.documents ?? [],
     units: over.units ?? [],
@@ -265,6 +266,25 @@ it('retries a failed concept', async () => {
   const { button } = await mount(makeDetail({ status: 'ready', documents: [pdf], units: unit([concept('c9', 'Safe drop', 'failed', { genError: 'No draft passed' })]) }))
   await act(async () => { button('Retry questions for Safe drop')!.click() })
   expect(retryConceptGeneration).toHaveBeenCalledWith({ data: { slug: 'x', conceptId: 'c9' } })
+})
+
+it('refreshes every 5 s while questions are queued, and not while the question queue is paused', async () => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+  try {
+    const queued = unit([concept('c1', 'Cash float', 'ready'), concept('c2', 'Card reader', 'pending')])
+    const reloads = async (detail: ReturnType<typeof makeDetail>) => {
+      const view = await renderDetail(detail)
+      const before = vi.mocked(getRoleDetail).mock.calls.length
+      await act(async () => { await vi.advanceTimersByTimeAsync(10_000) })
+      await view.cleanup()
+      return vi.mocked(getRoleDetail).mock.calls.length - before
+    }
+    expect(await reloads(makeDetail({ status: 'ready', documents: [pdf], units: queued }))).toBe(2)
+    expect(await reloads(makeDetail({ status: 'ready', documents: [pdf], units: queued, questionsPaused: true }))).toBe(0)
+    expect(await reloads(makeDetail({ status: 'ready', documents: [pdf], units: queued, generationPaused: true }))).toBe(0)
+  } finally {
+    vi.useRealTimers()
+  }
 })
 
 it('explains paused generation and offers no build or retry, while built concepts stay editable', async () => {

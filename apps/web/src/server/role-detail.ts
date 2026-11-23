@@ -5,6 +5,7 @@ import { getDb } from '@/db'
 import { member, user } from '@/db/auth-schema'
 import { concepts, items, jobRoles, memberRoleAssignments, sources, topics, units } from '@/db/schema'
 import { requireOrgAdmin, requireOrgReader } from '@/server/authz'
+import { conceptQueuePaused } from '@/server/concept-gen'
 import { httpError } from '@/server/helpers'
 import { companyGenerationPaused } from '@/server/model-cap'
 import { releaseStaleBuild } from '@/server/role-curriculum'
@@ -13,6 +14,8 @@ export type RoleDetail = {
   org: { slug: string; name: string }
   readOnly: boolean
   generationPaused: boolean
+  // Queued concepts wait without progress: no question model or company generation is paused.
+  questionsPaused: boolean
   role: { id: string; name: string; benchmark: number; onboardingDays: number; topicId: string; topicStatus: typeof topics.$inferSelect.status; people: number; liveQuestions: number; criticalQuestions: number }
   documents: {
     id: string
@@ -78,6 +81,7 @@ export const getRoleDetail = createServerFn({ method: 'GET' })
       org: { slug: org.slug, name: org.name },
       readOnly,
       generationPaused: companyGenerationPaused(),
+      questionsPaused: conceptQueuePaused(),
       role: {
         ...role,
         people: assigned?.n ?? 0,

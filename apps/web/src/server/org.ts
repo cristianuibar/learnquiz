@@ -12,6 +12,7 @@ import { roleMastery } from '@/lib/learning/path'
 import { WEEK, benchmarkMet } from '@/lib/learning/profile'
 import { getAuth } from '@/server/auth'
 import { requireOrgAdmin, requireOrgReader } from '@/server/authz'
+import { conceptQueuePaused } from '@/server/concept-gen'
 import { httpError, mean } from '@/server/helpers'
 import { liveConcept } from '@/server/live-concept'
 import { companyGenerationPaused } from '@/server/model-cap'
@@ -62,11 +63,12 @@ async function roleSummaries(orgId: string) {
   const peopleBy = new Map(people.map((r) => [r.id, r.n]))
   const documentsBy = new Map(documents.map((r) => [r.id, r.n]))
   const conceptsBy = new Map(conceptRows.map((r) => [r.id, r]))
-  // Nothing is being prepared while company generation is paused: queued concepts wait without a build.
+  // Nothing is being prepared while company generation is paused, and queued concepts wait while the question queue is paused.
   const paused = companyGenerationPaused()
+  const queuePaused = conceptQueuePaused()
   return roles.map((role) => {
     const c = conceptsBy.get(role.topicId)
-    return { ...role, people: peopleBy.get(role.id) ?? 0, documents: documentsBy.get(role.topicId) ?? 0, conceptsReady: Number(c?.ready ?? 0), conceptsTotal: c?.total ?? 0, preparing: !paused && (role.topicStatus === 'generating' || Number(c?.busy ?? 0) > 0) }
+    return { ...role, people: peopleBy.get(role.id) ?? 0, documents: documentsBy.get(role.topicId) ?? 0, conceptsReady: Number(c?.ready ?? 0), conceptsTotal: c?.total ?? 0, preparing: !paused && (role.topicStatus === 'generating' || (!queuePaused && Number(c?.busy ?? 0) > 0)) }
   })
 }
 

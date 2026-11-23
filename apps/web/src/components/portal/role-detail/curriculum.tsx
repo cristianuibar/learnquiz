@@ -9,6 +9,10 @@ import { plural } from '@/lib/utils'
 import type { RoleDetail } from '@/server/role-detail'
 import { UnitCard } from './unit-card'
 
+// A build runs while the curriculum generates, or while queued concepts can still get questions.
+export const buildRunning = ({ generationPaused, questionsPaused, role, units }: RoleDetail) =>
+  !generationPaused && (role.topicStatus === 'generating' || (!questionsPaused && units.some((u) => u.concepts.some((c) => c.genStatus === 'pending' || c.genStatus === 'generating'))))
+
 /** Curriculum section: head (title, build controls, progress or stats), finish banner, units. */
 export function Curriculum({ detail, readOnly, controls, error, announce }: {
   detail: RoleDetail
@@ -24,7 +28,7 @@ export function Curriculum({ detail, readOnly, controls, error, announce }: {
   const total = concepts.length
   const ready = concepts.filter((c) => c.genStatus === 'ready').length
   const failed = concepts.filter((c) => c.genStatus === 'failed').length
-  const running = !detail.generationPaused && (role.topicStatus === 'generating' || concepts.some((c) => c.genStatus === 'pending' || c.genStatus === 'generating'))
+  const running = buildRunning(detail)
   const [openById, setOpenById] = useState<Record<string, boolean>>({})
   const [finished, setFinished] = useState(false)
   const bucket = useRef<string | null>(null)
