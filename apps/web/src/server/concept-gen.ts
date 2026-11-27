@@ -18,7 +18,8 @@ const activeItems = async (db: Db, conceptId: string) =>
 // one atomic claim lets overlapping drains and retries skip work another invocation owns.
 export async function processConcept(db: Db, conceptId: string): Promise<void> {
   const now = Date.now()
-  const claimed = await db.update(concepts).set({ genStatus: 'generating', genStartedAt: now })
+  const claimToken = crypto.randomUUID()
+  const claimed = await db.update(concepts).set({ genStatus: 'generating', genStartedAt: now, genToken: claimToken })
     .where(and(
       eq(concepts.id, conceptId),
       liveConcept(),
@@ -30,7 +31,7 @@ export async function processConcept(db: Db, conceptId: string): Promise<void> {
   // a reset (a replaced document) or a newer claim since then owns the concept, and must not be overwritten.
   const settle = (set: Partial<typeof concepts.$inferInsert>) =>
     db.update(concepts).set(set)
-      .where(and(eq(concepts.id, conceptId), eq(concepts.genStatus, 'generating'), eq(concepts.genStartedAt, now))).then(() => {}, (e) => console.error('concept status write failed', e))
+      .where(and(eq(concepts.id, conceptId), eq(concepts.genStatus, 'generating'), eq(concepts.genToken, claimToken))).then(() => {}, (e) => console.error('concept status write failed', e))
   try {
     const [row] = await db.select({ concept: concepts, topic: topics }).from(concepts)
       .innerJoin(topics, eq(topics.id, concepts.topicId)).where(eq(concepts.id, conceptId))
@@ -44,7 +45,7 @@ export async function processConcept(db: Db, conceptId: string): Promise<void> {
       await generateConceptItems(db, concept, topic, {
         targetDifficulty: 3, spread: true, want: ITEMS_PER_CONCEPT - have, maxRounds: 3,
         avoidStems: existing.map((r) => (JSON.parse(r.payloadJson) as { stem: string }).stem),
-        learnerId: null, orgId: topic.orgId,
+        learnerId: null, orgId: topic.orgId, claimToken,
       })
     }
     // A partial set is still ready: its questions are live, and learner sessions top it up.

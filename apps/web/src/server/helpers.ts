@@ -1,5 +1,5 @@
-import { and, desc, eq, inArray, isNotNull, lt, or, sql } from 'drizzle-orm'
-import type { Db } from '@/db'
+import { and, desc, eq, inArray, isNotNull, isNull, lt, notExists, sql } from 'drizzle-orm'
+import { getDb, type Db } from '@/db'
 import { concepts, items, learnerConcept, sources, topics } from '@/db/schema'
 import { chatJson, jobModel, LlmError, MODEL_UNAVAILABLE_MESSAGE } from '@/lib/llm/client'
 import { ENABLED_FORMATS, itemsPrompt, selfCheckPrompt } from '@/lib/llm/prompts'
@@ -68,47 +68,55 @@ export async function ensureConceptItems(
   // A capped caller never claims: a claim it then refuses would make a concurrent caller join a generation that never runs.
   const capError = await assertWithinDailyCap(db, learnerId).then(() => null, (e: unknown) => e)
   // One generation per concept: an atomic claim on the row; a concurrent caller joins the in-flight one.
+  const status = async () => (await db.select({ s: concepts.genStatus, startedAt: concepts.genStartedAt }).from(concepts).where(eq(concepts.id, concept.id)))[0]
   const now = Date.now()
-  const claimed = capError ? [] : await db
+  const claimToken = crypto.randomUUID()
+  const before = await status()
+  const inFlight = before?.s === 'generating' && (before.startedAt ?? 0) >= now - STALE_CLAIM_MS
+  const released = !before || before.s === 'generating' ? { genStatus: 'ready' as const, genStartedAt: null } : { genStatus: before.s, genStartedAt: before.startedAt }
+  const claimed = capError || !before || inFlight ? [] : await db
     .update(concepts)
-    .set({ genStatus: 'generating', genStartedAt: now })
-    .where(and(eq(concepts.id, concept.id), liveConcept(), or(eq(concepts.genStatus, 'ready'), and(eq(concepts.genStatus, 'generating'), lt(concepts.genStartedAt, now - STALE_CLAIM_MS)))))
+    .set({ genStatus: 'generating', genStartedAt: now, genToken: claimToken })
+    .where(and(eq(concepts.id, concept.id), liveConcept(), eq(concepts.genStatus, before.s),
+      before.startedAt === null ? isNull(concepts.genStartedAt) : eq(concepts.genStartedAt, before.startedAt)))
     .returning({ id: concepts.id })
   if (!claimed.length) {
     // A refused claim on a dead concept must not fall through to generating unclaimed.
     const [dead] = await db.select({ id: concepts.id }).from(concepts).where(and(eq(concepts.id, concept.id), sql`not (${liveConcept()})`))
     if (dead) return existing.map(asItem)
-    const status = async () => (await db.select({ s: concepts.genStatus, startedAt: concepts.genStartedAt }).from(concepts).where(eq(concepts.id, concept.id)))[0]
     const current = await status()
     // A stale claim has no live writer; a capped caller that may not reclaim it refuses instead of waiting for nothing.
     if (current?.s === 'generating' && (current.startedAt ?? 0) >= now - STALE_CLAIM_MS) {
       // Wait for the in-flight writer, then read what it stored without spending the cap again.
       const deadline = Date.now() + JOIN_MAX_WAIT_MS
       while ((await status())?.s === 'generating' && Date.now() < deadline) await new Promise((r) => setTimeout(r, JOIN_POLL_MS))
-      const stored = await db
-        .select()
-        .from(items)
-        .where(and(eq(items.conceptId, concept.id), eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId)))
-        .orderBy(desc(items.createdAt))
-      return stored.map(asItem)
-    }
+    } else if (capError) throw capError
+    const stored = await db
+      .select()
+      .from(items)
+      .where(and(eq(items.conceptId, concept.id), eq(items.topicId, topic.id), eq(items.status, 'active'), notFlaggedBy(db, learnerId)))
+      .orderBy(desc(items.createdAt))
+    return stored.map(asItem)
   }
 
   try {
-    if (capError) throw capError
     const avoidStems = existing.slice(0, 3).map((r) => (JSON.parse(r.payloadJson) as ItemPayload).stem)
-    const generated = await generateConceptItems(db, concept, topic, { targetDifficulty: opts.targetDifficulty, spread: opts.spread, avoidStems, want: 3, maxRounds: 2, learnerId, sessionId: opts.sessionId })
+    const generated = await generateConceptItems(db, concept, topic, { targetDifficulty: opts.targetDifficulty, spread: opts.spread, avoidStems, want: 3, maxRounds: 2, learnerId, sessionId: opts.sessionId, claimToken })
     return [...existing.map(asItem), ...generated]
   } finally {
     // Release only our own claim; a failed release must not mask the generation's error.
-    if (claimed.length) {
-      await db
-        .update(concepts)
-        .set({ genStatus: 'ready', genStartedAt: null })
-        .where(and(eq(concepts.id, concept.id), eq(concepts.genStatus, 'generating'), eq(concepts.genStartedAt, now)))
-        .catch((e) => console.error('concept claim release failed', e))
-    }
+    await db
+      .update(concepts)
+      .set({ ...released, genToken: null })
+      .where(and(eq(concepts.id, concept.id), eq(concepts.genStatus, 'generating'), eq(concepts.genToken, claimToken)))
+      .catch((e) => console.error('concept claim release failed', e))
   }
+}
+
+export async function releaseStaleClaims(db: Db = getDb(), now = Date.now()): Promise<void> {
+  await db.update(concepts).set({ genStatus: 'ready', genStartedAt: null, genToken: null })
+    .where(and(eq(concepts.genStatus, 'generating'), lt(concepts.genStartedAt, now - STALE_CLAIM_MS),
+      inArray(concepts.topicId, db.select({ id: topics.id }).from(topics).where(isNull(topics.orgId)))))
 }
 
 const sourceRetired = async (db: Db, concept: typeof concepts.$inferSelect) => Boolean(concept.sourceId &&
@@ -119,7 +127,7 @@ export async function generateConceptItems(
   db: Db,
   concept: typeof concepts.$inferSelect,
   topic: typeof topics.$inferSelect,
-  opts: { targetDifficulty: number; spread?: boolean; avoidStems: string[]; want: number; maxRounds: number; learnerId: string | null; orgId?: string | null; sessionId?: string },
+  opts: { targetDifficulty: number; spread?: boolean; avoidStems: string[]; want: number; maxRounds: number; learnerId: string | null; orgId?: string | null; sessionId?: string; claimToken: string },
 ): Promise<StoredItem[]> {
   const { learnerId, orgId, avoidStems } = opts
   // Shared company questions are paused with the rest of company generation, whichever caller asks for them.
@@ -218,8 +226,11 @@ export async function generateConceptItems(
         )).returning({ id: items.id }),
       )
     : []
-  const [first, ...rest] = [...inserts, ...retire]
+  const owned = db.select({ id: concepts.id }).from(concepts).where(and(eq(concepts.id, concept.id), eq(concepts.genToken, opts.claimToken)))
+  const unowned = chunks(rows.map((r) => r.id), 50).map((ids) =>
+    db.delete(items).where(and(inArray(items.id, ids), notExists(owned))).returning({ id: items.id }))
+  const [first, ...rest] = [...inserts, ...unowned, ...retire]
   const results = (await db.batch([first, ...rest])) as unknown[]
-  const retired = new Set(results.slice(inserts.length).flatMap((r) => (r as { id: string }[]).map((x) => x.id)))
-  return rows.flatMap((r, i) => retired.has(r.id) ? [] : [{ id: r.id, format: r.format, difficultyPrior: r.difficultyPrior, payload: kept[i].payload, generatedBy: r.generatedBy }])
+  const dropped = new Set(results.slice(inserts.length).flatMap((r) => (r as { id: string }[]).map((x) => x.id)))
+  return rows.flatMap((r, i) => dropped.has(r.id) ? [] : [{ id: r.id, format: r.format, difficultyPrior: r.difficultyPrior, payload: kept[i].payload, generatedBy: r.generatedBy }])
 }

@@ -1,0 +1,1 @@
+ALTER TABLE `concepts` ADD `gen_token` text;
