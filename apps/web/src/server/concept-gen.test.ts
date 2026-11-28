@@ -293,6 +293,24 @@ it('retires questions when the document is replaced after generation read it but
   expect(raw.prepare("SELECT status, COUNT(*) AS n FROM items WHERE source_id = 'co-topic-src' GROUP BY status").all()).toEqual([{ status: 'retired', n: 6 }])
 })
 
+it('stores nothing and keeps the replacement claim when a newer drain claims the concept just before the insert', async () => {
+  raw.exec("DELETE FROM concepts WHERE id <> 'c00'")
+  beforeSql = { prefix: 'insert into "items"', fn: () => raw.prepare("UPDATE concepts SET gen_started_at = ?, gen_token = 'replacement' WHERE id = 'c00'").run(Date.now()) }
+  await drainConceptQueue()
+  expect(beforeSql).toBeNull()
+  expect(one('SELECT COUNT(*) AS n FROM items')).toEqual({ n: 0 })
+  expect(one("SELECT gen_status, gen_token FROM concepts WHERE id = 'c00'")).toEqual({ gen_status: 'generating', gen_token: 'replacement' })
+})
+
+it('stores nothing when a document replacement requeues the concept while its questions generate', async () => {
+  raw.exec("DELETE FROM concepts WHERE id <> 'c00'")
+  beforeSql = { prefix: 'insert into "items"', fn: () => raw.exec("UPDATE concepts SET gen_status = 'pending', gen_started_at = NULL WHERE id = 'c00'") }
+  await drainConceptQueue()
+  expect(beforeSql).toBeNull()
+  expect(one("SELECT COUNT(*) AS n FROM items WHERE status = 'active'")).toEqual({ n: 0 })
+  expect(one("SELECT gen_status FROM concepts WHERE id = 'c00'")).toEqual({ gen_status: 'pending' })
+})
+
 it('never selects a pending concept whose document is retired, and never calls the model for it', async () => {
   raw.exec("DELETE FROM concepts WHERE id <> 'c00'; UPDATE sources SET retired_at = 1 WHERE id = 'co-topic-src'")
   expect(await drainConceptQueue()).toBe(0)

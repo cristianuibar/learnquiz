@@ -69,6 +69,7 @@ export const concepts = sqliteTable('concepts', {
   genError: text('gen_error'),
   // Claim time of the background item generation; a stale claim is picked up again.
   genStartedAt: integer('gen_started_at'),
+  genToken: text('gen_token'),
 })
 
 export const conceptEdges = sqliteTable(
