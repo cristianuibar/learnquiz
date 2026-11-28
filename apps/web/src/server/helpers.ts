@@ -73,7 +73,7 @@ export async function ensureConceptItems(
   const claimToken = crypto.randomUUID()
   const before = await status()
   const inFlight = before?.s === 'generating' && (before.startedAt ?? 0) >= now - STALE_CLAIM_MS
-  const released = !before || before.s === 'generating' ? { genStatus: 'ready' as const, genStartedAt: null } : { genStatus: before.s, genStartedAt: before.startedAt }
+  const released = !before || before.s === 'generating' ? { genStatus: topic.orgId ? 'pending' as const : 'ready' as const, genStartedAt: null } : { genStatus: before.s, genStartedAt: before.startedAt }
   const claimed = capError || !before || inFlight ? [] : await db
     .update(concepts)
     .set({ genStatus: 'generating', genStartedAt: now, genToken: claimToken })
@@ -84,7 +84,7 @@ export async function ensureConceptItems(
     // A refused claim on a dead concept must not fall through to generating unclaimed.
     const [dead] = await db.select({ id: concepts.id }).from(concepts).where(and(eq(concepts.id, concept.id), sql`not (${liveConcept()})`))
     if (dead) return existing.map(asItem)
-    const current = await status()
+    const current = inFlight ? before : await status()
     // A stale claim has no live writer; a capped caller that may not reclaim it refuses instead of waiting for nothing.
     if (current?.s === 'generating' && (current.startedAt ?? 0) >= now - STALE_CLAIM_MS) {
       // Wait for the in-flight writer, then read what it stored without spending the cap again.
@@ -226,7 +226,7 @@ export async function generateConceptItems(
         )).returning({ id: items.id }),
       )
     : []
-  const owned = db.select({ id: concepts.id }).from(concepts).where(and(eq(concepts.id, concept.id), eq(concepts.genToken, opts.claimToken)))
+  const owned = db.select({ id: concepts.id }).from(concepts).where(and(eq(concepts.id, concept.id), eq(concepts.genStatus, 'generating'), eq(concepts.genToken, opts.claimToken)))
   const unowned = chunks(rows.map((r) => r.id), 50).map((ids) =>
     db.delete(items).where(and(inArray(items.id, ids), notExists(owned))).returning({ id: items.id }))
   const [first, ...rest] = [...inserts, ...unowned, ...retire]

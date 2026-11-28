@@ -108,6 +108,15 @@ it('generates for a queued company concept under its own claim and hands it back
   expect(claim('c1')).toEqual({ gen_status: 'pending', gen_started_at: null, gen_token: null })
 })
 
+it('hands a stale company claim back to the drain when the learner takeover hits a rate limit', async () => {
+  raw.exec(`INSERT INTO organization (id, name, slug, created_at) VALUES ('org1', 'Org', 'org', 1);
+    UPDATE topics SET learner_id = NULL, org_id = 'org1' WHERE id = 't1';`)
+  raw.prepare("UPDATE concepts SET gen_status = 'generating', gen_started_at = ?, gen_token = 'dead' WHERE id = 'c1'").run(Date.now() - 11 * 60 * 1000)
+  fetchModel.mockImplementation(async () => new Response('Too many requests', { status: 429 }))
+  await expect(ensure()).rejects.toMatchObject({ status: 429 })
+  expect(claim('c1')).toEqual({ gen_status: 'pending', gen_started_at: null, gen_token: null })
+})
+
 it('releases a stale personal claim and leaves company concepts and fresh claims alone', async () => {
   raw.exec(`INSERT INTO organization (id, name, slug, created_at) VALUES ('org1', 'Org', 'org', 1);
     INSERT INTO topics (id, org_id, title, status, created_at) VALUES ('t2', 'org1', 'Picking', 'ready', 1);
